@@ -15,7 +15,9 @@ let currentUser = null;
 
 // ── In-memory state ────────────────────────────────────
 let db = { workouts: {}, custom_exercises: [], records: {} };
-let videoLinks = {};
+let googleAccessToken = sessionStorage.getItem('google_access_token') || null;
+let driveFolderId = null;
+let pendingVideoSetIndex = null;
 
 // ── Splash coordination ────────────────────────────────
 let splashDone = false, authDone = false;
@@ -78,38 +80,77 @@ async function persistCustomExercises() {
   if (!currentUser) return;
   uDoc('meta/custom_exercises').set({ list: db.custom_exercises || [] }).catch(e => console.error(e));
 }
-async function persistVideoLinks() {
-  if (!currentUser) return;
-  uDoc('meta/video_links').set({ links: videoLinks }).catch(e => console.error(e));
-}
-
 async function loadUserData(userUid) {
   try {
-    const [workoutsSnap, recordsSnap, customSnap, videoSnap] = await Promise.all([
+    const [workoutsSnap, recordsSnap, customSnap] = await Promise.all([
       fStore.collection('users/' + userUid + '/workouts').get(),
       fStore.doc('users/' + userUid + '/meta/records').get(),
       fStore.doc('users/' + userUid + '/meta/custom_exercises').get(),
-      fStore.doc('users/' + userUid + '/meta/video_links').get(),
     ]);
     db.workouts = {};
     workoutsSnap.forEach(doc => { db.workouts[doc.id] = doc.data().exercises || []; });
     db.records = recordsSnap.exists ? (recordsSnap.data().data || {}) : {};
     db.custom_exercises = customSnap.exists ? (customSnap.data().list || []) : [];
-    videoLinks = videoSnap.exists ? (videoSnap.data().links || {}) : {};
   } catch(e) {
     console.error('loadUserData', e);
   }
 }
 
-// ── Video helpers ──────────────────────────────────────
-function saveVideoLink(key, meta) { videoLinks[key] = meta; persistVideoLinks(); }
-function removeVideoLink(key) { delete videoLinks[key]; persistVideoLinks(); }
-function getVideoLink(key) { return videoLinks[key] || null; }
-function makeVideoKey(date, exerciseName, setIndex) { return `${date}_${exerciseName}_${setIndex + 1}`; }
+// ── Google Drive helpers ───────────────────────────────
+async function ensureDriveFolder() {
+  if (driveFolderId) return driveFolderId;
+  const name = 'AI Fitness Co-Pilot';
+  const q = encodeURIComponent(`name='${name}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+  const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`, {
+    headers: { Authorization: 'Bearer ' + googleAccessToken }
+  });
+  const data = await searchRes.json();
+  if (data.files && data.files.length > 0) {
+    driveFolderId = data.files[0].id;
+    return driveFolderId;
+  }
+  const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + googleAccessToken, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, mimeType: 'application/vnd.google-apps.folder' })
+  });
+  const folder = await createRes.json();
+  driveFolderId = folder.id;
+  return driveFolderId;
+}
+
+async function uploadToDrive(file, filename) {
+  const folderId = await ensureDriveFolder();
+  const metadata = { name: filename, parents: [folderId] };
+  const form = new FormData();
+  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+  form.append('file', file);
+  const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + googleAccessToken },
+    body: form
+  });
+  if (!res.ok) throw new Error('Upload failed: ' + res.status);
+  const data = await res.json();
+  return data.id;
+}
+
+function openVideoFrame(videoId) {
+  document.getElementById('video-player').src = `https://drive.google.com/file/d/${videoId}/preview`;
+  document.getElementById('video-overlay').classList.add('open');
+}
+
+function removeSetVideo(setIndex) {
+  const workout = getWorkout(currentDate);
+  const ex = workout.find(e => e.name === currentExercise);
+  if (!ex || !ex.sets[setIndex]) return;
+  delete ex.sets[setIndex].videoId;
+  setWorkout(currentDate, workout);
+  renderSetList();
+  toast('Video removed');
+}
 
 // ── State ──────────────────────────────────────────────
-let currentVideoKey = null;
-let videoMode = null;
 let currentDate = todayStr();
 let currentExercise = null;
 let selectedSetIndex = null;
@@ -147,6 +188,11 @@ async function initAuth() {
     const result = await fAuth.getRedirectResult();
     if (result && result.user) {
       console.log('[Auth] redirect user:', result.user.email);
+      if (result.credential) {
+        googleAccessToken = result.credential.accessToken;
+        sessionStorage.setItem('google_access_token', googleAccessToken);
+        console.log('[Auth] access token saved from redirect');
+      }
       redirectHandled = true;
       currentUser = result.user;
       await loadUserData(result.user.uid);
@@ -184,7 +230,6 @@ async function initAuth() {
     } else {
       console.log('[Auth] no user, showing login screen');
       db = { workouts: {}, custom_exercises: [], records: {} };
-      videoLinks = {};
       showScreen('screen-login');
     }
     authDone = true;
@@ -197,10 +242,16 @@ initAuth();
 document.getElementById('btn-google-signin').addEventListener('click', async () => {
   console.log('[Auth] Google sign-in button clicked');
   const provider = new firebase.auth.GoogleAuthProvider();
+  provider.addScope('https://www.googleapis.com/auth/drive.file');
   try {
     console.log('[Auth] trying signInWithPopup...');
     const result = await fAuth.signInWithPopup(provider);
     console.log('[Auth] popup success:', result.user.email);
+    if (result.credential) {
+      googleAccessToken = result.credential.accessToken;
+      sessionStorage.setItem('google_access_token', googleAccessToken);
+      console.log('[Auth] access token saved from popup');
+    }
   } catch (err) {
     console.warn('[Auth] signInWithPopup error:', err.code, err.message);
     if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
@@ -219,6 +270,9 @@ document.getElementById('btn-google-signin').addEventListener('click', async () 
 });
 
 function signOutUser() {
+  googleAccessToken = null;
+  driveFolderId = null;
+  sessionStorage.removeItem('google_access_token');
   fAuth.signOut();
 }
 
@@ -454,8 +508,7 @@ function renderSetList() {
 
   sets.forEach((s, i) => {
     const isPR = exRecords[String(s.reps)] && parseFloat(s.weight) >= exRecords[String(s.reps)];
-    const vKey = makeVideoKey(currentDate, currentExercise, i);
-    const hasVideo = !!getVideoLink(vKey);
+    const hasVideo = !!s.videoId;
     const row = document.createElement('div');
     row.className = 'set-row' + (selectedSetIndex === i ? ' selected' : '');
     row.innerHTML = `
@@ -466,7 +519,7 @@ function renderSetList() {
       <span class="set-reps">${s.reps}${isPR ? `<svg class="set-pr-icon" viewBox="0 0 24 24"><path d="M12 1L9 9H1l6.5 4.7L5 21l7-5 7 5-2.5-7.3L23 9h-8z"/></svg>` : ''}</span>
       <button class="set-delete" aria-label="Delete set ${i + 1}"><svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
     `;
-    row.querySelector('.set-camera').addEventListener('click', e => { e.stopPropagation(); showVideoPopup(vKey, hasVideo, e.currentTarget); });
+    row.querySelector('.set-camera').addEventListener('click', e => { e.stopPropagation(); showVideoPopup(i, s.videoId || null, e.currentTarget); });
     row.querySelector('.set-delete').addEventListener('click', e => { e.stopPropagation(); deleteSet(i); });
     row.addEventListener('click', () => selectSet(i));
     list.appendChild(row);
@@ -483,7 +536,8 @@ function saveSet() {
   if (!ex) { ex = { name: currentExercise, sets: [] }; workout.push(ex); }
 
   if (selectedSetIndex !== null) {
-    ex.sets[selectedSetIndex] = { weight, reps };
+    const prevVideoId = ex.sets[selectedSetIndex].videoId;
+    ex.sets[selectedSetIndex] = { weight, reps, ...(prevVideoId ? { videoId: prevVideoId } : {}) };
     selectedSetIndex = null;
     toast('Set updated');
   } else {
@@ -915,12 +969,12 @@ document.getElementById('exercise-search').addEventListener('input', e => {
 });
 
 // ── Video Popup ────────────────────────────────────────
-function showVideoPopup(key, hasVideo, anchorEl) {
+function showVideoPopup(setIndex, videoId, anchorEl) {
   const popup = document.getElementById('video-popup');
   const panel = document.getElementById('video-popup-panel');
 
   const rect = anchorEl.getBoundingClientRect();
-  const pw = 220;
+  const pw = 230;
   let left = rect.left;
   let top = rect.bottom + 6;
   if (left + pw > window.innerWidth - 8) left = window.innerWidth - pw - 8;
@@ -928,45 +982,31 @@ function showVideoPopup(key, hasVideo, anchorEl) {
   panel.style.left = left + 'px';
   panel.style.top = top + 'px';
 
-  if (hasVideo) {
-    const link = getVideoLink(key);
+  if (videoId) {
     panel.innerHTML = `
       <div class="video-popup-item" id="popup-view">▶️ View video</div>
-      <div class="video-popup-item" id="popup-delete">🗑️ Remove link</div>
+      <div class="video-popup-item" id="popup-delete">🗑️ Remove video</div>
     `;
     document.getElementById('popup-view').addEventListener('click', () => {
       closeVideoPopup();
-      toast(`Find: ${link.filename}`);
-      currentVideoKey = key;
-      videoMode = 'view';
-      const input = document.getElementById('video-file-input');
-      input.value = '';
-      input.click();
+      openVideoFrame(videoId);
     });
     document.getElementById('popup-delete').addEventListener('click', () => {
       closeVideoPopup();
-      removeVideoLink(key);
-      renderSetList();
-      toast('Video link removed');
+      removeSetVideo(setIndex);
     });
   } else {
     panel.innerHTML = `
-      <div class="video-popup-item" id="popup-record">🎥 Record set</div>
-      <div class="video-popup-item" id="popup-link">📎 Link existing video</div>
+      <div class="video-popup-item" id="popup-upload">🎥 Upload video to Drive</div>
     `;
-    document.getElementById('popup-record').addEventListener('click', () => {
+    document.getElementById('popup-upload').addEventListener('click', () => {
       closeVideoPopup();
-      currentVideoKey = key;
-      videoMode = 'link';
-      const input = document.getElementById('video-camera-input');
-      input.value = '';
-      input.click();
-    });
-    document.getElementById('popup-link').addEventListener('click', () => {
-      closeVideoPopup();
-      currentVideoKey = key;
-      videoMode = 'link';
-      const input = document.getElementById('video-file-input');
+      if (!googleAccessToken) {
+        toast('Sign in again to enable video upload');
+        return;
+      }
+      pendingVideoSetIndex = setIndex;
+      const input = document.getElementById('video-input');
       input.value = '';
       input.click();
     });
@@ -979,44 +1019,39 @@ function closeVideoPopup() {
   document.getElementById('video-popup').classList.remove('open');
 }
 
-function openVideoOverlay(url) {
-  const video = document.getElementById('video-player');
-  video.src = url;
-  document.getElementById('video-overlay').classList.add('open');
-  video.play().catch(() => {});
-}
-
 document.getElementById('video-popup').addEventListener('click', e => {
   if (e.target === e.currentTarget) closeVideoPopup();
 });
 
-document.getElementById('video-camera-input').addEventListener('change', e => {
+document.getElementById('video-input').addEventListener('change', async e => {
   const file = e.target.files[0];
-  if (!file || !currentVideoKey) return;
-  saveVideoLink(currentVideoKey, { filename: file.name, lastModified: file.lastModified, size: file.size });
-  currentVideoKey = null; videoMode = null;
-  renderSetList();
-  toast('Video linked');
-});
-
-document.getElementById('video-file-input').addEventListener('change', e => {
-  const file = e.target.files[0];
-  if (!file || !currentVideoKey) return;
-  if (videoMode === 'view') {
-    const url = URL.createObjectURL(file);
-    openVideoOverlay(url);
-  } else {
-    saveVideoLink(currentVideoKey, { filename: file.name, lastModified: file.lastModified, size: file.size });
+  if (!file || pendingVideoSetIndex === null) return;
+  if (!googleAccessToken) { toast('Sign in again to enable video upload'); return; }
+  const setNum = pendingVideoSetIndex + 1;
+  const safeName = currentExercise.replace(/[^a-z0-9]/gi, '_');
+  const filename = `${currentDate}_${safeName}_set${setNum}.mp4`;
+  console.log('[Drive] uploading:', filename);
+  toast('Uploading to Drive...');
+  try {
+    const videoId = await uploadToDrive(file, filename);
+    console.log('[Drive] uploaded, id:', videoId);
+    const workout = getWorkout(currentDate);
+    const ex = workout.find(ex => ex.name === currentExercise);
+    if (ex && ex.sets[pendingVideoSetIndex]) {
+      ex.sets[pendingVideoSetIndex].videoId = videoId;
+      setWorkout(currentDate, workout);
+    }
     renderSetList();
-    toast('Video linked');
+    toast('Video saved to Drive');
+  } catch(err) {
+    console.error('[Drive] upload error:', err);
+    toast('Upload failed — check console');
   }
-  currentVideoKey = null; videoMode = null;
+  pendingVideoSetIndex = null;
+  e.target.value = '';
 });
 
 document.getElementById('btn-video-close').addEventListener('click', () => {
-  const video = document.getElementById('video-player');
-  video.pause();
-  URL.revokeObjectURL(video.src);
-  video.src = '';
+  document.getElementById('video-player').src = '';
   document.getElementById('video-overlay').classList.remove('open');
 });
