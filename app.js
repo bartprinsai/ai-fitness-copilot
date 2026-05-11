@@ -164,7 +164,7 @@ function removeSetVideo(setIndex) {
 // ── GIS token client (Drive) ───────────────────────────
 // Client ID: console.cloud.google.com → APIs & Services → Credentials
 //            → OAuth 2.0 Client IDs → "Web client (auto created by Google Service)"
-const GIS_CLIENT_ID = 'YOUR_OAUTH_CLIENT_ID_HERE';
+const GIS_CLIENT_ID = '41596366904-3h277tnkmavund1rc8l4rn3a5klu966k.apps.googleusercontent.com';
 
 if (typeof google !== 'undefined' && google.accounts) {
   tokenClient = google.accounts.oauth2.initTokenClient({
