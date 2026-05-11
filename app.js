@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 
 // ── Firebase ───────────────────────────────────────────
 firebase.initializeApp({
@@ -189,7 +189,7 @@ window.addEventListener('load', () => {
   });
   console.log('[GIS] token client initialized');
 } else {
-  console.warn('[GIS] google.accounts not available — Drive upload disabled');
+  console.warn('[GIS] google.accounts not available - Drive upload disabled');
 }
 
 function requestDriveToken(onSuccess) {
@@ -259,7 +259,7 @@ async function initAuth() {
   fAuth.onAuthStateChanged(async user => {
     console.log('[Auth] onAuthStateChanged user:', user ? user.email : 'null', '| redirectHandled:', redirectHandled);
     if (redirectHandled) {
-      // Already handled via getRedirectResult — skip this first firing
+      // Already handled via getRedirectResult - skip this first firing
       redirectHandled = false;
       console.log('[Auth] skipping (redirect already handled)');
       return;
