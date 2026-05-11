@@ -199,6 +199,29 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 
 ::-webkit-scrollbar { width: 0; }
 
+/* ── LOGIN SCREEN ─────────────────────────────────────── */
+#screen-login { background: var(--toolbar); justify-content: center; }
+.login-content { display: flex; flex-direction: column; align-items: center; gap: 48px; padding: 48px 32px; }
+.login-logo { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.login-logo img { width: 120px; height: 120px; border-radius: 20px; object-fit: contain; }
+.login-app-name { font-size: 32px; font-weight: 700; color: white; letter-spacing: -0.5px; }
+.login-app-sub { font-size: 18px; font-weight: 400; color: var(--cyan); letter-spacing: 3px; text-transform: uppercase; }
+.google-signin-btn { display: flex; align-items: center; gap: 14px; background: white; border: none; border-radius: 4px; padding: 13px 28px; font-family: inherit; font-size: 15px; font-weight: 500; color: #3c4043; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,.5); transition: box-shadow .15s, background .1s; white-space: nowrap; }
+.google-signin-btn:active { background: #f0f0f0; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+.google-signin-btn svg { width: 22px; height: 22px; flex-shrink: 0; }
+
+/* ── USER BAR ─────────────────────────────────────────── */
+.user-bar { padding: 4px 16px; font-size: 12px; color: rgba(255,255,255,.55); background: var(--toolbar); border-bottom: 1px solid rgba(255,255,255,.06); line-height: 1.8; }
+.user-bar:empty { display: none; }
+
+/* ── DROPDOWN MENU ────────────────────────────────────── */
+.dropdown-menu { position: fixed; inset: 0; z-index: 150; display: none; }
+.dropdown-menu.open { display: block; }
+.dropdown-panel { position: absolute; background: var(--surface); border-radius: 4px; box-shadow: 0 4px 20px rgba(0,0,0,.28); overflow: hidden; min-width: 180px; }
+.dropdown-item { padding: 14px 20px; font-size: 15px; color: var(--text-primary); cursor: pointer; border-bottom: 1px solid var(--border); }
+.dropdown-item:last-child { border-bottom: none; }
+.dropdown-item:active { background: var(--bg); }
+
 /* ── CAMERA ICON IN SET ROW ───────────────────────────── */
 .set-camera { display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 50%; transition: background 0.12s; }
 .set-camera:active { background: var(--bg); }

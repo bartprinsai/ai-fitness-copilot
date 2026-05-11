@@ -1,38 +1,115 @@
 'use strict';
 
-// ── Storage ────────────────────────────────────────────
-const DB_KEY = 'fitnotes_v1';
-const VIDEO_KEY = 'video_links';
+// ── Firebase ───────────────────────────────────────────
+firebase.initializeApp({
+  apiKey: "AIzaSyDPIDW9H3HA63YWbm-xA0S-GZvST3wnuyA",
+  authDomain: "ai-fitness-copilot.firebaseapp.com",
+  projectId: "ai-fitness-copilot",
+  storageBucket: "ai-fitness-copilot.firebasestorage.app",
+  messagingSenderId: "41596366904",
+  appId: "1:41596366904:web:420d738588d3157b4ef6cd"
+});
+const fAuth = firebase.auth();
+const fStore = firebase.firestore();
+let currentUser = null;
+
+// ── In-memory state ────────────────────────────────────
 let db = { workouts: {}, custom_exercises: [], records: {} };
+let videoLinks = {};
 
-function loadVideoLinks() {
-  try { const s = localStorage.getItem(VIDEO_KEY); return s ? JSON.parse(s) : {}; } catch(e) { return {}; }
+// ── Splash coordination ────────────────────────────────
+let splashDone = false, authDone = false;
+function checkAndReveal() {
+  if (!splashDone || !authDone) return;
+  const splash = document.getElementById('splash-screen');
+  if (splash) splash.style.display = 'none';
 }
-function saveVideoLink(key, meta) {
-  const links = loadVideoLinks();
-  links[key] = meta;
-  try { localStorage.setItem(VIDEO_KEY, JSON.stringify(links)); } catch(e) {}
+setTimeout(() => { splashDone = true; checkAndReveal(); }, 1200);
+
+// ── Helpers ────────────────────────────────────────────
+function todayStr() { return new Date().toISOString().split('T')[0]; }
+function formatDate(str) {
+  const today = todayStr();
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+  if (str === today) return 'TODAY';
+  if (str === yesterday) return 'YESTERDAY';
+  return new Date(str + 'T12:00:00').toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' }).toUpperCase();
 }
-function removeVideoLink(key) {
-  const links = loadVideoLinks();
-  delete links[key];
-  try { localStorage.setItem(VIDEO_KEY, JSON.stringify(links)); } catch(e) {}
+function formatDateShort(str) {
+  return new Date(str + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' }).toUpperCase();
 }
-function getVideoLink(key) { return loadVideoLinks()[key] || null; }
-function makeVideoKey(date, exerciseName, setIndex) {
-  return `${date}_${exerciseName}_${setIndex + 1}`;
+function changeDate(delta) {
+  const d = new Date(currentDate + 'T12:00:00');
+  d.setDate(d.getDate() + delta);
+  currentDate = d.toISOString().split('T')[0];
+}
+function getWorkout(date) { return db.workouts[date] || []; }
+function setWorkout(date, exercises) {
+  if (exercises.length === 0) delete db.workouts[date];
+  else db.workouts[date] = exercises;
+  persistWorkout(date, exercises);
+}
+function getCurrentExerciseData() { return getWorkout(currentDate).find(e => e.name === currentExercise) || null; }
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2000);
+}
+function allExercises() {
+  return [...EXERCISE_DB, ...(db.custom_exercises || []).map(e => ({ ...e, custom: true }))];
 }
 
-function loadDB() {
-  try { const s = localStorage.getItem(DB_KEY); if (s) db = JSON.parse(s); } catch(e) {}
+// ── Firestore persistence ──────────────────────────────
+function uDoc(path) { return fStore.doc('users/' + currentUser.uid + '/' + path); }
+
+async function persistWorkout(date, exercises) {
+  if (!currentUser) return;
+  if (!exercises || exercises.length === 0) {
+    uDoc('workouts/' + date).delete().catch(() => {});
+  } else {
+    uDoc('workouts/' + date).set({ exercises }).catch(e => console.error(e));
+  }
 }
-function saveDB() {
-  try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch(e) {}
+async function persistRecords() {
+  if (!currentUser) return;
+  uDoc('meta/records').set({ data: db.records }).catch(e => console.error(e));
 }
+async function persistCustomExercises() {
+  if (!currentUser) return;
+  uDoc('meta/custom_exercises').set({ list: db.custom_exercises || [] }).catch(e => console.error(e));
+}
+async function persistVideoLinks() {
+  if (!currentUser) return;
+  uDoc('meta/video_links').set({ links: videoLinks }).catch(e => console.error(e));
+}
+
+async function loadUserData(userUid) {
+  try {
+    const [workoutsSnap, recordsSnap, customSnap, videoSnap] = await Promise.all([
+      fStore.collection('users/' + userUid + '/workouts').get(),
+      fStore.doc('users/' + userUid + '/meta/records').get(),
+      fStore.doc('users/' + userUid + '/meta/custom_exercises').get(),
+      fStore.doc('users/' + userUid + '/meta/video_links').get(),
+    ]);
+    db.workouts = {};
+    workoutsSnap.forEach(doc => { db.workouts[doc.id] = doc.data().exercises || []; });
+    db.records = recordsSnap.exists ? (recordsSnap.data().data || {}) : {};
+    db.custom_exercises = customSnap.exists ? (customSnap.data().list || []) : [];
+    videoLinks = videoSnap.exists ? (videoSnap.data().links || {}) : {};
+  } catch(e) {
+    console.error('loadUserData', e);
+  }
+}
+
+// ── Video helpers ──────────────────────────────────────
+function saveVideoLink(key, meta) { videoLinks[key] = meta; persistVideoLinks(); }
+function removeVideoLink(key) { delete videoLinks[key]; persistVideoLinks(); }
+function getVideoLink(key) { return videoLinks[key] || null; }
+function makeVideoKey(date, exerciseName, setIndex) { return `${date}_${exerciseName}_${setIndex + 1}`; }
 
 // ── State ──────────────────────────────────────────────
 let currentVideoKey = null;
-let videoMode = null; // 'link' | 'view'
+let videoMode = null;
 let currentDate = todayStr();
 let currentExercise = null;
 let selectedSetIndex = null;
@@ -45,47 +122,82 @@ let calMonth = new Date();
 let exerciseBrowserMode = 'categories';
 let currentBrowseCategory = null;
 
-// ── Helpers ────────────────────────────────────────────
-function todayStr() {
-  return new Date().toISOString().split('T')[0];
-}
-function formatDate(str) {
-  const d = new Date(str + 'T12:00:00');
-  const today = todayStr();
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-  if (str === today) return 'TODAY';
-  if (str === yesterday) return 'YESTERDAY';
-  return d.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' }).toUpperCase();
-}
-function formatDateShort(str) {
-  const d = new Date(str + 'T12:00:00');
-  return d.toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' }).toUpperCase();
-}
-function changeDate(delta) {
-  const d = new Date(currentDate + 'T12:00:00');
-  d.setDate(d.getDate() + delta);
-  currentDate = d.toISOString().split('T')[0];
-}
-function getWorkout(date) { return db.workouts[date] || []; }
-function setWorkout(date, exercises) { db.workouts[date] = exercises; saveDB(); }
-function getCurrentExerciseData() {
-  return getWorkout(currentDate).find(e => e.name === currentExercise) || null;
-}
-function toast(msg) {
-  const el = document.getElementById('toast');
-  el.textContent = msg; el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), 2000);
-}
-function allExercises() {
-  const custom = (db.custom_exercises || []).map(e => ({ ...e, custom: true }));
-  return [...EXERCISE_DB, ...custom];
-}
-
 // ── Screen Navigation ──────────────────────────────────
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
 }
+
+// ── User bar ───────────────────────────────────────────
+function updateUserBar() {
+  const bar = document.getElementById('user-bar');
+  if (!currentUser) { bar.textContent = ''; return; }
+  const name = currentUser.displayName || currentUser.email || 'User';
+  bar.textContent = 'Hi, ' + name.split(' ')[0];
+}
+
+// ── Auth ───────────────────────────────────────────────
+fAuth.onAuthStateChanged(async user => {
+  currentUser = user;
+  if (user) {
+    await loadUserData(user.uid);
+    updateUserBar();
+    currentDate = todayStr();
+    renderHome();
+    showScreen('screen-home');
+  } else {
+    db = { workouts: {}, custom_exercises: [], records: {} };
+    videoLinks = {};
+    showScreen('screen-login');
+  }
+  authDone = true;
+  checkAndReveal();
+});
+
+document.getElementById('btn-google-signin').addEventListener('click', () => {
+  fAuth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(err => {
+    toast('Sign-in failed');
+    console.error(err);
+  });
+});
+
+function signOutUser() {
+  fAuth.signOut();
+}
+
+// ── Overflow / Dropdown Menu ───────────────────────────
+function showOverflowMenu(items, anchorEl) {
+  const menu = document.getElementById('overflow-menu');
+  const panel = document.getElementById('overflow-panel');
+  panel.innerHTML = '';
+  const rect = anchorEl.getBoundingClientRect();
+  const pw = 190;
+  let left = rect.right - pw;
+  if (left < 8) left = 8;
+  panel.style.left = left + 'px';
+  panel.style.top = (rect.bottom + 4) + 'px';
+  items.forEach(item => {
+    const el = document.createElement('div');
+    el.className = 'dropdown-item';
+    el.textContent = item.label;
+    el.addEventListener('click', () => { closeOverflowMenu(); item.action(); });
+    panel.appendChild(el);
+  });
+  menu.classList.add('open');
+}
+function closeOverflowMenu() { document.getElementById('overflow-menu').classList.remove('open'); }
+document.getElementById('overflow-menu').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeOverflowMenu();
+});
+document.getElementById('btn-overflow-home').addEventListener('click', e => {
+  showOverflowMenu([{ label: 'Sign out', action: signOutUser }], e.currentTarget);
+});
+document.getElementById('btn-overflow-training').addEventListener('click', e => {
+  showOverflowMenu([{ label: 'Sign out', action: signOutUser }], e.currentTarget);
+});
+document.getElementById('btn-overflow-exercises').addEventListener('click', e => {
+  showOverflowMenu([{ label: 'Sign out', action: signOutUser }], e.currentTarget);
+});
 
 // ── Home Screen ────────────────────────────────────────
 function renderHome() {
@@ -121,7 +233,6 @@ function renderHome() {
   exercises.forEach(ex => {
     const sets = ex.sets || [];
     const exRecords = records[ex.name] || {};
-
     const card = document.createElement('div');
     card.className = 'exercise-card';
 
@@ -129,12 +240,10 @@ function renderHome() {
     header.className = 'exercise-card-header';
     header.innerHTML = `<div class="exercise-card-name">${ex.name}</div>`;
     card.appendChild(header);
-
     card.appendChild(Object.assign(document.createElement('div'), { className: 'exercise-card-divider' }));
 
     const setsDiv = document.createElement('div');
     setsDiv.className = 'exercise-card-sets';
-
     if (sets.length === 0) {
       setsDiv.innerHTML = `<div class="exercise-card-empty">No sets</div>`;
     } else {
@@ -143,16 +252,13 @@ function renderHome() {
         const row = document.createElement('div');
         row.className = 'exercise-set-row';
         row.innerHTML = `
-          ${isPR
-            ? `<svg class="exercise-set-pr" viewBox="0 0 24 24"><path d="M12 1L9 9H1l6.5 4.7L5 21l7-5 7 5-2.5-7.3L23 9h-8z"/></svg>`
-            : `<span class="exercise-set-spacer"></span>`}
+          ${isPR ? `<svg class="exercise-set-pr" viewBox="0 0 24 24"><path d="M12 1L9 9H1l6.5 4.7L5 21l7-5 7 5-2.5-7.3L23 9h-8z"/></svg>` : `<span class="exercise-set-spacer"></span>`}
           <span class="exercise-set-weight">${s.weight} kg</span>
           <span class="exercise-set-reps">${s.reps} reps</span>
         `;
         setsDiv.appendChild(row);
       });
     }
-
     card.appendChild(setsDiv);
     card.addEventListener('click', () => openTraining(ex.name));
     container.appendChild(card);
@@ -261,8 +367,7 @@ function prefillFromLastWorkout(name) {
   const dates = Object.keys(db.workouts).sort().reverse();
   for (const date of dates) {
     if (date === currentDate) continue;
-    const workout = db.workouts[date];
-    const ex = workout && workout.find(e => e.name === name);
+    const ex = db.workouts[date] && db.workouts[date].find(e => e.name === name);
     if (ex && ex.sets && ex.sets.length > 0) {
       document.getElementById('field-weight').value = ex.sets[0].weight || 0;
       document.getElementById('field-reps').value = ex.sets[0].reps || 0;
@@ -284,15 +389,9 @@ function renderSetList() {
   }
 
   const exRecords = (db.records || {})[currentExercise] || {};
-
   list.innerHTML = `
     <div class="set-list-header">
-      <span></span>
-      <span></span>
-      <span>#</span>
-      <span>KG</span>
-      <span>REPS</span>
-      <span></span>
+      <span></span><span></span><span>#</span><span>KG</span><span>REPS</span><span></span>
     </div>
   `;
 
@@ -382,7 +481,7 @@ function updateRecords(name, weight, reps) {
     db.records[name][key] = weight;
     if (weight > 0) toast('🏆 Personal record!');
   }
-  saveDB();
+  persistRecords();
 }
 
 // ── Field +/− Buttons ─────────────────────────────────
@@ -412,10 +511,9 @@ function renderHistoryTab() {
   const container = document.getElementById('history-content');
   container.innerHTML = '';
 
-  const relevantDates = Object.keys(db.workouts).sort().reverse().filter(d => {
-    const w = db.workouts[d];
-    return w && w.find(e => e.name === currentExercise);
-  }).slice(0, 20);
+  const relevantDates = Object.keys(db.workouts).sort().reverse()
+    .filter(d => db.workouts[d] && db.workouts[d].find(e => e.name === currentExercise))
+    .slice(0, 20);
 
   if (relevantDates.length === 0) {
     container.innerHTML = `<div style="padding:32px;text-align:center;color:#9e9e9e">No previous sessions for ${currentExercise}</div>`;
@@ -438,9 +536,7 @@ function renderHistoryTab() {
       const row = document.createElement('div');
       row.className = 'history-set-row';
       row.innerHTML = `
-        ${isPR
-          ? `<svg class="history-set-pr" viewBox="0 0 24 24"><path d="M12 1L9 9H1l6.5 4.7L5 21l7-5 7 5-2.5-7.3L23 9h-8z"/></svg>`
-          : `<span class="history-set-spacer"></span>`}
+        ${isPR ? `<svg class="history-set-pr" viewBox="0 0 24 24"><path d="M12 1L9 9H1l6.5 4.7L5 21l7-5 7 5-2.5-7.3L23 9h-8z"/></svg>` : `<span class="history-set-spacer"></span>`}
         <span class="history-set-weight">${s.weight} kg</span>
         <span class="history-set-reps">${s.reps} reps</span>
       `;
@@ -620,8 +716,13 @@ document.getElementById('timer-slider').addEventListener('input', () => {
   updateTimerDisplay();
 });
 document.getElementById('btn-timer-start').addEventListener('click', () => {
-  if (timerRunning) { clearInterval(timerInterval); timerRunning = false; document.getElementById('btn-timer-start').textContent = 'Start'; }
-  else { runTimer(); }
+  if (timerRunning) {
+    clearInterval(timerInterval);
+    timerRunning = false;
+    document.getElementById('btn-timer-start').textContent = 'Start';
+  } else {
+    runTimer();
+  }
 });
 document.getElementById('btn-timer-cancel').addEventListener('click', () => {
   clearInterval(timerInterval); timerRunning = false; closeOverlay('timer-overlay');
@@ -695,7 +796,7 @@ document.getElementById('btn-new-exercise-save').addEventListener('click', () =>
   if (!db.custom_exercises) db.custom_exercises = [];
   if (allExercises().find(e => e.name.toLowerCase() === name.toLowerCase())) { toast('Exercise already exists'); return; }
   db.custom_exercises.push({ category: cat, name });
-  saveDB();
+  persistCustomExercises();
   closeOverlay('new-exercise-overlay');
   exerciseBrowserMode = 'categories';
   currentBrowseCategory = null;
@@ -734,9 +835,6 @@ document.getElementById('btn-clear').addEventListener('click', clearFields);
 document.getElementById('btn-timer').addEventListener('click', openTimer);
 document.getElementById('btn-training-pr').addEventListener('click', () => toast('Records coming soon'));
 document.getElementById('btn-training-info').addEventListener('click', () => toast('Info coming soon'));
-document.getElementById('btn-overflow-home').addEventListener('click', () => toast('Menu coming soon'));
-document.getElementById('btn-overflow-training').addEventListener('click', () => toast('Menu coming soon'));
-document.getElementById('btn-overflow-exercises').addEventListener('click', () => toast('Menu coming soon'));
 
 document.getElementById('exercise-search').addEventListener('input', e => {
   const q = e.target.value.toLowerCase().trim();
@@ -865,7 +963,3 @@ document.getElementById('btn-video-close').addEventListener('click', () => {
   video.src = '';
   document.getElementById('video-overlay').classList.remove('open');
 });
-
-// ── Init ───────────────────────────────────────────────
-loadDB();
-renderHome();
