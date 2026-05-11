@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="AI Fitness"/>
+  <meta name="theme-color" content="#212121"/>
+  <link rel="manifest" href="manifest.json"/>
+  <link rel="apple-touch-icon" href="icon-192.png"/>
+  <title>AI Fitness Co-Pilot</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+<!-- SPLASH SCREEN -->
+<div id="splash-screen" style="
+  position:fixed;inset:0;z-index:9999;
+  background:#212121;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:24px;
+">
+  <img src="icon-512.png" alt="AI Fitness Co-Pilot" style="width:160px;height:160px;object-fit:contain;border-radius:24px;"/>
+  <div style="text-align:center;">
+    <div style="font-family:Roboto,sans-serif;font-size:26px;font-weight:700;color:#fff;letter-spacing:-0.5px;">AI Fitness</div>
+    <div style="font-family:Roboto,sans-serif;font-size:16px;font-weight:400;color:#29b6f6;letter-spacing:2px;text-transform:uppercase;">Co-Pilot</div>
+  </div>
+</div>
+
+<!-- HOME SCREEN -->
+<div id="screen-home" class="screen active">
+  <div class="toolbar">
+    <span class="toolbar-title">FitNotes</span>
+    <div class="toolbar-actions">
+      <button class="toolbar-btn" id="btn-calendar" aria-label="Calendar">
+        <svg viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5C3.9 3 3 3.9 3 5v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>
+      </button>
+      <button class="toolbar-btn" id="btn-add-exercise" aria-label="Add exercise">
+        <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+      </button>
+      <button class="toolbar-btn" id="btn-overflow-home" aria-label="Menu">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="day-nav">
+    <button class="day-nav-btn" id="btn-prev-day" aria-label="Previous day">
+      <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+    </button>
+    <span class="day-nav-label" id="day-nav-label"></span>
+    <button class="day-nav-btn" id="btn-next-day" aria-label="Next day">
+      <svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+    </button>
+  </div>
+
+  <div class="home-content" id="home-content"></div>
+</div>
+
+<!-- EXERCISE LIST SCREEN -->
+<div id="screen-exercises" class="screen">
+  <div class="toolbar">
+    <button class="toolbar-btn back-btn" id="btn-back-exercises" aria-label="Back">
+      <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </button>
+    <span class="toolbar-title" id="exercises-title">All Exercises</span>
+    <div class="toolbar-actions">
+      <button class="toolbar-btn" id="btn-new-exercise" aria-label="New exercise">
+        <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+      </button>
+      <button class="toolbar-btn" id="btn-overflow-exercises" aria-label="Menu">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="search-bar">
+    <svg viewBox="0 0 24 24" class="search-icon"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+    <input type="text" id="exercise-search" placeholder="Search exercise..." autocomplete="off" autocorrect="off" spellcheck="false"/>
+  </div>
+  <div class="exercise-list" id="exercise-list"></div>
+</div>
+
+<!-- TRAINING SCREEN -->
+<div id="screen-training" class="screen">
+  <div class="toolbar">
+    <button class="toolbar-btn" id="btn-back-training" aria-label="Menu">
+      <svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+    </button>
+    <span class="toolbar-title" id="training-title">Exercise</span>
+    <div class="toolbar-actions">
+      <button class="toolbar-btn" id="btn-timer" aria-label="Rest timer">
+        <svg viewBox="0 0 24 24"><path d="M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61l1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42A7.928 7.928 0 0 0 12 4c-4.42 0-8 3.58-8 8s3.57 8 8 8 8-3.58 8-8c0-1.85-.63-3.55-1.67-4.91zM12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6z"/></svg>
+      </button>
+      <button class="toolbar-btn" id="btn-training-pr" aria-label="Records">
+        <svg viewBox="0 0 24 24"><path d="M12 1L9 9H1l6.5 4.7L5 21l7-5 7 5-2.5-7.3L23 9h-8z"/></svg>
+      </button>
+      <button class="toolbar-btn" id="btn-training-info" aria-label="Info">
+        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+      </button>
+      <button class="toolbar-btn" id="btn-overflow-training" aria-label="Menu">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="training-tabs">
+    <button class="tab active" data-tab="track">TRACK</button>
+    <button class="tab" data-tab="history">HISTORY</button>
+    <button class="tab" data-tab="graph">GRAPH</button>
+  </div>
+
+  <!-- Track tab -->
+  <div class="tab-content active" id="tab-track">
+    <div class="set-fields">
+      <div class="field-group">
+        <label class="field-label">WEIGHT (KGS)</label>
+        <div class="field-cyan-line"></div>
+        <div class="field-controls">
+          <button class="field-btn" data-field="weight" data-dir="-">−</button>
+          <input type="number" id="field-weight" inputmode="decimal" step="0.5" min="0" value="0"/>
+          <button class="field-btn" data-field="weight" data-dir="+">+</button>
+        </div>
+      </div>
+      <div class="field-group">
+        <label class="field-label">REPS</label>
+        <div class="field-cyan-line"></div>
+        <div class="field-controls">
+          <button class="field-btn" data-field="reps" data-dir="-">−</button>
+          <input type="number" id="field-reps" inputmode="numeric" step="1" min="0" value="0"/>
+          <button class="field-btn" data-field="reps" data-dir="+">+</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="action-buttons">
+      <button class="btn-save" id="btn-save-set">SAVE</button>
+      <button class="btn-clear" id="btn-clear">CLEAR</button>
+    </div>
+
+    <div class="set-list" id="set-list"></div>
+  </div>
+
+  <!-- History tab -->
+  <div class="tab-content" id="tab-history">
+    <div class="history-content" id="history-content"></div>
+  </div>
+
+  <!-- Graph tab -->
+  <div class="tab-content" id="tab-graph">
+    <div class="graph-time-filters">
+      <button class="time-filter active" data-range="1m">1m</button>
+      <button class="time-filter" data-range="3m">3m</button>
+      <button class="time-filter" data-range="6m">6m</button>
+      <button class="time-filter" data-range="1y">1y</button>
+      <button class="time-filter" data-range="all">all</button>
+    </div>
+    <div class="graph-selector">
+      <button class="graph-tab active" data-graph="max-weight">Max weight</button>
+      <button class="graph-tab" data-graph="volume">Volume</button>
+      <button class="graph-tab" data-graph="max-reps">Max reps</button>
+    </div>
+    <canvas id="progress-chart" width="340" height="220"></canvas>
+    <div class="graph-empty" id="graph-empty">No data available</div>
+    <div class="graph-hint" id="graph-hint">Tap a point to view more details</div>
+  </div>
+</div>
+
+<!-- CALENDAR OVERLAY -->
+<div class="overlay" id="calendar-overlay">
+  <div class="overlay-panel">
+    <div class="overlay-header">
+      <button class="icon-btn" id="cal-prev-month">
+        <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+      </button>
+      <span id="cal-month-label"></span>
+      <button class="icon-btn" id="cal-next-month">
+        <svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+      </button>
+    </div>
+    <div class="cal-grid-header">
+      <span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span><span>Su</span>
+    </div>
+    <div class="cal-grid" id="cal-grid"></div>
+    <button class="btn-text" id="cal-close">Close</button>
+  </div>
+</div>
+
+<!-- TIMER OVERLAY -->
+<div class="overlay" id="timer-overlay">
+  <div class="overlay-panel timer-panel">
+    <h3>Rest Timer</h3>
+    <div class="timer-display" id="timer-display">01:30</div>
+    <input type="range" id="timer-slider" min="0" max="600" value="90" step="5"/>
+    <div class="timer-btns">
+      <button class="btn-secondary" id="btn-timer-cancel">Cancel</button>
+      <button class="btn-primary" id="btn-timer-start">Start</button>
+    </div>
+  </div>
+</div>
+
+<!-- NEW EXERCISE OVERLAY -->
+<div class="overlay" id="new-exercise-overlay">
+  <div class="overlay-panel">
+    <h3>New Exercise</h3>
+    <input type="text" id="new-exercise-name" placeholder="Exercise name" autocomplete="off"/>
+    <select id="new-exercise-category">
+      <option value="">Choose category...</option>
+    </select>
+    <div class="overlay-btns">
+      <button class="btn-secondary" id="btn-new-exercise-cancel">Cancel</button>
+      <button class="btn-primary" id="btn-new-exercise-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- HIDDEN FILE INPUTS FOR VIDEO -->
+<input type="file" id="video-camera-input" accept="video/*" capture="environment" style="display:none"/>
+<input type="file" id="video-file-input" accept="video/*" style="display:none"/>
+
+<!-- VIDEO POPUP MENU -->
+<div class="video-popup" id="video-popup">
+  <div class="video-popup-panel" id="video-popup-panel"></div>
+</div>
+
+<!-- VIDEO FULLSCREEN OVERLAY -->
+<div class="video-fullscreen" id="video-overlay">
+  <button class="video-close-btn" id="btn-video-close">✕</button>
+  <video id="video-player" controls playsinline></video>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script src="exercises.js"></script>
+<script src="app.js"></script>
+
+<script>
+  window.addEventListener('load', function() {
+    setTimeout(function() {
+      const splash = document.getElementById('splash-screen');
+      if (splash) {
+        splash.style.transition = 'opacity 0.4s';
+        splash.style.opacity = '0';
+        setTimeout(() => splash.remove(), 400);
+      }
+    }, 1200);
+  });
+</script>
+</body>
+</html>
