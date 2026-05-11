@@ -166,17 +166,18 @@ function removeSetVideo(setIndex) {
 //            → OAuth 2.0 Client IDs → "Web client (auto created by Google Service)"
 const GIS_CLIENT_ID = '41596366904-3h277tnkmavund1rc8l4rn3a5klu966k.apps.googleusercontent.com';
 
-if (typeof google !== 'undefined' && google.accounts) {
-  tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: GIS_CLIENT_ID,
-    scope: 'https://www.googleapis.com/auth/drive.file',
-    callback: (response) => {
-      if (response.error) {
-        console.error('[GIS] token error:', response.error);
-        toast('Drive access denied');
-        pendingAction = null;
-        return;
-      }
+window.addEventListener('load', () => {
+  if (typeof google !== 'undefined' && google.accounts) {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: GIS_CLIENT_ID,
+      scope: 'https://www.googleapis.com/auth/drive.file',
+      callback: (response) => {
+        if (response.error) {
+          console.error('[GIS] token error:', response.error);
+          toast('Drive access denied');
+          pendingAction = null;
+          return;
+        }
       console.log('[GIS] access token obtained');
       googleAccessToken = response.access_token;
       if (pendingAction) {
@@ -1071,8 +1072,8 @@ document.getElementById('video-popup').addEventListener('click', e => {
 async function handleVideoUpload(file) {
   if (!file || pendingVideoSetIndex === null) return;
   if (!googleAccessToken) {
-    tokenClient.requestAccessToken({prompt: 'consent'});
-    return;
+           tokenClient.requestAccessToken({prompt: 'consent'});
+           return;
   }
   const setNum = pendingVideoSetIndex + 1;
   const safeName = currentExercise.replace(/[^a-z0-9]/gi, '_');
