@@ -137,6 +137,11 @@ function updateUserBar() {
 }
 
 // ── Auth ───────────────────────────────────────────────
+fAuth.getRedirectResult().catch(err => {
+  toast('Sign-in failed');
+  console.error(err);
+});
+
 fAuth.onAuthStateChanged(async user => {
   currentUser = user;
   if (user) {
@@ -155,7 +160,7 @@ fAuth.onAuthStateChanged(async user => {
 });
 
 document.getElementById('btn-google-signin').addEventListener('click', () => {
-  fAuth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(err => {
+  fAuth.signInWithRedirect(new firebase.auth.GoogleAuthProvider()).catch(err => {
     toast('Sign-in failed');
     console.error(err);
   });
