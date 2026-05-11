@@ -97,6 +97,13 @@ async function loadUserData(userUid) {
 }
 
 // ── Google Drive helpers ───────────────────────────────
+async function driveApiError(res) {
+  let msg = res.statusText;
+  try { const b = await res.json(); msg = b.error?.message || msg; } catch(_) {}
+  console.error('[Drive] API error', res.status, msg);
+  throw new Error(`${res.status}: ${msg}`);
+}
+
 async function ensureDriveFolder() {
   if (driveFolderId) return driveFolderId;
   const name = 'AI Fitness Co-Pilot';
@@ -104,6 +111,7 @@ async function ensureDriveFolder() {
   const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`, {
     headers: { Authorization: 'Bearer ' + googleAccessToken }
   });
+  if (!searchRes.ok) await driveApiError(searchRes);
   const data = await searchRes.json();
   if (data.files && data.files.length > 0) {
     driveFolderId = data.files[0].id;
@@ -114,6 +122,7 @@ async function ensureDriveFolder() {
     headers: { Authorization: 'Bearer ' + googleAccessToken, 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, mimeType: 'application/vnd.google-apps.folder' })
   });
+  if (!createRes.ok) await driveApiError(createRes);
   const folder = await createRes.json();
   driveFolderId = folder.id;
   return driveFolderId;
@@ -130,7 +139,7 @@ async function uploadToDrive(file, filename) {
     headers: { Authorization: 'Bearer ' + googleAccessToken },
     body: form
   });
-  if (!res.ok) throw new Error('Upload failed: ' + res.status);
+  if (!res.ok) await driveApiError(res);
   const data = await res.json();
   return data.id;
 }
@@ -974,11 +983,11 @@ function showVideoPopup(setIndex, videoId, anchorEl) {
   const panel = document.getElementById('video-popup-panel');
 
   const rect = anchorEl.getBoundingClientRect();
-  const pw = 230;
+  const pw = 240;
   let left = rect.left;
   let top = rect.bottom + 6;
   if (left + pw > window.innerWidth - 8) left = window.innerWidth - pw - 8;
-  if (top + 110 > window.innerHeight) top = rect.top - 110 - 6;
+  if (top + 160 > window.innerHeight) top = rect.top - 160 - 6;
   panel.style.left = left + 'px';
   panel.style.top = top + 'px';
 
@@ -986,31 +995,32 @@ function showVideoPopup(setIndex, videoId, anchorEl) {
     panel.innerHTML = `
       <div class="video-popup-item" id="popup-view">▶️ View video</div>
       <div class="video-popup-item" id="popup-delete">🗑️ Remove video</div>
+      <div class="video-popup-item video-popup-cancel" id="popup-cancel">❌ Cancel</div>
     `;
-    document.getElementById('popup-view').addEventListener('click', () => {
-      closeVideoPopup();
-      openVideoFrame(videoId);
-    });
-    document.getElementById('popup-delete').addEventListener('click', () => {
-      closeVideoPopup();
-      removeSetVideo(setIndex);
-    });
+    document.getElementById('popup-view').addEventListener('click', () => { closeVideoPopup(); openVideoFrame(videoId); });
+    document.getElementById('popup-delete').addEventListener('click', () => { closeVideoPopup(); removeSetVideo(setIndex); });
   } else {
     panel.innerHTML = `
-      <div class="video-popup-item" id="popup-upload">🎥 Upload video to Drive</div>
+      <div class="video-popup-item" id="popup-record">🎥 Record set</div>
+      <div class="video-popup-item" id="popup-upload">📎 Upload existing video</div>
+      <div class="video-popup-item video-popup-cancel" id="popup-cancel">❌ Cancel</div>
     `;
+    document.getElementById('popup-record').addEventListener('click', () => {
+      closeVideoPopup();
+      if (!googleAccessToken) { toast('Please sign out and sign in again to enable video upload'); return; }
+      pendingVideoSetIndex = setIndex;
+      const inp = document.getElementById('video-input-camera');
+      inp.value = ''; inp.click();
+    });
     document.getElementById('popup-upload').addEventListener('click', () => {
       closeVideoPopup();
-      if (!googleAccessToken) {
-        toast('Sign in again to enable video upload');
-        return;
-      }
+      if (!googleAccessToken) { toast('Please sign out and sign in again to enable video upload'); return; }
       pendingVideoSetIndex = setIndex;
-      const input = document.getElementById('video-input');
-      input.value = '';
-      input.click();
+      const inp = document.getElementById('video-input-file');
+      inp.value = ''; inp.click();
     });
   }
+  document.getElementById('popup-cancel').addEventListener('click', closeVideoPopup);
 
   popup.classList.add('open');
 }
@@ -1023,10 +1033,13 @@ document.getElementById('video-popup').addEventListener('click', e => {
   if (e.target === e.currentTarget) closeVideoPopup();
 });
 
-document.getElementById('video-input').addEventListener('change', async e => {
-  const file = e.target.files[0];
+async function handleVideoUpload(file) {
   if (!file || pendingVideoSetIndex === null) return;
-  if (!googleAccessToken) { toast('Sign in again to enable video upload'); return; }
+  if (!googleAccessToken) {
+    toast('Please sign out and sign in again to enable video upload');
+    pendingVideoSetIndex = null;
+    return;
+  }
   const setNum = pendingVideoSetIndex + 1;
   const safeName = currentExercise.replace(/[^a-z0-9]/gi, '_');
   const filename = `${currentDate}_${safeName}_set${setNum}.mp4`;
@@ -1036,7 +1049,7 @@ document.getElementById('video-input').addEventListener('change', async e => {
     const videoId = await uploadToDrive(file, filename);
     console.log('[Drive] uploaded, id:', videoId);
     const workout = getWorkout(currentDate);
-    const ex = workout.find(ex => ex.name === currentExercise);
+    const ex = workout.find(e => e.name === currentExercise);
     if (ex && ex.sets[pendingVideoSetIndex]) {
       ex.sets[pendingVideoSetIndex].videoId = videoId;
       setWorkout(currentDate, workout);
@@ -1045,9 +1058,22 @@ document.getElementById('video-input').addEventListener('change', async e => {
     toast('Video saved to Drive');
   } catch(err) {
     console.error('[Drive] upload error:', err);
-    toast('Upload failed — check console');
+    const msg = err.message || '';
+    if (msg.startsWith('401') || msg.startsWith('403')) {
+      toast('Please sign out and sign in again to enable video upload');
+    } else {
+      toast('Upload failed: ' + msg);
+    }
   }
   pendingVideoSetIndex = null;
+}
+
+document.getElementById('video-input-camera').addEventListener('change', async e => {
+  await handleVideoUpload(e.target.files[0]);
+  e.target.value = '';
+});
+document.getElementById('video-input-file').addEventListener('change', async e => {
+  await handleVideoUpload(e.target.files[0]);
   e.target.value = '';
 });
 

@@ -235,6 +235,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .video-popup-item { padding: 14px 20px; font-size: 15px; color: var(--text-primary); cursor: pointer; border-bottom: 1px solid var(--border); }
 .video-popup-item:last-child { border-bottom: none; }
 .video-popup-item:active { background: var(--bg); }
+.video-popup-cancel { color: var(--text-secondary); }
 
 /* ── VIDEO FULLSCREEN OVERLAY ─────────────────────────── */
 .video-fullscreen { position: fixed; inset: 0; background: rgba(0,0,0,.96); z-index: 300; display: none; align-items: center; justify-content: center; }
