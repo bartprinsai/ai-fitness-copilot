@@ -1071,8 +1071,7 @@ document.getElementById('video-popup').addEventListener('click', e => {
 async function handleVideoUpload(file) {
   if (!file || pendingVideoSetIndex === null) return;
   if (!googleAccessToken) {
-    toast('Please sign out and sign in again to enable video upload');
-    pendingVideoSetIndex = null;
+    tokenClient.requestAccessToken({prompt: 'consent'});
     return;
   }
   const setNum = pendingVideoSetIndex + 1;
