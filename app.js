@@ -194,12 +194,28 @@ async function initAuth() {
 
 initAuth();
 
-document.getElementById('btn-google-signin').addEventListener('click', () => {
-  console.log('[Auth] Google sign-in button clicked, starting redirect...');
-  fAuth.signInWithRedirect(new firebase.auth.GoogleAuthProvider()).catch(err => {
-    console.error('[Auth] signInWithRedirect error:', err);
-    toast('Sign-in failed');
-  });
+document.getElementById('btn-google-signin').addEventListener('click', async () => {
+  console.log('[Auth] Google sign-in button clicked');
+  const provider = new firebase.auth.GoogleAuthProvider();
+  try {
+    console.log('[Auth] trying signInWithPopup...');
+    const result = await fAuth.signInWithPopup(provider);
+    console.log('[Auth] popup success:', result.user.email);
+  } catch (err) {
+    console.warn('[Auth] signInWithPopup error:', err.code, err.message);
+    if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
+      console.log('[Auth] popup blocked/closed, falling back to signInWithRedirect...');
+      try {
+        await fAuth.signInWithRedirect(provider);
+      } catch (redirectErr) {
+        console.error('[Auth] signInWithRedirect error:', redirectErr);
+        toast('Sign-in failed');
+      }
+    } else {
+      console.error('[Auth] unhandled sign-in error:', err);
+      toast('Sign-in failed');
+    }
+  }
 });
 
 function signOutUser() {
