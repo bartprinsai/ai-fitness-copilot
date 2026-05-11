@@ -137,32 +137,68 @@ function updateUserBar() {
 }
 
 // ── Auth ───────────────────────────────────────────────
-fAuth.getRedirectResult().catch(err => {
-  toast('Sign-in failed');
-  console.error(err);
-});
+async function initAuth() {
+  console.log('[Auth] initAuth start');
+  let redirectHandled = false;
 
-fAuth.onAuthStateChanged(async user => {
-  currentUser = user;
-  if (user) {
-    await loadUserData(user.uid);
-    updateUserBar();
-    currentDate = todayStr();
-    renderHome();
-    showScreen('screen-home');
-  } else {
-    db = { workouts: {}, custom_exercises: [], records: {} };
-    videoLinks = {};
-    showScreen('screen-login');
+  // Step 1: check for redirect result BEFORE registering onAuthStateChanged
+  try {
+    console.log('[Auth] calling getRedirectResult...');
+    const result = await fAuth.getRedirectResult();
+    if (result && result.user) {
+      console.log('[Auth] redirect user:', result.user.email);
+      redirectHandled = true;
+      currentUser = result.user;
+      await loadUserData(result.user.uid);
+      updateUserBar();
+      currentDate = todayStr();
+      renderHome();
+      showScreen('screen-home');
+      authDone = true;
+      checkAndReveal();
+    } else {
+      console.log('[Auth] no redirect result');
+    }
+  } catch (err) {
+    console.error('[Auth] getRedirectResult error:', err);
+    toast('Sign-in failed');
   }
-  authDone = true;
-  checkAndReveal();
-});
+
+  // Step 2: register onAuthStateChanged for normal visits and sign-out
+  fAuth.onAuthStateChanged(async user => {
+    console.log('[Auth] onAuthStateChanged user:', user ? user.email : 'null', '| redirectHandled:', redirectHandled);
+    if (redirectHandled) {
+      // Already handled via getRedirectResult — skip this first firing
+      redirectHandled = false;
+      console.log('[Auth] skipping (redirect already handled)');
+      return;
+    }
+    currentUser = user;
+    if (user) {
+      console.log('[Auth] signing in via onAuthStateChanged');
+      await loadUserData(user.uid);
+      updateUserBar();
+      currentDate = todayStr();
+      renderHome();
+      showScreen('screen-home');
+    } else {
+      console.log('[Auth] no user, showing login screen');
+      db = { workouts: {}, custom_exercises: [], records: {} };
+      videoLinks = {};
+      showScreen('screen-login');
+    }
+    authDone = true;
+    checkAndReveal();
+  });
+}
+
+initAuth();
 
 document.getElementById('btn-google-signin').addEventListener('click', () => {
+  console.log('[Auth] Google sign-in button clicked, starting redirect...');
   fAuth.signInWithRedirect(new firebase.auth.GoogleAuthProvider()).catch(err => {
+    console.error('[Auth] signInWithRedirect error:', err);
     toast('Sign-in failed');
-    console.error(err);
   });
 });
 
