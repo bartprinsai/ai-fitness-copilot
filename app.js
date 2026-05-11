@@ -15,9 +15,11 @@ let currentUser = null;
 
 // ── In-memory state ────────────────────────────────────
 let db = { workouts: {}, custom_exercises: [], records: {} };
-let googleAccessToken = sessionStorage.getItem('google_access_token') || null;
+let googleAccessToken = null;
 let driveFolderId = null;
 let pendingVideoSetIndex = null;
+let pendingAction = null;
+let tokenClient = null;
 
 // ── Splash coordination ────────────────────────────────
 let splashDone = false, authDone = false;
@@ -159,6 +161,44 @@ function removeSetVideo(setIndex) {
   toast('Video removed');
 }
 
+// ── GIS token client (Drive) ───────────────────────────
+// Client ID: console.cloud.google.com → APIs & Services → Credentials
+//            → OAuth 2.0 Client IDs → "Web client (auto created by Google Service)"
+const GIS_CLIENT_ID = 'YOUR_OAUTH_CLIENT_ID_HERE';
+
+if (typeof google !== 'undefined' && google.accounts) {
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: GIS_CLIENT_ID,
+    scope: 'https://www.googleapis.com/auth/drive.file',
+    callback: (response) => {
+      if (response.error) {
+        console.error('[GIS] token error:', response.error);
+        toast('Drive access denied');
+        pendingAction = null;
+        return;
+      }
+      console.log('[GIS] access token obtained');
+      googleAccessToken = response.access_token;
+      if (pendingAction) {
+        const action = pendingAction;
+        pendingAction = null;
+        action();
+      }
+    }
+  });
+  console.log('[GIS] token client initialized');
+} else {
+  console.warn('[GIS] google.accounts not available — Drive upload disabled');
+}
+
+function requestDriveToken(onSuccess) {
+  if (googleAccessToken) { onSuccess(); return; }
+  if (!tokenClient) { toast('Drive not available'); return; }
+  console.log('[GIS] requesting access token...');
+  pendingAction = onSuccess;
+  tokenClient.requestAccessToken({ prompt: '' });
+}
+
 // ── State ──────────────────────────────────────────────
 let currentDate = todayStr();
 let currentExercise = null;
@@ -197,11 +237,6 @@ async function initAuth() {
     const result = await fAuth.getRedirectResult();
     if (result && result.user) {
       console.log('[Auth] redirect user:', result.user.email);
-      if (result.credential) {
-        googleAccessToken = result.credential.accessToken;
-        sessionStorage.setItem('google_access_token', googleAccessToken);
-        console.log('[Auth] access token saved from redirect');
-      }
       redirectHandled = true;
       currentUser = result.user;
       await loadUserData(result.user.uid);
@@ -256,11 +291,6 @@ document.getElementById('btn-google-signin').addEventListener('click', async () 
     console.log('[Auth] trying signInWithPopup...');
     const result = await fAuth.signInWithPopup(provider);
     console.log('[Auth] popup success:', result.user.email);
-    if (result.credential) {
-      googleAccessToken = result.credential.accessToken;
-      sessionStorage.setItem('google_access_token', googleAccessToken);
-      console.log('[Auth] access token saved from popup');
-    }
   } catch (err) {
     console.warn('[Auth] signInWithPopup error:', err.code, err.message);
     if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
@@ -279,9 +309,12 @@ document.getElementById('btn-google-signin').addEventListener('click', async () 
 });
 
 function signOutUser() {
+  if (googleAccessToken && typeof google !== 'undefined') {
+    google.accounts.oauth2.revoke(googleAccessToken, () => console.log('[GIS] token revoked'));
+  }
   googleAccessToken = null;
   driveFolderId = null;
-  sessionStorage.removeItem('google_access_token');
+  pendingAction = null;
   fAuth.signOut();
 }
 
@@ -1007,17 +1040,19 @@ function showVideoPopup(setIndex, videoId, anchorEl) {
     `;
     document.getElementById('popup-record').addEventListener('click', () => {
       closeVideoPopup();
-      if (!googleAccessToken) { toast('Please sign out and sign in again to enable video upload'); return; }
       pendingVideoSetIndex = setIndex;
-      const inp = document.getElementById('video-input-camera');
-      inp.value = ''; inp.click();
+      requestDriveToken(() => {
+        const inp = document.getElementById('video-input-camera');
+        inp.value = ''; inp.click();
+      });
     });
     document.getElementById('popup-upload').addEventListener('click', () => {
       closeVideoPopup();
-      if (!googleAccessToken) { toast('Please sign out and sign in again to enable video upload'); return; }
       pendingVideoSetIndex = setIndex;
-      const inp = document.getElementById('video-input-file');
-      inp.value = ''; inp.click();
+      requestDriveToken(() => {
+        const inp = document.getElementById('video-input-file');
+        inp.value = ''; inp.click();
+      });
     });
   }
   document.getElementById('popup-cancel').addEventListener('click', closeVideoPopup);
