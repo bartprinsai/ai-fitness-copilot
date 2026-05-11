@@ -1,6 +1,6 @@
 ﻿'use strict';
 
-// ── Firebase ───────────────────────────────────────────
+// -- Firebase -------------------------------------------
 firebase.initializeApp({
   apiKey: "AIzaSyDPIDW9H3HA63YWbm-xA0S-GZvST3wnuyA",
   authDomain: "ai-fitness-copilot.firebaseapp.com",
@@ -13,7 +13,7 @@ const fAuth = firebase.auth();
 const fStore = firebase.firestore();
 let currentUser = null;
 
-// ── In-memory state ────────────────────────────────────
+// -- In-memory state ------------------------------------
 let db = { workouts: {}, custom_exercises: [], records: {} };
 let googleAccessToken = null;
 let driveFolderId = null;
@@ -21,7 +21,7 @@ let pendingVideoSetIndex = null;
 let pendingAction = null;
 let tokenClient = null;
 
-// ── Splash coordination ────────────────────────────────
+// -- Splash coordination --------------------------------
 let splashDone = false, authDone = false;
 function checkAndReveal() {
   if (!splashDone || !authDone) return;
@@ -30,7 +30,7 @@ function checkAndReveal() {
 }
 setTimeout(() => { splashDone = true; checkAndReveal(); }, 1200);
 
-// ── Helpers ────────────────────────────────────────────
+// -- Helpers --------------------------------------------
 function todayStr() { return new Date().toISOString().split('T')[0]; }
 function formatDate(str) {
   const today = todayStr();
@@ -63,7 +63,7 @@ function allExercises() {
   return [...EXERCISE_DB, ...(db.custom_exercises || []).map(e => ({ ...e, custom: true }))];
 }
 
-// ── Firestore persistence ──────────────────────────────
+// -- Firestore persistence ------------------------------
 function uDoc(path) { return fStore.doc('users/' + currentUser.uid + '/' + path); }
 
 async function persistWorkout(date, exercises) {
@@ -98,7 +98,7 @@ async function loadUserData(userUid) {
   }
 }
 
-// ── Google Drive helpers ───────────────────────────────
+// -- Google Drive helpers -------------------------------
 async function driveApiError(res) {
   let msg = res.statusText;
   try { const b = await res.json(); msg = b.error?.message || msg; } catch(_) {}
@@ -161,9 +161,9 @@ function removeSetVideo(setIndex) {
   toast('Video removed');
 }
 
-// ── GIS token client (Drive) ───────────────────────────
-// Client ID: console.cloud.google.com → APIs & Services → Credentials
-//            → OAuth 2.0 Client IDs → "Web client (auto created by Google Service)"
+// -- GIS token client (Drive) ---------------------------
+// Client ID: console.cloud.google.com ? APIs & Services ? Credentials
+//            ? OAuth 2.0 Client IDs ? "Web client (auto created by Google Service)"
 const GIS_CLIENT_ID = '41596366904-3h277tnkmavund1rc8l4rn3a5klu966k.apps.googleusercontent.com';
 
 window.addEventListener('load', () => {
@@ -178,19 +178,20 @@ window.addEventListener('load', () => {
           pendingAction = null;
           return;
         }
-      console.log('[GIS] access token obtained');
-      googleAccessToken = response.access_token;
-      if (pendingAction) {
-        const action = pendingAction;
-        pendingAction = null;
-        action();
+        console.log('[GIS] access token obtained');
+        googleAccessToken = response.access_token;
+        if (pendingAction) {
+          const action = pendingAction;
+          pendingAction = null;
+          action();
+        }
       }
-    }
-  });
-  console.log('[GIS] token client initialized');
-} else {
-  console.warn('[GIS] google.accounts not available - Drive upload disabled');
-}
+    });
+    console.log('[GIS] token client initialized');
+  } else {
+    console.warn('[GIS] google.accounts not available - Drive upload disabled');
+  }
+});
 
 function requestDriveToken(onSuccess) {
   if (googleAccessToken) { onSuccess(); return; }
@@ -200,7 +201,7 @@ function requestDriveToken(onSuccess) {
   tokenClient.requestAccessToken({ prompt: '' });
 }
 
-// ── State ──────────────────────────────────────────────
+// -- State ----------------------------------------------
 let currentDate = todayStr();
 let currentExercise = null;
 let selectedSetIndex = null;
@@ -213,13 +214,13 @@ let calMonth = new Date();
 let exerciseBrowserMode = 'categories';
 let currentBrowseCategory = null;
 
-// ── Screen Navigation ──────────────────────────────────
+// -- Screen Navigation ----------------------------------
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
 }
 
-// ── User bar ───────────────────────────────────────────
+// -- User bar -------------------------------------------
 function updateUserBar() {
   const bar = document.getElementById('user-bar');
   if (!currentUser) { bar.textContent = ''; return; }
@@ -227,7 +228,7 @@ function updateUserBar() {
   bar.textContent = 'Hi, ' + name.split(' ')[0];
 }
 
-// ── Auth ───────────────────────────────────────────────
+// -- Auth -----------------------------------------------
 async function initAuth() {
   console.log('[Auth] initAuth start');
   let redirectHandled = false;
@@ -319,7 +320,7 @@ function signOutUser() {
   fAuth.signOut();
 }
 
-// ── Overflow / Dropdown Menu ───────────────────────────
+// -- Overflow / Dropdown Menu ---------------------------
 function showOverflowMenu(items, anchorEl) {
   const menu = document.getElementById('overflow-menu');
   const panel = document.getElementById('overflow-panel');
@@ -353,7 +354,7 @@ document.getElementById('btn-overflow-exercises').addEventListener('click', e =>
   showOverflowMenu([{ label: 'Sign out', action: signOutUser }], e.currentTarget);
 });
 
-// ── Home Screen ────────────────────────────────────────
+// -- Home Screen ----------------------------------------
 function renderHome() {
   document.getElementById('day-nav-label').textContent = formatDate(currentDate);
   const exercises = getWorkout(currentDate);
@@ -429,7 +430,7 @@ function copyPreviousWorkout() {
   toast('Workout copied');
 }
 
-// ── Exercise Browser ───────────────────────────────────
+// -- Exercise Browser -----------------------------------
 function openExerciseList() {
   exerciseBrowserMode = 'categories';
   currentBrowseCategory = null;
@@ -506,7 +507,7 @@ function addExerciseToWorkout(name) {
   }
 }
 
-// ── Training Screen ────────────────────────────────────
+// -- Training Screen ------------------------------------
 function openTraining(name) {
   currentExercise = name;
   selectedSetIndex = null;
@@ -633,12 +634,12 @@ function updateRecords(name, weight, reps) {
   const key = String(reps);
   if (!db.records[name][key] || weight > db.records[name][key]) {
     db.records[name][key] = weight;
-    if (weight > 0) toast('🏆 Personal record!');
+    if (weight > 0) toast('?? Personal record!');
   }
   persistRecords();
 }
 
-// ── Field +/− Buttons ─────────────────────────────────
+// -- Field +/- Buttons ---------------------------------
 document.querySelectorAll('.field-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     const field = btn.dataset.field;
@@ -651,7 +652,7 @@ document.querySelectorAll('.field-btn').forEach(btn => {
   });
 });
 
-// ── Tabs ───────────────────────────────────────────────
+// -- Tabs -----------------------------------------------
 function switchTab(tab) {
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === 'tab-' + tab));
@@ -660,7 +661,7 @@ function switchTab(tab) {
 }
 document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
 
-// ── History Tab ────────────────────────────────────────
+// -- History Tab ----------------------------------------
 function renderHistoryTab() {
   const container = document.getElementById('history-content');
   container.innerHTML = '';
@@ -699,7 +700,7 @@ function renderHistoryTab() {
   });
 }
 
-// ── Graph Tab ──────────────────────────────────────────
+// -- Graph Tab ------------------------------------------
 document.querySelectorAll('.graph-tab').forEach(t => {
   t.addEventListener('click', () => {
     document.querySelectorAll('.graph-tab').forEach(x => x.classList.remove('active'));
@@ -813,7 +814,7 @@ function renderGraph() {
   ctx.fillText(new Date(data[data.length-1].date + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short' }), pad.left + gW, H - 8);
 }
 
-// ── Timer ──────────────────────────────────────────────
+// -- Timer ----------------------------------------------
 function openTimer() {
   timerRunning = false;
   clearInterval(timerInterval);
@@ -840,7 +841,7 @@ function runTimer() {
       timerRunning = false;
       document.getElementById('btn-timer-start').textContent = 'Start';
       playBeep();
-      toast('⏱ Rest done!');
+      toast('? Rest done!');
     }
   }, 1000);
 }
@@ -882,7 +883,7 @@ document.getElementById('btn-timer-cancel').addEventListener('click', () => {
   clearInterval(timerInterval); timerRunning = false; closeOverlay('timer-overlay');
 });
 
-// ── Calendar ───────────────────────────────────────────
+// -- Calendar -------------------------------------------
 function openCalendar() {
   calMonth = new Date(currentDate + 'T12:00:00');
   calMonth.setDate(1);
@@ -929,7 +930,7 @@ document.getElementById('cal-prev-month').addEventListener('click', () => { calM
 document.getElementById('cal-next-month').addEventListener('click', () => { calMonth.setMonth(calMonth.getMonth() + 1); renderCalendar(); });
 document.getElementById('cal-close').addEventListener('click', () => closeOverlay('calendar-overlay'));
 
-// ── New Exercise ───────────────────────────────────────
+// -- New Exercise ---------------------------------------
 function openNewExercise() {
   const sel = document.getElementById('new-exercise-category');
   sel.innerHTML = '<option value="">Choose category...</option>';
@@ -960,11 +961,11 @@ document.getElementById('btn-new-exercise-save').addEventListener('click', () =>
 });
 document.getElementById('btn-new-exercise-cancel').addEventListener('click', () => closeOverlay('new-exercise-overlay'));
 
-// ── Overlay helpers ────────────────────────────────────
+// -- Overlay helpers ------------------------------------
 function openOverlay(id) { document.getElementById(id).classList.add('open'); }
 function closeOverlay(id) { document.getElementById(id).classList.remove('open'); }
 
-// ── Event Listeners ────────────────────────────────────
+// -- Event Listeners ------------------------------------
 document.getElementById('btn-prev-day').addEventListener('click', () => { changeDate(-1); renderHome(); });
 document.getElementById('btn-next-day').addEventListener('click', () => { changeDate(1); renderHome(); });
 document.getElementById('btn-calendar').addEventListener('click', openCalendar);
@@ -1011,7 +1012,7 @@ document.getElementById('exercise-search').addEventListener('input', e => {
   });
 });
 
-// ── Video Popup ────────────────────────────────────────
+// -- Video Popup ----------------------------------------
 function showVideoPopup(setIndex, videoId, anchorEl) {
   const popup = document.getElementById('video-popup');
   const panel = document.getElementById('video-popup-panel');
@@ -1027,17 +1028,17 @@ function showVideoPopup(setIndex, videoId, anchorEl) {
 
   if (videoId) {
     panel.innerHTML = `
-      <div class="video-popup-item" id="popup-view">▶️ View video</div>
-      <div class="video-popup-item" id="popup-delete">🗑️ Remove video</div>
-      <div class="video-popup-item video-popup-cancel" id="popup-cancel">❌ Cancel</div>
+      <div class="video-popup-item" id="popup-view">?? View video</div>
+      <div class="video-popup-item" id="popup-delete">??? Remove video</div>
+      <div class="video-popup-item video-popup-cancel" id="popup-cancel">? Cancel</div>
     `;
     document.getElementById('popup-view').addEventListener('click', () => { closeVideoPopup(); openVideoFrame(videoId); });
     document.getElementById('popup-delete').addEventListener('click', () => { closeVideoPopup(); removeSetVideo(setIndex); });
   } else {
     panel.innerHTML = `
-      <div class="video-popup-item" id="popup-record">🎥 Record set</div>
-      <div class="video-popup-item" id="popup-upload">📎 Upload existing video</div>
-      <div class="video-popup-item video-popup-cancel" id="popup-cancel">❌ Cancel</div>
+      <div class="video-popup-item" id="popup-record">?? Record set</div>
+      <div class="video-popup-item" id="popup-upload">?? Upload existing video</div>
+      <div class="video-popup-item video-popup-cancel" id="popup-cancel">? Cancel</div>
     `;
     document.getElementById('popup-record').addEventListener('click', () => {
       closeVideoPopup();
@@ -1116,4 +1117,4 @@ document.getElementById('btn-video-close').addEventListener('click', () => {
   document.getElementById('video-player').src = '';
   document.getElementById('video-overlay').classList.remove('open');
 });
-}
+
