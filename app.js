@@ -1116,3 +1116,4 @@ document.getElementById('btn-video-close').addEventListener('click', () => {
   document.getElementById('video-player').src = '';
   document.getElementById('video-overlay').classList.remove('open');
 });
+}
