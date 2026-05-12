@@ -1,5 +1,9 @@
 ﻿'use strict';
 
+// -- Anthropic API key ----------------------------------
+// Replace with your key from console.anthropic.com
+const ANTHROPIC_API_KEY = 'sk-ant-YOUR_KEY_HERE';
+
 // -- Firebase -------------------------------------------
 firebase.initializeApp({
   apiKey: "AIzaSyDPIDW9H3HA63YWbm-xA0S-GZvST3wnuyA",
@@ -14,7 +18,7 @@ const fStore = firebase.firestore();
 let currentUser = null;
 
 // -- In-memory state ------------------------------------
-let db = { workouts: {}, custom_exercises: [], records: {} };
+let db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null };
 let googleAccessToken = null;
 let driveFolderId = null;
 let pendingVideoSetIndex = null;
@@ -84,15 +88,20 @@ async function persistCustomExercises() {
 }
 async function loadUserData(userUid) {
   try {
-    const [workoutsSnap, recordsSnap, customSnap] = await Promise.all([
+    const [workoutsSnap, recordsSnap, customSnap, plansSnap, activePlanSnap] = await Promise.all([
       fStore.collection('users/' + userUid + '/workouts').get(),
       fStore.doc('users/' + userUid + '/meta/records').get(),
       fStore.doc('users/' + userUid + '/meta/custom_exercises').get(),
+      fStore.collection('users/' + userUid + '/plans').get(),
+      fStore.doc('users/' + userUid + '/meta/activeplan').get(),
     ]);
     db.workouts = {};
     workoutsSnap.forEach(doc => { db.workouts[doc.id] = doc.data().exercises || []; });
     db.records = recordsSnap.exists ? (recordsSnap.data().data || {}) : {};
     db.custom_exercises = customSnap.exists ? (customSnap.data().list || []) : [];
+    db.plans = {};
+    plansSnap.forEach(doc => { db.plans[doc.id] = { ...doc.data(), id: doc.id }; });
+    db.activePlan = activePlanSnap.exists ? activePlanSnap.data() : null;
   } catch(e) {
     console.error('loadUserData', e);
   }
@@ -221,6 +230,16 @@ function requestDriveToken(onSuccess) {
 // -- State ----------------------------------------------
 let currentDate = todayStr();
 let currentExercise = null;
+
+// -- Plan Builder state ---------------------------------
+let currentPlanId = null;
+let currentPlanData = null;
+let currentLoadPlanId = null;
+let currentLoadDayIndex = null;
+let loadWorkoutReturnScreen = 'screen-plan-detail';
+let bannerDismissed = false;
+let bannerSuggestedDayIndex = null;
+let loadWorkoutItems = [];
 let selectedSetIndex = null;
 let timerInterval = null;
 let timerRemaining = 90;
@@ -288,7 +307,8 @@ async function initAuth() {
       showScreen('screen-home');
     } else {
       console.log('[Auth] no user, showing login screen');
-      db = { workouts: {}, custom_exercises: [], records: {} };
+      db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null };
+      currentPlanId = null; currentPlanData = null; bannerDismissed = false;
       showScreen('screen-login');
     }
     authDone = true;
@@ -1530,13 +1550,15 @@ function renderMenuUserBar() {
 
 function openFitnessTracker() {
   currentDate = todayStr();
+  bannerDismissed = false;
   updateUserBar();
+  renderSmartBanner();
   renderHome();
   showScreen('screen-fitness-tracker');
 }
 
 document.getElementById('menu-card-fitness').addEventListener('click', openFitnessTracker);
-document.getElementById('menu-card-workout').addEventListener('click', () => showScreen('screen-workout-plan'));
+document.getElementById('menu-card-workout').addEventListener('click', openWorkoutPlan);
 document.getElementById('menu-card-nutrition').addEventListener('click', () => showScreen('screen-nutrition'));
 document.getElementById('menu-card-progress').addEventListener('click', () => showScreen('screen-progress'));
 
@@ -1544,6 +1566,491 @@ document.getElementById('btn-home-from-tracker').addEventListener('click', () =>
 document.getElementById('btn-back-workout-plan').addEventListener('click', () => showScreen('screen-home'));
 document.getElementById('btn-back-nutrition').addEventListener('click', () => showScreen('screen-home'));
 document.getElementById('btn-back-progress').addEventListener('click', () => showScreen('screen-home'));
+
+// ── Anthropic API helper ──────────────────────────────
+async function callClaude(userMessage, systemPrompt) {
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 4096,
+      system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
+      messages: [{ role: 'user', content: userMessage }],
+    }),
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.error?.message || 'API error ' + resp.status);
+  }
+  const data = await resp.json();
+  return data.content[0].text;
+}
+
+// ── Plan Firestore helpers ────────────────────────────
+function plansCol() { return fStore.collection('users/' + currentUser.uid + '/plans'); }
+function activePlanDoc() { return fStore.doc('users/' + currentUser.uid + '/meta/activeplan'); }
+
+async function persistPlan(planId, planData) {
+  if (!currentUser) return;
+  await plansCol().doc(planId).set(planData);
+}
+async function deletePlanDoc(planId) {
+  if (!currentUser) return;
+  await plansCol().doc(planId).delete();
+}
+async function persistActivePlan(data) {
+  if (!currentUser) return;
+  if (!data) { await activePlanDoc().delete().catch(() => {}); return; }
+  await activePlanDoc().set(data);
+}
+
+// ── Plan CRUD ─────────────────────────────────────────
+function genPlanId() { return 'plan_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7); }
+
+async function createPlan(name, days) {
+  const planId = genPlanId();
+  const planData = { id: planId, name, days, createdAt: Date.now() };
+  db.plans[planId] = planData;
+  await persistPlan(planId, planData);
+  return planId;
+}
+
+async function duplicatePlan(planId) {
+  const src = db.plans[planId];
+  if (!src) return;
+  const newId = genPlanId();
+  const copy = { id: newId, name: 'Copy of ' + src.name, days: JSON.parse(JSON.stringify(src.days || [])), createdAt: Date.now() };
+  db.plans[newId] = copy;
+  await persistPlan(newId, copy);
+  renderPlanList();
+  toast('Plan duplicated');
+}
+
+async function deletePlan(planId) {
+  delete db.plans[planId];
+  await deletePlanDoc(planId);
+  if (db.activePlan && db.activePlan.planId === planId) {
+    db.activePlan = null;
+    await persistActivePlan(null);
+  }
+  renderPlanList();
+  toast('Plan deleted');
+}
+
+async function setActivePlan(planId) {
+  const plan = db.plans[planId];
+  if (!plan) return;
+  const wasActive = db.activePlan && db.activePlan.planId === planId;
+  if (wasActive) {
+    db.activePlan = null;
+    await persistActivePlan(null);
+    toast('Active plan removed');
+  } else {
+    db.activePlan = { planId, planName: plan.name, lastDayIndex: -1 };
+    await persistActivePlan(db.activePlan);
+    bannerDismissed = false;
+    toast('Set as active plan');
+  }
+}
+
+// ── Plan List Screen ──────────────────────────────────
+function openWorkoutPlan() {
+  renderPlanList();
+  showScreen('screen-workout-plan');
+}
+
+function renderPlanList() {
+  const scroll = document.getElementById('plan-list-scroll');
+  const plans = Object.values(db.plans).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  if (plans.length === 0) {
+    scroll.innerHTML = '<div class="plan-list-empty">No plans yet. Create one above!</div>';
+    return;
+  }
+  scroll.innerHTML = '';
+  plans.forEach(plan => {
+    const isActive = db.activePlan && db.activePlan.planId === plan.id;
+    const item = document.createElement('div');
+    item.className = 'plan-item';
+    item.innerHTML = `
+      <div class="plan-item-info">
+        <div class="plan-item-name">${plan.name}</div>
+        <div class="plan-item-meta">${(plan.days || []).length} day${(plan.days || []).length !== 1 ? 's' : ''}</div>
+        ${isActive ? '<div class="plan-item-active-pill">★ ACTIVE</div>' : ''}
+      </div>
+      <button class="plan-item-dots" aria-label="Options"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button>
+    `;
+    item.querySelector('.plan-item-info').addEventListener('click', () => openPlanDetail(plan.id));
+    item.querySelector('.plan-item-dots').addEventListener('click', e => {
+      e.stopPropagation();
+      const isAct = db.activePlan && db.activePlan.planId === plan.id;
+      showOverflowMenu([
+        { label: isAct ? '★ Remove active' : 'Set as Active', action: async () => { await setActivePlan(plan.id); renderPlanList(); } },
+        { label: 'Duplicate', action: () => duplicatePlan(plan.id) },
+        { label: 'Delete', action: () => { if (confirm('Delete "' + plan.name + '"?')) deletePlan(plan.id); } },
+      ], e.currentTarget);
+    });
+    scroll.appendChild(item);
+  });
+}
+
+// ── Plan Detail Screen ────────────────────────────────
+function openPlanDetail(planId) {
+  currentPlanId = planId;
+  currentPlanData = db.plans[planId];
+  if (!currentPlanData) return;
+  document.getElementById('plan-detail-title').textContent = currentPlanData.name;
+  const isActive = db.activePlan && db.activePlan.planId === planId;
+  const ribbon = document.getElementById('plan-active-ribbon');
+  ribbon.classList.toggle('show', isActive);
+  const starBtn = document.getElementById('btn-plan-set-active');
+  starBtn.classList.toggle('is-active', isActive);
+  renderPlanDetail();
+  showScreen('screen-plan-detail');
+}
+
+function renderPlanDetail() {
+  const scroll = document.getElementById('plan-detail-scroll');
+  if (!currentPlanData || !currentPlanData.days) { scroll.innerHTML = ''; return; }
+  scroll.innerHTML = '';
+  currentPlanData.days.forEach((day, idx) => {
+    const card = document.createElement('div');
+    card.className = 'plan-day-card';
+    const exRows = (day.exercises || []).map(ex =>
+      `<div class="plan-day-ex-row"><span class="plan-day-ex-name">${ex.name}</span><span class="plan-day-ex-sets">${ex.sets}×${ex.reps}</span></div>`
+    ).join('');
+    card.innerHTML = `
+      <div class="plan-day-header">
+        <div class="plan-day-num">${idx + 1}</div>
+        <div class="plan-day-name">${day.name}</div>
+        <button class="plan-day-load-btn" data-idx="${idx}">Load ▶</button>
+      </div>
+      <div class="plan-day-exercises">${exRows || '<div style="color:#444;font-size:13px;padding:0 0 4px">No exercises</div>'}</div>
+    `;
+    card.querySelector('.plan-day-load-btn').addEventListener('click', () => {
+      loadWorkoutReturnScreen = 'screen-plan-detail';
+      openLoadWorkout(currentPlanId, idx);
+    });
+    scroll.appendChild(card);
+  });
+}
+
+// ── Plan Set Active / Overflow ────────────────────────
+document.getElementById('btn-plan-set-active').addEventListener('click', async () => {
+  if (!currentPlanId) return;
+  await setActivePlan(currentPlanId);
+  const isActive = db.activePlan && db.activePlan.planId === currentPlanId;
+  document.getElementById('plan-active-ribbon').classList.toggle('show', isActive);
+  document.getElementById('btn-plan-set-active').classList.toggle('is-active', isActive);
+});
+
+document.getElementById('btn-overflow-plan-detail').addEventListener('click', e => {
+  showOverflowMenu([
+    { label: 'Duplicate', action: () => duplicatePlan(currentPlanId) },
+    { label: 'Delete', action: () => {
+      if (!currentPlanData) return;
+      if (confirm('Delete "' + currentPlanData.name + '"?')) {
+        deletePlan(currentPlanId).then(() => showScreen('screen-workout-plan'));
+      }
+    }},
+  ], e.currentTarget);
+});
+
+document.getElementById('btn-back-plan-detail').addEventListener('click', () => {
+  renderPlanList();
+  showScreen('screen-workout-plan');
+});
+
+// ── AI Generate Screen ────────────────────────────────
+function openAIGenerate() {
+  document.getElementById('ai-gen-form').classList.remove('hidden');
+  document.getElementById('ai-gen-loading').classList.add('hidden');
+  document.getElementById('ai-gen-pref').value = '';
+  showScreen('screen-ai-generate');
+}
+
+document.getElementById('btn-back-ai-generate').addEventListener('click', () => showScreen('screen-workout-plan'));
+
+document.getElementById('btn-ai-generate-submit').addEventListener('click', async () => {
+  if (!ANTHROPIC_API_KEY || ANTHROPIC_API_KEY.includes('YOUR_KEY')) {
+    toast('Add your Anthropic API key in app.js');
+    return;
+  }
+  const goal = document.querySelector('#chips-goal .chip.active')?.dataset.val || 'Muscle Growth';
+  const level = document.querySelector('#chips-level .chip.active')?.dataset.val || 'Intermediate';
+  const days = document.querySelector('#chips-days .chip.active')?.dataset.val || '4';
+  const pref = document.getElementById('ai-gen-pref').value.trim();
+
+  document.getElementById('ai-gen-form').classList.add('hidden');
+  document.getElementById('ai-gen-loading').classList.remove('hidden');
+
+  const systemPrompt = `You are a professional fitness coach. Generate a workout plan based on the user's input. Respond ONLY with a valid JSON object, no markdown, no explanation. Format:
+{
+  "name": "string",
+  "days": [
+    {
+      "name": "string",
+      "exercises": [
+        { "name": "string", "sets": 3, "reps": 10 }
+      ]
+    }
+  ]
+}`;
+
+  const userMsg = `Goal: ${goal}\nLevel: ${level}\nDays per week: ${days}${pref ? '\nPreference: ' + pref : ''}`;
+
+  try {
+    const raw = await callClaude(userMsg, systemPrompt);
+    const plan = JSON.parse(raw);
+    if (!plan.name || !Array.isArray(plan.days)) throw new Error('Invalid format');
+    const planId = await createPlan(plan.name, plan.days);
+    openPlanDetail(planId);
+    toast('Plan generated!');
+  } catch(e) {
+    console.error('AI gen error', e);
+    document.getElementById('ai-gen-form').classList.remove('hidden');
+    document.getElementById('ai-gen-loading').classList.add('hidden');
+    toast('Generation failed: ' + (e.message || 'try again'));
+  }
+});
+
+// Chip group click delegation
+document.querySelectorAll('.chip-group').forEach(group => {
+  group.addEventListener('click', e => {
+    const chip = e.target.closest('.chip');
+    if (!chip) return;
+    group.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+  });
+});
+
+// ── Presets ───────────────────────────────────────────
+const PLAN_PRESETS = [
+  { name: 'Push / Pull / Legs', days: [
+    { name: 'Push', exercises: [{ name:'Bench Press', sets:4, reps:8 }, { name:'Overhead Press', sets:3, reps:10 }, { name:'Incline Dumbbell Press', sets:3, reps:12 }, { name:'Tricep Dips', sets:3, reps:12 }] },
+    { name: 'Pull', exercises: [{ name:'Deadlift', sets:4, reps:5 }, { name:'Pull-Ups', sets:4, reps:8 }, { name:'Barbell Row', sets:3, reps:10 }, { name:'Bicep Curl', sets:3, reps:12 }] },
+    { name: 'Legs', exercises: [{ name:'Squat', sets:4, reps:8 }, { name:'Romanian Deadlift', sets:3, reps:10 }, { name:'Leg Press', sets:3, reps:12 }, { name:'Calf Raise', sets:4, reps:15 }] },
+  ]},
+  { name: 'Upper / Lower (4-day)', days: [
+    { name: 'Upper A', exercises: [{ name:'Bench Press', sets:4, reps:6 }, { name:'Barbell Row', sets:4, reps:6 }, { name:'Overhead Press', sets:3, reps:8 }, { name:'Pull-Ups', sets:3, reps:8 }] },
+    { name: 'Lower A', exercises: [{ name:'Squat', sets:4, reps:6 }, { name:'Romanian Deadlift', sets:3, reps:8 }, { name:'Leg Press', sets:3, reps:10 }, { name:'Leg Curl', sets:3, reps:12 }] },
+    { name: 'Upper B', exercises: [{ name:'Incline Bench Press', sets:4, reps:8 }, { name:'Cable Row', sets:4, reps:10 }, { name:'Dumbbell Shoulder Press', sets:3, reps:10 }, { name:'Bicep Curl', sets:3, reps:12 }] },
+    { name: 'Lower B', exercises: [{ name:'Deadlift', sets:4, reps:5 }, { name:'Hack Squat', sets:3, reps:10 }, { name:'Walking Lunge', sets:3, reps:12 }, { name:'Calf Raise', sets:4, reps:15 }] },
+  ]},
+  { name: 'Full Body (3-day)', days: [
+    { name: 'Day A', exercises: [{ name:'Squat', sets:3, reps:8 }, { name:'Bench Press', sets:3, reps:8 }, { name:'Barbell Row', sets:3, reps:8 }, { name:'Overhead Press', sets:3, reps:8 }] },
+    { name: 'Day B', exercises: [{ name:'Deadlift', sets:3, reps:5 }, { name:'Incline Bench Press', sets:3, reps:10 }, { name:'Pull-Ups', sets:3, reps:8 }, { name:'Bicep Curl', sets:3, reps:12 }] },
+    { name: 'Day C', exercises: [{ name:'Front Squat', sets:3, reps:8 }, { name:'Dips', sets:3, reps:10 }, { name:'Chin-Ups', sets:3, reps:8 }, { name:'Lateral Raise', sets:3, reps:15 }] },
+  ]},
+  { name: 'Bro Split (5-day)', days: [
+    { name: 'Chest', exercises: [{ name:'Bench Press', sets:4, reps:8 }, { name:'Incline Dumbbell Press', sets:3, reps:10 }, { name:'Cable Fly', sets:3, reps:12 }, { name:'Dips', sets:3, reps:12 }] },
+    { name: 'Back', exercises: [{ name:'Deadlift', sets:4, reps:5 }, { name:'Pull-Ups', sets:4, reps:8 }, { name:'Barbell Row', sets:3, reps:10 }, { name:'Cable Row', sets:3, reps:12 }] },
+    { name: 'Shoulders', exercises: [{ name:'Overhead Press', sets:4, reps:8 }, { name:'Lateral Raise', sets:4, reps:15 }, { name:'Front Raise', sets:3, reps:12 }, { name:'Shrugs', sets:3, reps:12 }] },
+    { name: 'Arms', exercises: [{ name:'Barbell Curl', sets:4, reps:10 }, { name:'Hammer Curl', sets:3, reps:12 }, { name:'Skull Crushers', sets:4, reps:10 }, { name:'Tricep Pushdown', sets:3, reps:12 }] },
+    { name: 'Legs', exercises: [{ name:'Squat', sets:4, reps:8 }, { name:'Romanian Deadlift', sets:3, reps:10 }, { name:'Leg Press', sets:3, reps:12 }, { name:'Calf Raise', sets:5, reps:15 }] },
+  ]},
+];
+
+function openPresetsOverlay() {
+  const list = document.getElementById('presets-list');
+  list.innerHTML = '';
+  PLAN_PRESETS.forEach(preset => {
+    const item = document.createElement('div');
+    item.className = 'preset-item';
+    item.innerHTML = `
+      <div class="preset-item-body">
+        <div class="preset-item-name">${preset.name}</div>
+        <div class="preset-item-meta">${preset.days.length} days</div>
+      </div>
+      <span class="preset-item-arrow">›</span>
+    `;
+    item.addEventListener('click', async () => {
+      closeOverlay('presets-overlay');
+      const planId = await createPlan(preset.name, JSON.parse(JSON.stringify(preset.days)));
+      openPlanDetail(planId);
+      toast('Preset added!');
+    });
+    list.appendChild(item);
+  });
+  openOverlay('presets-overlay');
+}
+
+// ── Make your own ─────────────────────────────────────
+function openMakeYourOwn() {
+  document.getElementById('new-plan-name').value = '';
+  document.querySelectorAll('#chips-new-plan-days .chip').forEach(c => c.classList.remove('active'));
+  document.querySelector('#chips-new-plan-days [data-val="3"]').classList.add('active');
+  openOverlay('new-plan-overlay');
+}
+
+document.getElementById('btn-plan-make-own').addEventListener('click', openMakeYourOwn);
+document.getElementById('btn-plan-presets').addEventListener('click', openPresetsOverlay);
+document.getElementById('btn-plan-ai').addEventListener('click', openAIGenerate);
+document.getElementById('btn-new-plan-cancel').addEventListener('click', () => closeOverlay('new-plan-overlay'));
+document.getElementById('btn-presets-close').addEventListener('click', () => closeOverlay('presets-overlay'));
+
+document.getElementById('btn-new-plan-save').addEventListener('click', async () => {
+  const name = document.getElementById('new-plan-name').value.trim();
+  if (!name) { toast('Enter a plan name'); return; }
+  const daysCount = parseInt(document.querySelector('#chips-new-plan-days .chip.active')?.dataset.val || '3');
+  const planDays = Array.from({ length: daysCount }, (_, i) => ({ name: 'Day ' + (i + 1), exercises: [] }));
+  closeOverlay('new-plan-overlay');
+  const planId = await createPlan(name, planDays);
+  openPlanDetail(planId);
+});
+
+// ── Load Workout Screen ───────────────────────────────
+function getLastSetForExercise(exName) {
+  const dates = Object.keys(db.workouts).sort().reverse();
+  for (const date of dates) {
+    const ex = db.workouts[date]?.find(e => e.name === exName);
+    if (ex && ex.sets && ex.sets.length > 0) {
+      const s = ex.sets[ex.sets.length - 1];
+      return { weight: s.weight, reps: s.reps, date };
+    }
+  }
+  return null;
+}
+
+async function openLoadWorkout(planId, dayIndex) {
+  currentLoadPlanId = planId;
+  currentLoadDayIndex = dayIndex;
+  const plan = db.plans[planId];
+  if (!plan || !plan.days[dayIndex]) { toast('Could not load day'); return; }
+  const day = plan.days[dayIndex];
+
+  document.getElementById('load-workout-title').textContent = 'Load: ' + day.name;
+  document.getElementById('lw-scroll').innerHTML = '<div style="padding:32px;text-align:center;color:#555">Loading...</div>';
+  showScreen('screen-load-workout');
+
+  loadWorkoutItems = (day.exercises || []).map(ex => {
+    const prev = getLastSetForExercise(ex.name);
+    return { name: ex.name, sets: ex.sets, reps: ex.reps, prevWeight: prev?.weight ?? null, prevReps: prev?.reps ?? null, selected: true, suggestion: '' };
+  });
+
+  renderLoadWorkoutList();
+
+  if (ANTHROPIC_API_KEY && !ANTHROPIC_API_KEY.includes('YOUR_KEY') && loadWorkoutItems.some(i => i.prevWeight !== null)) {
+    fetchProgressionSuggestions();
+  }
+}
+
+function renderLoadWorkoutList() {
+  const scroll = document.getElementById('lw-scroll');
+  scroll.innerHTML = '';
+
+  const allChecked = loadWorkoutItems.every(i => i.selected);
+  const saRow = document.createElement('div');
+  saRow.className = 'lw-select-all-row';
+  saRow.innerHTML = `<div class="lw-checkbox ${allChecked ? 'checked' : ''}" id="lw-cb-all"></div><span>Select All</span>`;
+  saRow.addEventListener('click', () => {
+    const next = !loadWorkoutItems.every(i => i.selected);
+    loadWorkoutItems.forEach(i => i.selected = next);
+    renderLoadWorkoutList();
+  });
+  scroll.appendChild(saRow);
+
+  loadWorkoutItems.forEach((item, idx) => {
+    const card = document.createElement('div');
+    card.className = 'lw-ex-card';
+    const prevTxt = item.prevWeight !== null ? `Last: ${item.prevWeight}kg × ${item.prevReps} reps` : 'No previous data';
+    const suggHtml = item.suggestion ? `<div class="lw-suggestion">🤖 ${item.suggestion}</div>` : '';
+    card.innerHTML = `
+      <div class="lw-ex-header">
+        <div class="lw-checkbox ${item.selected ? 'checked' : ''}" data-idx="${idx}"></div>
+        <div class="lw-ex-name">${item.name}</div>
+        <div class="lw-ex-sets">${item.sets}×${item.reps}</div>
+      </div>
+      <div class="lw-prev">${prevTxt}</div>
+      ${suggHtml}
+    `;
+    card.querySelector('[data-idx]').addEventListener('click', e => {
+      e.stopPropagation();
+      loadWorkoutItems[idx].selected = !loadWorkoutItems[idx].selected;
+      renderLoadWorkoutList();
+    });
+    scroll.appendChild(card);
+  });
+}
+
+async function fetchProgressionSuggestions() {
+  const withPrev = loadWorkoutItems.filter(i => i.prevWeight !== null);
+  if (withPrev.length === 0) return;
+  const systemPrompt = `You are a fitness coach. Based on previous performance, suggest weight progression. Be brief, max 1 sentence per exercise. Respond ONLY in JSON: { "suggestions": [ { "exercise": "string", "suggestion": "string" } ] }`;
+  const userMsg = withPrev.map(i => `${i.name}: last ${i.prevWeight}kg × ${i.prevReps} reps (plan: ${i.sets}×${i.reps})`).join('\n');
+  try {
+    const raw = await callClaude(userMsg, systemPrompt);
+    const data = JSON.parse(raw);
+    if (Array.isArray(data.suggestions)) {
+      data.suggestions.forEach(s => {
+        const item = loadWorkoutItems.find(i => i.name === s.exercise);
+        if (item) item.suggestion = s.suggestion;
+      });
+      renderLoadWorkoutList();
+    }
+  } catch(e) { console.warn('Progression suggestions failed', e); }
+}
+
+document.getElementById('btn-confirm-load-workout').addEventListener('click', async () => {
+  const selected = loadWorkoutItems.filter(i => i.selected);
+  if (selected.length === 0) { toast('Select at least one exercise'); return; }
+  const workout = getWorkout(currentDate);
+  selected.forEach(item => {
+    if (!workout.find(e => e.name === item.name)) workout.push({ name: item.name, sets: [] });
+  });
+  setWorkout(currentDate, workout);
+  // Advance active plan day index
+  if (db.activePlan && currentLoadPlanId === db.activePlan.planId && currentLoadDayIndex !== null) {
+    db.activePlan.lastDayIndex = currentLoadDayIndex;
+    await persistActivePlan(db.activePlan);
+  }
+  bannerDismissed = true;
+  renderHome();
+  toast('Workout loaded!');
+  showScreen('screen-fitness-tracker');
+});
+
+document.getElementById('btn-back-load-workout').addEventListener('click', () => showScreen(loadWorkoutReturnScreen));
+
+// ── Smart Day Banner ──────────────────────────────────
+function renderSmartBanner() {
+  const banner = document.getElementById('smart-day-banner');
+  if (!banner) return;
+  if (bannerDismissed || !db.activePlan) { banner.classList.add('hidden'); return; }
+  const plan = db.plans[db.activePlan.planId];
+  if (!plan || !plan.days || plan.days.length === 0) { banner.classList.add('hidden'); return; }
+  const lastIdx = db.activePlan.lastDayIndex ?? -1;
+  const nextIdx = (lastIdx + 1) % plan.days.length;
+  bannerSuggestedDayIndex = nextIdx;
+  const dayName = plan.days[nextIdx].name || ('Day ' + (nextIdx + 1));
+  document.getElementById('smart-banner-msg').textContent = `Based on your plan, today is ${dayName}. Load it?`;
+  banner.classList.remove('hidden');
+}
+
+document.getElementById('btn-banner-skip').addEventListener('click', () => {
+  bannerDismissed = true;
+  document.getElementById('smart-day-banner').classList.add('hidden');
+});
+
+document.getElementById('btn-banner-load').addEventListener('click', () => {
+  document.getElementById('smart-day-banner').classList.add('hidden');
+  if (db.activePlan && bannerSuggestedDayIndex !== null) {
+    loadWorkoutReturnScreen = 'screen-fitness-tracker';
+    openLoadWorkout(db.activePlan.planId, bannerSuggestedDayIndex);
+  }
+});
+
+// Add new overlays to backdrop-close listener
+['new-plan-overlay', 'presets-overlay'].forEach(id => {
+  document.getElementById(id).addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeOverlay(id);
+  });
+});
 
 // ── AI camera button listeners ────────────────────────
 document.getElementById('btn-ai-cam-close').addEventListener('click', closeAICamera);

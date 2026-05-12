@@ -124,6 +124,17 @@
   </div>
   <div class="user-bar" id="user-bar"></div>
 
+  <div class="smart-banner hidden" id="smart-day-banner">
+    <div class="smart-banner-body">
+      <span class="smart-banner-icon">💪</span>
+      <span class="smart-banner-msg" id="smart-banner-msg"></span>
+    </div>
+    <div class="smart-banner-actions">
+      <button class="sbn-btn sbn-skip" id="btn-banner-skip">Skip</button>
+      <button class="sbn-btn sbn-load" id="btn-banner-load">Yes, load it</button>
+    </div>
+  </div>
+
   <div class="day-nav">
     <button class="day-nav-btn" id="btn-prev-day" aria-label="Previous day">
       <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
@@ -245,20 +256,116 @@
   </div>
 </div>
 
-<!-- WORKOUT PLAN SCREEN -->
-<div id="screen-workout-plan" class="screen screen-placeholder">
-  <div class="toolbar">
+<!-- WORKOUT PLAN BUILDER SCREEN -->
+<div id="screen-workout-plan" class="screen plan-screen">
+  <div class="toolbar plan-toolbar">
     <button class="toolbar-btn" id="btn-back-workout-plan" aria-label="Back">
       <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
     </button>
-    <span class="toolbar-title">Workout Plan Builder</span>
+    <span class="toolbar-title">Workout Plans</span>
   </div>
-  <div class="placeholder-content">
-    <div class="placeholder-icon" style="color:#7C4DFF">
-      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-4.18C14.4.84 13.3 0 12 0c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm2 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V6h10v2z"/></svg>
+  <div class="plan-create-row">
+    <button class="plan-create-btn" id="btn-plan-make-own">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+      <span>Make your own</span>
+    </button>
+    <button class="plan-create-btn" id="btn-plan-presets">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H8V4h12v12z"/></svg>
+      <span>Presets</span>
+    </button>
+    <button class="plan-create-btn plan-create-ai-btn" id="btn-plan-ai">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2M7.5 13A2.5 2.5 0 0 0 5 15.5 2.5 2.5 0 0 0 7.5 18 2.5 2.5 0 0 0 10 15.5 2.5 2.5 0 0 0 7.5 13m9 0A2.5 2.5 0 0 0 14 15.5a2.5 2.5 0 0 0 2.5 2.5 2.5 2.5 0 0 0 2.5-2.5A2.5 2.5 0 0 0 16.5 13z"/></svg>
+      <span>Generate with AI</span>
+    </button>
+  </div>
+  <div class="plan-list-label">My Plans</div>
+  <div class="plan-list-scroll" id="plan-list-scroll">
+    <div class="plan-list-empty" id="plan-list-empty">No plans yet. Create one above!</div>
+  </div>
+</div>
+
+<!-- PLAN DETAIL SCREEN -->
+<div id="screen-plan-detail" class="screen plan-screen">
+  <div class="toolbar plan-toolbar">
+    <button class="toolbar-btn" id="btn-back-plan-detail" aria-label="Back">
+      <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </button>
+    <span class="toolbar-title" id="plan-detail-title">Plan</span>
+    <div class="toolbar-actions">
+      <button class="toolbar-btn plan-active-star" id="btn-plan-set-active" aria-label="Set active">
+        <svg viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+      </button>
+      <button class="toolbar-btn" id="btn-overflow-plan-detail" aria-label="Menu">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+      </button>
     </div>
-    <div class="placeholder-title">Coming Soon</div>
-    <div class="placeholder-desc">Build and follow your training schedule</div>
+  </div>
+  <div class="plan-active-ribbon" id="plan-active-ribbon">★ ACTIVE PLAN</div>
+  <div class="plan-detail-scroll" id="plan-detail-scroll"></div>
+</div>
+
+<!-- AI GENERATE SCREEN -->
+<div id="screen-ai-generate" class="screen plan-screen">
+  <div class="toolbar plan-toolbar">
+    <button class="toolbar-btn" id="btn-back-ai-generate" aria-label="Back">
+      <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </button>
+    <span class="toolbar-title">Generate with AI</span>
+  </div>
+  <div class="ai-gen-form" id="ai-gen-form">
+    <div class="ai-gen-section">
+      <div class="ai-gen-label">Goal</div>
+      <div class="chip-group" id="chips-goal">
+        <button class="chip active" data-val="Muscle Growth">Muscle Growth</button>
+        <button class="chip" data-val="Strength">Strength</button>
+        <button class="chip" data-val="Fat Loss">Fat Loss</button>
+        <button class="chip" data-val="General Fitness">General Fitness</button>
+      </div>
+    </div>
+    <div class="ai-gen-section">
+      <div class="ai-gen-label">Level</div>
+      <div class="chip-group" id="chips-level">
+        <button class="chip" data-val="Beginner">Beginner</button>
+        <button class="chip active" data-val="Intermediate">Intermediate</button>
+        <button class="chip" data-val="Advanced">Advanced</button>
+      </div>
+    </div>
+    <div class="ai-gen-section">
+      <div class="ai-gen-label">Days per week</div>
+      <div class="chip-group" id="chips-days">
+        <button class="chip" data-val="2">2</button>
+        <button class="chip" data-val="3">3</button>
+        <button class="chip active" data-val="4">4</button>
+        <button class="chip" data-val="5">5</button>
+        <button class="chip" data-val="6">6</button>
+      </div>
+    </div>
+    <div class="ai-gen-section">
+      <div class="ai-gen-label">Preference (optional)</div>
+      <textarea id="ai-gen-pref" class="ai-gen-textarea" placeholder="E.g. Focus on chest and back, no leg press..."></textarea>
+    </div>
+    <button class="ai-gen-submit-btn" id="btn-ai-generate-submit">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+      Generate Plan
+    </button>
+  </div>
+  <div class="ai-gen-loading hidden" id="ai-gen-loading">
+    <div class="ai-gen-spinner"></div>
+    <div class="ai-gen-loading-text">Generating your plan...</div>
+  </div>
+</div>
+
+<!-- LOAD WORKOUT SCREEN -->
+<div id="screen-load-workout" class="screen plan-screen">
+  <div class="toolbar plan-toolbar">
+    <button class="toolbar-btn" id="btn-back-load-workout" aria-label="Back">
+      <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </button>
+    <span class="toolbar-title" id="load-workout-title">Load Workout</span>
+  </div>
+  <div class="lw-scroll" id="lw-scroll"></div>
+  <div class="lw-footer">
+    <button class="lw-load-btn" id="btn-confirm-load-workout">Load Workout</button>
   </div>
 </div>
 
@@ -293,6 +400,35 @@
     </div>
     <div class="placeholder-title">Coming Soon</div>
     <div class="placeholder-desc">Track your body metrics and see your transformation</div>
+  </div>
+</div>
+
+<!-- NEW PLAN OVERLAY -->
+<div class="overlay" id="new-plan-overlay">
+  <div class="overlay-panel">
+    <h3>Create New Plan</h3>
+    <input type="text" id="new-plan-name" placeholder="Plan name..." autocomplete="off"/>
+    <div class="ai-gen-label" style="margin-top:4px">Days per week</div>
+    <div class="chip-group" id="chips-new-plan-days" style="margin-top:6px">
+      <button class="chip" data-val="2">2</button>
+      <button class="chip active" data-val="3">3</button>
+      <button class="chip" data-val="4">4</button>
+      <button class="chip" data-val="5">5</button>
+      <button class="chip" data-val="6">6</button>
+    </div>
+    <div class="overlay-btns" style="margin-top:8px">
+      <button class="btn-secondary" id="btn-new-plan-cancel">Cancel</button>
+      <button class="btn-primary" id="btn-new-plan-save">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- PRESETS OVERLAY -->
+<div class="overlay" id="presets-overlay">
+  <div class="overlay-panel">
+    <h3>Choose a Preset</h3>
+    <div id="presets-list"></div>
+    <button class="btn-text" id="btn-presets-close">Close</button>
   </div>
 </div>
 
