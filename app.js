@@ -146,9 +146,23 @@ async function uploadToDrive(file, filename) {
   return data.id;
 }
 
-function openVideoFrame(videoId) {
-  document.getElementById('video-player').src = `https://drive.google.com/file/d/${videoId}/preview`;
-  document.getElementById('video-overlay').classList.add('open');
+async function openVideoFrame(videoId) {
+  const overlay = document.getElementById('video-overlay');
+  const player = document.getElementById('video-player');
+  player.src = '';
+  overlay.classList.add('open');
+  try {
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${videoId}?alt=media`, {
+      headers: { Authorization: 'Bearer ' + googleAccessToken }
+    });
+    if (!res.ok) throw new Error('Failed to load video');
+    const blob = await res.blob();
+    player.src = URL.createObjectURL(blob);
+    player.play();
+  } catch (e) {
+    toast('Could not load video: ' + e.message);
+    overlay.classList.remove('open');
+  }
 }
 
 function removeSetVideo(setIndex) {
@@ -1114,7 +1128,9 @@ document.getElementById('video-input-file').addEventListener('change', async e =
 });
 
 document.getElementById('btn-video-close').addEventListener('click', () => {
-  document.getElementById('video-player').src = '';
+  const player = document.getElementById('video-player');
+  if (player.src) URL.revokeObjectURL(player.src);
+  player.src = '';
   document.getElementById('video-overlay').classList.remove('open');
 });
 
