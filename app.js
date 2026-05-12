@@ -1007,6 +1007,7 @@ document.getElementById('btn-clear').addEventListener('click', clearFields);
 document.getElementById('btn-timer').addEventListener('click', openTimer);
 document.getElementById('btn-training-pr').addEventListener('click', () => toast('Records coming soon'));
 document.getElementById('btn-training-info').addEventListener('click', () => toast('Info coming soon'));
+document.getElementById('btn-ai-coach').addEventListener('click', () => openAICamera(null));
 
 document.getElementById('exercise-search').addEventListener('input', e => {
   const q = e.target.value.toLowerCase().trim();
@@ -1433,6 +1434,9 @@ function stopAndSaveRecording() {
 async function onAICamRecordingStop() {
   if (aiCamStream) { aiCamStream.getTracks().forEach(t => t.stop()); aiCamStream = null; }
   showScreen('screen-training');
+
+  // AI Coach mode (no set): skip video save, reps already filled by stopAndSaveRecording
+  if (aiCamSetIndex === null) { aiCamChunks = []; return; }
 
   if (aiCamChunks.length === 0) return;
   const blob = new Blob(aiCamChunks, { type: aiCamChunks[0].type || 'video/webm' });
