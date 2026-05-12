@@ -272,3 +272,41 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .ai-cam-record-btn::after { content: ''; position: absolute; inset: 6px; border-radius: 50%; background: #f44336; transition: inset .15s, border-radius .15s; }
 .ai-cam-record-btn.recording::after { inset: 16px; border-radius: 6px; }
 .ai-cam-footer-spacer { width: 56px; flex-shrink: 0; }
+
+/* ── MAIN MENU SCREEN ─────────────────────────────────── */
+#screen-home { background: #121212; }
+
+.menu-wrapper { flex: 1; display: flex; flex-direction: column; padding: calc(var(--safe-top) + 20px) 16px calc(var(--safe-bottom) + 16px); gap: 16px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+.menu-header { text-align: center; padding: 8px 0 4px; flex-shrink: 0; }
+.menu-app-name { font-size: 22px; font-weight: 700; color: #fff; letter-spacing: -0.3px; }
+.menu-app-subtitle { font-size: 13px; color: #9e9e9e; margin-top: 4px; }
+
+.menu-cards { flex: 1; display: flex; flex-direction: column; gap: 12px; justify-content: center; }
+
+.menu-card { background: #1E1E1E; border-radius: 16px; display: flex; align-items: center; padding: 18px 16px; gap: 14px; cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,.45); border-left: 4px solid var(--card-accent); position: relative; overflow: hidden; transition: opacity 0.12s, transform 0.1s; }
+.menu-card:active { opacity: 0.65; transform: scale(0.97); }
+
+.menu-card-icon { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.menu-card-icon svg { width: 30px; height: 30px; }
+
+.menu-card-body { flex: 1; min-width: 0; }
+.menu-card-title { font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 3px; }
+.menu-card-desc { font-size: 12px; color: #9e9e9e; line-height: 1.4; }
+
+.menu-card-arrow { flex-shrink: 0; display: flex; align-items: center; }
+.menu-card-arrow svg { width: 20px; height: 20px; fill: #555; }
+
+.menu-user { display: flex; align-items: center; gap: 10px; padding: 8px 4px 0; flex-shrink: 0; }
+.menu-user-photo { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.menu-user-name { font-size: 13px; color: #777; }
+
+/* ── PLACEHOLDER SCREENS ──────────────────────────────── */
+.screen-placeholder { background: #121212; }
+.screen-placeholder .toolbar { background: #1a1a1a; box-shadow: 0 2px 4px rgba(0,0,0,.6); }
+
+.placeholder-content { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 32px 24px; }
+.placeholder-icon { opacity: 0.75; }
+.placeholder-icon svg { width: 80px; height: 80px; display: block; }
+.placeholder-title { font-size: 26px; font-weight: 700; color: #fff; }
+.placeholder-desc { font-size: 15px; color: #9e9e9e; text-align: center; line-height: 1.5; max-width: 260px; }

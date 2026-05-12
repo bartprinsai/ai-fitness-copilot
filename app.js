@@ -259,9 +259,7 @@ async function initAuth() {
       redirectHandled = true;
       currentUser = result.user;
       await loadUserData(result.user.uid);
-      updateUserBar();
-      currentDate = todayStr();
-      renderHome();
+      renderMenuUserBar();
       showScreen('screen-home');
       authDone = true;
       checkAndReveal();
@@ -286,9 +284,7 @@ async function initAuth() {
     if (user) {
       console.log('[Auth] signing in via onAuthStateChanged');
       await loadUserData(user.uid);
-      updateUserBar();
-      currentDate = todayStr();
-      renderHome();
+      renderMenuUserBar();
       showScreen('screen-home');
     } else {
       console.log('[Auth] no user, showing login screen');
@@ -996,12 +992,12 @@ document.getElementById('btn-back-exercises').addEventListener('click', () => {
     document.getElementById('exercise-search').value = '';
     renderCategoryBrowser();
   } else {
-    showScreen('screen-home');
+    showScreen('screen-fitness-tracker');
   }
 });
 
 document.getElementById('btn-new-exercise').addEventListener('click', openNewExercise);
-document.getElementById('btn-back-training').addEventListener('click', () => { renderHome(); showScreen('screen-home'); });
+document.getElementById('btn-back-training').addEventListener('click', () => { renderHome(); showScreen('screen-fitness-tracker'); });
 document.getElementById('btn-save-set').addEventListener('click', saveSet);
 document.getElementById('btn-clear').addEventListener('click', clearFields);
 document.getElementById('btn-timer').addEventListener('click', openTimer);
@@ -1520,6 +1516,34 @@ async function viewSetVideo(setIndex) {
     toast('No video found');
   }
 }
+
+// ── Main Menu ─────────────────────────────────────────
+function renderMenuUserBar() {
+  const bar = document.getElementById('menu-user-bar');
+  if (!currentUser) { bar.innerHTML = ''; return; }
+  const name = currentUser.displayName || currentUser.email || 'User';
+  const photo = currentUser.photoURL;
+  bar.innerHTML = photo
+    ? `<img src="${photo}" class="menu-user-photo" alt="${name}"/><span class="menu-user-name">${name}</span>`
+    : `<span class="menu-user-name">${name}</span>`;
+}
+
+function openFitnessTracker() {
+  currentDate = todayStr();
+  updateUserBar();
+  renderHome();
+  showScreen('screen-fitness-tracker');
+}
+
+document.getElementById('menu-card-fitness').addEventListener('click', openFitnessTracker);
+document.getElementById('menu-card-workout').addEventListener('click', () => showScreen('screen-workout-plan'));
+document.getElementById('menu-card-nutrition').addEventListener('click', () => showScreen('screen-nutrition'));
+document.getElementById('menu-card-progress').addEventListener('click', () => showScreen('screen-progress'));
+
+document.getElementById('btn-home-from-tracker').addEventListener('click', () => showScreen('screen-home'));
+document.getElementById('btn-back-workout-plan').addEventListener('click', () => showScreen('screen-home'));
+document.getElementById('btn-back-nutrition').addEventListener('click', () => showScreen('screen-home'));
+document.getElementById('btn-back-progress').addEventListener('click', () => showScreen('screen-home'));
 
 // ── AI camera button listeners ────────────────────────
 document.getElementById('btn-ai-cam-close').addEventListener('click', closeAICamera);

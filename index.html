@@ -50,10 +50,66 @@
   </div>
 </div>
 
-<!-- HOME SCREEN -->
+<!-- HOME SCREEN (Main Menu) -->
 <div id="screen-home" class="screen">
+  <div class="menu-wrapper">
+    <div class="menu-header">
+      <div class="menu-app-name">AI Fitness Co-Pilot</div>
+      <div class="menu-app-subtitle">Your personal fitness companion</div>
+    </div>
+    <div class="menu-cards">
+      <div class="menu-card" id="menu-card-fitness" style="--card-accent:#00E5FF">
+        <div class="menu-card-icon" style="color:#00E5FF">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.57 14.86L22 13.43 20.57 12 17 15.57 8.43 7 12 3.43 10.57 2 9.14 3.43 7.71 2 5.57 4.14 4.14 5.57 2 7.71 3.43 9.14 2 10.57 3.43 12 7 8.43 15.57 17 12 20.57 13.43 22 14.86 20.57 16.29 22 18.43 19.86 19.86 18.43 22 16.29 20.57 14.86z"/></svg>
+        </div>
+        <div class="menu-card-body">
+          <div class="menu-card-title">Fitness Tracker</div>
+          <div class="menu-card-desc">Log workouts, track sets &amp; reps, get live coaching</div>
+        </div>
+        <div class="menu-card-arrow"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg></div>
+      </div>
+      <div class="menu-card" id="menu-card-workout" style="--card-accent:#7C4DFF">
+        <div class="menu-card-icon" style="color:#7C4DFF">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-4.18C14.4.84 13.3 0 12 0c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm2 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V6h10v2z"/></svg>
+        </div>
+        <div class="menu-card-body">
+          <div class="menu-card-title">Workout Plan Builder</div>
+          <div class="menu-card-desc">Build and follow your training schedule</div>
+        </div>
+        <div class="menu-card-arrow"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg></div>
+      </div>
+      <div class="menu-card" id="menu-card-nutrition" style="--card-accent:#00C853">
+        <div class="menu-card-icon" style="color:#00C853">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5v-9.03C11.34 12.84 13 11.12 13 9V2h-2v7zm5-3v8h2.5v8H21V2c-2.76 0-5 2.24-5 4z"/></svg>
+        </div>
+        <div class="menu-card-body">
+          <div class="menu-card-title">Nutrition</div>
+          <div class="menu-card-desc">Track meals, calories and macros</div>
+        </div>
+        <div class="menu-card-arrow"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg></div>
+      </div>
+      <div class="menu-card" id="menu-card-progress" style="--card-accent:#FF6D00">
+        <div class="menu-card-icon" style="color:#FF6D00">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 9.2h3V19H5V9.2zM10.6 5h2.8v14h-2.8V5zm5.6 8H19v6h-2.8v-6z"/></svg>
+        </div>
+        <div class="menu-card-body">
+          <div class="menu-card-title">Progress</div>
+          <div class="menu-card-desc">Track your body metrics and see your transformation</div>
+        </div>
+        <div class="menu-card-arrow"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg></div>
+      </div>
+    </div>
+    <div class="menu-user" id="menu-user-bar"></div>
+  </div>
+</div>
+
+<!-- FITNESS TRACKER SCREEN -->
+<div id="screen-fitness-tracker" class="screen">
   <div class="toolbar">
-    <span class="toolbar-title">FitNotes</span>
+    <button class="toolbar-btn" id="btn-home-from-tracker" aria-label="Home">
+      <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+    </button>
+    <span class="toolbar-title">Fitness Tracker</span>
     <div class="toolbar-actions">
       <button class="toolbar-btn" id="btn-calendar" aria-label="Calendar">
         <svg viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5C3.9 3 3 3.9 3 5v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>
@@ -186,6 +242,57 @@
   <div class="training-coach-bar">
     <button class="coach-btn coach-btn-live" id="btn-live-coach">Live Coach</button>
     <button class="coach-btn coach-btn-chat" id="btn-chat-coach">Chat Coach</button>
+  </div>
+</div>
+
+<!-- WORKOUT PLAN SCREEN -->
+<div id="screen-workout-plan" class="screen screen-placeholder">
+  <div class="toolbar">
+    <button class="toolbar-btn" id="btn-back-workout-plan" aria-label="Back">
+      <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </button>
+    <span class="toolbar-title">Workout Plan Builder</span>
+  </div>
+  <div class="placeholder-content">
+    <div class="placeholder-icon" style="color:#7C4DFF">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-4.18C14.4.84 13.3 0 12 0c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm2 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V6h10v2z"/></svg>
+    </div>
+    <div class="placeholder-title">Coming Soon</div>
+    <div class="placeholder-desc">Build and follow your training schedule</div>
+  </div>
+</div>
+
+<!-- NUTRITION SCREEN -->
+<div id="screen-nutrition" class="screen screen-placeholder">
+  <div class="toolbar">
+    <button class="toolbar-btn" id="btn-back-nutrition" aria-label="Back">
+      <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </button>
+    <span class="toolbar-title">Nutrition</span>
+  </div>
+  <div class="placeholder-content">
+    <div class="placeholder-icon" style="color:#00C853">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5v-9.03C11.34 12.84 13 11.12 13 9V2h-2v7zm5-3v8h2.5v8H21V2c-2.76 0-5 2.24-5 4z"/></svg>
+    </div>
+    <div class="placeholder-title">Coming Soon</div>
+    <div class="placeholder-desc">Track meals, calories and macros</div>
+  </div>
+</div>
+
+<!-- PROGRESS SCREEN -->
+<div id="screen-progress" class="screen screen-placeholder">
+  <div class="toolbar">
+    <button class="toolbar-btn" id="btn-back-progress" aria-label="Back">
+      <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </button>
+    <span class="toolbar-title">Progress</span>
+  </div>
+  <div class="placeholder-content">
+    <div class="placeholder-icon" style="color:#FF6D00">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 9.2h3V19H5V9.2zM10.6 5h2.8v14h-2.8V5zm5.6 8H19v6h-2.8v-6z"/></svg>
+    </div>
+    <div class="placeholder-title">Coming Soon</div>
+    <div class="placeholder-desc">Track your body metrics and see your transformation</div>
   </div>
 </div>
 
