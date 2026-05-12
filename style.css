@@ -402,6 +402,48 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .sbn-skip { background: #2a2a2a; color: #888; }
 .sbn-load { background: rgba(0,229,255,.15); color: #00E5FF; }
 
+/* ── EXERCISE ADD DROPDOWN ────────────────────────────── */
+.exd-overlay { position: fixed; inset: 0; z-index: 150; pointer-events: none; }
+.exd-overlay.exd-open { pointer-events: all; }
+.exd-panel { position: absolute; top: calc(var(--toolbar-height) + var(--safe-top) + 4px); left: 8px; right: 8px; background: #1E1E1E; border-radius: 12px; overflow: hidden; max-height: calc(100vh - var(--toolbar-height) - var(--safe-top) - 20px); overflow-y: auto; box-shadow: 0 6px 28px rgba(0,0,0,.7); opacity: 0; transform: translateY(-6px) scale(0.98); transition: opacity 0.18s ease, transform 0.18s ease; pointer-events: none; }
+.exd-overlay.exd-open .exd-panel { opacity: 1; transform: translateY(0) scale(1); pointer-events: all; }
+.exd-item { padding: 16px; color: #fff; cursor: pointer; font-size: 15px; }
+.exd-item:active { background: rgba(255,255,255,.08); }
+.exd-bold { font-weight: 700; }
+.exd-divider { height: 1px; background: #2a2a2a; }
+.exd-plans-label { padding: 10px 16px 4px; font-size: 11px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: .08em; }
+.exd-plan-row { display: flex; align-items: center; padding: 13px 16px; color: #ccc; font-size: 15px; cursor: pointer; gap: 8px; }
+.exd-plan-row:active { background: rgba(255,255,255,.07); }
+.exd-plan-row-name { flex: 1; }
+.exd-plan-row svg { width: 16px; height: 16px; fill: #555; flex-shrink: 0; }
+.exd-no-plans { padding: 10px 16px; font-size: 13px; color: #444; }
+.exd-days-hdr { display: flex; align-items: center; padding: 4px 8px; border-bottom: 1px solid #2a2a2a; }
+.exd-back-btn { width: 44px; height: 44px; border: none; background: none; cursor: pointer; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background .1s; flex-shrink: 0; }
+.exd-back-btn:active { background: rgba(255,255,255,.1); }
+.exd-back-btn svg { width: 20px; height: 20px; fill: #fff; }
+.exd-days-title { font-size: 16px; font-weight: 600; color: #fff; }
+.exd-day-row { display: flex; align-items: center; padding: 13px 16px; color: #ccc; font-size: 15px; cursor: pointer; gap: 12px; }
+.exd-day-row:active { background: rgba(255,255,255,.07); }
+.exd-day-num { width: 24px; height: 24px; border-radius: 50%; background: #7C4DFF; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+/* ── PLAN DAY EDIT SCREEN ─────────────────────────────── */
+.pde-hint-txt { padding: 8px 16px; font-size: 12px; color: #444; flex-shrink: 0; }
+.pde-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 4px 12px 24px; display: flex; flex-direction: column; gap: 2px; }
+.pde-item { position: relative; border-radius: 10px; overflow: hidden; flex-shrink: 0; }
+.pde-item-inner { display: flex; align-items: center; background: #1E1E1E; border-radius: 10px; padding: 12px 4px 12px 14px; position: relative; z-index: 1; will-change: transform; }
+.pde-item.pde-dragging .pde-item-inner { box-shadow: 0 8px 28px rgba(0,0,0,.65); background: #272727; transform: scale(1.015); }
+.pde-ex-info { flex: 1; min-width: 0; }
+.pde-ex-name { font-size: 15px; color: #fff; display: block; }
+.pde-ex-meta { font-size: 12px; color: #555; display: block; margin-top: 2px; }
+.pde-drag-handle { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; cursor: grab; flex-shrink: 0; touch-action: none; }
+.pde-drag-handle:active { cursor: grabbing; }
+.pde-drag-handle svg { width: 20px; height: 20px; fill: #3a3a3a; }
+.pde-delete-reveal { position: absolute; right: 0; top: 0; bottom: 0; width: 0; background: #C62828; border-radius: 0 10px 10px 0; display: flex; align-items: center; justify-content: center; overflow: hidden; z-index: 0; }
+.pde-delete-btn { width: 80px; height: 100%; border: none; background: none; color: #fff; font-family: inherit; font-size: 12px; font-weight: 700; letter-spacing: .05em; cursor: pointer; flex-shrink: 0; }
+.pde-empty { padding: 32px 16px; text-align: center; color: #444; font-size: 14px; }
+.plan-day-header { cursor: pointer; }
+.plan-day-header:active { opacity: .85; }
+
 /* ── PRESET OVERLAY ITEMS ─────────────────────────────── */
 .preset-item { padding: 13px; border: 1px solid #2e2e2e; border-radius: 10px; cursor: pointer; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; transition: background .1s; }
 .preset-item:active { background: rgba(124,77,255,.08); }

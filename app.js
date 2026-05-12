@@ -249,6 +249,12 @@ let currentTimeRange = 'all';
 let calMonth = new Date();
 let exerciseBrowserMode = 'categories';
 let currentBrowseCategory = null;
+let currentEditDayIndex = null;
+let pdeDragItem = null;
+let pdeDragStartY = 0;
+let pdeDragDy = 0;
+let pdeActiveSwipeInner = null;
+let pdeActiveSwipeReveal = null;
 
 // -- Screen Navigation ----------------------------------
 function showScreen(id) {
@@ -462,6 +468,76 @@ function copyPreviousWorkout() {
   renderHome();
   toast('Workout copied');
 }
+
+// -- Exercise Add Dropdown ------------------------------
+function openExerciseDropdown() {
+  const overlay = document.getElementById('exd-overlay');
+  const plansList = document.getElementById('exd-plans-list');
+  const plansLabel = document.getElementById('exd-plans-label');
+
+  document.getElementById('exd-view-main').style.display = '';
+  document.getElementById('exd-view-days').style.display = 'none';
+
+  const plans = Object.values(db.plans).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  plansList.innerHTML = '';
+  if (plans.length === 0) {
+    plansLabel.style.display = 'none';
+    plansList.innerHTML = '<div class="exd-no-plans">No plans yet</div>';
+  } else {
+    plansLabel.style.display = '';
+    plans.forEach(plan => {
+      const row = document.createElement('div');
+      row.className = 'exd-plan-row';
+      row.innerHTML = `<span class="exd-plan-row-name">${plan.name}</span><svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>`;
+      row.addEventListener('click', () => showPlanDaysInDropdown(plan.id));
+      plansList.appendChild(row);
+    });
+  }
+
+  overlay.classList.add('exd-open');
+}
+
+function closeExerciseDropdown() {
+  document.getElementById('exd-overlay').classList.remove('exd-open');
+}
+
+function showPlanDaysInDropdown(planId) {
+  const plan = db.plans[planId];
+  if (!plan) return;
+  document.getElementById('exd-view-main').style.display = 'none';
+  document.getElementById('exd-view-days').style.display = '';
+  document.getElementById('exd-days-title').textContent = plan.name;
+
+  const daysList = document.getElementById('exd-days-list');
+  daysList.innerHTML = '';
+  (plan.days || []).forEach((day, idx) => {
+    const row = document.createElement('div');
+    row.className = 'exd-day-row';
+    row.innerHTML = `<div class="exd-day-num">${idx + 1}</div><span>${day.name}</span>`;
+    row.addEventListener('click', () => {
+      closeExerciseDropdown();
+      loadWorkoutReturnScreen = 'screen-fitness-tracker';
+      openLoadWorkout(planId, idx);
+    });
+    daysList.appendChild(row);
+  });
+}
+
+document.getElementById('exd-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('exd-overlay')) closeExerciseDropdown();
+});
+document.getElementById('exd-all-exercises').addEventListener('click', () => {
+  closeExerciseDropdown();
+  openExerciseList();
+});
+document.getElementById('exd-create-routine').addEventListener('click', () => {
+  closeExerciseDropdown();
+  openWorkoutPlan();
+});
+document.getElementById('exd-back-btn').addEventListener('click', () => {
+  document.getElementById('exd-view-main').style.display = '';
+  document.getElementById('exd-view-days').style.display = 'none';
+});
 
 // -- Exercise Browser -----------------------------------
 function openExerciseList() {
@@ -1002,7 +1078,7 @@ function closeOverlay(id) { document.getElementById(id).classList.remove('open')
 document.getElementById('btn-prev-day').addEventListener('click', () => { changeDate(-1); renderHome(); });
 document.getElementById('btn-next-day').addEventListener('click', () => { changeDate(1); renderHome(); });
 document.getElementById('btn-calendar').addEventListener('click', openCalendar);
-document.getElementById('btn-add-exercise').addEventListener('click', openExerciseList);
+document.getElementById('btn-add-exercise').addEventListener('click', openExerciseDropdown);
 
 document.getElementById('btn-back-exercises').addEventListener('click', () => {
   if (exerciseBrowserMode === 'exercises') {
@@ -1736,9 +1812,219 @@ function renderPlanDetail() {
       loadWorkoutReturnScreen = 'screen-plan-detail';
       openLoadWorkout(currentPlanId, idx);
     });
+    card.querySelector('.plan-day-header').addEventListener('click', e => {
+      if (e.target.closest('.plan-day-load-btn')) return;
+      openPlanDayEdit(idx);
+    });
     scroll.appendChild(card);
   });
 }
+
+// ── Plan Day Edit Screen ──────────────────────────────
+function openPlanDayEdit(dayIdx) {
+  currentEditDayIndex = dayIdx;
+  const day = currentPlanData.days[dayIdx];
+  document.getElementById('plan-day-edit-title').textContent = day.name;
+  renderPlanDayEdit();
+  showScreen('screen-plan-day-edit');
+}
+
+function renderPlanDayEdit() {
+  const list = document.getElementById('pde-list');
+  const day = currentPlanData.days[currentEditDayIndex];
+  const exercises = day.exercises || [];
+  list.innerHTML = '';
+
+  if (exercises.length === 0) {
+    list.innerHTML = '<div class="pde-empty">No exercises. Load a workout to add exercises to this day.</div>';
+    return;
+  }
+
+  exercises.forEach((ex, idx) => {
+    const item = document.createElement('div');
+    item.className = 'pde-item';
+    item.dataset.exIdx = idx;
+    item.innerHTML = `
+      <div class="pde-delete-reveal"><button class="pde-delete-btn">DELETE</button></div>
+      <div class="pde-item-inner">
+        <div class="pde-ex-info">
+          <span class="pde-ex-name">${ex.name}</span>
+          <span class="pde-ex-meta">${ex.sets} sets × ${ex.reps} reps</span>
+        </div>
+        <div class="pde-drag-handle" aria-label="Drag to reorder">
+          <svg viewBox="0 0 24 24"><path d="M3 15h18v-2H3v2zm0 4h18v-2H3v2zm0-8h18V9H3v2zm0-6v2h18V5H3z"/></svg>
+        </div>
+      </div>
+    `;
+    setupPdeSwipeDelete(item);
+    list.appendChild(item);
+  });
+
+  setupPdeDragReorder(list);
+}
+
+async function savePlanDayExercises(newExercises) {
+  currentPlanData.days[currentEditDayIndex].exercises = newExercises;
+  db.plans[currentPlanId] = currentPlanData;
+  await persistPlan(currentPlanId, currentPlanData);
+}
+
+function setupPdeDragReorder(list) {
+  list.addEventListener('touchstart', e => {
+    if (!e.target.closest('.pde-drag-handle')) return;
+    if (pdeActiveSwipeInner) {
+      pdeActiveSwipeInner.style.transform = '';
+      if (pdeActiveSwipeReveal) pdeActiveSwipeReveal.style.width = '0';
+      pdeActiveSwipeInner = null;
+      pdeActiveSwipeReveal = null;
+    }
+    pdeDragItem = e.target.closest('.pde-item');
+    if (!pdeDragItem) return;
+    pdeDragStartY = e.touches[0].clientY;
+    pdeDragDy = 0;
+    pdeDragItem.classList.add('pde-dragging');
+  }, { passive: true });
+
+  list.addEventListener('touchmove', e => {
+    if (!pdeDragItem) return;
+    e.preventDefault();
+    const touchY = e.touches[0].clientY;
+    pdeDragDy = touchY - pdeDragStartY;
+    pdeDragItem.querySelector('.pde-item-inner').style.transform = `translateY(${pdeDragDy}px)`;
+
+    const items = [...list.querySelectorAll('.pde-item')];
+    const dragPos = items.indexOf(pdeDragItem);
+
+    for (let i = 0; i < items.length; i++) {
+      if (items[i] === pdeDragItem) continue;
+      const sibRect = items[i].getBoundingClientRect();
+      const sibCenter = sibRect.top + sibRect.height / 2;
+      if (dragPos < i && touchY > sibCenter) {
+        items[i].insertAdjacentElement('afterend', pdeDragItem);
+        pdeDragStartY += sibRect.height;
+        pdeDragDy -= sibRect.height;
+        pdeDragItem.querySelector('.pde-item-inner').style.transform = `translateY(${pdeDragDy}px)`;
+        break;
+      } else if (dragPos > i && touchY < sibCenter) {
+        items[i].insertAdjacentElement('beforebegin', pdeDragItem);
+        pdeDragStartY -= sibRect.height;
+        pdeDragDy += sibRect.height;
+        pdeDragItem.querySelector('.pde-item-inner').style.transform = `translateY(${pdeDragDy}px)`;
+        break;
+      }
+    }
+  }, { passive: false });
+
+  const endDrag = async () => {
+    if (!pdeDragItem) return;
+    pdeDragItem.classList.remove('pde-dragging');
+    pdeDragItem.querySelector('.pde-item-inner').style.transform = '';
+
+    const day = currentPlanData.days[currentEditDayIndex];
+    const oldExercises = day.exercises || [];
+    const newItems = [...list.querySelectorAll('.pde-item')];
+    const newExercises = newItems.map(el => oldExercises[parseInt(el.dataset.exIdx)]).filter(Boolean);
+
+    if (JSON.stringify(newExercises.map(e => e.name)) !== JSON.stringify(oldExercises.map(e => e.name))) {
+      await savePlanDayExercises(newExercises);
+      newItems.forEach((el, i) => { el.dataset.exIdx = i; });
+      toast('Order saved');
+    }
+    pdeDragItem = null;
+  };
+
+  list.addEventListener('touchend', endDrag, { passive: true });
+  list.addEventListener('touchcancel', endDrag, { passive: true });
+}
+
+function setupPdeSwipeDelete(item) {
+  const inner = item.querySelector('.pde-item-inner');
+  const reveal = item.querySelector('.pde-delete-reveal');
+  const deleteBtn = item.querySelector('.pde-delete-btn');
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let mode = null;
+  let baseX = 0;
+  let isOpen = false;
+
+  inner.addEventListener('touchstart', e => {
+    if (e.target.closest('.pde-drag-handle') || pdeDragItem) return;
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    baseX = isOpen ? -80 : 0;
+    mode = null;
+    if (pdeActiveSwipeInner && pdeActiveSwipeInner !== inner) {
+      pdeActiveSwipeInner.style.transition = 'transform 0.15s';
+      pdeActiveSwipeInner.style.transform = '';
+      if (pdeActiveSwipeReveal) { pdeActiveSwipeReveal.style.transition = 'width 0.15s'; pdeActiveSwipeReveal.style.width = '0'; }
+      setTimeout(() => { if (pdeActiveSwipeInner) { pdeActiveSwipeInner.style.transition = ''; } if (pdeActiveSwipeReveal) pdeActiveSwipeReveal.style.transition = ''; }, 160);
+      pdeActiveSwipeInner = null;
+      pdeActiveSwipeReveal = null;
+    }
+  }, { passive: true });
+
+  inner.addEventListener('touchmove', e => {
+    if (e.target.closest('.pde-drag-handle') || pdeDragItem) return;
+    if (mode === 'scroll') return;
+    const dx = e.touches[0].clientX - touchStartX;
+    const dy = e.touches[0].clientY - touchStartY;
+    if (mode === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+      mode = Math.abs(dx) > Math.abs(dy) ? 'swipe' : 'scroll';
+    }
+    if (mode === 'swipe') {
+      e.preventDefault();
+      const target = Math.max(-80, Math.min(0, baseX + dx));
+      inner.style.transform = `translateX(${target}px)`;
+      reveal.style.width = `${Math.abs(target)}px`;
+      pdeActiveSwipeInner = inner;
+      pdeActiveSwipeReveal = reveal;
+    }
+  }, { passive: false });
+
+  inner.addEventListener('touchend', e => {
+    if (mode !== 'swipe') return;
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const finalX = baseX + dx;
+    inner.style.transition = 'transform 0.15s';
+    reveal.style.transition = 'width 0.15s';
+    if (finalX < -40) {
+      inner.style.transform = 'translateX(-80px)';
+      reveal.style.width = '80px';
+      isOpen = true;
+    } else {
+      inner.style.transform = '';
+      reveal.style.width = '0';
+      isOpen = false;
+      pdeActiveSwipeInner = null;
+      pdeActiveSwipeReveal = null;
+    }
+    setTimeout(() => { inner.style.transition = ''; reveal.style.transition = ''; }, 160);
+    mode = null;
+  }, { passive: true });
+
+  deleteBtn.addEventListener('click', async () => {
+    pdeActiveSwipeInner = null;
+    pdeActiveSwipeReveal = null;
+    const allItems = [...document.querySelectorAll('#pde-list .pde-item')];
+    const currentPos = allItems.indexOf(item);
+    item.style.transition = 'height 0.2s ease, opacity 0.2s ease, margin-bottom 0.2s ease';
+    item.style.overflow = 'hidden';
+    item.style.height = item.offsetHeight + 'px';
+    requestAnimationFrame(() => { item.style.height = '0'; item.style.opacity = '0'; item.style.marginBottom = '0'; });
+    await new Promise(r => setTimeout(r, 220));
+    const day = currentPlanData.days[currentEditDayIndex];
+    const exercises = [...(day.exercises || [])];
+    if (currentPos >= 0 && currentPos < exercises.length) exercises.splice(currentPos, 1);
+    await savePlanDayExercises(exercises);
+    renderPlanDayEdit();
+    toast('Exercise removed');
+  });
+}
+
+document.getElementById('btn-back-plan-day-edit').addEventListener('click', () => {
+  renderPlanDetail();
+  showScreen('screen-plan-detail');
+});
 
 // ── Plan Set Active / Overflow ────────────────────────
 document.getElementById('btn-plan-set-active').addEventListener('click', async () => {
