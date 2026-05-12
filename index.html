@@ -252,6 +252,28 @@
   <div class="dropdown-panel" id="overflow-panel"></div>
 </div>
 
+<!-- AI CAMERA SCREEN -->
+<div id="screen-ai-camera" class="screen">
+  <video id="ai-cam-video" autoplay playsinline muted></video>
+  <canvas id="ai-cam-canvas"></canvas>
+  <div class="ai-cam-header">
+    <button class="ai-cam-hbtn" id="btn-ai-cam-close">✕</button>
+    <span id="ai-cam-exercise-name" class="ai-cam-exercise-name"></span>
+    <button class="ai-cam-hbtn" id="btn-ai-cam-flip">
+      <svg viewBox="0 0 24 24"><path d="M20 5h-3.17L15 3H9L7.17 5H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-8 13c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+    </button>
+  </div>
+  <div class="ai-cam-rec" id="ai-cam-rec">● REC</div>
+  <div class="ai-cam-reps-wrap">
+    <div class="ai-cam-reps" id="ai-cam-reps">0</div>
+    <div class="ai-cam-reps-label">REPS</div>
+  </div>
+  <div class="ai-cam-coaching" id="ai-cam-coaching"></div>
+  <div class="ai-cam-footer">
+    <button class="ai-cam-record-btn" id="btn-ai-cam-record" aria-label="Record"></button>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
@@ -262,6 +284,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+
+<!-- MEDIAPIPE POSE -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/pose.js" crossorigin="anonymous"></script>
 
 <script src="exercises.js"></script>
 <script src="app.js"></script>
