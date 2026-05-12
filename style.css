@@ -244,7 +244,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 #video-player { width: 100%; height: 85vh; border: none; background: #000; }
 
 /* ── AI CAMERA SCREEN ─────────────────────────────────── */
-#screen-ai-camera { background: #000; overflow: hidden; position: relative; }
+#screen-ai-camera { background: #000; overflow: hidden; }
 #ai-cam-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 #ai-cam-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .ai-cam-header { position: absolute; top: 0; left: 0; right: 0; z-index: 10; display: flex; align-items: center; padding: calc(var(--safe-top) + 6px) 4px 14px; background: linear-gradient(to bottom, rgba(0,0,0,.65), transparent); }
@@ -257,8 +257,11 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .ai-cam-reps { font-size: 88px; font-weight: 700; color: #fff; line-height: 1; text-shadow: 0 2px 20px rgba(0,0,0,.85); font-variant-numeric: tabular-nums; }
 .ai-cam-reps-label { font-size: 12px; font-weight: 700; color: rgba(255,255,255,.65); letter-spacing: 4px; text-transform: uppercase; margin-top: 2px; }
 .ai-cam-coaching { position: absolute; left: 0; right: 0; bottom: 130px; z-index: 10; text-align: center; color: #29b6f6; font-size: 20px; font-weight: 700; text-shadow: 0 1px 10px rgba(0,0,0,.9); padding: 0 24px; pointer-events: none; min-height: 28px; }
-.ai-cam-footer { position: absolute; bottom: 0; left: 0; right: 0; z-index: 10; padding: 16px 16px calc(var(--safe-bottom) + 24px); display: flex; align-items: center; justify-content: center; background: linear-gradient(to top, rgba(0,0,0,.65), transparent); }
+.ai-cam-footer { position: absolute; bottom: 0; left: 0; right: 0; z-index: 10; padding: 16px 40px calc(var(--safe-bottom) + 24px); display: flex; align-items: center; justify-content: space-between; background: linear-gradient(to top, rgba(0,0,0,.65), transparent); }
+.ai-cam-close-btn { width: 56px; height: 56px; border-radius: 50%; border: 2px solid rgba(255,255,255,.55); background: rgba(0,0,0,.35); color: #fff; font-size: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .15s; flex-shrink: 0; }
+.ai-cam-close-btn:active { background: rgba(255,255,255,.2); }
 .ai-cam-record-btn { width: 72px; height: 72px; border-radius: 50%; border: 4px solid #fff; background: transparent; cursor: pointer; position: relative; transition: transform .1s; flex-shrink: 0; }
 .ai-cam-record-btn:active { transform: scale(.93); }
 .ai-cam-record-btn::after { content: ''; position: absolute; inset: 6px; border-radius: 50%; background: #f44336; transition: inset .15s, border-radius .15s; }
 .ai-cam-record-btn.recording::after { inset: 16px; border-radius: 6px; }
+.ai-cam-footer-spacer { width: 56px; flex-shrink: 0; }

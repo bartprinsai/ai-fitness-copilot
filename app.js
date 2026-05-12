@@ -1339,15 +1339,9 @@ async function startAICamStream(facingFront) {
     });
     const video = document.getElementById('ai-cam-video');
     video.srcObject = aiCamStream;
-    await video.play();
-    video.addEventListener('loadedmetadata', () => {
-      const canvas = document.getElementById('ai-cam-canvas');
-      const screen = document.getElementById('screen-ai-camera');
-      canvas.width = screen.offsetWidth;
-      canvas.height = screen.offsetHeight;
-    }, { once: true });
+    video.play().catch(e => console.warn('[AICam] play():', e));
   } catch(e) {
-    console.error('[AICam] camera:', e);
+    console.error('[AICam] getUserMedia:', e);
     toast('Camera not available');
     closeAICamera();
   }
@@ -1370,6 +1364,12 @@ function openAICamera(setIndex) {
   document.getElementById('btn-ai-cam-record').classList.remove('recording');
 
   showScreen('screen-ai-camera');
+
+  // Set canvas to viewport size — screen is position:fixed;inset:0 so it equals the viewport
+  const canvas = document.getElementById('ai-cam-canvas');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
   startAICamStream(true).then(() => {
     if (!aiCamActive) return;
     aiCamPose = initAICamPose();
@@ -1520,7 +1520,16 @@ async function viewSetVideo(setIndex) {
 document.getElementById('btn-ai-cam-close').addEventListener('click', closeAICamera);
 document.getElementById('btn-ai-cam-record').addEventListener('click', toggleAICamRecording);
 document.getElementById('btn-ai-cam-flip').addEventListener('click', () => {
+  if (aiCamRecording) { toast('Stop recording first'); return; }
   aiCamFacingFront = !aiCamFacingFront;
-  startAICamStream(aiCamFacingFront);
+  // Restart pose loop for new stream
+  if (aiCamPose) { try { aiCamPose.close(); } catch(e) {} aiCamPose = null; }
+  if (aiCamAnimFrame) { cancelAnimationFrame(aiCamAnimFrame); aiCamAnimFrame = null; }
+  aiCamPoseProcessing = false;
+  startAICamStream(aiCamFacingFront).then(() => {
+    if (!aiCamActive) return;
+    aiCamPose = initAICamPose();
+    if (aiCamPose) aiCamPoseLoop();
+  });
 });
 
