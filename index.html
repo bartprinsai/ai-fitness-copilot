@@ -116,13 +116,10 @@
         <svg viewBox="0 0 24 24"><path d="M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61l1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42A7.928 7.928 0 0 0 12 4c-4.42 0-8 3.58-8 8s3.57 8 8 8 8-3.58 8-8c0-1.85-.63-3.55-1.67-4.91zM12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6z"/></svg>
       </button>
       <button class="toolbar-btn" id="btn-training-pr" aria-label="Records">
-        <svg viewBox="0 0 24 24"><path d="M12 1L9 9H1l6.5 4.7L5 21l7-5 7 5-2.5-7.3L23 9h-8z"/></svg>
+        <svg viewBox="0 0 24 24"><path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V17H7v2h10v-2h-4v-1.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z"/></svg>
       </button>
       <button class="toolbar-btn" id="btn-training-info" aria-label="Info">
         <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
-      </button>
-      <button class="toolbar-btn" id="btn-ai-coach" aria-label="AI Coach">
-        <svg viewBox="0 0 24 24"><path d="M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25L19 9zm-7.5.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12l-5.5-2.5zM19 15l-1.25 2.75L15 19l2.75 1.25L19 23l1.25-2.75L23 19l-2.75-1.25L19 15z"/></svg>
       </button>
       <button class="toolbar-btn" id="btn-overflow-training" aria-label="Menu">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
@@ -184,6 +181,11 @@
     <canvas id="progress-chart" width="340" height="220"></canvas>
     <div class="graph-empty" id="graph-empty">No data available</div>
     <div class="graph-hint" id="graph-hint">Tap a point to view more details</div>
+  </div>
+
+  <div class="training-coach-bar">
+    <button class="coach-btn coach-btn-live" id="btn-live-coach">Live Coach</button>
+    <button class="coach-btn coach-btn-chat" id="btn-chat-coach">Chat Coach</button>
   </div>
 </div>
 

@@ -1007,7 +1007,8 @@ document.getElementById('btn-clear').addEventListener('click', clearFields);
 document.getElementById('btn-timer').addEventListener('click', openTimer);
 document.getElementById('btn-training-pr').addEventListener('click', () => toast('Records coming soon'));
 document.getElementById('btn-training-info').addEventListener('click', () => toast('Info coming soon'));
-document.getElementById('btn-ai-coach').addEventListener('click', () => openAICamera(null));
+document.getElementById('btn-live-coach').addEventListener('click', () => openAICamera(null));
+document.getElementById('btn-chat-coach').addEventListener('click', () => toast('Coming soon!'));
 
 document.getElementById('exercise-search').addEventListener('input', e => {
   const q = e.target.value.toLowerCase().trim();

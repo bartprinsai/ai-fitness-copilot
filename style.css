@@ -93,6 +93,13 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .tab-content { display: none; flex: 1; overflow-y: auto; flex-direction: column; }
 .tab-content.active { display: flex; }
 
+/* ── TRAINING COACH BAR ───────────────────────────────── */
+.training-coach-bar { display: flex; gap: 10px; padding: 10px 12px calc(var(--safe-bottom) + 10px); background: var(--bg); border-top: 1px solid var(--border); flex-shrink: 0; }
+.coach-btn { flex: 1; padding: 15px 8px; border: none; border-radius: 10px; color: #fff; font-family: inherit; font-size: 15px; font-weight: 700; cursor: pointer; letter-spacing: .04em; transition: filter .1s; }
+.coach-btn:active { filter: brightness(.85); }
+.coach-btn-live { background: #00E5FF; }
+.coach-btn-chat { background: #FF6D00; }
+
 /* ── SET FIELDS ───────────────────────────────────────── */
 .set-fields { background: var(--surface); display: flex; flex-direction: column; flex-shrink: 0; box-shadow: 0 2px 4px rgba(0,0,0,.1); }
 .field-group { padding: 12px 16px 14px; border-bottom: 1px solid var(--border); }
