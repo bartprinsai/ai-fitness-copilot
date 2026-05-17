@@ -496,3 +496,28 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .new-ex-cat-confirm-btn:active { filter: brightness(.85); }
 .new-ex-cat-confirm-btn svg { width: 18px; height: 18px; fill: #fff; }
 .new-ex-saveadd-btn { font-size: 16px; font-weight: 700; letter-spacing: -1px; }
+
+/* ── EXERCISE INFO SCREEN ─────────────────────────────── */
+.ei-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 12px; display: flex; flex-direction: column; gap: 12px; padding-bottom: calc(var(--safe-bottom) + 20px); }
+.ei-card { background: var(--surface); border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.ei-section-title { font-size: 11px; font-weight: 700; color: var(--cyan); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 12px; }
+.ei-gif-wrapper { display: flex; align-items: center; justify-content: center; min-height: 160px; }
+.ei-gif { max-width: 100%; max-height: 300px; border-radius: 6px; display: block; }
+.ei-gif-placeholder { font-size: 14px; color: var(--text-hint); text-align: center; padding: 24px; }
+.ei-muscle-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.ei-muscle-row:last-child { margin-bottom: 0; }
+.ei-muscle-label { font-size: 12px; font-weight: 600; color: var(--text-secondary); min-width: 72px; flex-shrink: 0; }
+.ei-badge { padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; text-transform: capitalize; }
+.ei-badge-primary { background: var(--cyan-light); color: var(--cyan); }
+.ei-badge-secondary { background: var(--bg); color: var(--text-secondary); border: 1px solid var(--border); }
+.ei-muscle-empty { font-size: 14px; color: var(--text-hint); }
+.ei-loading { display: flex; align-items: center; justify-content: center; padding: 20px; }
+.ei-loading.hidden { display: none; }
+.ei-spinner { width: 28px; height: 28px; border: 3px solid var(--border); border-top-color: var(--cyan); border-radius: 50%; animation: spin .8s linear infinite; }
+.ei-steps-list { display: flex; flex-direction: column; gap: 12px; }
+.ei-step { display: flex; align-items: flex-start; gap: 12px; }
+.ei-step-num { width: 24px; height: 24px; border-radius: 50%; background: var(--cyan); color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+.ei-step-text { font-size: 15px; color: var(--text-primary); line-height: 1.5; flex: 1; }
+.ei-step-empty { font-size: 14px; color: var(--text-hint); }
+.exercise-item-info { width: 20px; height: 20px; fill: var(--text-hint); flex-shrink: 0; margin-right: 8px; cursor: pointer; padding: 2px; }
+.exercise-item-info:active { fill: var(--cyan); }

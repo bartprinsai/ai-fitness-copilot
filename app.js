@@ -35,6 +35,11 @@ let homeExDragDy = 0;
 // -- Exercise browser extended state -------------------
 let currentBrowsePlan = null;
 
+// -- Exercise info screen state ------------------------
+let freeExerciseDB = null;
+let howToCache = {};
+let exerciseInfoReturnScreen = 'screen-exercises';
+
 // -- Splash coordination --------------------------------
 let splashDone = false, authDone = false;
 function checkAndReveal() {
@@ -848,14 +853,125 @@ function renderExerciseItem(list, ex) {
   item.className = 'exercise-item' + (ex.custom ? ' exercise-item-custom' : '');
   item.innerHTML = `
     <span class="exercise-item-name">${ex.name}</span>
+    <svg class="exercise-item-info" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
     <svg class="exercise-item-dots" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
   `;
   item.querySelector('.exercise-item-name').addEventListener('click', () => {
     addExerciseToWorkout(ex.name);
     openTraining(ex.name);
   });
+  item.querySelector('.exercise-item-info').addEventListener('click', e => {
+    e.stopPropagation();
+    openExerciseInfo(ex.name, 'screen-exercises');
+  });
   item.querySelector('.exercise-item-dots').addEventListener('click', () => toast('Coming soon'));
   list.appendChild(item);
+}
+
+// -- Exercise Info Screen -------------------------------
+async function loadFreeExerciseDB() {
+  if (freeExerciseDB) return freeExerciseDB;
+  try {
+    const resp = await fetch('https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/exercises.json');
+    freeExerciseDB = await resp.json();
+  } catch {
+    freeExerciseDB = [];
+  }
+  return freeExerciseDB;
+}
+
+function normalizeExName(name) {
+  return name.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function findExerciseInDB(name, db) {
+  const norm = normalizeExName(name);
+  let match = db.find(e => normalizeExName(e.name) === norm);
+  if (match) return match;
+  match = db.find(e => normalizeExName(e.name).includes(norm) || norm.includes(normalizeExName(e.name)));
+  if (match) return match;
+  const words = norm.split(' ').filter(w => w.length > 2);
+  let best = null, bestScore = 0;
+  db.forEach(e => {
+    const eWords = normalizeExName(e.name).split(' ');
+    const score = words.filter(w => eWords.includes(w)).length;
+    if (score > bestScore) { bestScore = score; best = e; }
+  });
+  return bestScore >= 2 ? best : null;
+}
+
+function openExerciseInfo(name, returnScreen) {
+  exerciseInfoReturnScreen = returnScreen || 'screen-exercises';
+  document.getElementById('ei-title').textContent = name;
+  const gifEl = document.getElementById('ei-gif');
+  gifEl.src = '';
+  gifEl.classList.add('hidden');
+  const placeholder = document.getElementById('ei-gif-placeholder');
+  placeholder.textContent = 'Loading...';
+  placeholder.classList.remove('hidden');
+  document.getElementById('ei-muscles-card').innerHTML = '';
+  document.getElementById('ei-steps-list').innerHTML = '';
+  document.getElementById('ei-loading').classList.remove('hidden');
+  showScreen('screen-exercise-info');
+  loadExerciseInfo(name);
+}
+
+async function loadExerciseInfo(name) {
+  const db = await loadFreeExerciseDB();
+  const entry = findExerciseInDB(name, db);
+
+  const gifEl = document.getElementById('ei-gif');
+  const placeholder = document.getElementById('ei-gif-placeholder');
+  if (entry && entry.images && entry.images.length > 0) {
+    const imgUrl = `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/${entry.images[0]}`;
+    gifEl.onload = () => { gifEl.classList.remove('hidden'); placeholder.classList.add('hidden'); };
+    gifEl.onerror = () => { placeholder.textContent = 'Animation not available'; };
+    gifEl.src = imgUrl;
+  } else {
+    placeholder.textContent = 'Animation not available';
+  }
+
+  const musclesCard = document.getElementById('ei-muscles-card');
+  if (entry) {
+    const primary = entry.primaryMuscles || [];
+    const secondary = entry.secondaryMuscles || [];
+    let html = '';
+    if (primary.length) html += `<div class="ei-muscle-row"><span class="ei-muscle-label">Primary:</span>${primary.map(m => `<span class="ei-badge ei-badge-primary">${m}</span>`).join('')}</div>`;
+    if (secondary.length) html += `<div class="ei-muscle-row"><span class="ei-muscle-label">Secondary:</span>${secondary.map(m => `<span class="ei-badge ei-badge-secondary">${m}</span>`).join('')}</div>`;
+    musclesCard.innerHTML = html || '<div class="ei-step-empty">No muscle data available</div>';
+  } else {
+    musclesCard.innerHTML = '<div class="ei-step-empty">No muscle data available</div>';
+  }
+
+  const stepsList = document.getElementById('ei-steps-list');
+  const loadingEl = document.getElementById('ei-loading');
+  if (howToCache[name]) {
+    renderHowToSteps(stepsList, howToCache[name]);
+    loadingEl.classList.add('hidden');
+  } else if (!ANTHROPIC_API_KEY || ANTHROPIC_API_KEY.includes('YOUR_KEY')) {
+    stepsList.innerHTML = '<div class="ei-step-empty">Add your Anthropic API key to see instructions</div>';
+    loadingEl.classList.add('hidden');
+  } else {
+    try {
+      const system = 'You are a fitness expert. Give clear step-by-step instructions for performing the exercise correctly. Be concise. Return ONLY a JSON array of strings, no markdown, no explanation. Each string is one step. Maximum 6 steps.';
+      const text = await callClaude(`How to perform: ${name}`, system);
+      const steps = JSON.parse(text.trim());
+      howToCache[name] = steps;
+      renderHowToSteps(stepsList, steps);
+    } catch {
+      stepsList.innerHTML = '<div class="ei-step-empty">Could not load instructions</div>';
+    }
+    loadingEl.classList.add('hidden');
+  }
+}
+
+function renderHowToSteps(container, steps) {
+  container.innerHTML = steps.map((step, i) => `
+    <div class="ei-step">
+      <span class="ei-step-num">${i + 1}</span>
+      <span class="ei-step-text">${step}</span>
+    </div>
+  `).join('');
 }
 
 function addExerciseToWorkout(name) {
@@ -1421,7 +1537,8 @@ document.getElementById('btn-save-set').addEventListener('click', saveSet);
 document.getElementById('btn-clear').addEventListener('click', clearFields);
 document.getElementById('btn-timer').addEventListener('click', openTimer);
 document.getElementById('btn-training-pr').addEventListener('click', () => toast('Records coming soon'));
-document.getElementById('btn-training-info').addEventListener('click', () => toast('Info coming soon'));
+document.getElementById('btn-training-info').addEventListener('click', () => { if (currentExercise) openExerciseInfo(currentExercise, 'screen-training'); });
+document.getElementById('btn-back-exercise-info').addEventListener('click', () => showScreen(exerciseInfoReturnScreen));
 document.getElementById('btn-live-coach').addEventListener('click', () => openAICamera(null));
 document.getElementById('btn-chat-coach').addEventListener('click', () => toast('Coming soon!'));
 
