@@ -871,10 +871,16 @@ function renderExerciseItem(list, ex) {
 // -- Exercise Info Screen -------------------------------
 async function loadFreeExerciseDB() {
   if (freeExerciseDB) return freeExerciseDB;
+  const url = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/exercises.json';
+  console.log('[ExerciseInfo] Fetching dataset:', url);
   try {
-    const resp = await fetch('https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/exercises.json');
+    const resp = await fetch(url);
+    console.log('[ExerciseInfo] Dataset status:', resp.status);
     freeExerciseDB = await resp.json();
-  } catch {
+    console.log('[ExerciseInfo] Dataset loaded, total:', freeExerciseDB.length);
+    console.log('[ExerciseInfo] First 5 names:', freeExerciseDB.slice(0, 5).map(e => e.name));
+  } catch (err) {
+    console.error('[ExerciseInfo] Dataset fetch failed:', err);
     freeExerciseDB = [];
   }
   return freeExerciseDB;
@@ -946,11 +952,13 @@ function openExerciseInfo(name, returnScreen) {
 async function loadExerciseInfo(name) {
   const db = await loadFreeExerciseDB();
   const entry = findExerciseInDB(name, db);
+  console.log('[ExerciseInfo] Entry found:', entry ? entry.name : 'null');
 
   const gifEl = document.getElementById('ei-gif');
   const placeholder = document.getElementById('ei-gif-placeholder');
   if (entry && entry.images && entry.images.length > 0) {
     const imgUrl = `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/${entry.images[0]}`;
+    console.log('[ExerciseInfo] GIF URL:', imgUrl);
     gifEl.onload = () => { gifEl.classList.remove('hidden'); placeholder.classList.add('hidden'); };
     gifEl.onerror = () => { placeholder.textContent = 'Animation not available'; };
     gifEl.src = imgUrl;
@@ -977,8 +985,20 @@ async function loadExerciseInfo(name) {
     loadingEl.classList.add('hidden');
   } else {
     try {
-      const system = 'You are a fitness expert. Give clear step-by-step instructions for performing the exercise correctly. Be concise. Return ONLY a JSON array of strings, no markdown, no explanation. Each string is one step. Maximum 6 steps.';
-      const text = await callClaude(`How to perform: ${name}`, system);
+      const prompt = `You are a fitness expert. Give clear step-by-step instructions for performing the exercise correctly. Be concise. Return ONLY a JSON array of strings, no markdown, no explanation. Each string is one step. Maximum 6 steps.\n\nHow to perform: ${name}`;
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+      console.log('[ExerciseInfo] How-to response status:', resp.status);
+      const data = await resp.json();
+      console.log('[ExerciseInfo] How-to response:', data);
+      const text = data.content[0].text;
       const jsonMatch = text.match(/\[[\s\S]*\]/);
       const steps = JSON.parse(jsonMatch ? jsonMatch[0] : text.trim());
       howToCache[name] = steps;
