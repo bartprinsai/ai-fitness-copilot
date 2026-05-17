@@ -881,15 +881,37 @@ async function loadFreeExerciseDB() {
 }
 
 function normalizeExName(name) {
-  return name.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+  return name.toLowerCase()
+    .replace(/-/g, ' ')
+    .replace(/[()]/g, '')
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function findExerciseInDB(name, db) {
   const norm = normalizeExName(name);
+  console.log(`[ExerciseInfo] Searching for: "${name}" → normalized: "${norm}"`);
+
+  // 1. Exact match
   let match = db.find(e => normalizeExName(e.name) === norm);
-  if (match) return match;
-  match = db.find(e => normalizeExName(e.name).includes(norm) || norm.includes(normalizeExName(e.name)));
-  if (match) return match;
+  if (match) { console.log(`[ExerciseInfo] Exact match: "${match.name}"`); return match; }
+
+  // 2. One string contains the other
+  match = db.find(e => {
+    const n = normalizeExName(e.name);
+    return n.includes(norm) || norm.includes(n);
+  });
+  if (match) { console.log(`[ExerciseInfo] Partial match: "${match.name}"`); return match; }
+
+  // 3. First word match (startsWith)
+  const firstWord = norm.split(' ')[0];
+  if (firstWord.length > 3) {
+    match = db.find(e => normalizeExName(e.name).startsWith(firstWord));
+    if (match) { console.log(`[ExerciseInfo] First-word match: "${match.name}"`); return match; }
+  }
+
+  // 4. Word overlap score (threshold 1 for single-word names like "Squat")
   const words = norm.split(' ').filter(w => w.length > 2);
   let best = null, bestScore = 0;
   db.forEach(e => {
@@ -897,7 +919,12 @@ function findExerciseInDB(name, db) {
     const score = words.filter(w => eWords.includes(w)).length;
     if (score > bestScore) { bestScore = score; best = e; }
   });
-  return bestScore >= 2 ? best : null;
+  if (bestScore >= 1 && best) {
+    console.log(`[ExerciseInfo] Word-overlap match (score ${bestScore}): "${best.name}"`);
+    return best;
+  }
+  console.log(`[ExerciseInfo] No match found`);
+  return null;
 }
 
 function openExerciseInfo(name, returnScreen) {
@@ -948,17 +975,16 @@ async function loadExerciseInfo(name) {
   if (howToCache[name]) {
     renderHowToSteps(stepsList, howToCache[name]);
     loadingEl.classList.add('hidden');
-  } else if (!ANTHROPIC_API_KEY || ANTHROPIC_API_KEY.includes('YOUR_KEY')) {
-    stepsList.innerHTML = '<div class="ei-step-empty">Add your Anthropic API key to see instructions</div>';
-    loadingEl.classList.add('hidden');
   } else {
     try {
       const system = 'You are a fitness expert. Give clear step-by-step instructions for performing the exercise correctly. Be concise. Return ONLY a JSON array of strings, no markdown, no explanation. Each string is one step. Maximum 6 steps.';
       const text = await callClaude(`How to perform: ${name}`, system);
-      const steps = JSON.parse(text.trim());
+      const jsonMatch = text.match(/\[[\s\S]*\]/);
+      const steps = JSON.parse(jsonMatch ? jsonMatch[0] : text.trim());
       howToCache[name] = steps;
       renderHowToSteps(stepsList, steps);
-    } catch {
+    } catch (err) {
+      console.error('[ExerciseInfo] How-to fetch failed:', err);
       stepsList.innerHTML = '<div class="ei-step-empty">Could not load instructions</div>';
     }
     loadingEl.classList.add('hidden');
