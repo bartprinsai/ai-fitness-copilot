@@ -27,10 +27,13 @@ let tokenClient = null;
 
 // -- Home selection mode state --------------------------
 let homeSelMode = false;
-let homeSelCard = null;
+let homeSelCards = new Set();
 let homeExDragItem = null;
 let homeExDragStartY = 0;
 let homeExDragDy = 0;
+
+// -- Exercise browser extended state -------------------
+let currentBrowsePlan = null;
 
 // -- Splash coordination --------------------------------
 let splashDone = false, authDone = false;
@@ -482,44 +485,66 @@ function renderHome() {
     card.addEventListener('touchend', cancelLongPress, { passive: true });
     card.addEventListener('touchcancel', cancelLongPress, { passive: true });
 
-    card.addEventListener('click', () => { if (!homeSelMode) openTraining(ex.name); });
+    card.addEventListener('click', () => {
+      if (!homeSelMode) {
+        openTraining(ex.name);
+      } else {
+        if (homeSelCards.has(card)) {
+          homeSelCards.delete(card);
+          card.classList.remove('exercise-card-selected');
+          if (homeSelCards.size === 0) exitHomeSelMode();
+          else updateHomeSelCount();
+        } else {
+          homeSelCards.add(card);
+          card.classList.add('exercise-card-selected');
+          updateHomeSelCount();
+        }
+      }
+    });
     container.appendChild(card);
   });
 }
 
 function enterHomeSelMode(card) {
   homeSelMode = true;
-  homeSelCard = card;
+  homeSelCards.add(card);
   card.classList.add('exercise-card-selected');
   document.getElementById('screen-fitness-tracker').classList.add('sel-mode');
-  document.getElementById('home-sel-count').textContent = '1 exercise';
+  updateHomeSelCount();
+}
+
+function updateHomeSelCount() {
+  const n = homeSelCards.size;
+  document.getElementById('home-sel-count').textContent = n === 1 ? '1 exercise' : `${n} exercises`;
+  document.getElementById('screen-fitness-tracker').classList.toggle('sel-single', n === 1);
 }
 
 function exitHomeSelMode() {
   homeSelMode = false;
-  if (homeSelCard) { homeSelCard.classList.remove('exercise-card-selected'); homeSelCard = null; }
-  document.getElementById('screen-fitness-tracker').classList.remove('sel-mode');
+  homeSelCards.forEach(card => card.classList.remove('exercise-card-selected'));
+  homeSelCards.clear();
+  document.getElementById('screen-fitness-tracker').classList.remove('sel-mode', 'sel-single');
 }
 
-async function deleteHomeSelectedEx() {
-  if (!homeSelCard) return;
+function deleteHomeSelectedEx() {
+  if (homeSelCards.size === 0) return;
   const container = document.getElementById('home-content');
-  const cards = [...container.querySelectorAll('.exercise-card')];
-  const idx = cards.indexOf(homeSelCard);
-  if (idx < 0) return;
+  const allCards = [...container.querySelectorAll('.exercise-card')];
+  const selectedIdxs = new Set([...homeSelCards].map(c => allCards.indexOf(c)).filter(i => i >= 0));
   const exercises = getWorkout(currentDate);
-  exercises.splice(idx, 1);
-  setWorkout(currentDate, exercises);
+  const newExercises = exercises.filter((_, i) => !selectedIdxs.has(i));
+  const n = homeSelCards.size;
+  setWorkout(currentDate, newExercises);
   exitHomeSelMode();
   renderHome();
-  toast('Exercise removed');
+  toast(n === 1 ? 'Exercise removed' : `${n} exercises removed`);
 }
 
 function setupHomeExDragReorder() {
   const container = document.getElementById('home-content');
 
   container.addEventListener('touchstart', e => {
-    if (!homeSelMode) return;
+    if (!homeSelMode || homeSelCards.size !== 1) return;
     if (!e.target.closest('.exercise-card-drag-handle')) return;
     homeExDragItem = e.target.closest('.exercise-card');
     if (!homeExDragItem) return;
@@ -621,6 +646,12 @@ function closeExerciseDropdown() {
 }
 
 function showPlanDaysInDropdown(planId) {
+  // When in exercises screen, show plan days inline instead of in overlay
+  if (document.getElementById('screen-exercises').classList.contains('active')) {
+    closeExerciseDropdown();
+    renderPlanDayBrowser(planId);
+    return;
+  }
   const plan = db.plans[planId];
   if (!plan) return;
   document.getElementById('exd-view-main').style.display = 'none';
@@ -647,7 +678,15 @@ document.getElementById('exd-overlay').addEventListener('click', e => {
 });
 document.getElementById('exd-all-exercises').addEventListener('click', () => {
   closeExerciseDropdown();
-  openExerciseList();
+  if (document.getElementById('screen-exercises').classList.contains('active')) {
+    exerciseBrowserMode = 'categories';
+    currentBrowseCategory = null;
+    currentBrowsePlan = null;
+    document.getElementById('exercise-search').value = '';
+    renderCategoryBrowser();
+  } else {
+    openExerciseList();
+  }
 });
 document.getElementById('exd-create-routine').addEventListener('click', () => {
   closeExerciseDropdown();
@@ -659,16 +698,27 @@ document.getElementById('exd-back-btn').addEventListener('click', () => {
 });
 
 // -- Exercise Browser -----------------------------------
+function setExercisesTitle(text, withArrow) {
+  const titleEl = document.getElementById('exercises-title');
+  if (withArrow) {
+    titleEl.innerHTML = `${text} <span class="exercises-title-arrow">▾</span>`;
+  } else {
+    titleEl.textContent = text;
+  }
+}
+
 function openExerciseList() {
   exerciseBrowserMode = 'categories';
   currentBrowseCategory = null;
+  currentBrowsePlan = null;
   document.getElementById('exercise-search').value = '';
-  document.getElementById('exercises-title').textContent = 'All Exercises';
+  setExercisesTitle('All Exercises', true);
   renderCategoryBrowser();
   showScreen('screen-exercises');
 }
 
 function renderCategoryBrowser() {
+  setExercisesTitle('All Exercises', true);
   const list = document.getElementById('exercise-list');
   list.innerHTML = '';
   const cats = [...new Set(allExercises().map(e => e.category))].sort();
@@ -682,13 +732,94 @@ function renderCategoryBrowser() {
     item.querySelector('.category-item-name').addEventListener('click', () => {
       exerciseBrowserMode = 'exercises';
       currentBrowseCategory = cat;
-      document.getElementById('exercises-title').textContent = cat;
+      setExercisesTitle(cat, false);
       renderExercisesInCategory(cat);
     });
-    item.querySelector('.category-item-dots').addEventListener('click', () => toast('Coming soon'));
+    item.querySelector('.category-item-dots').addEventListener('click', e => {
+      e.stopPropagation();
+      showOverflowMenu([
+        { label: 'Edit', action: () => editCategory(cat) },
+        { label: 'Delete', action: () => deleteCategory(cat) }
+      ], e.currentTarget);
+    });
     list.appendChild(item);
   });
 }
+
+function renderPlanDayBrowser(planId) {
+  const plan = db.plans[planId];
+  if (!plan) return;
+  exerciseBrowserMode = 'plan-days';
+  currentBrowsePlan = planId;
+  setExercisesTitle(plan.name, true);
+  const list = document.getElementById('exercise-list');
+  list.innerHTML = '';
+  (plan.days || []).forEach((day, idx) => {
+    const item = document.createElement('div');
+    item.className = 'category-item';
+    const count = (day.exercises || []).length;
+    item.innerHTML = `
+      <div class="plan-day-badge">${idx + 1}</div>
+      <span class="category-item-name">${day.name}</span>
+      <span class="category-item-sub">${count} exercise${count !== 1 ? 's' : ''}</span>
+    `;
+    item.addEventListener('click', () => {
+      loadWorkoutReturnScreen = 'screen-exercises';
+      openLoadWorkout(planId, idx);
+    });
+    list.appendChild(item);
+  });
+}
+
+// -- Category edit/delete -------------------------------
+let pendingEditCategory = null;
+let pendingDeleteCategory = null;
+
+function editCategory(cat) {
+  pendingEditCategory = cat;
+  document.getElementById('cat-edit-input').value = cat;
+  openOverlay('cat-edit-overlay');
+  setTimeout(() => document.getElementById('cat-edit-input').select(), 100);
+}
+
+function deleteCategory(cat) {
+  pendingDeleteCategory = cat;
+  const total = allExercises().filter(e => e.category === cat).length;
+  const custom = (db.custom_exercises || []).filter(e => e.category === cat).length;
+  let msg = `Delete "${cat}"`;
+  if (total > 0) {
+    msg += ` and its ${total} exercise${total !== 1 ? 's' : ''}?`;
+    if (total > custom) msg += ` (${total - custom} built-in exercise${total - custom !== 1 ? 's' : ''} cannot be deleted)`;
+  }
+  document.getElementById('cat-delete-msg').textContent = msg;
+  openOverlay('cat-delete-overlay');
+}
+
+document.getElementById('btn-cat-edit-cancel').addEventListener('click', () => closeOverlay('cat-edit-overlay'));
+document.getElementById('btn-cat-edit-save').addEventListener('click', () => {
+  const newName = document.getElementById('cat-edit-input').value.trim();
+  if (!newName || !pendingEditCategory) return;
+  if (db.custom_exercises) {
+    db.custom_exercises.forEach(ex => { if (ex.category === pendingEditCategory) ex.category = newName; });
+    persistCustomExercises();
+  }
+  closeOverlay('cat-edit-overlay');
+  pendingEditCategory = null;
+  renderCategoryBrowser();
+  toast('Category renamed');
+});
+document.getElementById('btn-cat-delete-cancel').addEventListener('click', () => closeOverlay('cat-delete-overlay'));
+document.getElementById('btn-cat-delete-confirm').addEventListener('click', () => {
+  if (!pendingDeleteCategory) return;
+  if (db.custom_exercises) {
+    db.custom_exercises = db.custom_exercises.filter(e => e.category !== pendingDeleteCategory);
+    persistCustomExercises();
+  }
+  closeOverlay('cat-delete-overlay');
+  pendingDeleteCategory = null;
+  renderCategoryBrowser();
+  toast('Category deleted');
+});
 
 function renderExercisesInCategory(cat) {
   const list = document.getElementById('exercise-list');
@@ -1171,6 +1302,70 @@ function openNewExercise() {
   openOverlay('new-exercise-overlay');
 }
 
+function openNewExerciseScreen() {
+  document.getElementById('new-ex-name').value = '';
+  document.getElementById('new-ex-notes').value = '';
+  document.getElementById('new-ex-type').value = 'weight_reps';
+  document.getElementById('new-ex-weight-unit').value = 'default';
+  document.getElementById('new-ex-cat-input-row').classList.add('hidden');
+  document.getElementById('new-ex-new-cat').value = '';
+  const sel = document.getElementById('new-ex-category');
+  sel.innerHTML = '<option value="">Choose category...</option>';
+  [...new Set(allExercises().map(e => e.category))].sort().forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c; opt.textContent = c;
+    sel.appendChild(opt);
+  });
+  showScreen('screen-new-exercise');
+  setTimeout(() => document.getElementById('new-ex-name').focus(), 300);
+}
+
+function saveNewExerciseFromScreen(andAddAnother) {
+  const name = document.getElementById('new-ex-name').value.trim();
+  const cat = document.getElementById('new-ex-category').value;
+  const notes = document.getElementById('new-ex-notes').value.trim();
+  const type = document.getElementById('new-ex-type').value;
+  const weightUnit = document.getElementById('new-ex-weight-unit').value;
+  if (!name) { toast('Enter a name'); return; }
+  if (!cat) { toast('Choose a category'); return; }
+  if (allExercises().find(e => e.name.toLowerCase() === name.toLowerCase())) { toast('Exercise already exists'); return; }
+  if (!db.custom_exercises) db.custom_exercises = [];
+  db.custom_exercises.push({ category: cat, name, notes, type, weightUnit });
+  persistCustomExercises();
+  toast('Exercise created');
+  if (andAddAnother) {
+    openNewExerciseScreen();
+  } else {
+    exerciseBrowserMode = 'categories';
+    currentBrowseCategory = null;
+    setExercisesTitle('All Exercises', true);
+    renderCategoryBrowser();
+    showScreen('screen-exercises');
+  }
+}
+
+document.getElementById('btn-new-ex-back').addEventListener('click', () => showScreen('screen-exercises'));
+document.getElementById('btn-new-ex-save').addEventListener('click', () => saveNewExerciseFromScreen(false));
+document.getElementById('btn-new-ex-save-add').addEventListener('click', () => saveNewExerciseFromScreen(true));
+document.getElementById('btn-new-ex-add-cat').addEventListener('click', () => {
+  const row = document.getElementById('new-ex-cat-input-row');
+  row.classList.toggle('hidden');
+  if (!row.classList.contains('hidden')) document.getElementById('new-ex-new-cat').focus();
+});
+document.getElementById('btn-new-ex-cat-ok').addEventListener('click', () => {
+  const newCat = document.getElementById('new-ex-new-cat').value.trim();
+  if (!newCat) return;
+  const sel = document.getElementById('new-ex-category');
+  if (![...sel.options].some(o => o.value === newCat)) {
+    const opt = document.createElement('option');
+    opt.value = newCat; opt.textContent = newCat;
+    sel.appendChild(opt);
+  }
+  sel.value = newCat;
+  document.getElementById('new-ex-cat-input-row').classList.add('hidden');
+  document.getElementById('new-ex-new-cat').value = '';
+});
+
 document.getElementById('btn-new-exercise-save').addEventListener('click', () => {
   const name = document.getElementById('new-exercise-name').value.trim();
   const cat = document.getElementById('new-exercise-category').value;
@@ -1197,24 +1392,30 @@ function closeOverlay(id) { document.getElementById(id).classList.remove('open')
 document.getElementById('btn-prev-day').addEventListener('click', () => { exitHomeSelMode(); changeDate(-1); renderHome(); });
 document.getElementById('btn-next-day').addEventListener('click', () => { exitHomeSelMode(); changeDate(1); renderHome(); });
 document.getElementById('btn-calendar').addEventListener('click', openCalendar);
-document.getElementById('btn-add-exercise').addEventListener('click', openExerciseDropdown);
+document.getElementById('btn-add-exercise').addEventListener('click', openExerciseList);
 document.getElementById('btn-home-sel-done').addEventListener('click', exitHomeSelMode);
 document.getElementById('btn-home-sel-delete').addEventListener('click', deleteHomeSelectedEx);
 setupHomeExDragReorder();
+document.getElementById('exercises-title-btn').addEventListener('click', () => {
+  if (exerciseBrowserMode === 'categories' || exerciseBrowserMode === 'plan-days') {
+    openExerciseDropdown();
+  }
+});
 
 document.getElementById('btn-back-exercises').addEventListener('click', () => {
-  if (exerciseBrowserMode === 'exercises') {
+  if (exerciseBrowserMode === 'exercises' || exerciseBrowserMode === 'plan-days') {
     exerciseBrowserMode = 'categories';
     currentBrowseCategory = null;
-    document.getElementById('exercises-title').textContent = 'All Exercises';
+    currentBrowsePlan = null;
     document.getElementById('exercise-search').value = '';
+    setExercisesTitle('All Exercises', true);
     renderCategoryBrowser();
   } else {
     showScreen('screen-fitness-tracker');
   }
 });
 
-document.getElementById('btn-new-exercise').addEventListener('click', openNewExercise);
+document.getElementById('btn-new-exercise').addEventListener('click', openNewExerciseScreen);
 document.getElementById('btn-back-training').addEventListener('click', () => { renderHome(); showScreen('screen-fitness-tracker'); });
 document.getElementById('btn-save-set').addEventListener('click', saveSet);
 document.getElementById('btn-clear').addEventListener('click', clearFields);
@@ -1228,14 +1429,13 @@ document.getElementById('exercise-search').addEventListener('input', e => {
   const q = e.target.value.toLowerCase().trim();
   if (q) {
     renderExerciseSearchResults(q);
-    document.getElementById('exercises-title').textContent = 'All Exercises';
+    setExercisesTitle('All Exercises', false);
   } else if (exerciseBrowserMode === 'exercises' && currentBrowseCategory) {
     renderExercisesInCategory(currentBrowseCategory);
-    document.getElementById('exercises-title').textContent = currentBrowseCategory;
+    setExercisesTitle(currentBrowseCategory, false);
   } else {
     exerciseBrowserMode = 'categories';
     renderCategoryBrowser();
-    document.getElementById('exercises-title').textContent = 'All Exercises';
   }
 });
 
