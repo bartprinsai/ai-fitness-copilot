@@ -51,11 +51,22 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .home-empty-action svg { width: 48px; height: 48px; fill: var(--cyan); }
 .home-empty-action span { font-size: 14px; color: var(--text-secondary); text-align: center; }
 
+/* ── HOME SELECTION MODE ──────────────────────────────── */
+.sel-only { display: none !important; }
+#screen-fitness-tracker.sel-mode .norm-only { display: none !important; }
+#screen-fitness-tracker.sel-mode .sel-only { display: flex !important; }
+
 /* ── EXERCISE CARDS (HOME) ────────────────────────────── */
-.exercise-card { background: var(--surface); margin: 8px 8px 0; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.18), 0 1px 2px rgba(0,0,0,.12); cursor: pointer; overflow: hidden; transition: background 0.08s; }
+.exercise-card { background: var(--surface); margin: 8px 8px 0; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.18), 0 1px 2px rgba(0,0,0,.12); cursor: pointer; overflow: visible; transition: background 0.08s; position: relative; }
 .exercise-card:active { background: #f9f9f9; }
-.exercise-card-header { padding: 12px 12px 6px; }
-.exercise-card-name { font-size: 16px; font-weight: 500; color: var(--text-primary); margin-bottom: 6px; }
+.exercise-card-selected { background: rgba(41,182,246,0.10) !important; outline: 2px solid var(--cyan); outline-offset: 0; }
+.exercise-card-dragging { z-index: 10; will-change: transform; box-shadow: 0 8px 28px rgba(0,0,0,.22); }
+.exercise-card-header { display: flex; align-items: center; padding: 12px 4px 6px 12px; }
+.exercise-card-name { flex: 1; font-size: 16px; font-weight: 500; color: var(--text-primary); }
+.exercise-card-drag-handle { display: none; width: 44px; height: 44px; align-items: center; justify-content: center; cursor: grab; flex-shrink: 0; touch-action: none; }
+.exercise-card-drag-handle:active { cursor: grabbing; }
+.exercise-card-drag-handle svg { width: 22px; height: 22px; fill: var(--text-hint); }
+.exercise-card-selected .exercise-card-drag-handle { display: flex; }
 .exercise-card-divider { height: 2px; background: var(--cyan); }
 .exercise-card-sets { padding: 6px 12px 10px; }
 .exercise-set-row { display: flex; align-items: center; padding: 2px 0; gap: 6px; }

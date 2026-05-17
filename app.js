@@ -25,6 +25,13 @@ let pendingVideoSetIndex = null;
 let pendingAction = null;
 let tokenClient = null;
 
+// -- Home selection mode state --------------------------
+let homeSelMode = false;
+let homeSelCard = null;
+let homeExDragItem = null;
+let homeExDragStartY = 0;
+let homeExDragDy = 0;
+
 // -- Splash coordination --------------------------------
 let splashDone = false, authDone = false;
 function checkAndReveal() {
@@ -424,15 +431,20 @@ function renderHome() {
   container.innerHTML = '';
   const records = db.records || {};
 
-  exercises.forEach(ex => {
+  exercises.forEach((ex, idx) => {
     const sets = ex.sets || [];
     const exRecords = records[ex.name] || {};
     const card = document.createElement('div');
     card.className = 'exercise-card';
+    card.dataset.exIdx = idx;
 
     const header = document.createElement('div');
     header.className = 'exercise-card-header';
-    header.innerHTML = `<div class="exercise-card-name">${ex.name}</div>`;
+    header.innerHTML = `
+      <div class="exercise-card-name">${ex.name}</div>
+      <div class="exercise-card-drag-handle" aria-label="Drag to reorder">
+        <svg viewBox="0 0 24 24"><path d="M3 15h18v-2H3v2zm0 4h18v-2H3v2zm0-8h18V9H3v2zm0-6v2h18V5H3z"/></svg>
+      </div>`;
     card.appendChild(header);
     card.appendChild(Object.assign(document.createElement('div'), { className: 'exercise-card-divider' }));
 
@@ -454,9 +466,116 @@ function renderHome() {
       });
     }
     card.appendChild(setsDiv);
-    card.addEventListener('click', () => openTraining(ex.name));
+
+    // Long-press to enter selection mode
+    let longPressTimer = null;
+    card.addEventListener('touchstart', () => {
+      if (homeSelMode) return;
+      longPressTimer = setTimeout(() => {
+        longPressTimer = null;
+        if (navigator.vibrate) navigator.vibrate(30);
+        enterHomeSelMode(card);
+      }, 500);
+    }, { passive: true });
+    const cancelLongPress = () => { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } };
+    card.addEventListener('touchmove', cancelLongPress, { passive: true });
+    card.addEventListener('touchend', cancelLongPress, { passive: true });
+    card.addEventListener('touchcancel', cancelLongPress, { passive: true });
+
+    card.addEventListener('click', () => { if (!homeSelMode) openTraining(ex.name); });
     container.appendChild(card);
   });
+}
+
+function enterHomeSelMode(card) {
+  homeSelMode = true;
+  homeSelCard = card;
+  card.classList.add('exercise-card-selected');
+  document.getElementById('screen-fitness-tracker').classList.add('sel-mode');
+  document.getElementById('home-sel-count').textContent = '1 exercise';
+}
+
+function exitHomeSelMode() {
+  homeSelMode = false;
+  if (homeSelCard) { homeSelCard.classList.remove('exercise-card-selected'); homeSelCard = null; }
+  document.getElementById('screen-fitness-tracker').classList.remove('sel-mode');
+}
+
+async function deleteHomeSelectedEx() {
+  if (!homeSelCard) return;
+  const container = document.getElementById('home-content');
+  const cards = [...container.querySelectorAll('.exercise-card')];
+  const idx = cards.indexOf(homeSelCard);
+  if (idx < 0) return;
+  const exercises = getWorkout(currentDate);
+  exercises.splice(idx, 1);
+  setWorkout(currentDate, exercises);
+  exitHomeSelMode();
+  renderHome();
+  toast('Exercise removed');
+}
+
+function setupHomeExDragReorder() {
+  const container = document.getElementById('home-content');
+
+  container.addEventListener('touchstart', e => {
+    if (!homeSelMode) return;
+    if (!e.target.closest('.exercise-card-drag-handle')) return;
+    homeExDragItem = e.target.closest('.exercise-card');
+    if (!homeExDragItem) return;
+    homeExDragStartY = e.touches[0].clientY;
+    homeExDragDy = 0;
+    homeExDragItem.classList.add('exercise-card-dragging');
+  }, { passive: true });
+
+  container.addEventListener('touchmove', e => {
+    if (!homeExDragItem) return;
+    e.preventDefault();
+    const touchY = e.touches[0].clientY;
+    homeExDragDy = touchY - homeExDragStartY;
+    homeExDragItem.style.transform = `translateY(${homeExDragDy}px)`;
+
+    const cards = [...container.querySelectorAll('.exercise-card')];
+    const dragPos = cards.indexOf(homeExDragItem);
+    for (let i = 0; i < cards.length; i++) {
+      if (cards[i] === homeExDragItem) continue;
+      const sibRect = cards[i].getBoundingClientRect();
+      const sibCenter = sibRect.top + sibRect.height / 2;
+      if (dragPos < i && touchY > sibCenter) {
+        cards[i].insertAdjacentElement('afterend', homeExDragItem);
+        homeExDragStartY += sibRect.height;
+        homeExDragDy -= sibRect.height;
+        homeExDragItem.style.transform = `translateY(${homeExDragDy}px)`;
+        break;
+      } else if (dragPos > i && touchY < sibCenter) {
+        cards[i].insertAdjacentElement('beforebegin', homeExDragItem);
+        homeExDragStartY -= sibRect.height;
+        homeExDragDy += sibRect.height;
+        homeExDragItem.style.transform = `translateY(${homeExDragDy}px)`;
+        break;
+      }
+    }
+  }, { passive: false });
+
+  const endDrag = () => {
+    if (!homeExDragItem) return;
+    homeExDragItem.classList.remove('exercise-card-dragging');
+    homeExDragItem.style.transform = '';
+
+    const exercises = getWorkout(currentDate);
+    const cards = [...container.querySelectorAll('.exercise-card')];
+    const newExercises = cards.map(card => exercises[parseInt(card.dataset.exIdx)]).filter(Boolean);
+
+    if (JSON.stringify(newExercises.map(e => e.name)) !== JSON.stringify(exercises.map(e => e.name))) {
+      setWorkout(currentDate, newExercises);
+      cards.forEach((card, i) => { card.dataset.exIdx = i; });
+      toast('Order saved');
+    }
+    homeExDragItem = null;
+  };
+
+  container.addEventListener('touchend', endDrag, { passive: true });
+  container.addEventListener('touchcancel', endDrag, { passive: true });
 }
 
 function copyPreviousWorkout() {
@@ -1075,10 +1194,13 @@ function openOverlay(id) { document.getElementById(id).classList.add('open'); }
 function closeOverlay(id) { document.getElementById(id).classList.remove('open'); }
 
 // -- Event Listeners ------------------------------------
-document.getElementById('btn-prev-day').addEventListener('click', () => { changeDate(-1); renderHome(); });
-document.getElementById('btn-next-day').addEventListener('click', () => { changeDate(1); renderHome(); });
+document.getElementById('btn-prev-day').addEventListener('click', () => { exitHomeSelMode(); changeDate(-1); renderHome(); });
+document.getElementById('btn-next-day').addEventListener('click', () => { exitHomeSelMode(); changeDate(1); renderHome(); });
 document.getElementById('btn-calendar').addEventListener('click', openCalendar);
 document.getElementById('btn-add-exercise').addEventListener('click', openExerciseDropdown);
+document.getElementById('btn-home-sel-done').addEventListener('click', exitHomeSelMode);
+document.getElementById('btn-home-sel-delete').addEventListener('click', deleteHomeSelectedEx);
+setupHomeExDragReorder();
 
 document.getElementById('btn-back-exercises').addEventListener('click', () => {
   if (exerciseBrowserMode === 'exercises') {
