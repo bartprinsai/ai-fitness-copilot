@@ -2,16 +2,16 @@
 
 :root {
   --toolbar: #212121;
-  --daynav: #333333;
+  --daynav: #303030;
   --cyan: #29b6f6;
   --cyan-light: rgba(41,182,246,0.12);
-  --bg: #f0f0f0;
+  --bg: #f2f2f2;
   --surface: #ffffff;
   --border: #e0e0e0;
   --text-primary: #212121;
   --text-secondary: #757575;
   --text-hint: #9e9e9e;
-  --green: #5cb85c;
+  --green: #4CAF50;
   --blue-btn: #2196f3;
   --gray-btn: #e0e0e0;
   --safe-top: env(safe-area-inset-top, 0px);
@@ -25,22 +25,22 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .screen.active { display: flex; }
 
 /* ── TOOLBAR ──────────────────────────────────────────── */
-.toolbar { height: calc(var(--toolbar-height) + var(--safe-top)); padding-top: var(--safe-top); background: var(--toolbar); color: white; display: flex; align-items: center; padding-left: 4px; padding-right: 4px; flex-shrink: 0; box-shadow: 0 2px 4px rgba(0,0,0,.5); z-index: 10; }
-.toolbar-title { flex: 1; font-size: 20px; font-weight: 700; padding: 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.toolbar { height: calc(var(--toolbar-height) + var(--safe-top)); padding-top: var(--safe-top); background: var(--toolbar); color: white; display: flex; align-items: center; padding-left: 4px; padding-right: 4px; flex-shrink: 0; box-shadow: 0 2px 4px rgba(0,0,0,.4); z-index: 10; }
+.toolbar-title { flex: 1; font-size: 18px; font-weight: 500; padding: 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0.01em; }
 .toolbar-actions { display: flex; }
 .toolbar-btn { width: 48px; height: 48px; border: none; background: none; color: white; cursor: pointer; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.15s; flex-shrink: 0; }
 .toolbar-btn:active { background: rgba(255,255,255,.15); }
 .toolbar-btn svg { width: 24px; height: 24px; fill: white; }
 
 /* ── DAY NAV ──────────────────────────────────────────── */
-.day-nav { display: flex; align-items: center; background: var(--daynav); padding: 0 4px; height: 48px; flex-shrink: 0; border-bottom: 2px solid var(--cyan); }
+.day-nav { display: flex; align-items: center; background: var(--daynav); padding: 0 4px; height: 46px; flex-shrink: 0; border-bottom: 2px solid var(--cyan); }
 .day-nav-btn { width: 44px; height: 44px; border: none; background: none; cursor: pointer; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.15s; flex-shrink: 0; }
-.day-nav-btn:active { background: rgba(255,255,255,.1); }
+.day-nav-btn:active { background: rgba(255,255,255,.12); }
 .day-nav-btn svg { width: 24px; height: 24px; fill: var(--cyan); }
-.day-nav-label { flex: 1; font-size: 13px; font-weight: 700; color: white; text-align: center; text-transform: uppercase; letter-spacing: 0.08em; }
+.day-nav-label { flex: 1; font-size: 12px; font-weight: 700; color: white; text-align: center; text-transform: uppercase; letter-spacing: 0.1em; }
 
 /* ── HOME ─────────────────────────────────────────────── */
-.home-content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; }
+.home-content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; padding-bottom: calc(var(--safe-bottom) + 16px); }
 
 .home-empty { flex: 1; display: flex; flex-direction: column; align-items: center; }
 .home-empty-middle { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px; }
@@ -64,7 +64,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .exercise-card-selected::after { content: ''; position: absolute; top: 11px; left: 11px; width: 5px; height: 9px; border-right: 2px solid #fff; border-bottom: 2px solid #fff; transform: rotate(40deg); z-index: 3; }
 .exercise-card-dragging { z-index: 10; will-change: transform; box-shadow: 0 8px 28px rgba(0,0,0,.22); }
 .exercise-card-header { display: flex; align-items: center; padding: 12px 4px 6px 12px; }
-.exercise-card-name { flex: 1; font-size: 16px; font-weight: 500; color: var(--text-primary); }
+.exercise-card-name { flex: 1; font-size: 16px; font-weight: 600; color: var(--text-primary); }
 .exercise-card-drag-handle { display: none; width: 44px; height: 44px; align-items: center; justify-content: center; cursor: grab; flex-shrink: 0; touch-action: none; }
 .exercise-card-drag-handle:active { cursor: grabbing; }
 .exercise-card-drag-handle svg { width: 22px; height: 22px; fill: var(--text-hint); }
@@ -82,7 +82,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .toolbar-title-btn { flex: 1; background: none; border: none; color: white; font-family: inherit; font-size: 20px; font-weight: 700; padding: 0 8px; text-align: left; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 6px; }
 .toolbar-title-btn:active { opacity: 0.75; }
 .exercises-title-arrow { font-size: 13px; opacity: 0.75; flex-shrink: 0; }
-.plan-day-badge { width: 24px; height: 24px; border-radius: 50%; background: #7C4DFF; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-right: 4px; }
+.plan-day-badge { width: 24px; height: 24px; border-radius: 50%; background: var(--cyan); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-right: 4px; }
 .category-item-sub { font-size: 12px; color: var(--text-hint); flex-shrink: 0; }
 
 .search-bar { display: flex; align-items: center; gap: 12px; background: var(--surface); border-bottom: 1px solid var(--border); padding: 8px 16px; flex-shrink: 0; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
@@ -116,8 +116,8 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .training-coach-bar { display: flex; gap: 10px; padding: 10px 12px calc(var(--safe-bottom) + 10px); background: var(--bg); border-top: 1px solid var(--border); flex-shrink: 0; }
 .coach-btn { flex: 1; padding: 15px 8px; border: none; border-radius: 10px; color: #fff; font-family: inherit; font-size: 15px; font-weight: 700; cursor: pointer; letter-spacing: .04em; transition: filter .1s; }
 .coach-btn:active { filter: brightness(.85); }
-.coach-btn-live { background: #00E5FF; }
-.coach-btn-chat { background: #FF6D00; }
+.coach-btn-live { background: var(--cyan); }
+.coach-btn-chat { background: #546e7a; }
 
 /* ── SET FIELDS ───────────────────────────────────────── */
 .set-fields { background: var(--surface); display: flex; flex-direction: column; flex-shrink: 0; box-shadow: 0 2px 4px rgba(0,0,0,.1); }
@@ -126,9 +126,9 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .field-label { display: block; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 6px; }
 .field-cyan-line { height: 2px; background: var(--cyan); margin-bottom: 12px; }
 .field-controls { display: flex; align-items: center; gap: 12px; width: 100%; overflow: hidden; }
-.field-btn { width: 56px; height: 56px; border-radius: 6px; border: none; background: var(--gray-btn); color: var(--text-primary); font-size: 28px; font-weight: 300; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.1s; flex-shrink: 0; user-select: none; line-height: 1; }
+.field-btn { width: 56px; height: 56px; border-radius: 4px; border: none; background: var(--gray-btn); color: var(--text-primary); font-size: 28px; font-weight: 300; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.1s; flex-shrink: 0; user-select: none; line-height: 1; }
 .field-btn:active { background: #bdbdbd; }
-.field-group input { flex: 1; min-width: 0; text-align: center; border: none; outline: none; font-family: inherit; font-size: 40px; font-weight: 300; color: var(--text-primary); background: transparent; -moz-appearance: textfield; }
+.field-group input { flex: 1; min-width: 0; text-align: center; border: none; outline: none; font-family: inherit; font-size: 36px; font-weight: 300; color: var(--text-primary); background: transparent; -moz-appearance: textfield; }
 .field-group input::-webkit-inner-spin-button, .field-group input::-webkit-outer-spin-button { -webkit-appearance: none; }
 
 /* ── ACTION BUTTONS ───────────────────────────────────── */
@@ -363,8 +363,8 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .plan-day-header { display: flex; align-items: center; padding: 14px 14px 10px; gap: 10px; }
 .plan-day-num { width: 28px; height: 28px; border-radius: 50%; background: #7C4DFF; color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .plan-day-name { flex: 1; font-size: 16px; font-weight: 600; color: #fff; }
-.plan-day-load-btn { padding: 8px 14px; border: none; border-radius: 20px; background: rgba(0,229,255,.12); color: #00E5FF; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; flex-shrink: 0; transition: background .1s; }
-.plan-day-load-btn:active { background: rgba(0,229,255,.25); }
+.plan-day-load-btn { padding: 8px 14px; border: none; border-radius: 20px; background: var(--cyan-light); color: var(--cyan); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; flex-shrink: 0; transition: background .1s; }
+.plan-day-load-btn:active { background: rgba(41,182,246,.25); }
 .plan-day-exercises { padding: 0 14px 12px; }
 .plan-day-ex-row { display: flex; align-items: center; padding: 6px 0; border-top: 1px solid #2a2a2a; gap: 8px; }
 .plan-day-ex-name { flex: 1; font-size: 14px; color: #ccc; }
@@ -395,31 +395,31 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 /* ── LOAD WORKOUT SCREEN ──────────────────────────────── */
 .lw-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 10px 12px; }
 .lw-footer { padding: 12px 16px calc(var(--safe-bottom) + 12px); background: #1a1a1a; border-top: 1px solid #2a2a2a; flex-shrink: 0; }
-.lw-load-btn { width: 100%; padding: 16px; border: none; border-radius: 14px; background: #00E5FF; color: #000; font-family: inherit; font-size: 16px; font-weight: 700; cursor: pointer; transition: filter .1s; }
+.lw-load-btn { width: 100%; padding: 16px; border: none; border-radius: 14px; background: var(--cyan); color: #fff; font-family: inherit; font-size: 16px; font-weight: 700; cursor: pointer; transition: filter .1s; }
 .lw-load-btn:active { filter: brightness(.85); }
 
-.lw-select-all-row { display: flex; align-items: center; gap: 10px; padding: 8px 4px 12px; cursor: pointer; color: #00E5FF; font-size: 13px; font-weight: 600; }
+.lw-select-all-row { display: flex; align-items: center; gap: 10px; padding: 8px 4px 12px; cursor: pointer; color: var(--cyan); font-size: 13px; font-weight: 600; }
 .lw-ex-card { background: #1E1E1E; border-radius: 14px; padding: 14px; margin-bottom: 10px; }
 .lw-ex-header { display: flex; align-items: center; gap: 10px; }
 .lw-checkbox { width: 22px; height: 22px; border: 2px solid #444; border-radius: 6px; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all .12s; }
-.lw-checkbox.checked { background: #00E5FF; border-color: #00E5FF; }
-.lw-checkbox.checked::after { content: ''; display: block; width: 5px; height: 9px; border: 2px solid #000; border-top: none; border-left: none; transform: rotate(45deg) translate(-1px, -2px); }
+.lw-checkbox.checked { background: var(--cyan); border-color: var(--cyan); }
+.lw-checkbox.checked::after { content: ''; display: block; width: 5px; height: 9px; border: 2px solid #fff; border-top: none; border-left: none; transform: rotate(45deg) translate(-1px, -2px); }
 .lw-ex-name { flex: 1; font-size: 15px; font-weight: 600; color: #fff; }
 .lw-ex-sets { font-size: 12px; color: #555; flex-shrink: 0; }
 .lw-prev { font-size: 13px; color: #777; margin-top: 8px; }
 .lw-suggestion { font-size: 12px; color: #555; margin-top: 4px; font-style: italic; }
 
 /* ── SMART DAY BANNER ─────────────────────────────────── */
-.smart-banner { display: flex; align-items: center; gap: 12px; background: #1E1E1E; border-left: 3px solid #00E5FF; padding: 11px 14px; flex-shrink: 0; }
+.smart-banner { display: flex; align-items: center; gap: 12px; background: var(--surface); border-left: 3px solid var(--cyan); padding: 11px 14px; flex-shrink: 0; }
 .smart-banner.hidden { display: none; }
 .smart-banner-body { flex: 1; min-width: 0; display: flex; align-items: flex-start; gap: 7px; }
 .smart-banner-icon { flex-shrink: 0; font-size: 15px; }
-.smart-banner-msg { font-size: 13px; color: #ccc; line-height: 1.4; }
+.smart-banner-msg { font-size: 13px; color: var(--text-secondary); line-height: 1.4; }
 .smart-banner-actions { display: flex; gap: 8px; flex-shrink: 0; }
 .sbn-btn { padding: 7px 12px; border: none; border-radius: 8px; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; transition: filter .1s; }
 .sbn-btn:active { filter: brightness(.8); }
-.sbn-skip { background: #2a2a2a; color: #888; }
-.sbn-load { background: rgba(0,229,255,.15); color: #00E5FF; }
+.sbn-skip { background: var(--border); color: var(--text-secondary); }
+.sbn-load { background: var(--cyan-light); color: var(--cyan); }
 
 /* ── EXERCISE ADD DROPDOWN ────────────────────────────── */
 .exd-overlay { position: fixed; inset: 0; z-index: 150; pointer-events: none; }
