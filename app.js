@@ -37,7 +37,7 @@ let currentBrowsePlan = null;
 
 // -- Exercise info screen state ------------------------
 let freeExerciseDB = null;
-let howToCache = {};
+const EXERCISE_IMG_BASE = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/dist/exercises/';
 let exerciseInfoReturnScreen = 'screen-exercises';
 
 // -- Splash coordination --------------------------------
@@ -889,9 +889,7 @@ async function loadFreeExerciseDB() {
 
 function normalizeExName(name) {
   return name.toLowerCase()
-    .replace(/-/g, ' ')
-    .replace(/[()]/g, '')
-    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/[-/.,()]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -904,21 +902,15 @@ function findExerciseInDB(name, db) {
   let match = db.find(e => normalizeExName(e.name) === norm);
   if (match) { console.log(`[ExerciseInfo] Exact match: "${match.name}"`); return match; }
 
-  // 2. One string contains the other
-  match = db.find(e => {
-    const n = normalizeExName(e.name);
-    return n.includes(norm) || norm.includes(n);
-  });
-  if (match) { console.log(`[ExerciseInfo] Partial match: "${match.name}"`); return match; }
+  // 2. Dataset name contains search term
+  match = db.find(e => normalizeExName(e.name).includes(norm));
+  if (match) { console.log(`[ExerciseInfo] DB contains search: "${match.name}"`); return match; }
 
-  // 3. First word match (startsWith)
-  const firstWord = norm.split(' ')[0];
-  if (firstWord.length > 3) {
-    match = db.find(e => normalizeExName(e.name).startsWith(firstWord));
-    if (match) { console.log(`[ExerciseInfo] First-word match: "${match.name}"`); return match; }
-  }
+  // 3. Search term contains dataset name
+  match = db.find(e => norm.includes(normalizeExName(e.name)));
+  if (match) { console.log(`[ExerciseInfo] Search contains DB: "${match.name}"`); return match; }
 
-  // 4. Word overlap score (threshold 1 for single-word names like "Squat")
+  // 4. Any individual word in search term matches any word in dataset name
   const words = norm.split(' ').filter(w => w.length > 2);
   let best = null, bestScore = 0;
   db.forEach(e => {
@@ -927,10 +919,11 @@ function findExerciseInDB(name, db) {
     if (score > bestScore) { bestScore = score; best = e; }
   });
   if (bestScore >= 1 && best) {
-    console.log(`[ExerciseInfo] Word-overlap match (score ${bestScore}): "${best.name}"`);
+    console.log(`[ExerciseInfo] Word-match (score ${bestScore}): "${best.name}"`);
     return best;
   }
-  console.log(`[ExerciseInfo] No match found`);
+
+  console.log('[ExerciseInfo] No match found');
   return null;
 }
 
@@ -950,10 +943,6 @@ function openExerciseInfo(name, returnScreen) {
   loadExerciseInfo(name);
 }
 
-function stripHtml(html) {
-  return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
-}
-
 async function loadExerciseInfo(name) {
   const db = await loadFreeExerciseDB();
   const entry = findExerciseInDB(name, db);
@@ -962,8 +951,8 @@ async function loadExerciseInfo(name) {
   const gifEl = document.getElementById('ei-gif');
   const placeholder = document.getElementById('ei-gif-placeholder');
   if (entry && entry.images && entry.images.length > 0) {
-    const imgUrl = `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/${entry.images[0]}`;
-    console.log('[ExerciseInfo] GIF URL:', imgUrl);
+    const imgUrl = EXERCISE_IMG_BASE + entry.images[0];
+    console.log('[ExerciseInfo] Image URL:', imgUrl);
     gifEl.onload = () => { gifEl.classList.remove('hidden'); placeholder.classList.add('hidden'); };
     gifEl.onerror = () => { placeholder.textContent = 'Animation not available'; };
     gifEl.src = imgUrl;
@@ -971,71 +960,32 @@ async function loadExerciseInfo(name) {
     placeholder.textContent = 'Animation not available';
   }
 
-  const musclesCard = document.getElementById('ei-muscles-card');
-  const stepsList = document.getElementById('ei-steps-list');
-  const loadingEl = document.getElementById('ei-loading');
+  const primary = entry ? (entry.primaryMuscles || []) : [];
+  const secondary = entry ? (entry.secondaryMuscles || []) : [];
+  renderMuscles(document.getElementById('ei-muscles-card'), primary, secondary);
 
-  if (howToCache[name]) {
-    const cached = howToCache[name];
-    renderMuscles(musclesCard, cached.muscles, cached.musclesSecondary);
-    renderDescription(stepsList, cached.description);
-    loadingEl.classList.add('hidden');
-    return;
-  }
+  const instructions = entry ? (entry.instructions || []) : [];
+  renderInstructions(document.getElementById('ei-steps-list'), instructions);
 
-  try {
-    const searchResp = await fetch(`https://wger.de/api/v2/exercise/search/?term=${encodeURIComponent(name)}&language=english&format=json`);
-    const searchData = await searchResp.json();
-    console.log('[ExerciseInfo] wger search results:', searchData.suggestions?.length ?? 0);
-
-    let muscles = [], musclesSecondary = [], description = '';
-
-    if (searchData.suggestions && searchData.suggestions.length > 0) {
-      const baseId = searchData.suggestions[0].data.base_id;
-      console.log('[ExerciseInfo] wger base_id:', baseId);
-      const infoResp = await fetch(`https://wger.de/api/v2/exerciseinfo/${baseId}/?format=json`);
-      const infoData = await infoResp.json();
-
-      muscles = (infoData.muscles || []).map(m => m.name_en).filter(Boolean);
-      musclesSecondary = (infoData.muscles_secondary || []).map(m => m.name_en).filter(Boolean);
-
-      const translation = (infoData.translations || []).find(t => t.language === 2);
-      description = translation ? stripHtml(translation.description) : '';
-      console.log('[ExerciseInfo] wger muscles:', muscles, 'secondary:', musclesSecondary);
-    }
-
-    howToCache[name] = { muscles, musclesSecondary, description };
-    renderMuscles(musclesCard, muscles, musclesSecondary);
-    renderDescription(stepsList, description);
-  } catch (err) {
-    console.error('[ExerciseInfo] wger fetch failed:', err);
-    musclesCard.innerHTML = '<div class="ei-step-empty">No muscle data available</div>';
-    stepsList.innerHTML = '<div class="ei-step-empty">Instructions not available for this exercise</div>';
-  }
-  loadingEl.classList.add('hidden');
+  document.getElementById('ei-loading').classList.add('hidden');
 }
 
 function renderMuscles(container, primary, secondary) {
   let html = '';
-  if (primary && primary.length) html += `<div class="ei-muscle-row"><span class="ei-muscle-label">Primary:</span>${primary.map(m => `<span class="ei-badge ei-badge-primary">${m}</span>`).join('')}</div>`;
-  if (secondary && secondary.length) html += `<div class="ei-muscle-row"><span class="ei-muscle-label">Secondary:</span>${secondary.map(m => `<span class="ei-badge ei-badge-secondary">${m}</span>`).join('')}</div>`;
+  if (primary.length) html += `<div class="ei-muscle-row"><span class="ei-muscle-label">Primary:</span>${primary.map(m => `<span class="ei-badge ei-badge-primary">${m}</span>`).join('')}</div>`;
+  if (secondary.length) html += `<div class="ei-muscle-row"><span class="ei-muscle-label">Secondary:</span>${secondary.map(m => `<span class="ei-badge ei-badge-secondary">${m}</span>`).join('')}</div>`;
   container.innerHTML = html || '<div class="ei-step-empty">No muscle data available</div>';
 }
 
-function renderDescription(container, description) {
-  if (!description) {
+function renderInstructions(container, instructions) {
+  if (!instructions.length) {
     container.innerHTML = '<div class="ei-step-empty">Instructions not available for this exercise</div>';
     return;
   }
-  const sentences = description.split(/(?<=[.!?])\s+/).filter(s => s.length > 0);
-  if (sentences.length <= 1) {
-    container.innerHTML = `<div class="ei-step-text" style="padding:8px 0;line-height:1.6">${description}</div>`;
-    return;
-  }
-  container.innerHTML = sentences.map((s, i) => `
+  container.innerHTML = instructions.map((step, i) => `
     <div class="ei-step">
       <span class="ei-step-num">${i + 1}</span>
-      <span class="ei-step-text">${s}</span>
+      <span class="ei-step-text">${step}</span>
     </div>
   `).join('');
 }
