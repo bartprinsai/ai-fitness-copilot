@@ -46,6 +46,7 @@ function checkAndReveal() {
   if (!splashDone || !authDone) return;
   const splash = document.getElementById('splash-screen');
   if (splash) splash.style.display = 'none';
+  loadFreeExerciseDB();
 }
 setTimeout(() => { splashDone = true; checkAndReveal(); }, 1200);
 
@@ -871,7 +872,7 @@ function renderExerciseItem(list, ex) {
 // -- Exercise Info Screen -------------------------------
 async function loadFreeExerciseDB() {
   if (freeExerciseDB) return freeExerciseDB;
-  const url = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/exercises.json';
+  const url = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/dist/exercises.json';
   console.log('[ExerciseInfo] Fetching dataset:', url);
   try {
     const resp = await fetch(url);
@@ -949,6 +950,10 @@ function openExerciseInfo(name, returnScreen) {
   loadExerciseInfo(name);
 }
 
+function stripHtml(html) {
+  return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+}
+
 async function loadExerciseInfo(name) {
   const db = await loadFreeExerciseDB();
   const entry = findExerciseInDB(name, db);
@@ -957,7 +962,7 @@ async function loadExerciseInfo(name) {
   const gifEl = document.getElementById('ei-gif');
   const placeholder = document.getElementById('ei-gif-placeholder');
   if (entry && entry.images && entry.images.length > 0) {
-    const imgUrl = `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/${entry.images[0]}`;
+    const imgUrl = `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/${entry.images[0]}`;
     console.log('[ExerciseInfo] GIF URL:', imgUrl);
     gifEl.onload = () => { gifEl.classList.remove('hidden'); placeholder.classList.add('hidden'); };
     gifEl.onerror = () => { placeholder.textContent = 'Animation not available'; };
@@ -967,55 +972,70 @@ async function loadExerciseInfo(name) {
   }
 
   const musclesCard = document.getElementById('ei-muscles-card');
-  if (entry) {
-    const primary = entry.primaryMuscles || [];
-    const secondary = entry.secondaryMuscles || [];
-    let html = '';
-    if (primary.length) html += `<div class="ei-muscle-row"><span class="ei-muscle-label">Primary:</span>${primary.map(m => `<span class="ei-badge ei-badge-primary">${m}</span>`).join('')}</div>`;
-    if (secondary.length) html += `<div class="ei-muscle-row"><span class="ei-muscle-label">Secondary:</span>${secondary.map(m => `<span class="ei-badge ei-badge-secondary">${m}</span>`).join('')}</div>`;
-    musclesCard.innerHTML = html || '<div class="ei-step-empty">No muscle data available</div>';
-  } else {
-    musclesCard.innerHTML = '<div class="ei-step-empty">No muscle data available</div>';
-  }
-
   const stepsList = document.getElementById('ei-steps-list');
   const loadingEl = document.getElementById('ei-loading');
+
   if (howToCache[name]) {
-    renderHowToSteps(stepsList, howToCache[name]);
+    const cached = howToCache[name];
+    renderMuscles(musclesCard, cached.muscles, cached.musclesSecondary);
+    renderDescription(stepsList, cached.description);
     loadingEl.classList.add('hidden');
-  } else {
-    try {
-      const prompt = `You are a fitness expert. Give clear step-by-step instructions for performing the exercise correctly. Be concise. Return ONLY a JSON array of strings, no markdown, no explanation. Each string is one step. Maximum 6 steps.\n\nHow to perform: ${name}`;
-      const resp = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
-          messages: [{ role: 'user', content: prompt }]
-        })
-      });
-      console.log('[ExerciseInfo] How-to response status:', resp.status);
-      const data = await resp.json();
-      console.log('[ExerciseInfo] How-to response:', data);
-      const text = data.content[0].text;
-      const jsonMatch = text.match(/\[[\s\S]*\]/);
-      const steps = JSON.parse(jsonMatch ? jsonMatch[0] : text.trim());
-      howToCache[name] = steps;
-      renderHowToSteps(stepsList, steps);
-    } catch (err) {
-      console.error('[ExerciseInfo] How-to fetch failed:', err);
-      stepsList.innerHTML = '<div class="ei-step-empty">Could not load instructions</div>';
-    }
-    loadingEl.classList.add('hidden');
+    return;
   }
+
+  try {
+    const searchResp = await fetch(`https://wger.de/api/v2/exercise/search/?term=${encodeURIComponent(name)}&language=english&format=json`);
+    const searchData = await searchResp.json();
+    console.log('[ExerciseInfo] wger search results:', searchData.suggestions?.length ?? 0);
+
+    let muscles = [], musclesSecondary = [], description = '';
+
+    if (searchData.suggestions && searchData.suggestions.length > 0) {
+      const baseId = searchData.suggestions[0].data.base_id;
+      console.log('[ExerciseInfo] wger base_id:', baseId);
+      const infoResp = await fetch(`https://wger.de/api/v2/exerciseinfo/${baseId}/?format=json`);
+      const infoData = await infoResp.json();
+
+      muscles = (infoData.muscles || []).map(m => m.name_en).filter(Boolean);
+      musclesSecondary = (infoData.muscles_secondary || []).map(m => m.name_en).filter(Boolean);
+
+      const translation = (infoData.translations || []).find(t => t.language === 2);
+      description = translation ? stripHtml(translation.description) : '';
+      console.log('[ExerciseInfo] wger muscles:', muscles, 'secondary:', musclesSecondary);
+    }
+
+    howToCache[name] = { muscles, musclesSecondary, description };
+    renderMuscles(musclesCard, muscles, musclesSecondary);
+    renderDescription(stepsList, description);
+  } catch (err) {
+    console.error('[ExerciseInfo] wger fetch failed:', err);
+    musclesCard.innerHTML = '<div class="ei-step-empty">No muscle data available</div>';
+    stepsList.innerHTML = '<div class="ei-step-empty">Instructions not available for this exercise</div>';
+  }
+  loadingEl.classList.add('hidden');
 }
 
-function renderHowToSteps(container, steps) {
-  container.innerHTML = steps.map((step, i) => `
+function renderMuscles(container, primary, secondary) {
+  let html = '';
+  if (primary && primary.length) html += `<div class="ei-muscle-row"><span class="ei-muscle-label">Primary:</span>${primary.map(m => `<span class="ei-badge ei-badge-primary">${m}</span>`).join('')}</div>`;
+  if (secondary && secondary.length) html += `<div class="ei-muscle-row"><span class="ei-muscle-label">Secondary:</span>${secondary.map(m => `<span class="ei-badge ei-badge-secondary">${m}</span>`).join('')}</div>`;
+  container.innerHTML = html || '<div class="ei-step-empty">No muscle data available</div>';
+}
+
+function renderDescription(container, description) {
+  if (!description) {
+    container.innerHTML = '<div class="ei-step-empty">Instructions not available for this exercise</div>';
+    return;
+  }
+  const sentences = description.split(/(?<=[.!?])\s+/).filter(s => s.length > 0);
+  if (sentences.length <= 1) {
+    container.innerHTML = `<div class="ei-step-text" style="padding:8px 0;line-height:1.6">${description}</div>`;
+    return;
+  }
+  container.innerHTML = sentences.map((s, i) => `
     <div class="ei-step">
       <span class="ei-step-num">${i + 1}</span>
-      <span class="ei-step-text">${step}</span>
+      <span class="ei-step-text">${s}</span>
     </div>
   `).join('');
 }
