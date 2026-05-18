@@ -872,7 +872,7 @@ function renderExerciseItem(list, ex) {
 // -- Exercise Info Screen -------------------------------
 async function loadFreeExerciseDB() {
   if (freeExerciseDB) return freeExerciseDB;
-  const url = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/exercises.json';
+  const url = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/dist/exercises.json';
   console.log('[ExerciseInfo] Fetching dataset:', url);
   try {
     const resp = await fetch(url);
