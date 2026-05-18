@@ -37,7 +37,7 @@ let currentBrowsePlan = null;
 
 // -- Exercise info screen state ------------------------
 let freeExerciseDB = null;
-const EXERCISE_IMG_BASE = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/';
+let gifCache = {};
 let exerciseInfoReturnScreen = 'screen-exercises';
 
 // -- Splash coordination --------------------------------
@@ -943,6 +943,27 @@ function openExerciseInfo(name, returnScreen) {
   loadExerciseInfo(name);
 }
 
+async function fetchGifUrl(name) {
+  if (name in gifCache) return gifCache[name];
+  const norm = normalizeExName(name);
+  try {
+    const resp = await fetch(`https://oss.exercisedb.dev/api/v1/exercises?name=${encodeURIComponent(norm)}&limit=10`);
+    const data = await resp.json();
+    const results = Array.isArray(data) ? data : (data.data || []);
+    console.log('[ExerciseInfo] ExerciseDB results:', results.length);
+    if (results.length > 0) {
+      const match = results.find(e => normalizeExName(e.name) === norm) || results[0];
+      gifCache[name] = match.gifUrl || null;
+    } else {
+      gifCache[name] = null;
+    }
+  } catch (err) {
+    console.error('[ExerciseInfo] ExerciseDB fetch failed:', err);
+    gifCache[name] = null;
+  }
+  return gifCache[name];
+}
+
 async function loadExerciseInfo(name) {
   const db = await loadFreeExerciseDB();
   const entry = findExerciseInDB(name, db);
@@ -950,12 +971,15 @@ async function loadExerciseInfo(name) {
 
   const gifEl = document.getElementById('ei-gif');
   const placeholder = document.getElementById('ei-gif-placeholder');
-  if (entry && entry.images && entry.images.length > 0) {
-    const imgUrl = EXERCISE_IMG_BASE + entry.images[0];
-    console.log('[ExerciseInfo] Image URL:', imgUrl);
+
+  const gifUrl = await fetchGifUrl(name);
+  console.log('[ExerciseInfo] GIF URL:', gifUrl);
+  if (gifUrl) {
+    gifEl.style.cssText = 'width:100%;border-radius:8px';
+    gifEl.alt = name;
     gifEl.onload = () => { gifEl.classList.remove('hidden'); placeholder.classList.add('hidden'); };
     gifEl.onerror = () => { placeholder.textContent = 'Animation not available'; };
-    gifEl.src = imgUrl;
+    gifEl.src = gifUrl;
   } else {
     placeholder.textContent = 'Animation not available';
   }
