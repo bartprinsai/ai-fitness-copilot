@@ -37,7 +37,7 @@ let currentBrowsePlan = null;
 
 // -- Exercise info screen state ------------------------
 let freeExerciseDB = null;
-const EXERCISE_IMG_BASE = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/dist/exercises/';
+const EXERCISE_IMG_BASE = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/';
 let exerciseInfoReturnScreen = 'screen-exercises';
 
 // -- Splash coordination --------------------------------
