@@ -40,6 +40,13 @@ let freeExerciseDB = null;
 let gifCache = {};
 let exerciseInfoReturnScreen = 'screen-exercises';
 
+const LOCAL_EXERCISE_VIDEOS = {
+  'squat': 'exercises/videos/barbell-squat.mp4',
+  'barbell squat': 'exercises/videos/barbell-squat.mp4',
+  'bench press': 'exercises/videos/bench-press.mp4',
+  'barbell bench press': 'exercises/videos/bench-press.mp4',
+};
+
 // -- Splash coordination --------------------------------
 let splashDone = false, authDone = false;
 function checkAndReveal() {
@@ -972,16 +979,37 @@ async function loadExerciseInfo(name) {
   const gifEl = document.getElementById('ei-gif');
   const placeholder = document.getElementById('ei-gif-placeholder');
 
-  const gifUrl = await fetchGifUrl(name);
-  console.log('[ExerciseInfo] GIF URL:', gifUrl);
-  if (gifUrl) {
-    gifEl.style.cssText = 'width:100%;border-radius:8px';
-    gifEl.alt = name;
-    gifEl.onload = () => { gifEl.classList.remove('hidden'); placeholder.classList.add('hidden'); };
-    gifEl.onerror = () => { placeholder.textContent = 'Animation not available'; };
-    gifEl.src = gifUrl;
+  const normName = name.toLowerCase().trim();
+  const localVideoKey = Object.keys(LOCAL_EXERCISE_VIDEOS).find(k => normName.includes(k));
+  const localVideoPath = localVideoKey ? LOCAL_EXERCISE_VIDEOS[localVideoKey] : null;
+
+  if (localVideoPath) {
+    console.log('[ExerciseInfo] Local video:', localVideoPath);
+    gifEl.classList.add('hidden');
+    const existingVideo = placeholder.querySelector('video');
+    if (existingVideo) existingVideo.remove();
+    const video = document.createElement('video');
+    video.src = localVideoPath;
+    video.autoplay = true;
+    video.loop = true;
+    video.muted = true;
+    video.setAttribute('playsinline', '');
+    video.style.cssText = 'width:100%;border-radius:8px;display:block';
+    placeholder.innerHTML = '';
+    placeholder.appendChild(video);
+    placeholder.classList.remove('hidden');
   } else {
-    placeholder.textContent = 'Animation not available';
+    const gifUrl = await fetchGifUrl(name);
+    console.log('[ExerciseInfo] GIF URL:', gifUrl);
+    if (gifUrl) {
+      gifEl.style.cssText = 'width:100%;border-radius:8px';
+      gifEl.alt = name;
+      gifEl.onload = () => { gifEl.classList.remove('hidden'); placeholder.classList.add('hidden'); };
+      gifEl.onerror = () => { placeholder.textContent = 'Animation not available'; };
+      gifEl.src = gifUrl;
+    } else {
+      placeholder.textContent = 'Animation not available';
+    }
   }
 
   const primary = entry ? (entry.primaryMuscles || []) : [];
