@@ -146,11 +146,68 @@ let pdeDragDy = 0;
 let pdeActiveSwipeInner = null;
 let pdeActiveSwipeReveal = null;
 
-// -- Screen Navigation ----------------------------------
+// -- Screen Navigation ------------------------------------
+// Central place that both switches the visible .screen AND keeps the
+// browser/Android history in sync, so the hardware back button steps back
+// through the app's screens instead of closing the PWA.
+//
+// - Every call pushes a new history entry, except: (a) the very first
+//   screen shown after boot (login or home), which replaces the initial
+//   entry instead of adding one — so back from there falls through to the
+//   platform's default behavior (backgrounding the PWA, per spec), and
+//   (b) navigating to the screen that's already active, which is a no-op
+//   for history (avoids duplicate back-taps landing on the same screen).
+// - A small table of "on-enter" refreshers re-runs whenever its screen
+//   becomes active, however it got there (forward navigation, an in-app
+//   back button, or the hardware back button), so returning to a screen
+//   never shows stale data. It's intentionally only for screens whose
+//   content can change while you're away from them.
+const SCREEN_ON_ENTER = {
+  'screen-fitness-tracker': () => renderHome(),
+  'screen-workout-plan': () => renderPlanList(),
+  'screen-plan-detail': () => renderPlanDetail(),
+};
+
+let historyInitialized = false;
+let inPopstateNavigation = false;
+
 function showScreen(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const wasActive = el.classList.contains('active');
+
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
+  el.classList.add('active');
+
+  if (SCREEN_ON_ENTER[id]) SCREEN_ON_ENTER[id]();
+
+  if (inPopstateNavigation) return;
+  if (!historyInitialized) {
+    historyInitialized = true;
+    history.replaceState({ screen: id }, '', '#' + id);
+  } else if (!wasActive) {
+    history.pushState({ screen: id }, '', '#' + id);
+  }
 }
+
+// In-app "back" controls call this instead of showScreen() directly, so
+// they walk the same history stack the hardware back button uses instead
+// of pushing a redundant duplicate entry on top of it. `fallbackId` covers
+// the (normally unreachable) case where there's no app history yet.
+function goBack(fallbackId) {
+  if (history.state && history.state.screen) {
+    history.back();
+  } else {
+    showScreen(fallbackId);
+  }
+}
+
+window.addEventListener('popstate', e => {
+  const id = (e.state && e.state.screen) || 'screen-home';
+  inPopstateNavigation = true;
+  showScreen(id);
+  inPopstateNavigation = false;
+});
 
 // -- User bar -------------------------------------------
 function updateUserBar() {
@@ -1447,7 +1504,7 @@ function saveNewExerciseFromScreen(andAddAnother) {
   }
 }
 
-document.getElementById('btn-new-ex-back').addEventListener('click', () => showScreen('screen-exercises'));
+document.getElementById('btn-new-ex-back').addEventListener('click', () => goBack('screen-exercises'));
 document.getElementById('btn-new-ex-save').addEventListener('click', () => saveNewExerciseFromScreen(false));
 document.getElementById('btn-new-ex-save-add').addEventListener('click', () => saveNewExerciseFromScreen(true));
 document.getElementById('btn-new-ex-add-cat').addEventListener('click', () => {
@@ -1514,18 +1571,18 @@ document.getElementById('btn-back-exercises').addEventListener('click', () => {
     setExercisesTitle('All Exercises', true);
     renderCategoryBrowser();
   } else {
-    showScreen('screen-fitness-tracker');
+    goBack('screen-fitness-tracker');
   }
 });
 
 document.getElementById('btn-new-exercise').addEventListener('click', openNewExerciseScreen);
-document.getElementById('btn-back-training').addEventListener('click', () => { renderHome(); showScreen('screen-fitness-tracker'); });
+document.getElementById('btn-back-training').addEventListener('click', () => goBack('screen-fitness-tracker'));
 document.getElementById('btn-save-set').addEventListener('click', saveSet);
 document.getElementById('btn-clear').addEventListener('click', clearFields);
 document.getElementById('btn-timer').addEventListener('click', openTimer);
 document.getElementById('btn-training-pr').addEventListener('click', () => toast('Records coming soon'));
 document.getElementById('btn-training-info').addEventListener('click', () => { if (currentExercise) openExerciseInfo(currentExercise, 'screen-training'); });
-document.getElementById('btn-back-exercise-info').addEventListener('click', () => showScreen(exerciseInfoReturnScreen));
+document.getElementById('btn-back-exercise-info').addEventListener('click', () => goBack(exerciseInfoReturnScreen));
 document.getElementById('btn-chat-coach').addEventListener('click', () => toast('Coming soon!'));
 
 document.getElementById('exercise-search').addEventListener('input', e => {
@@ -1573,10 +1630,10 @@ document.getElementById('menu-card-workout').addEventListener('click', openWorko
 document.getElementById('menu-card-nutrition').addEventListener('click', () => showScreen('screen-nutrition'));
 document.getElementById('menu-card-progress').addEventListener('click', () => showScreen('screen-progress'));
 
-document.getElementById('btn-home-from-tracker').addEventListener('click', () => showScreen('screen-home'));
-document.getElementById('btn-back-workout-plan').addEventListener('click', () => showScreen('screen-home'));
-document.getElementById('btn-back-nutrition').addEventListener('click', () => showScreen('screen-home'));
-document.getElementById('btn-back-progress').addEventListener('click', () => showScreen('screen-home'));
+document.getElementById('btn-home-from-tracker').addEventListener('click', () => goBack('screen-home'));
+document.getElementById('btn-back-workout-plan').addEventListener('click', () => goBack('screen-home'));
+document.getElementById('btn-back-nutrition').addEventListener('click', () => goBack('screen-home'));
+document.getElementById('btn-back-progress').addEventListener('click', () => goBack('screen-home'));
 
 // ── Anthropic API helper ──────────────────────────────
 async function callClaude(userMessage, systemPrompt) {
@@ -1956,10 +2013,7 @@ function setupPdeSwipeDelete(item) {
   });
 }
 
-document.getElementById('btn-back-plan-day-edit').addEventListener('click', () => {
-  renderPlanDetail();
-  showScreen('screen-plan-detail');
-});
+document.getElementById('btn-back-plan-day-edit').addEventListener('click', () => goBack('screen-plan-detail'));
 
 // ── Plan Set Active / Overflow ────────────────────────
 document.getElementById('btn-plan-set-active').addEventListener('click', async () => {
@@ -1982,10 +2036,7 @@ document.getElementById('btn-overflow-plan-detail').addEventListener('click', e 
   ], e.currentTarget);
 });
 
-document.getElementById('btn-back-plan-detail').addEventListener('click', () => {
-  renderPlanList();
-  showScreen('screen-workout-plan');
-});
+document.getElementById('btn-back-plan-detail').addEventListener('click', () => goBack('screen-workout-plan'));
 
 // ── AI Generate Screen ────────────────────────────────
 function openAIGenerate() {
@@ -1995,7 +2046,7 @@ function openAIGenerate() {
   showScreen('screen-ai-generate');
 }
 
-document.getElementById('btn-back-ai-generate').addEventListener('click', () => showScreen('screen-workout-plan'));
+document.getElementById('btn-back-ai-generate').addEventListener('click', () => goBack('screen-workout-plan'));
 
 document.getElementById('btn-ai-generate-submit').addEventListener('click', async () => {
   if (!ANTHROPIC_API_KEY || ANTHROPIC_API_KEY.includes('YOUR_KEY')) {
@@ -2236,7 +2287,7 @@ document.getElementById('btn-confirm-load-workout').addEventListener('click', as
   showScreen('screen-fitness-tracker');
 });
 
-document.getElementById('btn-back-load-workout').addEventListener('click', () => showScreen(loadWorkoutReturnScreen));
+document.getElementById('btn-back-load-workout').addEventListener('click', () => goBack(loadWorkoutReturnScreen));
 
 // ── Smart Day Banner ──────────────────────────────────
 function renderSmartBanner() {

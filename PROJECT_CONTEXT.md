@@ -162,6 +162,7 @@ GitHub Pages deployt automatisch na elke push.
 - Firebase compat SDK versie: 10.13.2
 - Bij syntax errors: `node --check app.js`
 - Anthropic API werkt niet vanuit alle browsercontexten door CORS-beperkingen — als de AI-generator in de Workout Plan Builder faalt, eerst dit checken
+- **Android/browser back-knop**: `showScreen()` (app.js) is de centrale plek die zowel het zichtbare scherm wisselt als `history.pushState`/`popstate` bijhoudt, zodat de hardware terug-knop één scherm terugstapt i.p.v. de PWA te sluiten. Nieuwe schermovergangen die via een menu/kaart/actie vooruit navigeren, blijven gewoon `showScreen(id)` aanroepen; nieuwe "terug"-knoppen (een `<`-pijltje dat terugkeert naar het vorige scherm) moeten `goBack(fallbackId)` aanroepen in plaats van `showScreen(id)`, anders ontstaan dubbele history-entries.
 
 ---
 
