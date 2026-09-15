@@ -45,9 +45,10 @@ const keyArg = process.argv.find(a => a.startsWith('--key='));
 const keyPath = keyArg ? path.resolve(keyArg.slice('--key='.length))
                        : path.join(__dirname, 'serviceAccountKey.json');
 
-let admin, serviceAccount;
+let initializeApp, cert, getFirestore, serviceAccount;
 try {
-  admin = require('firebase-admin');
+  ({ initializeApp, cert } = require('firebase-admin/app'));
+  ({ getFirestore } = require('firebase-admin/firestore'));
 } catch (e) {
   console.error('Missing dependency "firebase-admin". Run: cd scripts && npm install');
   process.exit(1);
@@ -60,8 +61,8 @@ try {
   process.exit(1);
 }
 
-admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-const db = admin.firestore();
+const app = initializeApp({ credential: cert(serviceAccount) });
+const db = getFirestore(app);
 
 // Returns a copy of `set` with videoId/idbKey removed, or null if neither was present.
 function stripVideoFields(set) {
