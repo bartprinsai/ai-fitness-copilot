@@ -632,6 +632,24 @@
   </div>
 </div>
 
+<!-- RESET TO DEFAULT OVERLAY -->
+<div class="overlay" id="reset-overlay">
+  <div class="overlay-panel">
+    <h3>Reset to default?</h3>
+    <p class="cat-delete-msg">This permanently deletes <strong>all data</strong> for this account — workout history, exercises you added or removed, workout plans, and settings — and resets the app to its original state. This cannot be undone.</p>
+    <p class="cat-delete-msg">Type <strong>RESET</strong> below to confirm.</p>
+    <input type="text" id="reset-confirm-input" placeholder="Type RESET" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"/>
+    <p class="reset-error hidden" id="reset-error"></p>
+    <div class="overlay-btns">
+      <button class="btn-secondary" id="btn-reset-cancel">Cancel</button>
+      <button class="btn-danger" id="btn-reset-confirm" disabled>
+        <span class="reset-btn-spinner hidden" id="reset-btn-spinner"></span>
+        <span id="reset-confirm-label">Reset</span>
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- OVERFLOW DROPDOWN MENU -->
 <div class="dropdown-menu" id="overflow-menu">
   <div class="dropdown-panel" id="overflow-panel"></div>

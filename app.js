@@ -255,7 +255,7 @@ function showOverflowMenu(items, anchorEl) {
   panel.style.top = (rect.bottom + 4) + 'px';
   items.forEach(item => {
     const el = document.createElement('div');
-    el.className = 'dropdown-item';
+    el.className = 'dropdown-item' + (item.danger ? ' dropdown-item-danger' : '');
     el.textContent = item.label;
     el.addEventListener('click', () => { closeOverflowMenu(); item.action(); });
     panel.appendChild(el);
@@ -267,13 +267,124 @@ document.getElementById('overflow-menu').addEventListener('click', e => {
   if (e.target === e.currentTarget) closeOverflowMenu();
 });
 document.getElementById('btn-overflow-home').addEventListener('click', e => {
-  showOverflowMenu([{ label: 'Sign out', action: signOutUser }], e.currentTarget);
+  showOverflowMenu([
+    { label: 'Sign out', action: signOutUser },
+    { label: 'Reset to default', action: openResetOverlay, danger: true },
+  ], e.currentTarget);
 });
 document.getElementById('btn-overflow-training').addEventListener('click', e => {
   showOverflowMenu([{ label: 'Sign out', action: signOutUser }], e.currentTarget);
 });
 document.getElementById('btn-overflow-exercises').addEventListener('click', e => {
   showOverflowMenu([{ label: 'Sign out', action: signOutUser }], e.currentTarget);
+});
+
+// -- Reset to default ------------------------------------
+// Deletes every piece of this user's data from Firestore and returns the
+// app to its out-of-the-box state. Paths touched (all scoped under
+// users/{uid}/ for the currently signed-in user):
+//   - users/{uid}/workouts/*            (every logged workout/date)
+//   - users/{uid}/plans/*                (every Workout Plan Builder plan)
+//   - users/{uid}/coachingPhilosophies/* (if that collection exists)
+//   - users/{uid}/meta/records           (PR records)
+//   - users/{uid}/meta/custom_exercises  (self-added exercises)
+//   - users/{uid}/meta/activeplan        (active plan pointer)
+let resetInProgress = false;
+
+function openResetOverlay() {
+  if (!currentUser) return;
+  document.getElementById('reset-confirm-input').value = '';
+  document.getElementById('reset-error').textContent = '';
+  document.getElementById('reset-error').classList.add('hidden');
+  setResetBusy(false);
+  updateResetConfirmEnabled();
+  openOverlay('reset-overlay');
+  setTimeout(() => document.getElementById('reset-confirm-input').focus(), 100);
+}
+
+function updateResetConfirmEnabled() {
+  if (resetInProgress) return;
+  const match = document.getElementById('reset-confirm-input').value === 'RESET';
+  document.getElementById('btn-reset-confirm').disabled = !match;
+}
+
+function setResetBusy(busy) {
+  resetInProgress = busy;
+  document.getElementById('reset-confirm-input').disabled = busy;
+  document.getElementById('btn-reset-cancel').disabled = busy;
+  document.getElementById('btn-reset-confirm').disabled = busy || document.getElementById('reset-confirm-input').value !== 'RESET';
+  document.getElementById('reset-btn-spinner').classList.toggle('hidden', !busy);
+  document.getElementById('reset-confirm-label').textContent = busy ? 'Resetting...' : 'Reset';
+}
+
+function showResetError(msg) {
+  const el = document.getElementById('reset-error');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+
+document.getElementById('reset-confirm-input').addEventListener('input', updateResetConfirmEnabled);
+document.getElementById('btn-reset-cancel').addEventListener('click', () => {
+  if (resetInProgress) return;
+  closeOverlay('reset-overlay');
+});
+
+document.getElementById('btn-reset-confirm').addEventListener('click', async () => {
+  if (resetInProgress) return;
+  if (document.getElementById('reset-confirm-input').value !== 'RESET') return;
+  if (!currentUser) { showResetError('You are not signed in.'); return; }
+
+  const uid = currentUser.uid;
+  const userPrefix = `users/${uid}/`;
+  document.getElementById('reset-error').classList.add('hidden');
+  setResetBusy(true);
+
+  try {
+    const [workoutsSnap, plansSnap, philosophiesSnap] = await Promise.all([
+      fStore.collection(userPrefix + 'workouts').get(),
+      fStore.collection(userPrefix + 'plans').get(),
+      fStore.collection(userPrefix + 'coachingPhilosophies').get(),
+    ]);
+
+    const refs = [
+      ...workoutsSnap.docs.map(d => d.ref),
+      ...plansSnap.docs.map(d => d.ref),
+      ...philosophiesSnap.docs.map(d => d.ref),
+      fStore.doc(userPrefix + 'meta/records'),
+      fStore.doc(userPrefix + 'meta/custom_exercises'),
+      fStore.doc(userPrefix + 'meta/activeplan'),
+    ];
+
+    // Explicit per-doc safety check: refuse to touch anything outside this user's own subtree.
+    for (const ref of refs) {
+      if (!ref.path.startsWith(userPrefix)) {
+        throw new Error('Refused to delete out-of-scope path: ' + ref.path);
+      }
+    }
+
+    // Firestore caps a single batch at 500 writes. Commit in chunks so each
+    // chunk is atomic (all-or-nothing); this app's data realistically stays
+    // well under one chunk, but this keeps larger accounts safe too.
+    const BATCH_LIMIT = 400;
+    for (let i = 0; i < refs.length; i += BATCH_LIMIT) {
+      const batch = fStore.batch();
+      refs.slice(i, i + BATCH_LIMIT).forEach(ref => batch.delete(ref));
+      await batch.commit();
+    }
+
+    db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null };
+    currentPlanId = null;
+    currentPlanData = null;
+
+    closeOverlay('reset-overlay');
+    toast('Reset complete');
+    openFitnessTracker();
+  } catch (err) {
+    console.error('[Reset] failed:', err);
+    showResetError((err && err.message) ? err.message : 'Reset failed. Please check your connection and try again.');
+  } finally {
+    setResetBusy(false);
+  }
 });
 
 // -- Home Screen ----------------------------------------

@@ -118,6 +118,7 @@ callClaude(userMessage, sysPrompt) // Anthropic API call voor de AI plan generat
 - **Nieuw oefening aanmaken** scherm (NAME, NOTES, CATEGORY, TYPE, WEIGHT UNIT)
 - **Edit/Delete categorieën** via drie puntjes menu
 - **Selectie modus** met vinkje en vuilnisbak in toolbar bij ingedrukt houden
+- **"Reset to default"** in het drie-puntjes-menu van de Fitness Tracker — tijdelijke knop (blijft staan tot de app verder af is) om alle Firestore-data van het account te wissen en de app terug te zetten naar de standaardstaat. Vereist het typen van "RESET" ter bevestiging. Zie `resetInProgress`/`openResetOverlay` in app.js voor de exacte paden die dit raakt.
 
 ## Wat bewust is verwijderd
 - **AI Camera** (MediaPipe pose detection, skeleton overlay, automatische rep-telling per oefeningstype, live coaching via Web Speech API)

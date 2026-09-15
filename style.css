@@ -427,9 +427,16 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .preset-item-arrow { color: #aaa; font-size: 16px; }
 
 /* ── DANGER BUTTON ────────────────────────────────────── */
-.btn-danger { flex: 1; padding: 11px 8px; border: none; border-radius: 2px; background: #C62828; color: white; font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.12s; text-transform: uppercase; letter-spacing: .06em; }
+.btn-danger { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 11px 8px; border: none; border-radius: 2px; background: #C62828; color: white; font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.12s; text-transform: uppercase; letter-spacing: .06em; }
 .btn-danger:active { background: #b71c1c; }
+.btn-danger:disabled, .btn-secondary:disabled { opacity: .5; cursor: not-allowed; }
+.btn-danger:disabled:active { background: #C62828; }
 .cat-delete-msg { font-size: 14px; color: var(--text-secondary); line-height: 1.5; }
+
+/* ── RESET TO DEFAULT ─────────────────────────────────── */
+.reset-error { font-size: 13px; color: #d32f2f; line-height: 1.4; }
+.reset-btn-spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.4); border-top-color: #fff; border-radius: 50%; animation: spin .8s linear infinite; flex-shrink: 0; }
+.dropdown-item-danger { color: #d32f2f; }
 
 /* ── NEW EXERCISE SCREEN ──────────────────────────────── */
 .new-ex-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
