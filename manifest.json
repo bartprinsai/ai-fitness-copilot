@@ -3,6 +3,7 @@
   "short_name": "AI Fitness",
   "description": "Jouw AI-gedreven workout tracker",
   "start_url": "/ai-fitness-copilot/",
+  "scope": "/ai-fitness-copilot/",
   "display": "standalone",
   "background_color": "#0a1628",
   "theme_color": "#0a1628",
