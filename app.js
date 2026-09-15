@@ -19,11 +19,6 @@ let currentUser = null;
 
 // -- In-memory state ------------------------------------
 let db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null };
-let googleAccessToken = null;
-let driveFolderId = null;
-let pendingVideoSetIndex = null;
-let pendingAction = null;
-let tokenClient = null;
 
 // -- Home selection mode state --------------------------
 let homeSelMode = false;
@@ -120,126 +115,6 @@ async function loadUserData(userUid) {
   } catch(e) {
     console.error('loadUserData', e);
   }
-}
-
-// -- Google Drive helpers -------------------------------
-async function driveApiError(res) {
-  let msg = res.statusText;
-  try { const b = await res.json(); msg = b.error?.message || msg; } catch(_) {}
-  console.error('[Drive] API error', res.status, msg);
-  throw new Error(`${res.status}: ${msg}`);
-}
-
-async function ensureDriveFolder() {
-  if (driveFolderId) return driveFolderId;
-  const name = 'AI Fitness Co-Pilot';
-  const q = encodeURIComponent(`name='${name}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
-  const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`, {
-    headers: { Authorization: 'Bearer ' + googleAccessToken }
-  });
-  if (!searchRes.ok) await driveApiError(searchRes);
-  const data = await searchRes.json();
-  if (data.files && data.files.length > 0) {
-    driveFolderId = data.files[0].id;
-    return driveFolderId;
-  }
-  const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
-    method: 'POST',
-    headers: { Authorization: 'Bearer ' + googleAccessToken, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, mimeType: 'application/vnd.google-apps.folder' })
-  });
-  if (!createRes.ok) await driveApiError(createRes);
-  const folder = await createRes.json();
-  driveFolderId = folder.id;
-  return driveFolderId;
-}
-
-async function uploadToDrive(file, filename) {
-  const folderId = await ensureDriveFolder();
-  const metadata = { name: filename, parents: [folderId] };
-  const form = new FormData();
-  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-  form.append('file', file);
-  const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
-    method: 'POST',
-    headers: { Authorization: 'Bearer ' + googleAccessToken },
-    body: form
-  });
-  if (!res.ok) await driveApiError(res);
-  const data = await res.json();
-  return data.id;
-}
-
-async function openVideoFrame(videoId) {
-  const overlay = document.getElementById('video-overlay');
-  const player = document.getElementById('video-player');
-  player.src = '';
-  overlay.classList.add('open');
-  try {
-    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${videoId}?alt=media`, {
-      headers: { Authorization: 'Bearer ' + googleAccessToken }
-    });
-    if (!res.ok) throw new Error('Failed to load video');
-    const blob = await res.blob();
-    player.src = URL.createObjectURL(blob);
-    player.play();
-  } catch (e) {
-    toast('Could not load video: ' + e.message);
-    overlay.classList.remove('open');
-  }
-}
-
-function removeSetVideo(setIndex) {
-  const workout = getWorkout(currentDate);
-  const ex = workout.find(e => e.name === currentExercise);
-  if (!ex || !ex.sets[setIndex]) return;
-  const s = ex.sets[setIndex];
-  if (s.idbKey) idbDelete(s.idbKey).catch(() => {});
-  delete s.videoId;
-  delete s.idbKey;
-  setWorkout(currentDate, workout);
-  renderSetList();
-  toast('Video removed');
-}
-
-// -- GIS token client (Drive) ---------------------------
-// Client ID: console.cloud.google.com ? APIs & Services ? Credentials
-//            ? OAuth 2.0 Client IDs ? "Web client (auto created by Google Service)"
-const GIS_CLIENT_ID = '41596366904-3h277tnkmavund1rc8l4rn3a5klu966k.apps.googleusercontent.com';
-
-window.addEventListener('load', () => {
-  if (typeof google !== 'undefined' && google.accounts) {
-    tokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: GIS_CLIENT_ID,
-      scope: 'https://www.googleapis.com/auth/drive.file',
-      callback: (response) => {
-        if (response.error) {
-          console.error('[GIS] token error:', response.error);
-          toast('Drive access denied');
-          pendingAction = null;
-          return;
-        }
-        console.log('[GIS] access token obtained');
-        googleAccessToken = response.access_token;
-        if (pendingAction) {
-          const action = pendingAction;
-          pendingAction = null;
-          action();
-        }
-      }
-    });
-    console.log('[GIS] token client initialized');
-  } else {
-    console.warn('[GIS] google.accounts not available - Drive upload disabled');
-  }
-});
-
-function requestDriveToken(onSuccess) {
-  if (googleAccessToken) { onSuccess(); return; }
-  if (!tokenClient) { toast('Drive not available'); return; }
-  console.log('[GIS] requesting access token...');
-  pendingAction = onSuccess;
-  tokenClient.requestAccessToken({ prompt: '' });
 }
 
 // -- State ----------------------------------------------
@@ -342,7 +217,6 @@ initAuth();
 document.getElementById('btn-google-signin').addEventListener('click', async () => {
   console.log('[Auth] Google sign-in button clicked');
   const provider = new firebase.auth.GoogleAuthProvider();
-  provider.addScope('https://www.googleapis.com/auth/drive.file');
   try {
     console.log('[Auth] trying signInWithPopup...');
     const result = await fAuth.signInWithPopup(provider);
@@ -365,12 +239,6 @@ document.getElementById('btn-google-signin').addEventListener('click', async () 
 });
 
 function signOutUser() {
-  if (googleAccessToken && typeof google !== 'undefined') {
-    google.accounts.oauth2.revoke(googleAccessToken, () => console.log('[GIS] token revoked'));
-  }
-  googleAccessToken = null;
-  driveFolderId = null;
-  pendingAction = null;
   fAuth.signOut();
 }
 
@@ -1041,24 +909,21 @@ function renderSetList() {
   const exRecords = (db.records || {})[currentExercise] || {};
   list.innerHTML = `
     <div class="set-list-header">
-      <span></span><span></span><span>#</span><span>KG</span><span>REPS</span><span></span>
+      <span></span><span>#</span><span>KG</span><span>REPS</span><span></span>
     </div>
   `;
 
   sets.forEach((s, i) => {
     const isPR = exRecords[String(s.reps)] && parseFloat(s.weight) >= exRecords[String(s.reps)];
-    const hasVideo = !!(s.videoId || s.idbKey);
     const row = document.createElement('div');
     row.className = 'set-row' + (selectedSetIndex === i ? ' selected' : '');
     row.innerHTML = `
       <span class="set-comment"><svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg></span>
-      <span class="set-camera ${hasVideo ? 'has-video' : ''}"><svg viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg></span>
       <span class="set-num">${i + 1}</span>
       <span class="set-weight">${s.weight}</span>
       <span class="set-reps">${s.reps}${isPR ? `<svg class="set-pr-icon" viewBox="0 0 24 24"><path d="M12 1L9 9H1l6.5 4.7L5 21l7-5 7 5-2.5-7.3L23 9h-8z"/></svg>` : ''}</span>
       <button class="set-delete" aria-label="Delete set ${i + 1}"><svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
     `;
-    row.querySelector('.set-camera').addEventListener('click', e => { e.stopPropagation(); showVideoPopup(i, s.videoId || null, s.idbKey || null, e.currentTarget); });
     row.querySelector('.set-delete').addEventListener('click', e => { e.stopPropagation(); deleteSet(i); });
     row.addEventListener('click', () => selectSet(i));
     list.appendChild(row);
@@ -1075,8 +940,7 @@ function saveSet() {
   if (!ex) { ex = { name: currentExercise, sets: [] }; workout.push(ex); }
 
   if (selectedSetIndex !== null) {
-    const prevVideoId = ex.sets[selectedSetIndex].videoId;
-    ex.sets[selectedSetIndex] = { weight, reps, ...(prevVideoId ? { videoId: prevVideoId } : {}) };
+    ex.sets[selectedSetIndex] = { weight, reps };
     selectedSetIndex = null;
     toast('Set updated');
   } else {
@@ -1559,7 +1423,6 @@ document.getElementById('btn-timer').addEventListener('click', openTimer);
 document.getElementById('btn-training-pr').addEventListener('click', () => toast('Records coming soon'));
 document.getElementById('btn-training-info').addEventListener('click', () => { if (currentExercise) openExerciseInfo(currentExercise, 'screen-training'); });
 document.getElementById('btn-back-exercise-info').addEventListener('click', () => showScreen(exerciseInfoReturnScreen));
-document.getElementById('btn-live-coach').addEventListener('click', () => openAICamera(null));
 document.getElementById('btn-chat-coach').addEventListener('click', () => toast('Coming soon!'));
 
 document.getElementById('exercise-search').addEventListener('input', e => {
@@ -1581,496 +1444,6 @@ document.getElementById('exercise-search').addEventListener('input', e => {
     if (e.target === e.currentTarget) closeOverlay(id);
   });
 });
-
-// -- Video Popup ----------------------------------------
-function showVideoPopup(setIndex, videoId, idbKey, anchorEl) {
-  const popup = document.getElementById('video-popup');
-  const panel = document.getElementById('video-popup-panel');
-
-  const rect = anchorEl.getBoundingClientRect();
-  const pw = 240;
-  let left = rect.left;
-  let top = rect.bottom + 6;
-  if (left + pw > window.innerWidth - 8) left = window.innerWidth - pw - 8;
-  if (top + 160 > window.innerHeight) top = rect.top - 160 - 6;
-  panel.style.left = left + 'px';
-  panel.style.top = top + 'px';
-
-  if (videoId || idbKey) {
-    panel.innerHTML = `
-      <div class="video-popup-item" id="popup-view">?? View video</div>
-      <div class="video-popup-item" id="popup-delete">??? Remove video</div>
-      <div class="video-popup-item video-popup-cancel" id="popup-cancel">? Cancel</div>
-    `;
-    document.getElementById('popup-view').addEventListener('click', () => { closeVideoPopup(); viewSetVideo(setIndex); });
-    document.getElementById('popup-delete').addEventListener('click', () => { closeVideoPopup(); removeSetVideo(setIndex); });
-  } else {
-    panel.innerHTML = `
-      <div class="video-popup-item" id="popup-record">?? Record set</div>
-      <div class="video-popup-item" id="popup-upload">?? Upload existing video</div>
-      <div class="video-popup-item video-popup-cancel" id="popup-cancel">? Cancel</div>
-    `;
-    document.getElementById('popup-record').addEventListener('click', () => {
-      closeVideoPopup();
-      pendingVideoSetIndex = setIndex;
-      openAICamera(setIndex);
-    });
-    document.getElementById('popup-upload').addEventListener('click', () => {
-      closeVideoPopup();
-      pendingVideoSetIndex = setIndex;
-      requestDriveToken(() => {
-        const inp = document.getElementById('video-input-file');
-        inp.value = ''; inp.click();
-      });
-    });
-  }
-  document.getElementById('popup-cancel').addEventListener('click', closeVideoPopup);
-
-  popup.classList.add('open');
-}
-
-function closeVideoPopup() {
-  document.getElementById('video-popup').classList.remove('open');
-}
-
-document.getElementById('video-popup').addEventListener('click', e => {
-  if (e.target === e.currentTarget) closeVideoPopup();
-});
-
-async function handleVideoUpload(file) {
-  if (!file || pendingVideoSetIndex === null) return;
-  if (!googleAccessToken) {
-           tokenClient.requestAccessToken({prompt: 'consent'});
-           return;
-  }
-  const setNum = pendingVideoSetIndex + 1;
-  const safeName = currentExercise.replace(/[^a-z0-9]/gi, '_');
-  const filename = `${currentDate}_${safeName}_set${setNum}.mp4`;
-  console.log('[Drive] uploading:', filename);
-  toast('Uploading to Drive...');
-  try {
-    const videoId = await uploadToDrive(file, filename);
-    console.log('[Drive] uploaded, id:', videoId);
-    const workout = getWorkout(currentDate);
-    const ex = workout.find(e => e.name === currentExercise);
-    if (ex && ex.sets[pendingVideoSetIndex]) {
-      ex.sets[pendingVideoSetIndex].videoId = videoId;
-      setWorkout(currentDate, workout);
-    }
-    renderSetList();
-    toast('Video saved to Drive');
-  } catch(err) {
-    console.error('[Drive] upload error:', err);
-    const msg = err.message || '';
-    if (msg.startsWith('401') || msg.startsWith('403')) {
-      toast('Please sign out and sign in again to enable video upload');
-    } else {
-      toast('Upload failed: ' + msg);
-    }
-  }
-  pendingVideoSetIndex = null;
-}
-
-document.getElementById('video-input-camera').addEventListener('change', async e => {
-  await handleVideoUpload(e.target.files[0]);
-  e.target.value = '';
-});
-document.getElementById('video-input-file').addEventListener('change', async e => {
-  await handleVideoUpload(e.target.files[0]);
-  e.target.value = '';
-});
-
-document.getElementById('btn-video-close').addEventListener('click', () => {
-  const player = document.getElementById('video-player');
-  if (player.src) URL.revokeObjectURL(player.src);
-  player.src = '';
-  document.getElementById('video-overlay').classList.remove('open');
-});
-
-// ── IndexedDB helpers ─────────────────────────────────
-function openFitIDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open('FitnessCopilot', 1);
-    req.onupgradeneeded = e => e.target.result.createObjectStore('videos');
-    req.onsuccess = e => resolve(e.target.result);
-    req.onerror = e => reject(e.target.error);
-  });
-}
-async function idbPut(key, value) {
-  const idb = await openFitIDB();
-  return new Promise((resolve, reject) => {
-    const tx = idb.transaction('videos', 'readwrite');
-    tx.objectStore('videos').put(value, key);
-    tx.oncomplete = () => resolve();
-    tx.onerror = e => reject(e.target.error);
-  });
-}
-async function idbGet(key) {
-  const idb = await openFitIDB();
-  return new Promise((resolve, reject) => {
-    const tx = idb.transaction('videos', 'readonly');
-    const req = tx.objectStore('videos').get(key);
-    req.onsuccess = e => resolve(e.target.result);
-    req.onerror = e => reject(e.target.error);
-  });
-}
-async function idbDelete(key) {
-  const idb = await openFitIDB();
-  return new Promise((resolve, reject) => {
-    const tx = idb.transaction('videos', 'readwrite');
-    tx.objectStore('videos').delete(key);
-    tx.oncomplete = () => resolve();
-    tx.onerror = e => reject(e.target.error);
-  });
-}
-
-// ── AI Camera state ───────────────────────────────────
-let aiCamActive = false;
-let aiCamStream = null;
-let aiCamFacingFront = true;
-let aiCamPose = null;
-let aiCamReps = 0;
-let aiCamRepState = 'up';
-let aiCamSetIndex = null;
-let aiCamRecording = false;
-let aiCamMediaRecorder = null;
-let aiCamChunks = [];
-let aiCamAnimFrame = null;
-let aiCamPoseProcessing = false;
-let aiCamExerciseConfig = null;
-let aiCamLastCoachMsg = '';
-let aiCamLastSpeakTime = 0;
-
-// ── Exercise config ───────────────────────────────────
-function getExerciseConfig(name) {
-  const n = (name || '').toLowerCase();
-  if (/squat|deadlift|leg press|lunge/.test(n)) {
-    return { joints: 'knee', downAngle: 90, upAngle: 160,
-      coachDeep: 'Good depth!', coachShallow: 'Go deeper', coachUp: 'Drive up!' };
-  }
-  if (/curl|bicep|hammer/.test(n)) {
-    return { joints: 'elbow', downAngle: 50, upAngle: 150,
-      coachDeep: 'Full contraction!', coachShallow: 'Curl higher', coachUp: 'Lower slowly' };
-  }
-  if (/shoulder press|overhead|military|ohp/.test(n)) {
-    return { joints: 'shoulder', downAngle: 80, upAngle: 160,
-      coachDeep: 'Arms down!', coachShallow: 'Lower fully', coachUp: 'Lock out!' };
-  }
-  return { joints: 'elbow', downAngle: 50, upAngle: 150,
-    coachDeep: 'Full range!', coachShallow: 'More range', coachUp: 'Good rep!' };
-}
-
-// ── Angle calculation ─────────────────────────────────
-function calcPoseAngle(a, b, c) {
-  const rad = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
-  let angle = Math.abs(rad * 180 / Math.PI);
-  if (angle > 180) angle = 360 - angle;
-  return angle;
-}
-
-function getJointAngle(landmarks) {
-  const lm = landmarks;
-  if (!lm || lm.length < 33 || !aiCamExerciseConfig) return null;
-  try {
-    if (aiCamExerciseConfig.joints === 'knee') {
-      return (calcPoseAngle(lm[23], lm[25], lm[27]) + calcPoseAngle(lm[24], lm[26], lm[28])) / 2;
-    }
-    if (aiCamExerciseConfig.joints === 'shoulder') {
-      return (calcPoseAngle(lm[23], lm[11], lm[13]) + calcPoseAngle(lm[24], lm[12], lm[14])) / 2;
-    }
-    return (calcPoseAngle(lm[11], lm[13], lm[15]) + calcPoseAngle(lm[12], lm[14], lm[16])) / 2;
-  } catch(e) { return null; }
-}
-
-// ── Rep counting & coaching ───────────────────────────
-function processJointAngle(angle) {
-  const cfg = aiCamExerciseConfig;
-  if (!cfg) return;
-  let msg = '';
-  if (aiCamRepState === 'up') {
-    if (angle < cfg.downAngle) {
-      aiCamRepState = 'down'; msg = cfg.coachDeep;
-    } else if (angle < cfg.downAngle + 35) {
-      msg = cfg.coachShallow;
-    }
-  } else if (aiCamRepState === 'down' && angle > cfg.upAngle) {
-    aiCamRepState = 'up';
-    aiCamReps++;
-    document.getElementById('ai-cam-reps').textContent = aiCamReps;
-    msg = cfg.coachUp;
-  }
-  if (msg && msg !== aiCamLastCoachMsg) {
-    aiCamLastCoachMsg = msg;
-    const el = document.getElementById('ai-cam-coaching');
-    if (el) el.textContent = msg;
-    const now = Date.now();
-    if (window.speechSynthesis && now - aiCamLastSpeakTime > 2000) {
-      aiCamLastSpeakTime = now;
-      const utt = new SpeechSynthesisUtterance(msg);
-      utt.rate = 1.1; utt.volume = 0.8;
-      speechSynthesis.cancel();
-      speechSynthesis.speak(utt);
-    }
-  }
-}
-
-// ── Skeleton drawing ──────────────────────────────────
-const POSE_CONNECTIONS = [
-  [11,12],[11,13],[13,15],[12,14],[14,16],
-  [11,23],[12,24],[23,24],[23,25],[24,26],
-  [25,27],[26,28],[27,29],[28,30],[29,31],[30,32]
-];
-
-function drawPoseSkeleton(landmarks, canvas) {
-  const ctx = canvas.getContext('2d');
-  const W = canvas.width, H = canvas.height;
-  ctx.clearRect(0, 0, W, H);
-  if (!landmarks) return;
-
-  const video = document.getElementById('ai-cam-video');
-  const vW = video.videoWidth || W, vH = video.videoHeight || H;
-  const scale = Math.max(W / vW, H / vH);
-  const ox = (W - vW * scale) / 2, oy = (H - vH * scale) / 2;
-  const px = nx => nx * vW * scale + ox;
-  const py = ny => ny * vH * scale + oy;
-
-  ctx.strokeStyle = '#29b6f6'; ctx.lineWidth = 3; ctx.lineCap = 'round';
-  for (const [a, b] of POSE_CONNECTIONS) {
-    const pa = landmarks[a], pb = landmarks[b];
-    if (!pa || !pb || pa.visibility < 0.4 || pb.visibility < 0.4) continue;
-    ctx.beginPath(); ctx.moveTo(px(pa.x), py(pa.y)); ctx.lineTo(px(pb.x), py(pb.y)); ctx.stroke();
-  }
-  ctx.fillStyle = '#fff';
-  for (const lm of landmarks) {
-    if (!lm || lm.visibility < 0.4) continue;
-    ctx.beginPath(); ctx.arc(px(lm.x), py(lm.y), 5, 0, Math.PI * 2); ctx.fill();
-  }
-}
-
-// ── MediaPipe Pose ────────────────────────────────────
-function initAICamPose() {
-  if (typeof Pose === 'undefined') { console.warn('[AICam] Pose CDN not loaded'); return null; }
-  const pose = new Pose({
-    locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/${f}`
-  });
-  pose.setOptions({
-    modelComplexity: 1, smoothLandmarks: true, enableSegmentation: false,
-    minDetectionConfidence: 0.5, minTrackingConfidence: 0.5
-  });
-  pose.onResults(results => {
-    aiCamPoseProcessing = false;
-    const canvas = document.getElementById('ai-cam-canvas');
-    if (!canvas || !aiCamActive) return;
-    if (results.poseLandmarks) {
-      drawPoseSkeleton(results.poseLandmarks, canvas);
-      const angle = getJointAngle(results.poseLandmarks);
-      if (angle !== null) processJointAngle(angle);
-    } else {
-      canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
-    }
-  });
-  return pose;
-}
-
-function aiCamPoseLoop() {
-  if (!aiCamActive) return;
-  const video = document.getElementById('ai-cam-video');
-  if (video && video.readyState >= 2 && !aiCamPoseProcessing && aiCamPose) {
-    aiCamPoseProcessing = true;
-    aiCamPose.send({ image: video }).catch(() => { aiCamPoseProcessing = false; });
-  }
-  aiCamAnimFrame = requestAnimationFrame(aiCamPoseLoop);
-}
-
-// ── Camera stream ─────────────────────────────────────
-async function startAICamStream(facingFront) {
-  if (aiCamStream) { aiCamStream.getTracks().forEach(t => t.stop()); aiCamStream = null; }
-  try {
-    aiCamStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: facingFront ? 'user' : 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
-      audio: true
-    });
-    const video = document.getElementById('ai-cam-video');
-    video.srcObject = aiCamStream;
-    video.play().catch(e => console.warn('[AICam] play():', e));
-  } catch(e) {
-    console.error('[AICam] getUserMedia:', e);
-    toast('Camera not available');
-    closeAICamera();
-  }
-}
-
-// ── Open / Close ──────────────────────────────────────
-function openAICamera(setIndex) {
-  aiCamSetIndex = setIndex;
-  aiCamReps = 0; aiCamRepState = 'up';
-  aiCamRecording = false; aiCamChunks = [];
-  aiCamLastCoachMsg = ''; aiCamLastSpeakTime = 0;
-  aiCamExerciseConfig = getExerciseConfig(currentExercise);
-  aiCamFacingFront = true; aiCamActive = true;
-  aiCamPoseProcessing = false;
-
-  document.getElementById('ai-cam-exercise-name').textContent = currentExercise || '';
-  document.getElementById('ai-cam-reps').textContent = '0';
-  document.getElementById('ai-cam-coaching').textContent = '';
-  document.getElementById('ai-cam-rec').style.display = 'none';
-  document.getElementById('btn-ai-cam-record').classList.remove('recording');
-
-  showScreen('screen-ai-camera');
-
-  // Set canvas to viewport size — screen is position:fixed;inset:0 so it equals the viewport
-  const canvas = document.getElementById('ai-cam-canvas');
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-
-  startAICamStream(true).then(() => {
-    if (!aiCamActive) return;
-    aiCamPose = initAICamPose();
-    if (aiCamPose) aiCamPoseLoop();
-  });
-}
-
-function closeAICamera() {
-  aiCamActive = false;
-  if (aiCamAnimFrame) { cancelAnimationFrame(aiCamAnimFrame); aiCamAnimFrame = null; }
-  if (window.speechSynthesis) speechSynthesis.cancel();
-  if (aiCamPose) { try { aiCamPose.close(); } catch(e) {} aiCamPose = null; }
-  if (aiCamMediaRecorder && aiCamMediaRecorder.state !== 'inactive') {
-    aiCamMediaRecorder.ondataavailable = null;
-    aiCamMediaRecorder.onstop = null;
-    aiCamMediaRecorder.stop();
-  }
-  if (aiCamStream) { aiCamStream.getTracks().forEach(t => t.stop()); aiCamStream = null; }
-  showScreen('screen-training');
-}
-
-// ── Recording ─────────────────────────────────────────
-function toggleAICamRecording() {
-  if (!aiCamRecording) startAICamRecording();
-  else stopAndSaveRecording();
-}
-
-function startAICamRecording() {
-  if (!aiCamStream) return;
-  aiCamChunks = [];
-  const types = ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm','video/mp4'];
-  const mimeType = types.find(m => MediaRecorder.isTypeSupported(m)) || '';
-  try {
-    aiCamMediaRecorder = new MediaRecorder(aiCamStream, mimeType ? { mimeType } : {});
-  } catch(e) { aiCamMediaRecorder = new MediaRecorder(aiCamStream); }
-  aiCamMediaRecorder.ondataavailable = e => { if (e.data.size > 0) aiCamChunks.push(e.data); };
-  aiCamMediaRecorder.onstop = onAICamRecordingStop;
-  aiCamMediaRecorder.start(1000);
-  aiCamRecording = true;
-  document.getElementById('ai-cam-rec').style.display = 'flex';
-  document.getElementById('btn-ai-cam-record').classList.add('recording');
-}
-
-function stopAndSaveRecording() {
-  if (aiCamReps > 0) document.getElementById('field-reps').value = aiCamReps;
-  aiCamActive = false;
-  if (aiCamAnimFrame) { cancelAnimationFrame(aiCamAnimFrame); aiCamAnimFrame = null; }
-  if (window.speechSynthesis) speechSynthesis.cancel();
-  if (aiCamPose) { try { aiCamPose.close(); } catch(e) {} aiCamPose = null; }
-  document.getElementById('ai-cam-rec').style.display = 'none';
-  document.getElementById('btn-ai-cam-record').classList.remove('recording');
-  aiCamRecording = false;
-  if (aiCamMediaRecorder && aiCamMediaRecorder.state !== 'inactive') {
-    aiCamMediaRecorder.stop();
-  } else {
-    if (aiCamStream) { aiCamStream.getTracks().forEach(t => t.stop()); aiCamStream = null; }
-    showScreen('screen-training');
-  }
-}
-
-async function onAICamRecordingStop() {
-  if (aiCamStream) { aiCamStream.getTracks().forEach(t => t.stop()); aiCamStream = null; }
-  showScreen('screen-training');
-
-  // AI Coach mode (no set): skip video save, reps already filled by stopAndSaveRecording
-  if (aiCamSetIndex === null) { aiCamChunks = []; return; }
-
-  if (aiCamChunks.length === 0) return;
-  const blob = new Blob(aiCamChunks, { type: aiCamChunks[0].type || 'video/webm' });
-  aiCamChunks = [];
-
-  const safeName = (currentExercise || 'exercise').replace(/[^a-z0-9]/gi, '_');
-  const setNum = aiCamSetIndex !== null ? aiCamSetIndex + 1 : 1;
-  const idbKey = `video_${currentDate}_${safeName}_set${setNum}`;
-
-  toast('Saving video...');
-  try {
-    await idbPut(idbKey, blob);
-    const workout = getWorkout(currentDate);
-    const ex = workout.find(e => e.name === currentExercise);
-    if (ex && ex.sets[aiCamSetIndex] !== undefined) {
-      ex.sets[aiCamSetIndex].idbKey = idbKey;
-      setWorkout(currentDate, workout);
-    }
-    renderSetList();
-    toast('Video saved locally');
-    backgroundUploadVideo(idbKey, aiCamSetIndex, blob);
-  } catch(e) {
-    console.error('[AICam] save error:', e);
-    toast('Could not save video');
-  }
-}
-
-async function backgroundUploadVideo(idbKey, setIndex, blob) {
-  if (!navigator.onLine) return;
-  const doUpload = async () => {
-    try {
-      const safeName = (currentExercise || 'exercise').replace(/[^a-z0-9]/gi, '_');
-      const setNum = setIndex !== null ? setIndex + 1 : 1;
-      const filename = `${currentDate}_${safeName}_set${setNum}.mp4`;
-      const file = new File([blob], filename, { type: blob.type });
-      const videoId = await uploadToDrive(file, filename);
-      const workout = getWorkout(currentDate);
-      const ex = workout.find(e => e.name === currentExercise);
-      if (ex && ex.sets[setIndex] !== undefined) {
-        ex.sets[setIndex].videoId = videoId;
-        delete ex.sets[setIndex].idbKey;
-        setWorkout(currentDate, workout);
-      }
-      await idbDelete(idbKey);
-      renderSetList();
-      toast('Video uploaded to Drive');
-    } catch(e) {
-      console.error('[AICam] upload error:', e);
-    }
-  };
-  if (googleAccessToken) {
-    doUpload();
-  } else if (tokenClient) {
-    pendingAction = doUpload;
-    tokenClient.requestAccessToken({ prompt: '' });
-  }
-}
-
-// ── View video: IDB first, then Drive ────────────────
-async function viewSetVideo(setIndex) {
-  const ex = getCurrentExerciseData();
-  if (!ex || !ex.sets[setIndex]) return;
-  const s = ex.sets[setIndex];
-  if (s.idbKey) {
-    try {
-      const blob = await idbGet(s.idbKey);
-      if (blob) {
-        const overlay = document.getElementById('video-overlay');
-        const player = document.getElementById('video-player');
-        player.src = URL.createObjectURL(blob);
-        overlay.classList.add('open');
-        player.play();
-        return;
-      }
-    } catch(e) {}
-  }
-  if (s.videoId) {
-    openVideoFrame(s.videoId);
-  } else {
-    toast('No video found');
-  }
-}
 
 // ── Main Menu ─────────────────────────────────────────
 function renderMenuUserBar() {
@@ -2796,21 +2169,3 @@ document.getElementById('btn-banner-load').addEventListener('click', () => {
     if (e.target === e.currentTarget) closeOverlay(id);
   });
 });
-
-// ── AI camera button listeners ────────────────────────
-document.getElementById('btn-ai-cam-close').addEventListener('click', closeAICamera);
-document.getElementById('btn-ai-cam-record').addEventListener('click', toggleAICamRecording);
-document.getElementById('btn-ai-cam-flip').addEventListener('click', () => {
-  if (aiCamRecording) { toast('Stop recording first'); return; }
-  aiCamFacingFront = !aiCamFacingFront;
-  // Restart pose loop for new stream
-  if (aiCamPose) { try { aiCamPose.close(); } catch(e) {} aiCamPose = null; }
-  if (aiCamAnimFrame) { cancelAnimationFrame(aiCamAnimFrame); aiCamAnimFrame = null; }
-  aiCamPoseProcessing = false;
-  startAICamStream(aiCamFacingFront).then(() => {
-    if (!aiCamActive) return;
-    aiCamPose = initAICamPose();
-    if (aiCamPose) aiCamPoseLoop();
-  });
-});
-
