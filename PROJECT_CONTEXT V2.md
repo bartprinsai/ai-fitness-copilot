@@ -1,7 +1,7 @@
 # AI Fitness Co-Pilot — Project Context & Workflow
 
 ## Wat is dit project?
-Een fitness tracker PWA (Progressive Web App) waarmee gebruikers workouts kunnen bijhouden, video's kunnen opnemen bij sets, en live AI coaching kunnen krijgen via pose detection.
+Een fitness tracker PWA (Progressive Web App) waarmee je workouts bijhoudt: sets, reps en gewicht loggen, geschiedenis en grafieken bekijken, en workout plannen bouwen (met AI-hulp). Persoonlijke app, geen product voor extern publiek.
 
 ---
 
@@ -48,10 +48,8 @@ Een fitness tracker PWA (Progressive Web App) waarmee gebruikers workouts kunnen
 - **Hosting**: GitHub Pages → https://bartprinsai.github.io/ai-fitness-copilot
 - **Database**: Firebase Firestore (workout data per gebruiker)
 - **Auth**: Firebase Authentication (Google login)
-- **Video opslag**: IndexedDB (lokaal, snel) + Google Drive (cloud, achtergrond upload)
-- **Pose detection**: MediaPipe (gebouwd)
-- **AI**: Anthropic API — **werkt NIET direct vanuit browser vanwege CORS** — alleen via proxy of alternatieve API's
-- **Exercise data**: wger API (gratis, CORS-vriendelijk) voor instructies, GitHub free-exercise-db voor animaties
+- **Exercise data**: free-exercise-db (GitHub, `dist/exercises.json`) voor spiergroepen en instructies, lokale mp4's in `exercises/videos/` voor animaties (nu: squat, bench press — niet elke oefening heeft er een)
+- **AI (Workout Plan Builder)**: Anthropic API — rechtstreeks vanuit de browser via `anthropic-dangerous-direct-browser-access`, vereist een eigen API key in `app.js`
 - **Repo**: https://github.com/bartprinsai/ai-fitness-copilot
 - **Lokale map**: C:\Users\bartp\projecten\ai-fitness-copilot
 
@@ -60,11 +58,14 @@ Een fitness tracker PWA (Progressive Web App) waarmee gebruikers workouts kunnen
 ## Projectstructuur
 ```
 ai-fitness-copilot/
-├── index.html       # Alle schermen en overlays
-├── app.js           # Alle logica
-├── exercises.js     # Lijst van oefeningen
-├── style.css        # Styling
-├── manifest.json    # PWA manifest (start_url/scope: /ai-fitness-copilot/)
+├── index.html              # Alle schermen en overlays
+├── app.js                  # Alle logica
+├── exercises.js            # Lijst van oefeningen
+├── style.css                # Styling
+├── manifest.json            # PWA manifest (start_url/scope: /ai-fitness-copilot/)
+├── exercises/videos/         # Lokale mp4-animaties per oefening
+├── scripts/                  # Eenmalige admin-scripts (niet onderdeel van de live app)
+│   └── cleanup-video-fields.js
 ├── icon-192.png
 └── icon-512.png
 ```
@@ -77,21 +78,12 @@ ai-fitness-copilot/
 
 ---
 
-## Google OAuth
-- **Client ID**: 41596366904-3h277tnkmavund1rc8l4rn3a5klu966k.apps.googleusercontent.com
-- **Scope**: https://www.googleapis.com/auth/drive.file
-- **Authorized origins**: https://bartprinsai.github.io
-
----
-
 ## Belangrijke variabelen in app.js
 ```javascript
-let googleAccessToken = null;      // Drive access token
-let driveFolderId = null;          // Drive folder ID
-let pendingVideoSetIndex = null;   // Set index voor video upload
+let currentUser = null;            // Ingelogde Firebase user
 let currentExercise = null;        // Huidige oefening naam
 let currentDate = todayStr();      // Huidige datum (YYYY-MM-DD)
-let tokenClient = null;            // GIS token client
+let db = { ... };                  // In-memory state: workouts, records, plans
 ```
 
 ---
@@ -102,11 +94,8 @@ getWorkout(date)                   // Haal workout op voor datum
 setWorkout(date, workout)          // Sla workout op in Firestore
 renderSetList()                    // Herrender de set lijst
 toast(message)                     // Toon een toast melding
-uploadToDrive(file, filename)      // Upload bestand naar Google Drive
-openVideoFrame(videoId)            // Toon video van Drive
-showVideoPopup(setIndex, videoId)  // Toon video popup menu
-requestDriveToken(onSuccess)       // Vraag Drive token aan
-openExerciseInfo(exerciseName)     // Open exercise info scherm
+openExerciseInfo(exerciseName)     // Open exercise info scherm (video + spieren + instructies)
+callClaude(userMessage, sysPrompt) // Anthropic API call voor de AI plan generator
 ```
 
 ---
@@ -115,78 +104,42 @@ openExerciseInfo(exerciseName)     // Open exercise info scherm
 - Google login via Firebase Auth
 - Workout data opslaan in Firestore per gebruiker
 - Oefeningen bijhouden met sets, reps en gewicht
-- Geschiedenis en grafieken
-- Video opnemen en uploaden naar Google Drive
-- Video bekijken via streaming van Drive
+- Geschiedenis en grafieken, PR-detectie
 - PWA installeerbaar op telefoon
 - **Hoofdmenu** met 4 secties: Fitness Tracker, Workout Plan Builder, Nutrition (coming soon), Progress (coming soon)
-- **AI Camera** met MediaPipe pose detection, rep teller, live coaching via Web Speech API
-- **Live Coach** en **Chat Coach** knoppen in Fitness Tracker (Chat Coach nog niet actief)
+- **Chat Coach**-knop in Fitness Tracker (scherm/logica nog niet gebouwd, toont "Coming soon!")
 - **Workout Plan Builder** met presets (Push Pull Legs, Upper Lower), AI generator, koppeling aan Fitness Tracker
 - **Multi-select modus** voor meerdere oefeningen tegelijk verwijderen
 - **Drag-to-reorder** oefeningen in daglijst (ingedrukt houden → slepen)
 - **Copy Previous Workout** via kalender
-- **Exercise info scherm** (ⓘ bolletje bij elke oefening) — animaties, spiergroepen, instructies
+- **Exercise info scherm** (ⓘ bolletje bij elke oefening) — lokale video-animatie waar beschikbaar, spiergroepen en instructies uit free-exercise-db
 - **FitNotes-geïnspireerde** visuele stijl (lichtgrijs, cyaan accenten, witte kaarten)
 - **Dropdown** in All Exercises toolbar met plannen en "Create New Routine"
 - **Nieuw oefening aanmaken** scherm (NAME, NOTES, CATEGORY, TYPE, WEIGHT UNIT)
 - **Edit/Delete categorieën** via drie puntjes menu
 - **Selectie modus** met vinkje en vuilnisbak in toolbar bij ingedrukt houden
 
----
-
-## Bekende bug — Exercise info pagina
-
-### Symptomen
-Als je op het ⓘ bolletje tikt bij een oefening:
-- "Animation not available"
-- "No muscle data available"
-- "Could not load instructions"
-
-### Oorzaken
-1. **Dataset URL is 404** — verkeerde URL in de code:
-   - Fout: `.../exercises/exercises.json`
-   - Correct: `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/dist/exercises.json`
-
-2. **Anthropic API CORS fout** — werkt niet direct vanuit GitHub Pages
-
-### Fix prompt voor Claude Code
-```
-Fix de exercise info pagina in C:\Users\bartp\projecten\ai-fitness-copilot:
-
-## 1. Fix GitHub dataset URL voor animaties en spiergroepen
-Verander de URL naar:
-https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/dist/exercises.json
-
-## 2. Fix instructies via wger API
-De Anthropic API werkt niet direct vanuit GitHub Pages vanwege CORS.
-Gebruik de gratis wger API:
-
-Zoek oefening op naam:
-https://wger.de/api/v2/exercise/search/?term={naam}&language=english&format=json
-
-Haal volledige info op:
-https://wger.de/api/v2/exerciseinfo/{id}/?format=json
-
-- Gebruik description als instructie tekst (strip HTML tags)
-- Gebruik muscles en muscles_secondary voor spiergroepen
-- Cache resultaten in memory per oefening
-- Als niet gevonden: toon "Instructions not available for this exercise"
-
-## 3. Laad GitHub dataset bij opstarten
-Laad de dataset eenmalig bij opstarten en cache in memory.
-
-Push daarna naar GitHub:
-git add -A && git commit -m "Fix exercise info: correct dataset URL and use wger API" && git push origin main
-```
+## Wat bewust is verwijderd
+- **AI Camera** (MediaPipe pose detection, skeleton overlay, automatische rep-telling per oefeningstype, live coaching via Web Speech API)
+- **Live Coach**-knop in de Fitness Tracker
+- **Video opname bij sets**: "Record set"-optie, IndexedDB-opslag, Google Drive-upload/streaming, bijbehorende Google OAuth `drive.file`-scope
+- Reden: persoonlijke app, deze features kostten meer onderhoud dan ze waarde opleverden
+- Oude `videoId`/`idbKey` velden in bestaande Firestore-documenten zijn opgeschoond via `scripts/cleanup-video-fields.js` (eenmalig, met Firebase Admin SDK — zie het bestand zelf voor gebruiksinstructies)
 
 ---
 
-## Volgende stappen na huidige bug fix
+## Opgeloste bugs
+### Exercise info pagina toonde "Animation not available" / "No muscle data" / "Could not load instructions"
+- **Oorzaak**: verkeerde dataset-URL (`.../exercises/exercises.json` i.p.v. `.../dist/exercises.json`) en een CORS-blokkade op directe Anthropic API calls voor instructies vanuit GitHub Pages
+- **Oplossing die uiteindelijk is gebouwd**: dataset-URL gefixt naar `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/dist/exercises.json`; spiergroepen en instructies komen rechtstreeks uit die dataset (geen wger of Anthropic API nodig); animaties zijn overgestapt van een externe GIF-API naar lokaal gehoste mp4's in `exercises/videos/` (nog niet voor elke oefening aanwezig — valt dan terug op "Animation not available")
+
+---
+
+## Volgende stappen
 1. Chat Coach activeren in Fitness Tracker
 2. Nutrition sectie bouwen
 3. Progress sectie bouwen
-4. Rep telling finetunen per oefening
+4. Meer lokale video-animaties toevoegen voor oefeningen die er nog geen hebben
 
 ---
 
@@ -204,11 +157,9 @@ GitHub Pages deployt automatisch na elke push.
 ## Belangrijke aandachtspunten
 - PWA — na wijzigingen cache wissen of hard refreshen
 - manifest.json heeft `"scope": "/ai-fitness-copilot/"` — nodig voor GitHub Pages
-- Google Drive API moet actief zijn in Google Cloud Console (project: ai-fitness-copilot)
-- IndexedDB key formaat voor videos: `video_{date}_{exercise}_{setIndex}`
 - Firebase compat SDK versie: 10.13.2
-- Bij syntax errors: `node --input-type=module < app.js`
-- **Anthropic API werkt NIET direct vanuit browser op GitHub Pages** — gebruik wger of andere CORS-vriendelijke API's
+- Bij syntax errors: `node --check app.js`
+- Anthropic API werkt niet vanuit alle browsercontexten door CORS-beperkingen — als de AI-generator in de Workout Plan Builder faalt, eerst dit checken
 
 ---
 
