@@ -1,0 +1,8 @@
+{
+  "name": "ai-fitness-copilot-scripts",
+  "private": true,
+  "description": "One-off admin scripts for the AI Fitness Co-Pilot Firestore data. Not part of the app.",
+  "dependencies": {
+    "firebase-admin": "^14.0.0"
+  }
+}
