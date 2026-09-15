@@ -293,14 +293,16 @@ function renderHome() {
             <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
             <span>Start New Workout</span>
           </button>
-          <button class="home-empty-action" id="btn-copy-prev">
-            <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
-            <span>Copy Previous Workout</span>
+          <button class="home-empty-action" id="btn-ai-coach-tile">
+            <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+            <span>AI Coach</span>
           </button>
         </div>
       </div>`;
     document.getElementById('btn-start-new').addEventListener('click', openExerciseList);
-    document.getElementById('btn-copy-prev').addEventListener('click', copyPreviousWorkout);
+    document.getElementById('btn-ai-coach-tile').addEventListener('click', () => {
+      // TODO: link to the Chat Coach screen once it's built
+    });
     return;
   }
 
@@ -474,16 +476,6 @@ function setupHomeExDragReorder() {
 
   container.addEventListener('touchend', endDrag, { passive: true });
   container.addEventListener('touchcancel', endDrag, { passive: true });
-}
-
-function copyPreviousWorkout() {
-  const dates = Object.keys(db.workouts).sort().reverse();
-  const prev = dates.find(d => d < currentDate && db.workouts[d] && db.workouts[d].length > 0);
-  if (!prev) { toast('No previous workout found'); return; }
-  const copied = db.workouts[prev].map(ex => ({ name: ex.name, sets: [] }));
-  setWorkout(currentDate, copied);
-  renderHome();
-  toast('Workout copied');
 }
 
 // -- Exercise Add Dropdown ------------------------------

@@ -45,8 +45,8 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .home-empty { flex: 1; display: flex; flex-direction: column; align-items: center; }
 .home-empty-middle { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px; }
 .home-empty-title { font-size: 20px; font-weight: 400; color: var(--text-hint); text-align: center; }
-.home-empty-actions { padding-bottom: 48px; display: flex; flex-direction: column; align-items: center; gap: 28px; }
-.home-empty-action { display: flex; flex-direction: column; align-items: center; gap: 8px; border: none; background: none; cursor: pointer; font-family: inherit; padding: 8px 24px; }
+.home-empty-actions { width: 100%; padding-bottom: 48px; display: flex; flex-direction: row; }
+.home-empty-action { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; border: none; background: none; cursor: pointer; font-family: inherit; padding: 8px 24px; }
 .home-empty-action:active { opacity: 0.7; }
 .home-empty-action svg { width: 48px; height: 48px; fill: var(--cyan); }
 .home-empty-action span { font-size: 14px; color: var(--text-secondary); text-align: center; }

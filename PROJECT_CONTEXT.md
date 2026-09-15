@@ -111,7 +111,7 @@ callClaude(userMessage, sysPrompt) // Anthropic API call voor de AI plan generat
 - **Workout Plan Builder** met presets (Push Pull Legs, Upper Lower), AI generator, koppeling aan Fitness Tracker
 - **Multi-select modus** voor meerdere oefeningen tegelijk verwijderen
 - **Drag-to-reorder** oefeningen in daglijst (ingedrukt houden → slepen)
-- **Copy Previous Workout** via kalender
+- **"AI Coach"-tegel** naast "Start New Workout" in het lege-workoutlog-scherm (placeholder, linkt nog nergens naartoe — komt bij het bouwen van Chat Coach)
 - **Exercise info scherm** (ⓘ bolletje bij elke oefening) — lokale video-animatie waar beschikbaar, spiergroepen en instructies uit free-exercise-db
 - **FitNotes-geïnspireerde** visuele stijl (lichtgrijs, cyaan accenten, witte kaarten)
 - **Dropdown** in All Exercises toolbar met plannen en "Create New Routine"
@@ -123,6 +123,7 @@ callClaude(userMessage, sysPrompt) // Anthropic API call voor de AI plan generat
 - **AI Camera** (MediaPipe pose detection, skeleton overlay, automatische rep-telling per oefeningstype, live coaching via Web Speech API)
 - **Live Coach**-knop in de Fitness Tracker
 - **Video opname bij sets**: "Record set"-optie, IndexedDB-opslag, Google Drive-upload/streaming, bijbehorende Google OAuth `drive.file`-scope
+- **Copy Previous Workout**-tegel (kopieerde oefeningsnamen van de laatste workout met sets naar de huidige dag, zonder sets) — vervangen door de "AI Coach"-placeholdertegel
 - Reden: persoonlijke app, deze features kostten meer onderhoud dan ze waarde opleverden
 - Oude `videoId`/`idbKey` velden in bestaande Firestore-documenten zijn opgeschoond via `scripts/cleanup-video-fields.js` (eenmalig, met Firebase Admin SDK — zie het bestand zelf voor gebruiksinstructies)
 
