@@ -15,7 +15,11 @@
   --blue-btn: #2196f3;
   --gray-btn: #e0e0e0;
   --color-ai-coach-accent: #22c55e;
-  --color-ai-coach-bg: #e8f9ee;
+  --color-ai-coach-gradient-start: #4ade80;
+  --color-ai-coach-gradient-end: #16a34a;
+  --color-ai-coach-glow: rgba(34,197,94,0.35);
+  --ai-bar-bg: #141414;
+  --ai-bar-border: #2a2a2a;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --toolbar-height: 56px;
@@ -27,14 +31,14 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 
 .screen { position: fixed; top: 0; left: 0; right: 0; bottom: var(--ai-bar-space); display: none; flex-direction: column; background: var(--bg); }
 .screen.active { display: flex; }
-#screen-login { bottom: 0; }
+#screen-login, #screen-home { bottom: 0; }
 
 /* ── GLOBAL AI COACH BAR ──────────────────────────────── */
-.global-ai-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; height: var(--ai-bar-height); padding-bottom: var(--safe-bottom); box-sizing: border-box; background: var(--surface); border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: center; }
-#screen-login.active ~ .global-ai-bar { display: none; }
-.global-ai-bar-pill { display: flex; align-items: center; gap: 8px; border: none; border-radius: 999px; background: var(--color-ai-coach-bg); color: var(--color-ai-coach-accent); font-family: inherit; font-size: 14px; font-weight: 700; padding: 12px 28px; cursor: pointer; transition: background 0.12s; }
-.global-ai-bar-pill:active { background: #d5f2e0; }
-.global-ai-bar-pill svg { width: 18px; height: 18px; fill: var(--color-ai-coach-accent); flex-shrink: 0; }
+.global-ai-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; height: var(--ai-bar-height); padding-bottom: var(--safe-bottom); box-sizing: border-box; background: var(--ai-bar-bg); border-top: 1px solid var(--ai-bar-border); display: flex; align-items: center; justify-content: center; }
+#screen-login.active ~ .global-ai-bar, #screen-home.active ~ .global-ai-bar { display: none; }
+.global-ai-bar-pill { display: flex; align-items: center; gap: 8px; border: none; border-radius: 22px; background: linear-gradient(135deg, var(--color-ai-coach-gradient-start), var(--color-ai-coach-gradient-end)); color: #fff; font-family: inherit; font-size: 14px; font-weight: 700; padding: 12px 28px; cursor: pointer; box-shadow: 0 3px 10px var(--color-ai-coach-glow); transition: transform 0.08s, box-shadow 0.12s; }
+.global-ai-bar-pill:active { transform: scale(0.97); box-shadow: 0 2px 6px var(--color-ai-coach-glow); }
+.global-ai-bar-pill svg { width: 18px; height: 18px; fill: #fff; flex-shrink: 0; }
 
 /* ── TOOLBAR ──────────────────────────────────────────── */
 .toolbar { height: calc(var(--toolbar-height) + var(--safe-top)); padding-top: var(--safe-top); background: var(--toolbar); color: white; display: flex; align-items: center; padding-left: 4px; padding-right: 4px; flex-shrink: 0; box-shadow: 0 2px 4px rgba(0,0,0,.4); z-index: 10; }
@@ -55,10 +59,9 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 /* ── HOME ─────────────────────────────────────────────── */
 .home-content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; padding-bottom: calc(var(--safe-bottom) + 16px); }
 
-.home-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.home-empty-group { display: flex; flex-direction: column; align-items: center; gap: 28px; padding: 24px; }
-.home-empty-title { font-size: 20px; font-weight: 400; color: var(--text-hint); text-align: center; }
-.home-empty-action { flex: 0 0 auto; width: 120px; display: flex; flex-direction: column; align-items: center; gap: 8px; border: none; background: none; cursor: pointer; font-family: inherit; padding: 8px; }
+.home-empty { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 0 24px; }
+.home-empty-title { font-size: 20px; font-weight: 400; color: var(--text-hint); text-align: center; padding-top: 72px; }
+.home-empty-action { flex: 0 0 auto; width: 120px; display: flex; flex-direction: column; align-items: center; gap: 8px; border: none; background: none; cursor: pointer; font-family: inherit; padding: 8px; margin-top: auto; margin-bottom: 40px; }
 .home-empty-action:active { opacity: 0.7; }
 .home-empty-action svg { width: 48px; height: 48px; fill: var(--cyan); }
 .home-empty-action span { font-size: 14px; color: var(--text-secondary); text-align: center; }

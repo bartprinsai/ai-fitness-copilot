@@ -449,13 +449,11 @@ function renderHome() {
   if (exercises.length === 0) {
     container.innerHTML = `
       <div class="home-empty">
-        <div class="home-empty-group">
-          <span class="home-empty-title">Workout Log Empty</span>
-          <button class="home-empty-action" id="btn-start-new">
-            <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-            <span>Start New Workout</span>
-          </button>
-        </div>
+        <span class="home-empty-title">Workout Log Empty</span>
+        <button class="home-empty-action" id="btn-start-new">
+          <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          <span>Start New Workout</span>
+        </button>
       </div>`;
     document.getElementById('btn-start-new').addEventListener('click', openExerciseList);
     return;

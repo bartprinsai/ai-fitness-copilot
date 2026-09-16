@@ -23,8 +23,12 @@ Stijl-inspiratie: **FitNotes** (Android app) — lichtgrijze achtergrond, cyaan 
 | `--green` | `#4CAF50` | SAVE-knop |
 | `--blue-btn` | `#2196f3` | CLEAR-knop |
 | `--gray-btn` | `#e0e0e0` | Stepper-knoppen (−/+) |
-| `--color-ai-coach-accent` | `#22c55e` | Accentkleur voor AI-gedreven features (bv. de globale AI Coach-balk, zie hieronder). Bewust een ander groen dan `--green` (dat is de bestaande SAVE-knopkleur) — dit is de eerste kleur van een groeiende "AI-feature"-accentfamilie, te onderscheiden van de FitNotes-cyaan die voor kernfunctionaliteit (loggen, tracken) blijft staan. |
-| `--color-ai-coach-bg` | `#e8f9ee` | Lichtgroene pil-achtergrond achter AI-Coach-accentelementen (bv. de knop in de globale AI Coach-balk) — een lichte tint van `--color-ai-coach-accent`, zelfde relatie als `--cyan-light` tot `--cyan`. |
+| `--color-ai-coach-accent` | `#22c55e` | Basis/referentie-groen voor AI-gedreven features. Bewust een ander groen dan `--green` (dat is de bestaande SAVE-knopkleur) — dit is de eerste kleur van een groeiende "AI-feature"-accentfamilie, te onderscheiden van de FitNotes-cyaan die voor kernfunctionaliteit (loggen, tracken) blijft staan. |
+| `--color-ai-coach-gradient-start` | `#4ade80` | Lichtste stop van de groene gradient op de AI Coach-pil (135°, samen met `--color-ai-coach-gradient-end`). |
+| `--color-ai-coach-gradient-end` | `#16a34a` | Donkerste stop van de groene gradient op de AI Coach-pil. |
+| `--color-ai-coach-glow` | `rgba(34,197,94,0.35)` | Zachte groene gloed-schaduw rond de AI Coach-pil (`box-shadow`). |
+| `--ai-bar-bg` | `#141414` | Achtergrond van de globale AI Coach-balk zelf (donker/zwart, niet de pil). |
+| `--ai-bar-border` | `#2a2a2a` | Scheidingslijn (`border-top`) tussen de globale AI Coach-balk en de content erboven. |
 
 ## Typografie
 
@@ -41,18 +45,19 @@ Basisregel, geldig op **elke** toolbar in de app: `.toolbar-btn svg { fill: whit
 
 - `.icon-outline` — `fill: none; stroke: white; stroke-width: 1.8;` — lijnstijl-override, alleen gebruikt voor de rest-timer (klok), records (trofee) en info-iconen in de training-toolbar, ter referentie aan de FitNotes-screenshot (dunne witte outline-iconen op de donkere toolbar). Elders in de app blijven toolbar-iconen gewoon gevuld (de default).
 - PR-trofee-icoon (los van de toolbar, gebruikt in set-rijen/history/kalender-popup) is altijd een gevulde `--cyan` trofee (`.set-pr-icon` / `.history-set-pr`), consistent op elke plek waar een PR getoond wordt.
-- AI-features gebruiken een sparkle/sterren-icoon (Material Icons "auto_awesome"-pad) in `--color-ai-coach-accent` i.p.v. de generieke chat-bubble die eerder als placeholder diende (zie globale AI Coach-balk hieronder) — dit is het te herhalen icoon/kleur-patroon voor toekomstige AI-features (bv. straks de Chat Coach zelf).
+- AI-features gebruiken een sparkle/sterren-icoon (Material Icons "auto_awesome"-pad), wit gevuld op de groene gradient-pil van de globale AI Coach-balk (zie hieronder) — dit is het te herhalen icoon-patroon voor toekomstige AI-features (bv. straks de Chat Coach zelf).
 
 ## Globale layout-elementen
 
 Elementen die **niet** binnen een los `.screen`-blok staan maar als eigen `<body>`-kind na alle schermen in `index.html` staan, en daardoor automatisch op elk scherm zichtbaar zijn zonder dat een nieuw scherm er zelf iets voor hoeft te doen:
 
-- **Globale AI Coach-balk** (`#global-ai-bar`, knop `#btn-global-ai-coach`) — een vaste, gecentreerde pil-knop ("AI Coach" + sparkle-icoon) die `position: fixed; bottom: 0;` onderaan de viewport staat, boven de Android-systeembalk (`padding-bottom: var(--safe-bottom)`), met een `border-top: 1px solid var(--border)` en witte (`--surface`) achtergrond — zelfde scheidingslijn-patroon als andere balken in de app (bv. `.day-nav`, `.cal-footer`). De pil zelf gebruikt `--color-ai-coach-bg` als achtergrond en `--color-ai-coach-accent` voor icoon+tekst.
+- **Globale AI Coach-balk** (`#global-ai-bar`, knop `#btn-global-ai-coach`) — een vaste balk die `position: fixed; bottom: 0;` onderaan de viewport staat, boven de Android-systeembalk (`padding-bottom: var(--safe-bottom)`). De balk zelf is donker/zwart (`background: var(--ai-bar-bg)`, `#141414`) met een subtiele scheidingslijn (`border-top: 1px solid var(--ai-bar-border)`, `#2a2a2a`) tussen de balk en de content erboven — zelfde scheidingslijn-patroon als andere balken in de app (bv. `.day-nav`, `.cal-footer`), maar met een donkere kleurzetting die losstaat van de rest van de balk-varianten.
+  - Binnenin: één gecentreerde pil-knop (`.global-ai-bar-pill`) met een groene 135°-gradient-achtergrond (`linear-gradient(135deg, var(--color-ai-coach-gradient-start), var(--color-ai-coach-gradient-end))`), `border-radius: 22px`, en een zachte groene gloed-schaduw (`box-shadow: 0 3px 10px var(--color-ai-coach-glow)`). Sparkle-icoon en "AI Coach"-tekst zijn beide wit (`#fff`) en bold — geen aparte accentkleur voor de inhoud, het contrast komt van wit-op-gradient.
   - Klik-gedrag is voorlopig een lege handler met `// TODO: link to the Chat Coach screen once it's built` in `app.js` — de echte Chat Coach-koppeling volgt later.
   - **Hoogte wordt gereserveerd via `--ai-bar-height` (64px) en `--ai-bar-space` (`--ai-bar-height` + `--safe-bottom`).** Elk `.screen`-element gebruikt `bottom: var(--ai-bar-space)` (i.p.v. het vroegere `inset: 0`) zodat de scrollbare inhoud van *elk* scherm automatisch inkrimpt en nooit achter de balk verdwijnt — dit is een globale CSS-regel, geen per-scherm padding-hack. **Nieuwe schermen hoeven hier niets extra's voor te doen**, zolang ze de standaard `.screen`-class gebruiken.
-  - Uitzondering: `#screen-login` (vóór inloggen) krijgt `bottom: 0` (volledige hoogte) en de balk zelf is daar verborgen via `#screen-login.active ~ .global-ai-bar { display: none; }` — een AI-coach-call-to-action heeft geen zin vóór authenticatie.
+  - Uitzonderingen — schermen waar de balk **niet** hoort: `#screen-login` (vóór inloggen — een AI-coach-call-to-action heeft geen zin vóór authenticatie) en `#screen-home` (het hoofdmenu/hub-scherm met de 4 kaarten — de balk is daar bewust afwezig, dit is het startpunt vóórdat de gebruiker een sectie gekozen heeft). Beide krijgen `bottom: 0` (volledige hoogte, geen ruimte gereserveerd) en verbergen de balk zelf via de CSS-sibling-selector `#screen-login.active ~ .global-ai-bar, #screen-home.active ~ .global-ai-bar { display: none; }`.
   - Bottom-sheet overlays (`.overlay`, z-index 100) en het overflow-dropdownmenu (`.dropdown-menu`, `.exd-overlay`, z-index 150) liggen boven de balk (`.global-ai-bar` heeft z-index 60) en dekken 'm dus tijdelijk af zolang ze open staan — bewust, want dat zijn modale lagen.
-  - Was voorheen twee losse, schermgebonden implementaties: de "Chat Coach"-knop onderaan het exercise-logging scherm (`.training-coach-bar`, nu verwijderd) en de "AI Coach"-tegel op het lege Fitness Tracker-startscherm (nu verwijderd, zie hieronder). Beide zijn vervangen door dit ene globale element — voeg geen nieuwe schermgebonden "coach"-knoppen meer toe, alles gaat via deze balk.
+  - Was voorheen twee losse, schermgebonden implementaties: de "Chat Coach"-knop onderaan het exercise-logging scherm (`.training-coach-bar`, verwijderd) en de "AI Coach"-tegel op het lege Fitness Tracker-startscherm (verwijderd, zie hieronder). Beide zijn vervangen door dit ene globale element — voeg geen nieuwe schermgebonden "coach"-knoppen meer toe, alles gaat via deze balk.
 
 ## Exercise-logging scherm (`#screen-training`) — referentie-implementatie
 
@@ -73,7 +78,7 @@ Dit scherm (het datum-navigatie-scherm dat opent na "Fitness Tracker") is het **
 
 - **Geen groet-balkje meer onder de header.** Het vroegere `#user-bar`-element ("Hi, [naam]") is volledig verwijderd (uit `index.html`, `style.css` én de `updateUserBar()`-functie in `app.js`) — niet alleen leeggemaakt, ook de ruimte die het innam is weg. Reden: voegde geen functionele waarde toe en oogde als restant uit een eerdere iteratie.
 - **Geen losse "AI Coach"-tegel meer op dit scherm.** Die is verwijderd (zowel in de lege als de gevulde workoutlog-staat — de gevulde staat had er sowieso nooit een) en vervangen door de globale AI Coach-balk (zie "Globale layout-elementen" hierboven), die nu overal in de app staat in plaats van hier lokaal.
-- **Lege-workoutlog-staat ("Workout Log Empty" + "Start New Workout") is nu één gecentreerde groep**, verticaal én horizontaal gecentreerd in de beschikbare ruimte (`.home-empty-group`: kolom, `gap: 28px`, tekst boven, icoon+label eronder) — voorheen stond de tekst los in het midden met de tegel-rij daaronder tegen de bodem aan gedrukt.
+- **Lege-workoutlog-staat**: "Workout Log Empty" staat hoger in het blok (`padding-top: 72px`, niet meer verticaal gecentreerd), en "Start New Workout" is naar onderin het scherm verplaatst (`margin-top: auto` duwt 'm naar beneden, `margin-bottom: 40px` houdt 'm met duidelijke ruimte los van de globale AI Coach-balk eronder). Bewust géén gecentreerde groep meer — de twee elementen staan onafhankelijk hoog/laag in `.home-empty` (flex column zonder `justify-content: center`).
 - "Start New Workout" blijft cyaan (de hoofdkleur), zoals de rest van de kernfunctionaliteit.
 
 Volgende schermen die aan deze eigen identiteit meebouwen: volg hetzelfde patroon — witte toolbar-iconen blijven de vaste basis (zie Iconen hierboven), maar layout/spacing/accentkleuren mogen per scherm bewust van de FitNotes-referentie afwijken zodra dat expliciet gevraagd wordt.
