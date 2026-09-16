@@ -213,14 +213,6 @@ window.addEventListener('popstate', e => {
   inPopstateNavigation = false;
 });
 
-// -- User bar -------------------------------------------
-function updateUserBar() {
-  const bar = document.getElementById('user-bar');
-  if (!currentUser) { bar.textContent = ''; return; }
-  const name = currentUser.displayName || currentUser.email || 'User';
-  bar.textContent = 'Hi, ' + name.split(' ')[0];
-}
-
 // -- Auth -----------------------------------------------
 async function initAuth() {
   console.log('[Auth] initAuth start');
@@ -465,8 +457,8 @@ function renderHome() {
             <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
             <span>Start New Workout</span>
           </button>
-          <button class="home-empty-action" id="btn-ai-coach-tile">
-            <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+          <button class="home-empty-action ai-coach-tile" id="btn-ai-coach-tile">
+            <svg viewBox="0 0 24 24"><path d="M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25zm-7.5.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12zM19 15l-1.25 2.75L15 19l2.75 1.25L19 23l1.25-2.75L23 19l-2.75-1.25z"/></svg>
             <span>AI Coach</span>
           </button>
         </div>
@@ -1880,7 +1872,6 @@ function renderMenuUserBar() {
 function openFitnessTracker() {
   currentDate = todayStr();
   bannerDismissed = false;
-  updateUserBar();
   renderSmartBanner();
   renderHome();
   showScreen('screen-fitness-tracker');

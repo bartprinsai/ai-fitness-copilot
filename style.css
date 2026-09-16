@@ -14,6 +14,7 @@
   --green: #4CAF50;
   --blue-btn: #2196f3;
   --gray-btn: #e0e0e0;
+  --color-ai-coach-accent: #22c55e;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --toolbar-height: 56px;
@@ -30,9 +31,8 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .toolbar-actions { display: flex; }
 .toolbar-btn { width: 48px; height: 48px; border: none; background: none; color: white; cursor: pointer; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.15s; flex-shrink: 0; }
 .toolbar-btn:active { background: rgba(255,255,255,.15); }
-.toolbar-btn svg { width: 24px; height: 24px; }
+.toolbar-btn svg { width: 24px; height: 24px; fill: white; }
 .toolbar-btn svg.icon-outline { fill: none; stroke: white; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.toolbar-btn svg.icon-solid { fill: white; }
 
 /* ── DAY NAV ──────────────────────────────────────────── */
 .day-nav { display: flex; align-items: center; background: var(--daynav); padding: 0 4px; height: 46px; flex-shrink: 0; border-bottom: 2px solid var(--cyan); }
@@ -47,11 +47,12 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .home-empty { flex: 1; display: flex; flex-direction: column; align-items: center; }
 .home-empty-middle { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px; }
 .home-empty-title { font-size: 20px; font-weight: 400; color: var(--text-hint); text-align: center; }
-.home-empty-actions { width: 100%; padding-bottom: 48px; display: flex; flex-direction: row; }
-.home-empty-action { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; border: none; background: none; cursor: pointer; font-family: inherit; padding: 8px 24px; }
+.home-empty-actions { width: 100%; padding-bottom: 48px; display: flex; flex-direction: row; justify-content: center; align-items: flex-start; gap: 40px; }
+.home-empty-action { flex: 0 0 auto; width: 120px; display: flex; flex-direction: column; align-items: center; gap: 8px; border: none; background: none; cursor: pointer; font-family: inherit; padding: 8px; }
 .home-empty-action:active { opacity: 0.7; }
 .home-empty-action svg { width: 48px; height: 48px; fill: var(--cyan); }
 .home-empty-action span { font-size: 14px; color: var(--text-secondary); text-align: center; }
+.home-empty-action.ai-coach-tile svg { fill: var(--color-ai-coach-accent); }
 
 /* ── HOME SELECTION MODE ──────────────────────────────── */
 .sel-only { display: none !important; }
@@ -259,8 +260,6 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .google-signin-btn svg { width: 22px; height: 22px; flex-shrink: 0; }
 
 /* ── USER BAR ─────────────────────────────────────────── */
-.user-bar { padding: 4px 16px; font-size: 12px; color: rgba(255,255,255,.55); background: var(--toolbar); border-bottom: 1px solid rgba(255,255,255,.06); line-height: 1.8; }
-.user-bar:empty { display: none; }
 
 /* ── DROPDOWN MENU ────────────────────────────────────── */
 .dropdown-menu { position: fixed; inset: 0; z-index: 150; display: none; }

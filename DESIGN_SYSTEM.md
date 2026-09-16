@@ -23,6 +23,7 @@ Stijl-inspiratie: **FitNotes** (Android app) — lichtgrijze achtergrond, cyaan 
 | `--green` | `#4CAF50` | SAVE-knop |
 | `--blue-btn` | `#2196f3` | CLEAR-knop |
 | `--gray-btn` | `#e0e0e0` | Stepper-knoppen (−/+) |
+| `--color-ai-coach-accent` | `#22c55e` | Accentkleur voor AI-gedreven features (bv. AI Coach-tegel). Bewust een ander groen dan `--green` (dat is de bestaande SAVE-knopkleur) — dit is de eerste kleur van een groeiende "AI-feature"-accentfamilie, te onderscheiden van de FitNotes-cyaan die voor kernfunctionaliteit (loggen, tracken) blijft staan. |
 
 ## Typografie
 
@@ -35,11 +36,11 @@ Stijl-inspiratie: **FitNotes** (Android app) — lichtgrijze achtergrond, cyaan 
 
 ## Iconen
 
-Twee iconstijlen naast elkaar, bewust gescheiden via CSS-klassen op het `<svg>`-element (niet via een globale fill-regel, want dat zou stroke-based iconen breken):
+Basisregel, geldig op **elke** toolbar in de app: `.toolbar-btn svg { fill: white; }` — alle header-iconen zijn wit op de donkere toolbar-achtergrond (`--toolbar`), ongeacht welk scherm. Dit is een globale default in `style.css` en moet dat blijven; een icoon dat lokaal een andere fill/stroke nodig heeft, krijgt een eigen klasse die de default overschrijft (nooit de globale regel zelf verwijderen — daarmee vallen alle toolbar-iconen impliciet terug op SVG-default-zwart, wat op een donkere balk onleesbaar is).
 
-- `.icon-outline` — `fill: none; stroke: white; stroke-width: 1.8;` — lijnstijl, gebruikt voor de rest-timer (klok), records (trofee) en info-iconen in de training-toolbar. Dit is de stijl die in de FitNotes-referentiescreenshot te zien is (dunne witte outline-iconen op de donkere toolbar).
-- `.icon-solid` — `fill: white;` — gevulde stijl, gebruikt voor het hamburger/terug-icoon en het drie-puntjes-overflow-menu (drie gevulde bolletjes), die in de referentie ook als solide vormen ogen.
+- `.icon-outline` — `fill: none; stroke: white; stroke-width: 1.8;` — lijnstijl-override, alleen gebruikt voor de rest-timer (klok), records (trofee) en info-iconen in de training-toolbar, ter referentie aan de FitNotes-screenshot (dunne witte outline-iconen op de donkere toolbar). Elders in de app blijven toolbar-iconen gewoon gevuld (de default).
 - PR-trofee-icoon (los van de toolbar, gebruikt in set-rijen/history/kalender-popup) is altijd een gevulde `--cyan` trofee (`.set-pr-icon` / `.history-set-pr`), consistent op elke plek waar een PR getoond wordt.
+- AI-features gebruiken een sparkle/sterren-icoon (Material Icons "auto_awesome"-pad) in `--color-ai-coach-accent` i.p.v. de generieke chat-bubble die eerder als placeholder diende (zie AI Coach-tegel hieronder) — dit is het te herhalen icoon/kleur-patroon voor toekomstige AI-features (bv. straks de Chat Coach zelf).
 
 ## Exercise-logging scherm (`#screen-training`) — referentie-implementatie
 
@@ -53,6 +54,17 @@ Dit scherm (geopend via `openTraining(name)`, TRACK/HISTORY/GRAPH tabs) is het c
 - Per-set notitie: opgeslagen als optioneel `note`-veld op het set-object in Firestore (`users/{uid}/workouts/{date}` → `exercises[].sets[].note`), bewerkbaar via een bottom-sheet overlay (`#set-note-overlay`) die opent via het notitie-icoon.
 - Records-knop (trofee in de toolbar) opent een overlay (`#records-overlay`) met de PR-tabel van de huidige oefening (per repcount de beste gewicht-waarde uit `db.records`), i.p.v. de vroegere "Records coming soon"-placeholder.
 - HISTORY- en GRAPH-tab: styling ongewijzigd t.o.v. wat er al was (matchte al met de FitNotes-referentie); onderliggende data-logica (`renderHistoryTab`, `renderGraph`) is niet aangeraakt.
+
+## Fitness Tracker startscherm (`#screen-fitness-tracker`) — begin van een eigen visuele identiteit
+
+Dit scherm (het datum-navigatie-scherm dat opent na "Fitness Tracker") is het **eerste scherm dat bewust afwijkt** van de FitNotes-referentiestijl hierboven. Toekomstige schermen mogen hierop voortbouwen; de trainingsscreen-sectie hierboven blijft het FitNotes-getrouwe referentiepunt, dit is het startpunt van de eigen richting:
+
+- **Geen groet-balkje meer onder de header.** Het vroegere `#user-bar`-element ("Hi, [naam]") is volledig verwijderd (uit `index.html`, `style.css` én de `updateUserBar()`-functie in `app.js`) — niet alleen leeggemaakt, ook de ruimte die het innam is weg. Reden: voegde geen functionele waarde toe en oogde als restant uit een eerdere iteratie.
+- **Lege-workoutlog-tegels ("Start New Workout" / "AI Coach") staan gecentreerd, niet edge-to-edge.** `.home-empty-actions` gebruikt `justify-content: center` met een vaste `gap: 40px` tussen de tegels i.p.v. `flex: 1` per tegel (dat rekte ze voorheen over de volle breedte uit).
+- **AI Coach-tegel heeft een eigen accentkleur** (`--color-ai-coach-accent`, groen) i.p.v. de standaard cyaan — dit is bewust het enige element op dit scherm dat afwijkt qua kleur, om AI-features visueel te onderscheiden van kernfunctionaliteit. "Start New Workout" blijft cyaan (de hoofdkleur) omdat het geen AI-feature is.
+- Icoon van de AI Coach-tegel is het Material "auto_awesome" sparkle-icoon (drie sterretjes), ter vervanging van de eerdere chat-bubble die niets met de tegel-tekst te maken had.
+
+Volgende schermen die aan deze eigen identiteit meebouwen: volg hetzelfde patroon — witte toolbar-iconen blijven de vaste basis (zie Iconen hierboven), maar layout/spacing/accentkleuren mogen per scherm bewust van de FitNotes-referentie afwijken zodra dat expliciet gevraagd wordt.
 
 ## Overlays (bottom sheets)
 
