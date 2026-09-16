@@ -27,6 +27,8 @@ Stijl-inspiratie: **FitNotes** (Android app) — lichtgrijze achtergrond, cyaan 
 | `--color-ai-coach-gradient-start` | `#4ade80` | Lichtste stop van de groene gradient op de AI Coach-pil (135°, samen met `--color-ai-coach-gradient-end`). |
 | `--color-ai-coach-gradient-end` | `#16a34a` | Donkerste stop van de groene gradient op de AI Coach-pil. |
 | `--color-ai-coach-glow` | `rgba(34,197,94,0.35)` | Zachte groene gloed-schaduw rond de AI Coach-pil (`box-shadow`). |
+| `--color-manual-accent` | `#4a9eff` | Accentkleur voor "Manual Workout" op het New Workout-scherm. **Let op**: dit bestond nog niet als variabele — de opdracht ging ervan uit dat `--blue`/`#4a9eff` al bestond, maar de enige bestaande blauwtint in de app was `--blue-btn` (`#2196f3`, de CLEAR-knop). Nieuw aangemaakt met de opgegeven hex-waarde. |
+| `--color-schema-manual-accent` | `#a855f7` | Accentkleur voor "Load Schedule Manually" op het New Workout-scherm — paars, nieuw. |
 
 ## Typografie
 
@@ -83,9 +85,19 @@ Dit scherm (het datum-navigatie-scherm dat opent na "Fitness Tracker") is het **
 - **Geen groet-balkje meer onder de header.** Het vroegere `#user-bar`-element ("Hi, [naam]") is volledig verwijderd (uit `index.html`, `style.css` én de `updateUserBar()`-functie in `app.js`) — niet alleen leeggemaakt, ook de ruimte die het innam is weg. Reden: voegde geen functionele waarde toe en oogde als restant uit een eerdere iteratie.
 - **Geen losse "AI Coach"-tegel meer op dit scherm.** Die is verwijderd (zowel in de lege als de gevulde workoutlog-staat — de gevulde staat had er sowieso nooit een) en vervangen door de globale AI Coach-pil (zie "Globale layout-elementen" hierboven), die nu overal in de app staat in plaats van hier lokaal.
 - **Lege-workoutlog-staat**: "Start New Workout" staat dicht bij de onderkant van het scherm — `.home-empty-action { margin-bottom: var(--ai-bar-space) }` (niet scrollbaar, dus zelfde `margin-bottom`-aanpak als de niet-scrollbare bodembalken hierboven) zodat de knop vlak boven de zone zit waar de AI Coach-pil zweeft, zonder overlap. "Workout Log Empty" is verticaal gecentreerd, maar **niet over het hele scherm** — een eigen wrapper (`.home-empty-title-wrap { flex: 1; display:flex; align-items:center; justify-content:center }`) centreert 'm alleen binnen de ruimte tussen de dag-navigatiebalk bovenaan en de bovenkant van de "Start New Workout"-knop. Bewust géén gecentreerde groep meer — de twee elementen staan onafhankelijk hoog/laag in `.home-empty` (flex column, titel-wrapper neemt de resterende ruimte, knop volgt daarna in de flow).
-- "Start New Workout" blijft cyaan (de hoofdkleur), zoals de rest van de kernfunctionaliteit.
+- "Start New Workout" blijft cyaan (de hoofdkleur), zoals de rest van de kernfunctionaliteit. Opent sinds het New Workout-tussenscherm (zie hieronder) niet meer direct "All Exercises", maar dat tussenscherm.
 
 Volgende schermen die aan deze eigen identiteit meebouwen: volg hetzelfde patroon — witte toolbar-iconen blijven de vaste basis (zie Iconen hierboven), maar layout/spacing/accentkleuren mogen per scherm bewust van de FitNotes-referentie afwijken zodra dat expliciet gevraagd wordt.
+
+## New Workout-tussenscherm (`#screen-new-workout`)
+
+Zit tussen "Start New Workout" (leeg Fitness Tracker-scherm) en het bestaande "All Exercises"-scherm in. Standaard toolbar (terug-pijl + titel "New Workout"), lichtgrijze achtergrond (`--bg`, de normale `.screen`-default — geen aparte styling nodig). Drie brede kaarten onder elkaar (`.new-workout-card`), zelfde structurele patroon als de kaarten op het hoofdmenu-scherm (`.menu-card`: icoon + titel + ondertekst, gekleurde `border-left: 4px solid var(--card-accent)` via een per-kaart CSS-custom-property), maar met een **lichte** in plaats van donkere kaartstijl (`background: var(--surface)`, `color: var(--text-primary)`/`--text-secondary`) om bij de rest van de (lichte) Fitness Tracker-flow te passen — het hoofdmenu blijft het enige donkere kaart-scherm.
+
+- **Manual Workout** (`--color-manual-accent`, blauw) — pen-icoon (Material "edit"). Navigeert naar het bestaande `openExerciseList()` / "All Exercises"-scherm, ongewijzigd.
+- **Load Schedule Manually** (`--color-schema-manual-accent`, paars, nieuw) — clipboard-icoon (hetzelfde pad als de "Presets"-knop in de Workout Plan Builder). Klik-handler is voorlopig een lege TODO in `app.js`.
+- **Load Schedule Automatically** (`--color-ai-coach-accent`, groen — bewust dezelfde kleur als de AI Coach-pil, want dit is ook een AI/automatisch-planning-feature) — sparkle-icoon. Ondertekst is dynamisch: `getTodaysScheduledDayName()` in `app.js` hergebruikt **dezelfde rotatielogica als de bestaande smart-day-banner** (`renderSmartBanner()`: `db.activePlan.lastDayIndex + 1` gemoduleerd op `plan.days.length`) om te bepalen welke plandag er "vandaag" aan de beurt zou zijn — geen nieuwe planningslogica, puur hergebruik. Toont "Today you have [Day Name]." als er een actief plan met dagen is, anders de generieke placeholder "Automatic planning not set up yet" (i.p.v. iets te verzinnen). Klik-handler is voorlopig een lege TODO.
+- Krijgt de globale AI Coach-pil automatisch (`#screen-new-workout` staat niet op de uitsluitingslijst naast `#screen-login`/`#screen-home` — geen extra werk nodig), met de standaard scroll-cushion (`padding-bottom: var(--ai-bar-space)`) op `.new-workout-content` zodat de derde kaart er nooit permanent achter verstopt zit.
+- Tekst in de UI is Engels, consistent met de rest van de app (alle andere schermen/knoppen/toasts zijn Engels) — de Nederlandse titels/onderteksten uit de opdracht zijn hiervoor vertaald.
 
 ## Fitness Tracker dagoverzicht (gevulde workout-staat) — grote cijfers, PR-logica, comments
 

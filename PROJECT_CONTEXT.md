@@ -107,11 +107,12 @@ callClaude(userMessage, sysPrompt) // Anthropic API call voor de AI plan generat
 - Geschiedenis en grafieken, PR-detectie
 - PWA installeerbaar op telefoon
 - **Hoofdmenu** met 4 secties: Fitness Tracker, Workout Plan Builder, Nutrition (coming soon), Progress (coming soon)
-- **Globale "AI Coach"-balk** onderaan op elk scherm in de app (pil-knop, groen, sparkle-icoon) — scherm/logica nog niet gebouwd, klik-handler is een lege TODO in `app.js` (`btn-global-ai-coach`)
+- **Globale "AI Coach"-pil** zwevend onderaan op elk scherm behalve login/hoofdmenu (groen, sparkle-icoon, geen achtergrondbalk erachter) — scherm/logica nog niet gebouwd, klik-handler is een lege TODO in `app.js` (`btn-global-ai-coach`)
 - **Workout Plan Builder** met presets (Push Pull Legs, Upper Lower), AI generator, koppeling aan Fitness Tracker
 - **Multi-select modus** voor meerdere oefeningen tegelijk verwijderen
 - **Drag-to-reorder** oefeningen in daglijst (ingedrukt houden → slepen)
-- Leeg-workoutlog-scherm toont nu alleen "Workout Log Empty" + "Start New Workout" gecentreerd (de losse "AI Coach"-tegel hier is vervallen — die functionaliteit zit nu in de globale AI Coach-balk hierboven)
+- Leeg-workoutlog-scherm toont nu "Workout Log Empty" + "Start New Workout" (de losse "AI Coach"-tegel hier is vervallen — die functionaliteit zit nu in de globale AI Coach-pil hierboven)
+- **"Start New Workout"** opent niet meer direct "All Exercises", maar eerst het **New Workout-tussenscherm** (`#screen-new-workout`) met drie kaarten: Manual Workout (→ All Exercises, werkt), Load Schedule Manually (TODO) en Load Schedule Automatically (TODO, toont via `getTodaysScheduledDayName()` welke plandag er volgens de bestaande plan-rotatielogica vandaag aan de beurt zou zijn)
 - **Exercise info scherm** (ⓘ bolletje bij elke oefening) — lokale video-animatie waar beschikbaar, spiergroepen en instructies uit free-exercise-db
 - **FitNotes-geïnspireerde** visuele stijl (lichtgrijs, cyaan accenten, witte kaarten)
 - **Dropdown** in All Exercises toolbar met plannen en "Create New Routine"

@@ -182,6 +182,7 @@ let pdeActiveSwipeReveal = null;
 //   content can change while you're away from them.
 const SCREEN_ON_ENTER = {
   'screen-fitness-tracker': () => renderHome(),
+  'screen-new-workout': () => renderNewWorkoutScreen(),
   'screen-workout-plan': () => renderPlanList(),
   'screen-plan-detail': () => renderPlanDetail(),
 };
@@ -496,7 +497,7 @@ function renderHome() {
           <span>Start New Workout</span>
         </button>
       </div>`;
-    document.getElementById('btn-start-new').addEventListener('click', openExerciseList);
+    document.getElementById('btn-start-new').addEventListener('click', openNewWorkoutScreen);
     return;
   }
 
@@ -829,6 +830,31 @@ function setExercisesTitle(text, withArrow) {
   } else {
     titleEl.textContent = text;
   }
+}
+
+// -- New Workout intermediate screen --------------------
+function openNewWorkoutScreen() {
+  renderNewWorkoutScreen();
+  showScreen('screen-new-workout');
+}
+
+// Reuses the same active-plan day-rotation logic as the smart day banner
+// (db.activePlan.lastDayIndex -> next index in plan.days) to figure out
+// what today's automatic pick would be.
+function getTodaysScheduledDayName() {
+  if (!db.activePlan) return null;
+  const plan = db.plans[db.activePlan.planId];
+  if (!plan || !plan.days || plan.days.length === 0) return null;
+  const lastIdx = db.activePlan.lastDayIndex ?? -1;
+  const nextIdx = (lastIdx + 1) % plan.days.length;
+  return plan.days[nextIdx].name || ('Day ' + (nextIdx + 1));
+}
+
+function renderNewWorkoutScreen() {
+  const dayName = getTodaysScheduledDayName();
+  document.getElementById('nw-schema-auto-desc').textContent = dayName
+    ? `Today you have ${dayName}.`
+    : 'Automatic planning not set up yet';
 }
 
 function openExerciseList() {
@@ -1922,6 +1948,14 @@ document.getElementById('btn-back-exercises').addEventListener('click', () => {
 
 document.getElementById('btn-new-exercise').addEventListener('click', openNewExerciseScreen);
 document.getElementById('btn-back-training').addEventListener('click', () => goBack('screen-fitness-tracker'));
+document.getElementById('btn-back-new-workout').addEventListener('click', () => goBack('screen-fitness-tracker'));
+document.getElementById('btn-nw-manual').addEventListener('click', openExerciseList);
+document.getElementById('btn-nw-schema-manual').addEventListener('click', () => {
+  // TODO: navigeert later naar een lijst met opgeslagen schema's uit de Workout Plan Builder om handmatig te kiezen — nog niet gebouwd
+});
+document.getElementById('btn-nw-schema-auto').addEventListener('click', () => {
+  // TODO: automatisch schema laden — nog niet gebouwd
+});
 document.getElementById('btn-save-set').addEventListener('click', saveSet);
 document.getElementById('btn-clear').addEventListener('click', clearFields);
 document.getElementById('btn-timer').addEventListener('click', openTimer);

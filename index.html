@@ -156,6 +156,39 @@
   <div class="home-content" id="home-content"></div>
 </div>
 
+<!-- NEW WORKOUT SCREEN -->
+<div id="screen-new-workout" class="screen">
+  <div class="toolbar">
+    <button class="toolbar-btn" id="btn-back-new-workout" aria-label="Back">
+      <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </button>
+    <span class="toolbar-title">New Workout</span>
+  </div>
+  <div class="new-workout-content" id="new-workout-content">
+    <button class="new-workout-card" id="btn-nw-manual" style="--card-accent: var(--color-manual-accent)">
+      <div class="new-workout-card-icon"><svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></div>
+      <div class="new-workout-card-body">
+        <div class="new-workout-card-title">Manual Workout</div>
+        <div class="new-workout-card-desc">Pick your own exercises</div>
+      </div>
+    </button>
+    <button class="new-workout-card" id="btn-nw-schema-manual" style="--card-accent: var(--color-schema-manual-accent)">
+      <div class="new-workout-card-icon"><svg viewBox="0 0 24 24"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H8V4h12v12z"/></svg></div>
+      <div class="new-workout-card-body">
+        <div class="new-workout-card-title">Load Schedule Manually</div>
+        <div class="new-workout-card-desc">Choose from your saved schedules</div>
+      </div>
+    </button>
+    <button class="new-workout-card" id="btn-nw-schema-auto" style="--card-accent: var(--color-ai-coach-accent)">
+      <div class="new-workout-card-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25zm-7.5.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12zM19 15l-1.25 2.75L15 19l2.75 1.25L19 23l1.25-2.75L23 19l-2.75-1.25z"/></svg></div>
+      <div class="new-workout-card-body">
+        <div class="new-workout-card-title">Load Schedule Automatically</div>
+        <div class="new-workout-card-desc" id="nw-schema-auto-desc">Automatic planning not set up yet</div>
+      </div>
+    </button>
+  </div>
+</div>
+
 <!-- CALENDAR SCREEN -->
 <div id="screen-calendar" class="screen">
   <div class="toolbar">

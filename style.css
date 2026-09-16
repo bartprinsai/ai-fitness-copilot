@@ -18,6 +18,8 @@
   --color-ai-coach-gradient-start: #4ade80;
   --color-ai-coach-gradient-end: #16a34a;
   --color-ai-coach-glow: rgba(34,197,94,0.35);
+  --color-manual-accent: #4a9eff;
+  --color-schema-manual-accent: #a855f7;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --toolbar-height: 56px;
@@ -72,6 +74,16 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .home-empty-action:active { opacity: 0.7; }
 .home-empty-action svg { width: 48px; height: 48px; fill: var(--cyan); }
 .home-empty-action span { font-size: 14px; color: var(--text-secondary); text-align: center; }
+
+/* ── NEW WORKOUT SCREEN ───────────────────────────────── */
+.new-workout-content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px 16px calc(var(--ai-bar-space) + 16px); display: flex; flex-direction: column; gap: 12px; }
+.new-workout-card { width: 100%; background: var(--surface); border: none; border-left: 4px solid var(--card-accent); border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.08); display: flex; align-items: center; gap: 14px; padding: 18px 16px; cursor: pointer; font-family: inherit; text-align: left; transition: opacity 0.12s, transform 0.1s; }
+.new-workout-card:active { opacity: 0.75; transform: scale(0.98); }
+.new-workout-card-icon { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.new-workout-card-icon svg { width: 26px; height: 26px; fill: var(--card-accent); }
+.new-workout-card-body { flex: 1; min-width: 0; }
+.new-workout-card-title { font-size: 16px; font-weight: 700; color: var(--text-primary); margin-bottom: 3px; }
+.new-workout-card-desc { font-size: 13px; color: var(--text-secondary); line-height: 1.4; }
 
 /* ── HOME SELECTION MODE ──────────────────────────────── */
 .sel-only { display: none !important; }
