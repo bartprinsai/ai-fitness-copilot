@@ -233,7 +233,7 @@
       </button>
     </div>
   </div>
-  <div class="search-bar">
+  <div class="search-bar list-row">
     <svg viewBox="0 0 24 24" class="search-icon"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
     <input type="text" id="exercise-search" placeholder="Search exercise..." autocomplete="off" autocorrect="off" spellcheck="false"/>
   </div>
@@ -260,20 +260,10 @@
       <input type="text" id="new-ex-name" class="new-ex-input" placeholder="Exercise name" autocomplete="off" autocorrect="off"/>
     </div>
     <div class="new-ex-section">
-      <div class="new-ex-label">NOTES <span class="new-ex-optional">(OPTIONAL)</span></div>
-      <input type="text" id="new-ex-notes" class="new-ex-input" placeholder="Add notes..." autocomplete="off" autocorrect="off"/>
-    </div>
-    <div class="new-ex-section">
-      <div class="new-ex-label-row">
-        <div class="new-ex-label">CATEGORY</div>
-        <button class="new-ex-add-cat-btn" id="btn-new-ex-add-cat">+</button>
-      </div>
-      <select id="new-ex-category" class="new-ex-select"></select>
-      <div id="new-ex-cat-input-row" class="new-ex-cat-input-row hidden">
-        <input type="text" id="new-ex-new-cat" class="new-ex-input" placeholder="New category name..."/>
-        <button class="new-ex-cat-confirm-btn" id="btn-new-ex-cat-ok">
-          <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-        </button>
+      <div class="new-ex-label">CATEGORY</div>
+      <div class="new-ex-field-row">
+        <select id="new-ex-category" class="new-ex-select"></select>
+        <button class="new-ex-add-cat-btn" id="btn-new-ex-add-cat" aria-label="New category">+</button>
       </div>
     </div>
     <div class="new-ex-section">
@@ -282,13 +272,13 @@
         <option value="weight_reps">Weight and Reps</option>
         <option value="reps_only">Reps Only</option>
         <option value="duration">Duration</option>
+        <option value="distance">Distance</option>
       </select>
     </div>
     <div class="new-ex-section">
       <div class="new-ex-label">WEIGHT UNIT</div>
       <select id="new-ex-weight-unit" class="new-ex-select">
-        <option value="default">Default (kgs)</option>
-        <option value="kg">Kilograms</option>
+        <option value="kg">Kilogram</option>
         <option value="lbs">Pounds</option>
       </select>
     </div>
@@ -636,6 +626,18 @@
     <div class="records-list" id="records-list"></div>
     <div class="overlay-btns">
       <button class="btn-primary" id="btn-records-close">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- NEW CATEGORY OVERLAY -->
+<div class="overlay" id="new-category-overlay">
+  <div class="overlay-panel">
+    <h3>New Category</h3>
+    <input type="text" id="new-category-input" class="modal-input-underline" placeholder="Category name" autocomplete="off"/>
+    <div class="overlay-btns">
+      <button class="btn-secondary" id="btn-new-category-cancel">Cancel</button>
+      <button class="btn-primary" id="btn-new-category-save">Save</button>
     </div>
   </div>
 </div>

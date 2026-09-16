@@ -18,7 +18,7 @@ const fStore = firebase.firestore();
 let currentUser = null;
 
 // -- In-memory state ------------------------------------
-let db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, favoriteExercises: {} };
+let db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, favoriteExercises: {}, hiddenBuiltins: {} };
 
 // -- Home selection mode state --------------------------
 let homeSelMode = false;
@@ -75,7 +75,11 @@ function toast(msg) {
   setTimeout(() => el.classList.remove('show'), 2000);
 }
 function allExercises() {
-  return [...EXERCISE_DB, ...(db.custom_exercises || []).map(e => ({ ...e, custom: true }))];
+  const custom = db.custom_exercises || [];
+  const customNames = new Set(custom.map(e => e.name));
+  const hidden = db.hiddenBuiltins || {};
+  const builtins = EXERCISE_DB.filter(e => !hidden[e.name] && !customNames.has(e.name));
+  return [...builtins, ...custom.map(e => ({ ...e, custom: true }))];
 }
 
 // -- Firestore persistence ------------------------------
@@ -119,15 +123,20 @@ function toggleFavoriteExercise(name) {
   persistFavorites();
   return next;
 }
+async function persistHiddenBuiltins() {
+  if (!currentUser) return;
+  uDoc('meta/hidden_builtins').set({ names: Object.keys(db.hiddenBuiltins || {}) }).catch(e => console.error(e));
+}
 async function loadUserData(userUid) {
   try {
-    const [workoutsSnap, recordsSnap, customSnap, plansSnap, activePlanSnap, favoritesSnap] = await Promise.all([
+    const [workoutsSnap, recordsSnap, customSnap, plansSnap, activePlanSnap, favoritesSnap, hiddenBuiltinsSnap] = await Promise.all([
       fStore.collection('users/' + userUid + '/workouts').get(),
       fStore.doc('users/' + userUid + '/meta/records').get(),
       fStore.doc('users/' + userUid + '/meta/custom_exercises').get(),
       fStore.collection('users/' + userUid + '/plans').get(),
       fStore.doc('users/' + userUid + '/meta/activeplan').get(),
       fStore.doc('users/' + userUid + '/meta/favorites').get(),
+      fStore.doc('users/' + userUid + '/meta/hidden_builtins').get(),
     ]);
     db.workouts = {};
     db.sessionNotes = {};
@@ -144,6 +153,10 @@ async function loadUserData(userUid) {
     db.favoriteExercises = {};
     if (favoritesSnap.exists) {
       (favoritesSnap.data().names || []).forEach(name => { db.favoriteExercises[name] = true; });
+    }
+    db.hiddenBuiltins = {};
+    if (hiddenBuiltinsSnap.exists) {
+      (hiddenBuiltinsSnap.data().names || []).forEach(name => { db.hiddenBuiltins[name] = true; });
     }
   } catch(e) {
     console.error('loadUserData', e);
@@ -290,7 +303,7 @@ async function initAuth() {
       showScreen('screen-home');
     } else {
       console.log('[Auth] no user, showing login screen');
-      db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, favoriteExercises: {} };
+      db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, favoriteExercises: {}, hiddenBuiltins: {} };
       currentPlanId = null; currentPlanData = null; bannerDismissed = false;
       showScreen('screen-login');
     }
@@ -441,6 +454,7 @@ document.getElementById('btn-reset-confirm').addEventListener('click', async () 
       fStore.doc(userPrefix + 'meta/custom_exercises'),
       fStore.doc(userPrefix + 'meta/activeplan'),
       fStore.doc(userPrefix + 'meta/favorites'),
+      fStore.doc(userPrefix + 'meta/hidden_builtins'),
     ];
 
     // Explicit per-doc safety check: refuse to touch anything outside this user's own subtree.
@@ -460,7 +474,7 @@ document.getElementById('btn-reset-confirm').addEventListener('click', async () 
       await batch.commit();
     }
 
-    db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, favoriteExercises: {} };
+    db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, favoriteExercises: {}, hiddenBuiltins: {} };
     currentPlanId = null;
     currentPlanData = null;
 
@@ -805,7 +819,7 @@ function renderCategoryBrowser() {
   const hasFavorites = Object.keys(db.favoriteExercises || {}).length > 0;
   if (hasFavorites) {
     const item = document.createElement('div');
-    item.className = 'category-item category-item-favorites';
+    item.className = 'category-item category-item-favorites list-row';
     item.innerHTML = `
       <svg class="category-item-fav-star" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
       <span class="category-item-name">Favorites</span>
@@ -821,7 +835,7 @@ function renderCategoryBrowser() {
   const cats = [...new Set(allExercises().map(e => e.category))].sort();
   cats.forEach(cat => {
     const item = document.createElement('div');
-    item.className = 'category-item';
+    item.className = 'category-item list-row';
     item.innerHTML = `
       <span class="category-item-name">${cat}</span>
       <svg class="category-item-dots" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
@@ -853,7 +867,7 @@ function renderPlanDayBrowser(planId) {
   list.innerHTML = '';
   (plan.days || []).forEach((day, idx) => {
     const item = document.createElement('div');
-    item.className = 'category-item';
+    item.className = 'category-item list-row';
     const count = (day.exercises || []).length;
     item.innerHTML = `
       <div class="plan-day-badge">${idx + 1}</div>
@@ -965,7 +979,7 @@ function refreshExerciseList() {
 
 function renderExerciseItem(list, ex) {
   const item = document.createElement('div');
-  item.className = 'exercise-item' + (ex.custom ? ' exercise-item-custom' : '');
+  item.className = 'exercise-item list-row' + (ex.custom ? ' exercise-item-custom' : '');
   const isFav = isFavoriteExercise(ex.name);
   item.innerHTML = `
     <span class="exercise-item-name">${ex.name}</span>
@@ -978,16 +992,14 @@ function renderExerciseItem(list, ex) {
   });
   item.querySelector('.exercise-item-dots').addEventListener('click', e => {
     e.stopPropagation();
-    const menuItems = [];
-    if (ex.custom) {
-      menuItems.push({ label: 'Edit', action: () => openEditExerciseScreen(ex) });
-      menuItems.push({ label: 'Delete', action: () => openDeleteExerciseConfirm(ex), danger: true });
-    }
-    menuItems.push({
-      label: isFav ? 'Unfavorite' : 'Favorite',
-      action: () => { toggleFavoriteExercise(ex.name); refreshExerciseList(); }
-    });
-    showOverflowMenu(menuItems, e.currentTarget);
+    showOverflowMenu([
+      { label: 'Edit', action: () => openEditExerciseScreen(ex) },
+      { label: 'Delete', action: () => openDeleteExerciseConfirm(ex), danger: true },
+      {
+        label: isFav ? 'Unfavorite' : 'Favorite',
+        action: () => { toggleFavoriteExercise(ex.name); refreshExerciseList(); }
+      }
+    ], e.currentTarget);
   });
   list.appendChild(item);
 }
@@ -1830,11 +1842,8 @@ function openNewExerciseScreen() {
   document.getElementById('new-ex-title').textContent = 'New Exercise';
   document.getElementById('btn-new-ex-save-add').classList.remove('hidden');
   document.getElementById('new-ex-name').value = '';
-  document.getElementById('new-ex-notes').value = '';
   document.getElementById('new-ex-type').value = 'weight_reps';
-  document.getElementById('new-ex-weight-unit').value = 'default';
-  document.getElementById('new-ex-cat-input-row').classList.add('hidden');
-  document.getElementById('new-ex-new-cat').value = '';
+  document.getElementById('new-ex-weight-unit').value = 'kg';
   populateNewExCategorySelect();
   showScreen('screen-new-exercise');
   setTimeout(() => document.getElementById('new-ex-name').focus(), 300);
@@ -1845,25 +1854,31 @@ function openEditExerciseScreen(ex) {
   document.getElementById('new-ex-title').textContent = 'Update Exercise';
   document.getElementById('btn-new-ex-save-add').classList.add('hidden');
   document.getElementById('new-ex-name').value = ex.name;
-  document.getElementById('new-ex-notes').value = ex.notes || '';
   document.getElementById('new-ex-type').value = ex.type || 'weight_reps';
-  document.getElementById('new-ex-weight-unit').value = ex.weightUnit || 'default';
-  document.getElementById('new-ex-cat-input-row').classList.add('hidden');
-  document.getElementById('new-ex-new-cat').value = '';
+  document.getElementById('new-ex-weight-unit').value = ex.weightUnit === 'lbs' ? 'lbs' : 'kg';
   populateNewExCategorySelect(ex.category);
   showScreen('screen-new-exercise');
 }
 
-// Renames an exercise across every place it's referenced by name: the
+// Renames/updates an exercise across every place it's referenced by name: the
 // custom-exercise definition itself, every logged workout, PR records and
 // favorites — name is this app's only stable identifier for an exercise.
+// originalName may belong to a built-in (no db.custom_exercises entry yet) —
+// in that case editing converts it into a custom override and hides the
+// built-in so it doesn't also keep showing up unedited.
 function updateExistingExercise(originalName, updated) {
-  const entry = (db.custom_exercises || []).find(e => e.name === originalName);
-  if (!entry) return;
+  if (!db.custom_exercises) db.custom_exercises = [];
+  let entry = db.custom_exercises.find(e => e.name === originalName);
+  if (!entry) {
+    entry = { category: updated.category, name: updated.name, type: updated.type, weightUnit: updated.weightUnit };
+    db.custom_exercises.push(entry);
+    if (!db.hiddenBuiltins) db.hiddenBuiltins = {};
+    db.hiddenBuiltins[originalName] = true;
+    persistHiddenBuiltins();
+  }
   const nameChanged = updated.name !== originalName;
   entry.category = updated.category;
   entry.name = updated.name;
-  entry.notes = updated.notes;
   entry.type = updated.type;
   entry.weightUnit = updated.weightUnit;
   persistCustomExercises();
@@ -1893,7 +1908,6 @@ function updateExistingExercise(originalName, updated) {
 function saveNewExerciseFromScreen(andAddAnother) {
   const name = document.getElementById('new-ex-name').value.trim();
   const cat = document.getElementById('new-ex-category').value;
-  const notes = document.getElementById('new-ex-notes').value.trim();
   const type = document.getElementById('new-ex-type').value;
   const weightUnit = document.getElementById('new-ex-weight-unit').value;
   if (!name) { toast('Enter a name'); return; }
@@ -1903,7 +1917,7 @@ function saveNewExerciseFromScreen(andAddAnother) {
     const nameTaken = name.toLowerCase() !== pendingEditExerciseOriginalName.toLowerCase()
       && allExercises().find(e => e.name.toLowerCase() === name.toLowerCase());
     if (nameTaken) { toast('Exercise already exists'); return; }
-    updateExistingExercise(pendingEditExerciseOriginalName, { category: cat, name, notes, type, weightUnit });
+    updateExistingExercise(pendingEditExerciseOriginalName, { category: cat, name, type, weightUnit });
     pendingEditExerciseOriginalName = null;
     exerciseBrowserMode = 'categories';
     currentBrowseCategory = null;
@@ -1915,7 +1929,7 @@ function saveNewExerciseFromScreen(andAddAnother) {
 
   if (allExercises().find(e => e.name.toLowerCase() === name.toLowerCase())) { toast('Exercise already exists'); return; }
   if (!db.custom_exercises) db.custom_exercises = [];
-  db.custom_exercises.push({ category: cat, name, notes, type, weightUnit });
+  db.custom_exercises.push({ category: cat, name, type, weightUnit });
   persistCustomExercises();
   toast('Exercise created');
   if (andAddAnother) {
@@ -1929,7 +1943,7 @@ function saveNewExerciseFromScreen(andAddAnother) {
   }
 }
 
-// -- Delete exercise (custom exercises only) -------------
+// -- Delete exercise (built-in or custom) ----------------
 let pendingDeleteExercise = null;
 
 function openDeleteExerciseConfirm(ex) {
@@ -1952,8 +1966,14 @@ document.getElementById('btn-delete-ex-cancel').addEventListener('click', () => 
 document.getElementById('btn-delete-ex-confirm').addEventListener('click', () => {
   if (!pendingDeleteExercise) return;
   const name = pendingDeleteExercise.name;
-  db.custom_exercises = (db.custom_exercises || []).filter(e => e.name !== name);
-  persistCustomExercises();
+  if (pendingDeleteExercise.custom) {
+    db.custom_exercises = (db.custom_exercises || []).filter(e => e.name !== name);
+    persistCustomExercises();
+  } else {
+    if (!db.hiddenBuiltins) db.hiddenBuiltins = {};
+    db.hiddenBuiltins[name] = true;
+    persistHiddenBuiltins();
+  }
   Object.keys(db.workouts).forEach(date => {
     const workout = db.workouts[date];
     if (!workout.some(e => e.name === name)) return;
@@ -1972,12 +1992,13 @@ document.getElementById('btn-new-ex-back').addEventListener('click', () => goBac
 document.getElementById('btn-new-ex-save').addEventListener('click', () => saveNewExerciseFromScreen(false));
 document.getElementById('btn-new-ex-save-add').addEventListener('click', () => saveNewExerciseFromScreen(true));
 document.getElementById('btn-new-ex-add-cat').addEventListener('click', () => {
-  const row = document.getElementById('new-ex-cat-input-row');
-  row.classList.toggle('hidden');
-  if (!row.classList.contains('hidden')) document.getElementById('new-ex-new-cat').focus();
+  document.getElementById('new-category-input').value = '';
+  openOverlay('new-category-overlay');
+  setTimeout(() => document.getElementById('new-category-input').focus(), 100);
 });
-document.getElementById('btn-new-ex-cat-ok').addEventListener('click', () => {
-  const newCat = document.getElementById('new-ex-new-cat').value.trim();
+document.getElementById('btn-new-category-cancel').addEventListener('click', () => closeOverlay('new-category-overlay'));
+document.getElementById('btn-new-category-save').addEventListener('click', () => {
+  const newCat = document.getElementById('new-category-input').value.trim();
   if (!newCat) return;
   const sel = document.getElementById('new-ex-category');
   if (![...sel.options].some(o => o.value === newCat)) {
@@ -1986,8 +2007,7 @@ document.getElementById('btn-new-ex-cat-ok').addEventListener('click', () => {
     sel.appendChild(opt);
   }
   sel.value = newCat;
-  document.getElementById('new-ex-cat-input-row').classList.add('hidden');
-  document.getElementById('new-ex-new-cat').value = '';
+  closeOverlay('new-category-overlay');
 });
 
 document.getElementById('btn-new-exercise-save').addEventListener('click', () => {
