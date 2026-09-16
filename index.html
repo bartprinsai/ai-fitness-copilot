@@ -697,6 +697,41 @@
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
+<!-- DAY ACTIONS ROW (Recap / Comment — Fitness Tracker day view only) -->
+<div class="day-actions-row" id="day-actions-row">
+  <button class="day-action-pill" id="btn-day-recap">
+    <svg viewBox="0 0 24 24"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6a7 7 0 1 1 2.05 4.95l-1.42 1.42A9 9 0 1 0 13 3zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8z"/></svg>
+    <span>Recap</span>
+  </button>
+  <button class="day-action-pill" id="btn-day-comment">
+    <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+    <span>Comment</span>
+  </button>
+</div>
+
+<!-- COMMENT POPUP (per-set and per-session) -->
+<div class="overlay" id="comment-overlay">
+  <div class="overlay-panel comment-panel">
+    <div id="comment-view-mode">
+      <h3 class="comment-title">Comment</h3>
+      <p class="comment-text" id="comment-view-text"></p>
+      <div class="overlay-btns">
+        <button class="btn-secondary" id="btn-comment-edit">Edit</button>
+        <button class="btn-primary" id="btn-comment-done">Done</button>
+      </div>
+    </div>
+    <div id="comment-edit-mode" class="hidden">
+      <h3 class="comment-title">Comment</h3>
+      <textarea id="comment-edit-input" placeholder="Add a comment..." maxlength="500"></textarea>
+      <div class="overlay-btns">
+        <button class="btn-secondary" id="btn-comment-cancel">Cancel</button>
+        <button class="btn-text-danger" id="btn-comment-delete">Delete</button>
+        <button class="btn-primary" id="btn-comment-save">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- GLOBAL AI COACH BAR -->
 <div class="global-ai-bar" id="global-ai-bar">
   <button class="global-ai-bar-pill" id="btn-global-ai-coach">

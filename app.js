@@ -18,7 +18,7 @@ const fStore = firebase.firestore();
 let currentUser = null;
 
 // -- In-memory state ------------------------------------
-let db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null };
+let db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {} };
 
 // -- Home selection mode state --------------------------
 let homeSelMode = false;
@@ -85,8 +85,17 @@ async function persistWorkout(date, exercises) {
   if (!exercises || exercises.length === 0) {
     uDoc('workouts/' + date).delete().catch(() => {});
   } else {
-    uDoc('workouts/' + date).set({ exercises }).catch(e => console.error(e));
+    uDoc('workouts/' + date).set({ exercises }, { merge: true }).catch(e => console.error(e));
   }
+}
+function getSessionNote(date) { return (db.sessionNotes || {})[date] || ''; }
+function saveSessionNote(date, note) {
+  if (!db.sessionNotes) db.sessionNotes = {};
+  const trimmed = (note || '').trim();
+  if (trimmed) db.sessionNotes[date] = trimmed;
+  else delete db.sessionNotes[date];
+  if (!currentUser) return;
+  uDoc('workouts/' + date).set({ sessionNote: trimmed }, { merge: true }).catch(e => console.error(e));
 }
 async function persistRecords() {
   if (!currentUser) return;
@@ -106,7 +115,12 @@ async function loadUserData(userUid) {
       fStore.doc('users/' + userUid + '/meta/activeplan').get(),
     ]);
     db.workouts = {};
-    workoutsSnap.forEach(doc => { db.workouts[doc.id] = doc.data().exercises || []; });
+    db.sessionNotes = {};
+    workoutsSnap.forEach(doc => {
+      const data = doc.data();
+      db.workouts[doc.id] = data.exercises || [];
+      if (data.sessionNote) db.sessionNotes[doc.id] = data.sessionNote;
+    });
     db.records = recordsSnap.exists ? (recordsSnap.data().data || {}) : {};
     db.custom_exercises = customSnap.exists ? (customSnap.data().list || []) : [];
     db.plans = {};
@@ -441,12 +455,37 @@ document.getElementById('btn-reset-confirm').addEventListener('click', async () 
 });
 
 // -- Home Screen ----------------------------------------
+// Returns a Set of "date#setIndex" keys marking, per exercise, only the very
+// first chronological set that ever hit a given (reps, weight) PR combo —
+// so repeats of an already-celebrated combo (same day or later) don't re-trophy.
+function getFirstPRComboKeys(exerciseName) {
+  const exRecords = (db.records || {})[exerciseName] || {};
+  const dates = Object.keys(db.workouts).sort();
+  const seenCombos = new Set();
+  const result = new Set();
+  dates.forEach(date => {
+    const ex = (db.workouts[date] || []).find(e => e.name === exerciseName);
+    if (!ex) return;
+    (ex.sets || []).forEach((s, i) => {
+      const isPR = exRecords[String(s.reps)] && parseFloat(s.weight) >= exRecords[String(s.reps)];
+      if (!isPR) return;
+      const combo = s.reps + '_' + s.weight;
+      if (seenCombos.has(combo)) return;
+      seenCombos.add(combo);
+      result.add(date + '#' + i);
+    });
+  });
+  return result;
+}
+
 function renderHome() {
   document.getElementById('day-nav-label').textContent = formatDate(currentDate);
   const exercises = getWorkout(currentDate);
   const container = document.getElementById('home-content');
+  const screenEl = document.getElementById('screen-fitness-tracker');
 
   if (exercises.length === 0) {
+    screenEl.classList.remove('has-day-actions');
     container.innerHTML = `
       <div class="home-empty">
         <span class="home-empty-title">Workout Log Empty</span>
@@ -459,12 +498,12 @@ function renderHome() {
     return;
   }
 
+  screenEl.classList.add('has-day-actions');
   container.innerHTML = '';
-  const records = db.records || {};
 
   exercises.forEach((ex, idx) => {
     const sets = ex.sets || [];
-    const exRecords = records[ex.name] || {};
+    const firstPRKeys = getFirstPRComboKeys(ex.name);
     const card = document.createElement('div');
     card.className = 'exercise-card';
     card.dataset.exIdx = idx;
@@ -484,15 +523,23 @@ function renderHome() {
     if (sets.length === 0) {
       setsDiv.innerHTML = `<div class="exercise-card-empty">No sets</div>`;
     } else {
-      sets.forEach(s => {
-        const isPR = exRecords[String(s.reps)] && Number(s.weight) >= exRecords[String(s.reps)];
+      sets.forEach((s, setIdx) => {
+        const isFirstPR = firstPRKeys.has(currentDate + '#' + setIdx);
+        const hasNote = !!(s.note && s.note.trim());
         const row = document.createElement('div');
         row.className = 'exercise-set-row';
         row.innerHTML = `
-          ${isPR ? `<svg class="exercise-set-pr" viewBox="0 0 24 24"><path d="M12 1L9 9H1l6.5 4.7L5 21l7-5 7 5-2.5-7.3L23 9h-8z"/></svg>` : `<span class="exercise-set-spacer"></span>`}
-          <span class="exercise-set-weight">${s.weight} kg</span>
-          <span class="exercise-set-reps">${s.reps} reps</span>
+          <span class="exercise-set-comment${hasNote ? ' has-note' : ''}" aria-label="Set comment">${hasNote ? `<svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>` : ''}</span>
+          ${isFirstPR ? `<svg class="exercise-set-pr" viewBox="0 0 24 24"><path d="M12 1L9 9H1l6.5 4.7L5 21l7-5 7 5-2.5-7.3L23 9h-8z"/></svg>` : `<span class="exercise-set-spacer"></span>`}
+          <span class="exercise-set-weight"><span class="exercise-set-val">${s.weight}</span><span class="exercise-set-unit">kgs</span></span>
+          <span class="exercise-set-reps"><span class="exercise-set-val">${s.reps}</span><span class="exercise-set-unit">reps</span></span>
         `;
+        if (hasNote) {
+          row.querySelector('.exercise-set-comment').addEventListener('click', e => {
+            e.stopPropagation();
+            openSetCommentPopup(idx, setIdx);
+          });
+        }
         setsDiv.appendChild(row);
       });
     }
@@ -530,6 +577,63 @@ function renderHome() {
       }
     });
     container.appendChild(card);
+  });
+}
+
+// -- Comment popup (per-set and per-session) ------------
+let commentPopupCtx = null;
+
+function openCommentPopup(ctx) {
+  commentPopupCtx = ctx;
+  const text = ctx.getText();
+  if (text && text.trim()) showCommentView(text);
+  else showCommentEdit('');
+  openOverlay('comment-overlay');
+}
+
+function showCommentView(text) {
+  document.getElementById('comment-view-text').textContent = text;
+  document.getElementById('comment-view-mode').classList.remove('hidden');
+  document.getElementById('comment-edit-mode').classList.add('hidden');
+}
+
+function showCommentEdit(text) {
+  document.getElementById('comment-edit-input').value = text;
+  document.getElementById('comment-edit-mode').classList.remove('hidden');
+  document.getElementById('comment-view-mode').classList.add('hidden');
+}
+
+function openSetCommentPopup(exIdx, setIdx) {
+  openCommentPopup({
+    getText: () => {
+      const ex = getWorkout(currentDate)[exIdx];
+      return (ex && ex.sets[setIdx] && ex.sets[setIdx].note) || '';
+    },
+    onSave: val => {
+      const workout = getWorkout(currentDate);
+      const ex = workout[exIdx];
+      if (!ex || !ex.sets[setIdx]) return;
+      if (val) ex.sets[setIdx].note = val; else delete ex.sets[setIdx].note;
+      setWorkout(currentDate, workout);
+      renderHome();
+    },
+    onDelete: () => {
+      const workout = getWorkout(currentDate);
+      const ex = workout[exIdx];
+      if (!ex || !ex.sets[setIdx]) return;
+      delete ex.sets[setIdx].note;
+      setWorkout(currentDate, workout);
+      renderHome();
+    }
+  });
+}
+
+function openSessionCommentPopup() {
+  const date = currentDate;
+  openCommentPopup({
+    getText: () => getSessionNote(date),
+    onSave: val => saveSessionNote(date, val),
+    onDelete: () => saveSessionNote(date, '')
   });
 }
 
@@ -1827,6 +1931,26 @@ document.getElementById('btn-training-info').addEventListener('click', () => { i
 document.getElementById('btn-back-exercise-info').addEventListener('click', () => goBack(exerciseInfoReturnScreen));
 document.getElementById('btn-global-ai-coach').addEventListener('click', () => {
   // TODO: link to the Chat Coach screen once it's built
+});
+document.getElementById('btn-day-recap').addEventListener('click', () => {
+  // TODO: recap-functionaliteit volgt later
+});
+document.getElementById('btn-day-comment').addEventListener('click', openSessionCommentPopup);
+document.getElementById('btn-comment-edit').addEventListener('click', () => showCommentEdit(commentPopupCtx.getText()));
+document.getElementById('btn-comment-done').addEventListener('click', () => closeOverlay('comment-overlay'));
+document.getElementById('btn-comment-cancel').addEventListener('click', () => {
+  const text = commentPopupCtx && commentPopupCtx.getText();
+  if (text && text.trim()) showCommentView(text);
+  else closeOverlay('comment-overlay');
+});
+document.getElementById('btn-comment-delete').addEventListener('click', () => {
+  if (commentPopupCtx) commentPopupCtx.onDelete();
+  closeOverlay('comment-overlay');
+});
+document.getElementById('btn-comment-save').addEventListener('click', () => {
+  const val = document.getElementById('comment-edit-input').value.trim();
+  if (commentPopupCtx) commentPopupCtx.onSave(val);
+  closeOverlay('comment-overlay');
 });
 
 document.getElementById('exercise-search').addEventListener('input', e => {

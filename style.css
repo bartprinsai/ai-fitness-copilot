@@ -25,6 +25,7 @@
   --toolbar-height: 56px;
   --ai-bar-height: 64px;
   --ai-bar-space: calc(var(--ai-bar-height) + var(--safe-bottom));
+  --day-actions-height: 56px;
 }
 
 html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-serif; font-size: 16px; color: var(--text-primary); -webkit-font-smoothing: antialiased; overscroll-behavior: none; }
@@ -32,12 +33,20 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .screen { position: fixed; top: 0; left: 0; right: 0; bottom: var(--ai-bar-space); display: none; flex-direction: column; background: var(--bg); }
 .screen.active { display: flex; }
 #screen-login, #screen-home { bottom: 0; }
+#screen-fitness-tracker.has-day-actions { bottom: calc(var(--ai-bar-space) + var(--day-actions-height)); }
 
 /* ── GLOBAL AI COACH BAR ──────────────────────────────── */
 .global-ai-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; height: var(--ai-bar-height); padding-bottom: var(--safe-bottom); box-sizing: border-box; background: var(--ai-bar-bg); border-top: 1px solid var(--ai-bar-border); display: flex; align-items: center; justify-content: center; }
 #screen-login.active ~ .global-ai-bar, #screen-home.active ~ .global-ai-bar { display: none; }
 .global-ai-bar-pill { display: flex; align-items: center; gap: 8px; border: none; border-radius: 22px; background: linear-gradient(135deg, var(--color-ai-coach-gradient-start), var(--color-ai-coach-gradient-end)); color: #fff; font-family: inherit; font-size: 14px; font-weight: 700; padding: 12px 28px; cursor: pointer; box-shadow: 0 3px 10px var(--color-ai-coach-glow); transition: transform 0.08s, box-shadow 0.12s; }
 .global-ai-bar-pill:active { transform: scale(0.97); box-shadow: 0 2px 6px var(--color-ai-coach-glow); }
+
+/* ── DAY ACTIONS ROW (Recap / Comment) ───────────────── */
+.day-actions-row { position: fixed; left: 0; right: 0; bottom: var(--ai-bar-space); height: var(--day-actions-height); z-index: 55; box-sizing: border-box; background: var(--surface); border-top: 1px solid var(--border); display: none; align-items: center; justify-content: center; gap: 12px; padding: 0 16px; }
+#screen-fitness-tracker.active.has-day-actions ~ .day-actions-row { display: flex; }
+.day-action-pill { display: flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text-primary); font-family: inherit; font-size: 14px; font-weight: 700; padding: 9px 20px; cursor: pointer; }
+.day-action-pill:active { background: var(--bg); }
+.day-action-pill svg { width: 16px; height: 16px; fill: var(--text-secondary); flex-shrink: 0; }
 .global-ai-bar-pill svg { width: 18px; height: 18px; fill: #fff; flex-shrink: 0; }
 
 /* ── TOOLBAR ──────────────────────────────────────────── */
@@ -86,11 +95,15 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 #screen-fitness-tracker.sel-single .exercise-card-selected .exercise-card-drag-handle { display: flex; }
 .exercise-card-divider { height: 2px; background: var(--cyan); }
 .exercise-card-sets { padding: 6px 12px 10px; }
-.exercise-set-row { display: flex; align-items: center; padding: 2px 0; gap: 6px; }
+.exercise-set-row { display: grid; grid-template-columns: 20px 16px 1fr 1fr; align-items: baseline; padding: 6px 0; gap: 10px; }
+.exercise-set-comment { display: flex; align-items: center; justify-content: center; cursor: default; }
+.exercise-set-comment.has-note { cursor: pointer; }
+.exercise-set-comment svg { width: 15px; height: 15px; fill: var(--cyan); }
 .exercise-set-pr { width: 14px; height: 14px; fill: var(--cyan); flex-shrink: 0; }
 .exercise-set-spacer { width: 14px; flex-shrink: 0; }
-.exercise-set-weight { font-size: 14px; font-weight: 700; color: var(--text-primary); }
-.exercise-set-reps { font-size: 14px; color: var(--text-secondary); margin-left: auto; }
+.exercise-set-weight, .exercise-set-reps { display: flex; align-items: baseline; justify-content: flex-end; gap: 4px; }
+.exercise-set-val { font-size: 20px; font-weight: 700; color: var(--text-primary); }
+.exercise-set-unit { font-size: 12px; font-weight: 400; color: var(--text-secondary); }
 .exercise-card-empty { padding: 6px 12px 10px; font-size: 14px; color: var(--text-hint); }
 
 /* ── EXERCISE LIST SCREEN ─────────────────────────────── */
@@ -195,6 +208,11 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .overlay-panel { width: 100%; max-width: 480px; margin: 0 auto; background: var(--surface); border-radius: 12px 12px 0 0; padding: 20px 20px calc(var(--safe-bottom) + 20px); transform: translateY(100%); transition: transform 0.28s cubic-bezier(0.32,0.72,0,1); display: flex; flex-direction: column; gap: 14px; }
 .overlay.open .overlay-panel { transform: translateY(0); }
 .overlay-panel h3 { font-size: 18px; font-weight: 500; color: var(--text-primary); }
+.comment-panel #comment-view-mode, .comment-panel #comment-edit-mode { display: flex; flex-direction: column; gap: 14px; }
+.overlay-panel .comment-title { color: var(--blue-btn); }
+.comment-text { font-size: 15px; color: var(--text-primary); line-height: 1.5; white-space: pre-wrap; }
+.btn-text-danger { flex: 1; padding: 11px 8px; border: none; border-radius: 2px; background: var(--bg); color: #d32f2f; font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.12s; text-transform: uppercase; letter-spacing: .06em; }
+.btn-text-danger:active { background: #ffebee; }
 .overlay-panel input[type="text"], .overlay-panel select, .overlay-panel textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 2px; font-family: inherit; font-size: 16px; color: var(--text-primary); outline: none; background: var(--surface); transition: border-color 0.15s; }
 .overlay-panel textarea { resize: vertical; min-height: 72px; }
 .overlay-panel input:focus, .overlay-panel select:focus, .overlay-panel textarea:focus { border-color: var(--cyan); }
