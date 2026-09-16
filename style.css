@@ -132,11 +132,14 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .category-item:active { background: #f5f5f5; }
 .category-item-name { flex: 1; }
 .category-item-dots { width: 20px; height: 20px; fill: var(--text-hint); flex-shrink: 0; }
+.category-item-favorites .category-item-name { font-weight: 700; }
+.category-item-fav-star { width: 20px; height: 20px; fill: var(--blue-btn); flex-shrink: 0; margin-right: 14px; }
 
 .exercise-item { display: flex; align-items: center; padding: 16px 16px; border-bottom: 1px solid var(--border); font-size: 15px; color: var(--text-primary); cursor: pointer; background: var(--surface); transition: background 0.08s; }
 .exercise-item:active { background: #f5f5f5; }
 .exercise-item-name { flex: 1; }
 .exercise-item-custom .exercise-item-name { color: var(--cyan); }
+.exercise-item-fav-star { width: 18px; height: 18px; fill: var(--blue-btn); flex-shrink: 0; margin-right: 10px; }
 .exercise-item-dots { width: 20px; height: 20px; fill: var(--text-hint); flex-shrink: 0; }
 .exercise-empty { padding: 32px; text-align: center; color: var(--text-hint); font-size: 15px; }
 
@@ -462,6 +465,9 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .btn-danger:disabled, .btn-secondary:disabled { opacity: .5; cursor: not-allowed; }
 .btn-danger:disabled:active { background: #C62828; }
 .cat-delete-msg { font-size: 14px; color: var(--text-secondary); line-height: 1.5; }
+.overlay-panel .delete-ex-title { color: var(--blue-btn); text-decoration: underline; }
+.delete-ex-check-row { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; color: var(--text-secondary); line-height: 1.4; cursor: pointer; }
+.delete-ex-check-row input[type="checkbox"] { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--blue-btn); margin-top: 1px; }
 
 /* ── RESET TO DEFAULT ─────────────────────────────────── */
 .reset-error { font-size: 13px; color: #d32f2f; line-height: 1.4; }
@@ -511,5 +517,3 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .ei-step-num { width: 24px; height: 24px; border-radius: 50%; background: var(--cyan); color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
 .ei-step-text { font-size: 15px; color: var(--text-primary); line-height: 1.5; flex: 1; }
 .ei-step-empty { font-size: 14px; color: var(--text-hint); }
-.exercise-item-info { width: 20px; height: 20px; fill: var(--text-hint); flex-shrink: 0; margin-right: 8px; cursor: pointer; padding: 2px; }
-.exercise-item-info:active { fill: var(--cyan); }

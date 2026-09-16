@@ -18,7 +18,7 @@ const fStore = firebase.firestore();
 let currentUser = null;
 
 // -- In-memory state ------------------------------------
-let db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {} };
+let db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, favoriteExercises: {} };
 
 // -- Home selection mode state --------------------------
 let homeSelMode = false;
@@ -29,6 +29,7 @@ let homeExDragDy = 0;
 
 // -- Exercise browser extended state -------------------
 let currentBrowsePlan = null;
+const FAVORITES_CATEGORY = '__favorites__';
 
 // -- Exercise info screen state ------------------------
 let freeExerciseDB = null;
@@ -105,14 +106,28 @@ async function persistCustomExercises() {
   if (!currentUser) return;
   uDoc('meta/custom_exercises').set({ list: db.custom_exercises || [] }).catch(e => console.error(e));
 }
+async function persistFavorites() {
+  if (!currentUser) return;
+  uDoc('meta/favorites').set({ names: Object.keys(db.favoriteExercises || {}) }).catch(e => console.error(e));
+}
+function isFavoriteExercise(name) { return !!(db.favoriteExercises || {})[name]; }
+function toggleFavoriteExercise(name) {
+  if (!db.favoriteExercises) db.favoriteExercises = {};
+  const next = !db.favoriteExercises[name];
+  if (next) db.favoriteExercises[name] = true;
+  else delete db.favoriteExercises[name];
+  persistFavorites();
+  return next;
+}
 async function loadUserData(userUid) {
   try {
-    const [workoutsSnap, recordsSnap, customSnap, plansSnap, activePlanSnap] = await Promise.all([
+    const [workoutsSnap, recordsSnap, customSnap, plansSnap, activePlanSnap, favoritesSnap] = await Promise.all([
       fStore.collection('users/' + userUid + '/workouts').get(),
       fStore.doc('users/' + userUid + '/meta/records').get(),
       fStore.doc('users/' + userUid + '/meta/custom_exercises').get(),
       fStore.collection('users/' + userUid + '/plans').get(),
       fStore.doc('users/' + userUid + '/meta/activeplan').get(),
+      fStore.doc('users/' + userUid + '/meta/favorites').get(),
     ]);
     db.workouts = {};
     db.sessionNotes = {};
@@ -126,6 +141,10 @@ async function loadUserData(userUid) {
     db.plans = {};
     plansSnap.forEach(doc => { db.plans[doc.id] = { ...doc.data(), id: doc.id }; });
     db.activePlan = activePlanSnap.exists ? activePlanSnap.data() : null;
+    db.favoriteExercises = {};
+    if (favoritesSnap.exists) {
+      (favoritesSnap.data().names || []).forEach(name => { db.favoriteExercises[name] = true; });
+    }
   } catch(e) {
     console.error('loadUserData', e);
   }
@@ -271,7 +290,7 @@ async function initAuth() {
       showScreen('screen-home');
     } else {
       console.log('[Auth] no user, showing login screen');
-      db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null };
+      db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, favoriteExercises: {} };
       currentPlanId = null; currentPlanData = null; bannerDismissed = false;
       showScreen('screen-login');
     }
@@ -421,6 +440,7 @@ document.getElementById('btn-reset-confirm').addEventListener('click', async () 
       fStore.doc(userPrefix + 'meta/records'),
       fStore.doc(userPrefix + 'meta/custom_exercises'),
       fStore.doc(userPrefix + 'meta/activeplan'),
+      fStore.doc(userPrefix + 'meta/favorites'),
     ];
 
     // Explicit per-doc safety check: refuse to touch anything outside this user's own subtree.
@@ -440,7 +460,7 @@ document.getElementById('btn-reset-confirm').addEventListener('click', async () 
       await batch.commit();
     }
 
-    db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null };
+    db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, favoriteExercises: {} };
     currentPlanId = null;
     currentPlanData = null;
 
@@ -782,6 +802,22 @@ function renderCategoryBrowser() {
   setExercisesTitle('All Exercises');
   const list = document.getElementById('exercise-list');
   list.innerHTML = '';
+  const hasFavorites = Object.keys(db.favoriteExercises || {}).length > 0;
+  if (hasFavorites) {
+    const item = document.createElement('div');
+    item.className = 'category-item category-item-favorites';
+    item.innerHTML = `
+      <svg class="category-item-fav-star" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+      <span class="category-item-name">Favorites</span>
+    `;
+    item.addEventListener('click', () => {
+      exerciseBrowserMode = 'exercises';
+      currentBrowseCategory = FAVORITES_CATEGORY;
+      setExercisesTitle('Favorites');
+      renderFavoriteExercises();
+    });
+    list.appendChild(item);
+  }
   const cats = [...new Set(allExercises().map(e => e.category))].sort();
   cats.forEach(cat => {
     const item = document.createElement('div');
@@ -893,6 +929,17 @@ function renderExercisesInCategory(cat) {
   exercises.forEach(ex => renderExerciseItem(list, ex));
 }
 
+function renderFavoriteExercises() {
+  const list = document.getElementById('exercise-list');
+  list.innerHTML = '';
+  const favs = allExercises().filter(e => isFavoriteExercise(e.name));
+  if (favs.length === 0) {
+    list.innerHTML = `<div class="exercise-empty">No favorites yet</div>`;
+    return;
+  }
+  favs.forEach(ex => renderExerciseItem(list, ex));
+}
+
 function renderExerciseSearchResults(q) {
   const list = document.getElementById('exercise-list');
   list.innerHTML = '';
@@ -904,23 +951,44 @@ function renderExerciseSearchResults(q) {
   filtered.forEach(ex => renderExerciseItem(list, ex));
 }
 
+function refreshExerciseList() {
+  const q = document.getElementById('exercise-search').value.toLowerCase().trim();
+  if (q) { renderExerciseSearchResults(q); return; }
+  if (exerciseBrowserMode === 'exercises' && currentBrowseCategory === FAVORITES_CATEGORY) {
+    renderFavoriteExercises();
+  } else if (exerciseBrowserMode === 'exercises' && currentBrowseCategory) {
+    renderExercisesInCategory(currentBrowseCategory);
+  } else {
+    renderCategoryBrowser();
+  }
+}
+
 function renderExerciseItem(list, ex) {
   const item = document.createElement('div');
   item.className = 'exercise-item' + (ex.custom ? ' exercise-item-custom' : '');
+  const isFav = isFavoriteExercise(ex.name);
   item.innerHTML = `
     <span class="exercise-item-name">${ex.name}</span>
-    <svg class="exercise-item-info" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+    ${isFav ? `<svg class="exercise-item-fav-star" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>` : ''}
     <svg class="exercise-item-dots" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
   `;
   item.querySelector('.exercise-item-name').addEventListener('click', () => {
     addExerciseToWorkout(ex.name);
     openTraining(ex.name);
   });
-  item.querySelector('.exercise-item-info').addEventListener('click', e => {
+  item.querySelector('.exercise-item-dots').addEventListener('click', e => {
     e.stopPropagation();
-    openExerciseInfo(ex.name, 'screen-exercises');
+    const menuItems = [];
+    if (ex.custom) {
+      menuItems.push({ label: 'Edit', action: () => openEditExerciseScreen(ex) });
+      menuItems.push({ label: 'Delete', action: () => openDeleteExerciseConfirm(ex), danger: true });
+    }
+    menuItems.push({
+      label: isFav ? 'Unfavorite' : 'Favorite',
+      action: () => { toggleFavoriteExercise(ex.name); refreshExerciseList(); }
+    });
+    showOverflowMenu(menuItems, e.currentTarget);
   });
-  item.querySelector('.exercise-item-dots').addEventListener('click', () => toast('Coming soon'));
   list.appendChild(item);
 }
 
@@ -1744,13 +1812,9 @@ function openNewExercise() {
   openOverlay('new-exercise-overlay');
 }
 
-function openNewExerciseScreen() {
-  document.getElementById('new-ex-name').value = '';
-  document.getElementById('new-ex-notes').value = '';
-  document.getElementById('new-ex-type').value = 'weight_reps';
-  document.getElementById('new-ex-weight-unit').value = 'default';
-  document.getElementById('new-ex-cat-input-row').classList.add('hidden');
-  document.getElementById('new-ex-new-cat').value = '';
+let pendingEditExerciseOriginalName = null;
+
+function populateNewExCategorySelect(selected) {
   const sel = document.getElementById('new-ex-category');
   sel.innerHTML = '<option value="">Choose category...</option>';
   [...new Set(allExercises().map(e => e.category))].sort().forEach(c => {
@@ -1758,8 +1822,72 @@ function openNewExerciseScreen() {
     opt.value = c; opt.textContent = c;
     sel.appendChild(opt);
   });
+  if (selected) sel.value = selected;
+}
+
+function openNewExerciseScreen() {
+  pendingEditExerciseOriginalName = null;
+  document.getElementById('new-ex-title').textContent = 'New Exercise';
+  document.getElementById('btn-new-ex-save-add').classList.remove('hidden');
+  document.getElementById('new-ex-name').value = '';
+  document.getElementById('new-ex-notes').value = '';
+  document.getElementById('new-ex-type').value = 'weight_reps';
+  document.getElementById('new-ex-weight-unit').value = 'default';
+  document.getElementById('new-ex-cat-input-row').classList.add('hidden');
+  document.getElementById('new-ex-new-cat').value = '';
+  populateNewExCategorySelect();
   showScreen('screen-new-exercise');
   setTimeout(() => document.getElementById('new-ex-name').focus(), 300);
+}
+
+function openEditExerciseScreen(ex) {
+  pendingEditExerciseOriginalName = ex.name;
+  document.getElementById('new-ex-title').textContent = 'Update Exercise';
+  document.getElementById('btn-new-ex-save-add').classList.add('hidden');
+  document.getElementById('new-ex-name').value = ex.name;
+  document.getElementById('new-ex-notes').value = ex.notes || '';
+  document.getElementById('new-ex-type').value = ex.type || 'weight_reps';
+  document.getElementById('new-ex-weight-unit').value = ex.weightUnit || 'default';
+  document.getElementById('new-ex-cat-input-row').classList.add('hidden');
+  document.getElementById('new-ex-new-cat').value = '';
+  populateNewExCategorySelect(ex.category);
+  showScreen('screen-new-exercise');
+}
+
+// Renames an exercise across every place it's referenced by name: the
+// custom-exercise definition itself, every logged workout, PR records and
+// favorites — name is this app's only stable identifier for an exercise.
+function updateExistingExercise(originalName, updated) {
+  const entry = (db.custom_exercises || []).find(e => e.name === originalName);
+  if (!entry) return;
+  const nameChanged = updated.name !== originalName;
+  entry.category = updated.category;
+  entry.name = updated.name;
+  entry.notes = updated.notes;
+  entry.type = updated.type;
+  entry.weightUnit = updated.weightUnit;
+  persistCustomExercises();
+
+  if (nameChanged) {
+    Object.keys(db.workouts).forEach(date => {
+      const workout = db.workouts[date];
+      const idx = workout.findIndex(e => e.name === originalName);
+      if (idx === -1) return;
+      workout[idx] = { ...workout[idx], name: updated.name };
+      setWorkout(date, workout);
+    });
+    if (db.records && db.records[originalName]) {
+      db.records[updated.name] = db.records[originalName];
+      delete db.records[originalName];
+      persistRecords();
+    }
+    if (db.favoriteExercises && db.favoriteExercises[originalName]) {
+      db.favoriteExercises[updated.name] = true;
+      delete db.favoriteExercises[originalName];
+      persistFavorites();
+    }
+  }
+  toast('Exercise updated');
 }
 
 function saveNewExerciseFromScreen(andAddAnother) {
@@ -1770,6 +1898,21 @@ function saveNewExerciseFromScreen(andAddAnother) {
   const weightUnit = document.getElementById('new-ex-weight-unit').value;
   if (!name) { toast('Enter a name'); return; }
   if (!cat) { toast('Choose a category'); return; }
+
+  if (pendingEditExerciseOriginalName) {
+    const nameTaken = name.toLowerCase() !== pendingEditExerciseOriginalName.toLowerCase()
+      && allExercises().find(e => e.name.toLowerCase() === name.toLowerCase());
+    if (nameTaken) { toast('Exercise already exists'); return; }
+    updateExistingExercise(pendingEditExerciseOriginalName, { category: cat, name, notes, type, weightUnit });
+    pendingEditExerciseOriginalName = null;
+    exerciseBrowserMode = 'categories';
+    currentBrowseCategory = null;
+    setExercisesTitle('All Exercises');
+    renderCategoryBrowser();
+    showScreen('screen-exercises');
+    return;
+  }
+
   if (allExercises().find(e => e.name.toLowerCase() === name.toLowerCase())) { toast('Exercise already exists'); return; }
   if (!db.custom_exercises) db.custom_exercises = [];
   db.custom_exercises.push({ category: cat, name, notes, type, weightUnit });
@@ -1785,6 +1928,45 @@ function saveNewExerciseFromScreen(andAddAnother) {
     showScreen('screen-exercises');
   }
 }
+
+// -- Delete exercise (custom exercises only) -------------
+let pendingDeleteExercise = null;
+
+function openDeleteExerciseConfirm(ex) {
+  pendingDeleteExercise = ex;
+  const workoutCount = Object.values(db.workouts).filter(exercises => exercises.some(e => e.name === ex.name)).length;
+  document.getElementById('delete-ex-msg').innerHTML =
+    `Are you sure you want to delete <strong>${ex.name}</strong>? <strong>${workoutCount} workout${workoutCount !== 1 ? 's' : ''}</strong> recorded for this exercise will also be permanently deleted.`;
+  document.getElementById('delete-ex-confirm-check').checked = false;
+  document.getElementById('btn-delete-ex-confirm').disabled = true;
+  openOverlay('delete-exercise-overlay');
+}
+
+document.getElementById('delete-ex-confirm-check').addEventListener('change', e => {
+  document.getElementById('btn-delete-ex-confirm').disabled = !e.target.checked;
+});
+document.getElementById('btn-delete-ex-cancel').addEventListener('click', () => {
+  pendingDeleteExercise = null;
+  closeOverlay('delete-exercise-overlay');
+});
+document.getElementById('btn-delete-ex-confirm').addEventListener('click', () => {
+  if (!pendingDeleteExercise) return;
+  const name = pendingDeleteExercise.name;
+  db.custom_exercises = (db.custom_exercises || []).filter(e => e.name !== name);
+  persistCustomExercises();
+  Object.keys(db.workouts).forEach(date => {
+    const workout = db.workouts[date];
+    if (!workout.some(e => e.name === name)) return;
+    setWorkout(date, workout.filter(e => e.name !== name));
+  });
+  if (db.records && db.records[name]) { delete db.records[name]; persistRecords(); }
+  if (db.favoriteExercises && db.favoriteExercises[name]) { delete db.favoriteExercises[name]; persistFavorites(); }
+  pendingDeleteExercise = null;
+  closeOverlay('delete-exercise-overlay');
+  refreshExerciseList();
+  renderHome();
+  toast('Exercise deleted');
+});
 
 document.getElementById('btn-new-ex-back').addEventListener('click', () => goBack('screen-exercises'));
 document.getElementById('btn-new-ex-save').addEventListener('click', () => saveNewExerciseFromScreen(false));
@@ -1899,6 +2081,9 @@ document.getElementById('exercise-search').addEventListener('input', e => {
   if (q) {
     renderExerciseSearchResults(q);
     setExercisesTitle('All Exercises');
+  } else if (exerciseBrowserMode === 'exercises' && currentBrowseCategory === FAVORITES_CATEGORY) {
+    renderFavoriteExercises();
+    setExercisesTitle('Favorites');
   } else if (exerciseBrowserMode === 'exercises' && currentBrowseCategory) {
     renderExercisesInCategory(currentBrowseCategory);
     setExercisesTitle(currentBrowseCategory);

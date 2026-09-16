@@ -113,9 +113,10 @@ callClaude(userMessage, sysPrompt) // Anthropic API call voor de AI plan generat
 - **Drag-to-reorder** oefeningen in daglijst (ingedrukt houden → slepen)
 - Leeg-workoutlog-scherm toont nu "Workout Log Empty" + "Start New Workout" (de losse "AI Coach"-tegel hier is vervallen — die functionaliteit zit nu in de globale AI Coach-pil hierboven)
 - **"Start New Workout"** opent niet meer direct "All Exercises", maar eerst het **New Workout-tussenscherm** (`#screen-new-workout`) met drie kaarten: Manual Workout (→ All Exercises, werkt), Load Schedule Manually (TODO) en Load Schedule Automatically (TODO, toont via `getTodaysScheduledDayName()` welke plandag er volgens de bestaande plan-rotatielogica vandaag aan de beurt zou zijn)
-- **Exercise info scherm** (ⓘ bolletje bij elke oefening) — lokale video-animatie waar beschikbaar, spiergroepen en instructies uit free-exercise-db
+- **Exercise info scherm** — lokale video-animatie waar beschikbaar, spiergroepen en instructies uit free-exercise-db. Bereikbaar via het ⓘ-icoon in de training-toolbar (niet meer per oefening in de All Exercises-lijst, dat icoon is verwijderd)
 - **FitNotes-geïnspireerde** visuele stijl (lichtgrijs, cyaan accenten, witte kaarten)
-- **Nieuw oefening aanmaken** scherm (NAME, NOTES, CATEGORY, TYPE, WEIGHT UNIT)
+- **Nieuw oefening aanmaken** scherm (NAME, NOTES, CATEGORY, TYPE, WEIGHT UNIT) — hetzelfde scherm dient ook als **Edit**-formulier voor bestaande custom oefeningen (titel wisselt naar "Update Exercise")
+- **Edit/Delete/Favorite per oefening** via drie puntjes menu in de All Exercises-lijst — Edit/Delete alleen voor zelf toegevoegde (custom) oefeningen, Favorite/Unfavorite voor alle oefeningen (ook built-in). Favorieten krijgen een blauw sterretje en verschijnen gebundeld in een automatische "Favorites"-categorie bovenaan. Delete cascadeert door alle gelogde workouts/records/favorieten voor die oefening
 - **Edit/Delete categorieën** via drie puntjes menu
 - **Selectie modus** met vinkje en vuilnisbak in toolbar bij ingedrukt houden
 - **"Reset to default"** in het drie-puntjes-menu van de Fitness Tracker — tijdelijke knop (blijft staan tot de app verder af is) om alle Firestore-data van het account te wissen en de app terug te zetten naar de standaardstaat. Vereist het typen van "RESET" ter bevestiging. Zie `resetInProgress`/`openResetOverlay` in app.js voor de exacte paden die dit raakt.

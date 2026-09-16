@@ -246,7 +246,7 @@
     <button class="toolbar-btn" id="btn-new-ex-back" aria-label="Back">
       <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
     </button>
-    <span class="toolbar-title">New Exercise</span>
+    <span class="toolbar-title" id="new-ex-title">New Exercise</span>
     <div class="toolbar-actions">
       <button class="toolbar-btn new-ex-saveadd-btn" id="btn-new-ex-save-add" aria-label="Save and add another">✓+</button>
       <button class="toolbar-btn" id="btn-new-ex-save" aria-label="Save">
@@ -648,6 +648,22 @@
     <div class="overlay-btns">
       <button class="btn-secondary" id="btn-cat-edit-cancel">Cancel</button>
       <button class="btn-primary" id="btn-cat-edit-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- DELETE EXERCISE OVERLAY -->
+<div class="overlay" id="delete-exercise-overlay">
+  <div class="overlay-panel">
+    <h3 class="delete-ex-title">Delete Exercise</h3>
+    <p id="delete-ex-msg" class="cat-delete-msg"></p>
+    <label class="delete-ex-check-row">
+      <input type="checkbox" id="delete-ex-confirm-check"/>
+      <span>I understand that this action cannot be undone.</span>
+    </label>
+    <div class="overlay-btns">
+      <button class="btn-secondary" id="btn-delete-ex-cancel">Cancel</button>
+      <button class="btn-danger" id="btn-delete-ex-confirm" disabled>Delete</button>
     </div>
   </div>
 </div>
