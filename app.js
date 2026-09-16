@@ -738,98 +738,9 @@ function setupHomeExDragReorder() {
   container.addEventListener('touchcancel', endDrag, { passive: true });
 }
 
-// -- Exercise Add Dropdown ------------------------------
-function openExerciseDropdown() {
-  const overlay = document.getElementById('exd-overlay');
-  const plansList = document.getElementById('exd-plans-list');
-  const plansLabel = document.getElementById('exd-plans-label');
-
-  document.getElementById('exd-view-main').style.display = '';
-  document.getElementById('exd-view-days').style.display = 'none';
-
-  const plans = Object.values(db.plans).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-  plansList.innerHTML = '';
-  if (plans.length === 0) {
-    plansLabel.style.display = 'none';
-    plansList.innerHTML = '<div class="exd-no-plans">No plans yet</div>';
-  } else {
-    plansLabel.style.display = '';
-    plans.forEach(plan => {
-      const row = document.createElement('div');
-      row.className = 'exd-plan-row';
-      row.innerHTML = `<span class="exd-plan-row-name">${plan.name}</span><svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>`;
-      row.addEventListener('click', () => showPlanDaysInDropdown(plan.id));
-      plansList.appendChild(row);
-    });
-  }
-
-  overlay.classList.add('exd-open');
-}
-
-function closeExerciseDropdown() {
-  document.getElementById('exd-overlay').classList.remove('exd-open');
-}
-
-function showPlanDaysInDropdown(planId) {
-  // When in exercises screen, show plan days inline instead of in overlay
-  if (document.getElementById('screen-exercises').classList.contains('active')) {
-    closeExerciseDropdown();
-    renderPlanDayBrowser(planId);
-    return;
-  }
-  const plan = db.plans[planId];
-  if (!plan) return;
-  document.getElementById('exd-view-main').style.display = 'none';
-  document.getElementById('exd-view-days').style.display = '';
-  document.getElementById('exd-days-title').textContent = plan.name;
-
-  const daysList = document.getElementById('exd-days-list');
-  daysList.innerHTML = '';
-  (plan.days || []).forEach((day, idx) => {
-    const row = document.createElement('div');
-    row.className = 'exd-day-row';
-    row.innerHTML = `<div class="exd-day-num">${idx + 1}</div><span>${day.name}</span>`;
-    row.addEventListener('click', () => {
-      closeExerciseDropdown();
-      loadWorkoutReturnScreen = 'screen-fitness-tracker';
-      openLoadWorkout(planId, idx);
-    });
-    daysList.appendChild(row);
-  });
-}
-
-document.getElementById('exd-overlay').addEventListener('click', e => {
-  if (e.target === document.getElementById('exd-overlay')) closeExerciseDropdown();
-});
-document.getElementById('exd-all-exercises').addEventListener('click', () => {
-  closeExerciseDropdown();
-  if (document.getElementById('screen-exercises').classList.contains('active')) {
-    exerciseBrowserMode = 'categories';
-    currentBrowseCategory = null;
-    currentBrowsePlan = null;
-    document.getElementById('exercise-search').value = '';
-    renderCategoryBrowser();
-  } else {
-    openExerciseList();
-  }
-});
-document.getElementById('exd-create-routine').addEventListener('click', () => {
-  closeExerciseDropdown();
-  openWorkoutPlan();
-});
-document.getElementById('exd-back-btn').addEventListener('click', () => {
-  document.getElementById('exd-view-main').style.display = '';
-  document.getElementById('exd-view-days').style.display = 'none';
-});
-
 // -- Exercise Browser -----------------------------------
-function setExercisesTitle(text, withArrow) {
-  const titleEl = document.getElementById('exercises-title');
-  if (withArrow) {
-    titleEl.innerHTML = `${text} <span class="exercises-title-arrow">▾</span>`;
-  } else {
-    titleEl.textContent = text;
-  }
+function setExercisesTitle(text) {
+  document.getElementById('exercises-title').textContent = text;
 }
 
 // -- New Workout intermediate screen --------------------
@@ -862,13 +773,13 @@ function openExerciseList() {
   currentBrowseCategory = null;
   currentBrowsePlan = null;
   document.getElementById('exercise-search').value = '';
-  setExercisesTitle('All Exercises', true);
+  setExercisesTitle('All Exercises');
   renderCategoryBrowser();
   showScreen('screen-exercises');
 }
 
 function renderCategoryBrowser() {
-  setExercisesTitle('All Exercises', true);
+  setExercisesTitle('All Exercises');
   const list = document.getElementById('exercise-list');
   list.innerHTML = '';
   const cats = [...new Set(allExercises().map(e => e.category))].sort();
@@ -882,7 +793,7 @@ function renderCategoryBrowser() {
     item.querySelector('.category-item-name').addEventListener('click', () => {
       exerciseBrowserMode = 'exercises';
       currentBrowseCategory = cat;
-      setExercisesTitle(cat, false);
+      setExercisesTitle(cat);
       renderExercisesInCategory(cat);
     });
     item.querySelector('.category-item-dots').addEventListener('click', e => {
@@ -901,7 +812,7 @@ function renderPlanDayBrowser(planId) {
   if (!plan) return;
   exerciseBrowserMode = 'plan-days';
   currentBrowsePlan = planId;
-  setExercisesTitle(plan.name, true);
+  setExercisesTitle(plan.name);
   const list = document.getElementById('exercise-list');
   list.innerHTML = '';
   (plan.days || []).forEach((day, idx) => {
@@ -1869,7 +1780,7 @@ function saveNewExerciseFromScreen(andAddAnother) {
   } else {
     exerciseBrowserMode = 'categories';
     currentBrowseCategory = null;
-    setExercisesTitle('All Exercises', true);
+    setExercisesTitle('All Exercises');
     renderCategoryBrowser();
     showScreen('screen-exercises');
   }
@@ -1927,19 +1838,13 @@ document.getElementById('btn-add-exercise').addEventListener('click', openExerci
 document.getElementById('btn-home-sel-done').addEventListener('click', exitHomeSelMode);
 document.getElementById('btn-home-sel-delete').addEventListener('click', deleteHomeSelectedEx);
 setupHomeExDragReorder();
-document.getElementById('exercises-title-btn').addEventListener('click', () => {
-  if (exerciseBrowserMode === 'categories' || exerciseBrowserMode === 'plan-days') {
-    openExerciseDropdown();
-  }
-});
-
 document.getElementById('btn-back-exercises').addEventListener('click', () => {
   if (exerciseBrowserMode === 'exercises' || exerciseBrowserMode === 'plan-days') {
     exerciseBrowserMode = 'categories';
     currentBrowseCategory = null;
     currentBrowsePlan = null;
     document.getElementById('exercise-search').value = '';
-    setExercisesTitle('All Exercises', true);
+    setExercisesTitle('All Exercises');
     renderCategoryBrowser();
   } else {
     goBack('screen-fitness-tracker');
@@ -1993,10 +1898,10 @@ document.getElementById('exercise-search').addEventListener('input', e => {
   const q = e.target.value.toLowerCase().trim();
   if (q) {
     renderExerciseSearchResults(q);
-    setExercisesTitle('All Exercises', false);
+    setExercisesTitle('All Exercises');
   } else if (exerciseBrowserMode === 'exercises' && currentBrowseCategory) {
     renderExercisesInCategory(currentBrowseCategory);
-    setExercisesTitle(currentBrowseCategory, false);
+    setExercisesTitle(currentBrowseCategory);
   } else {
     exerciseBrowserMode = 'categories';
     renderCategoryBrowser();

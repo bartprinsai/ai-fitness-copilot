@@ -115,7 +115,6 @@ callClaude(userMessage, sysPrompt) // Anthropic API call voor de AI plan generat
 - **"Start New Workout"** opent niet meer direct "All Exercises", maar eerst het **New Workout-tussenscherm** (`#screen-new-workout`) met drie kaarten: Manual Workout (→ All Exercises, werkt), Load Schedule Manually (TODO) en Load Schedule Automatically (TODO, toont via `getTodaysScheduledDayName()` welke plandag er volgens de bestaande plan-rotatielogica vandaag aan de beurt zou zijn)
 - **Exercise info scherm** (ⓘ bolletje bij elke oefening) — lokale video-animatie waar beschikbaar, spiergroepen en instructies uit free-exercise-db
 - **FitNotes-geïnspireerde** visuele stijl (lichtgrijs, cyaan accenten, witte kaarten)
-- **Dropdown** in All Exercises toolbar met plannen en "Create New Routine"
 - **Nieuw oefening aanmaken** scherm (NAME, NOTES, CATEGORY, TYPE, WEIGHT UNIT)
 - **Edit/Delete categorieën** via drie puntjes menu
 - **Selectie modus** met vinkje en vuilnisbak in toolbar bij ingedrukt houden

@@ -76,7 +76,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .home-empty-action span { font-size: 14px; color: var(--text-secondary); text-align: center; }
 
 /* ── NEW WORKOUT SCREEN ───────────────────────────────── */
-.new-workout-content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px 16px calc(var(--ai-bar-space) + 16px); display: flex; flex-direction: column; gap: 12px; }
+.new-workout-content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px 16px calc(var(--ai-bar-space) + 16px); display: flex; flex-direction: column; justify-content: center; gap: 12px; }
 .new-workout-card { width: 100%; background: var(--surface); border: none; border-left: 4px solid var(--card-accent); border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.08); display: flex; align-items: center; gap: 14px; padding: 18px 16px; cursor: pointer; font-family: inherit; text-align: left; transition: opacity 0.12s, transform 0.1s; }
 .new-workout-card:active { opacity: 0.75; transform: scale(0.98); }
 .new-workout-card-icon { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -117,9 +117,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .exercise-card-empty { padding: 6px 12px 10px; font-size: 14px; color: var(--text-hint); }
 
 /* ── EXERCISE LIST SCREEN ─────────────────────────────── */
-.toolbar-title-btn { flex: 1; background: none; border: none; color: white; font-family: inherit; font-size: 20px; font-weight: 700; padding: 0 8px; text-align: left; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 6px; }
-.toolbar-title-btn:active { opacity: 0.75; }
-.exercises-title-arrow { font-size: 13px; opacity: 0.75; flex-shrink: 0; }
+.exercises-title-wrap { flex: 1; color: white; font-size: 20px; font-weight: 700; padding: 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .plan-day-badge { width: 24px; height: 24px; border-radius: 50%; background: var(--cyan); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-right: 4px; }
 .category-item-sub { font-size: 12px; color: var(--text-hint); flex-shrink: 0; }
 
@@ -431,30 +429,6 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .sbn-btn:active { filter: brightness(.8); }
 .sbn-skip { background: var(--border); color: var(--text-secondary); }
 .sbn-load { background: var(--cyan-light); color: var(--cyan); }
-
-/* ── EXERCISE ADD DROPDOWN ────────────────────────────── */
-.exd-overlay { position: fixed; inset: 0; z-index: 150; pointer-events: none; }
-.exd-overlay.exd-open { pointer-events: all; }
-.exd-panel { position: absolute; top: calc(var(--toolbar-height) + var(--safe-top) + 4px); left: 8px; right: 8px; background: #1E1E1E; border-radius: 12px; overflow: hidden; max-height: calc(100vh - var(--toolbar-height) - var(--safe-top) - 20px); overflow-y: auto; box-shadow: 0 6px 28px rgba(0,0,0,.7); opacity: 0; transform: translateY(-6px) scale(0.98); transition: opacity 0.18s ease, transform 0.18s ease; pointer-events: none; }
-.exd-overlay.exd-open .exd-panel { opacity: 1; transform: translateY(0) scale(1); pointer-events: all; }
-.exd-item { padding: 16px; color: #fff; cursor: pointer; font-size: 15px; }
-.exd-item:active { background: rgba(255,255,255,.08); }
-.exd-bold { font-weight: 700; }
-.exd-divider { height: 1px; background: #2a2a2a; }
-.exd-plans-label { padding: 10px 16px 4px; font-size: 11px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: .08em; }
-.exd-plan-row { display: flex; align-items: center; padding: 13px 16px; color: #ccc; font-size: 15px; cursor: pointer; gap: 8px; }
-.exd-plan-row:active { background: rgba(255,255,255,.07); }
-.exd-plan-row-name { flex: 1; }
-.exd-plan-row svg { width: 16px; height: 16px; fill: #555; flex-shrink: 0; }
-.exd-no-plans { padding: 10px 16px; font-size: 13px; color: #444; }
-.exd-days-hdr { display: flex; align-items: center; padding: 4px 8px; border-bottom: 1px solid #2a2a2a; }
-.exd-back-btn { width: 44px; height: 44px; border: none; background: none; cursor: pointer; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background .1s; flex-shrink: 0; }
-.exd-back-btn:active { background: rgba(255,255,255,.1); }
-.exd-back-btn svg { width: 20px; height: 20px; fill: #fff; }
-.exd-days-title { font-size: 16px; font-weight: 600; color: #fff; }
-.exd-day-row { display: flex; align-items: center; padding: 13px 16px; color: #ccc; font-size: 15px; cursor: pointer; gap: 12px; }
-.exd-day-row:active { background: rgba(255,255,255,.07); }
-.exd-day-num { width: 24px; height: 24px; border-radius: 50%; background: #7C4DFF; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 
 /* ── PLAN DAY EDIT SCREEN ─────────────────────────────── */
 .pde-hint-txt { padding: 8px 16px; font-size: 12px; color: #444; flex-shrink: 0; }
