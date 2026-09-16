@@ -1071,27 +1071,70 @@ function renderSetList() {
   }
 
   const exRecords = (db.records || {})[currentExercise] || {};
-  list.innerHTML = `
-    <div class="set-list-header">
-      <span></span><span>#</span><span>KG</span><span>REPS</span><span></span>
-    </div>
-  `;
+  list.innerHTML = '';
 
   sets.forEach((s, i) => {
     const isPR = exRecords[String(s.reps)] && parseFloat(s.weight) >= exRecords[String(s.reps)];
+    const hasNote = !!(s.note && s.note.trim());
+    const isSelected = selectedSetIndex === i;
     const row = document.createElement('div');
-    row.className = 'set-row' + (selectedSetIndex === i ? ' selected' : '');
+    row.className = 'set-row' + (isSelected ? ' selected' : '');
     row.innerHTML = `
-      <span class="set-comment"><svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg></span>
+      <span class="set-comment${hasNote ? ' has-note' : ''}" aria-label="Set note"><svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg></span>
+      <span class="set-row-pr">${isPR ? `<svg class="set-pr-icon" viewBox="0 0 24 24"><path d="M12 1L9 9H1l6.5 4.7L5 21l7-5 7 5-2.5-7.3L23 9h-8z"/></svg>` : ''}</span>
       <span class="set-num">${i + 1}</span>
-      <span class="set-weight">${s.weight}</span>
-      <span class="set-reps">${s.reps}${isPR ? `<svg class="set-pr-icon" viewBox="0 0 24 24"><path d="M12 1L9 9H1l6.5 4.7L5 21l7-5 7 5-2.5-7.3L23 9h-8z"/></svg>` : ''}</span>
-      <button class="set-delete" aria-label="Delete set ${i + 1}"><svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
+      <span class="set-weight"><span class="set-weight-val">${s.weight}</span><span class="set-weight-unit">kgs</span></span>
+      <span class="set-reps"><span class="set-reps-val">${s.reps}</span><span class="set-reps-unit">reps</span></span>
+      ${isSelected ? `<button class="set-delete" aria-label="Delete set ${i + 1}"><svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>` : ''}
     `;
-    row.querySelector('.set-delete').addEventListener('click', e => { e.stopPropagation(); deleteSet(i); });
+    row.querySelector('.set-comment').addEventListener('click', e => { e.stopPropagation(); openSetNote(i); });
+    const delBtn = row.querySelector('.set-delete');
+    if (delBtn) delBtn.addEventListener('click', e => { e.stopPropagation(); deleteSet(i); });
     row.addEventListener('click', () => selectSet(i));
     list.appendChild(row);
   });
+}
+
+let noteEditIndex = null;
+
+function openSetNote(i) {
+  const ex = getCurrentExerciseData();
+  if (!ex || !ex.sets[i]) return;
+  noteEditIndex = i;
+  document.getElementById('set-note-input').value = ex.sets[i].note || '';
+  openOverlay('set-note-overlay');
+}
+
+function saveSetNote() {
+  if (noteEditIndex === null) return;
+  const workout = getWorkout(currentDate);
+  const ex = workout.find(e => e.name === currentExercise);
+  if (!ex || !ex.sets[noteEditIndex]) { closeOverlay('set-note-overlay'); return; }
+  const note = document.getElementById('set-note-input').value.trim();
+  if (note) ex.sets[noteEditIndex].note = note;
+  else delete ex.sets[noteEditIndex].note;
+  setWorkout(currentDate, workout);
+  noteEditIndex = null;
+  closeOverlay('set-note-overlay');
+  renderSetList();
+}
+
+function openExerciseRecords() {
+  const list = document.getElementById('records-list');
+  document.getElementById('records-title').textContent = 'Personal Records — ' + (currentExercise || '');
+  const exRecords = (db.records || {})[currentExercise] || {};
+  const reps = Object.keys(exRecords).map(Number).sort((a, b) => a - b);
+  if (reps.length === 0) {
+    list.innerHTML = `<div class="records-empty">No records yet for ${currentExercise}</div>`;
+  } else {
+    list.innerHTML = reps.map(r => `
+      <div class="records-row">
+        <span class="records-row-reps">${r} rep${r === 1 ? '' : 's'}</span>
+        <span class="records-row-weight"><svg viewBox="0 0 24 24"><path d="M12 1L9 9H1l6.5 4.7L5 21l7-5 7 5-2.5-7.3L23 9h-8z"/></svg>${exRecords[r]} kgs</span>
+      </div>
+    `).join('');
+  }
+  openOverlay('records-overlay');
 }
 
 function saveSet() {
@@ -1104,7 +1147,8 @@ function saveSet() {
   if (!ex) { ex = { name: currentExercise, sets: [] }; workout.push(ex); }
 
   if (selectedSetIndex !== null) {
-    ex.sets[selectedSetIndex] = { weight, reps };
+    const existingNote = ex.sets[selectedSetIndex] && ex.sets[selectedSetIndex].note;
+    ex.sets[selectedSetIndex] = existingNote ? { weight, reps, note: existingNote } : { weight, reps };
     selectedSetIndex = null;
     toast('Set updated');
   } else {
@@ -1794,7 +1838,10 @@ document.getElementById('btn-back-training').addEventListener('click', () => goB
 document.getElementById('btn-save-set').addEventListener('click', saveSet);
 document.getElementById('btn-clear').addEventListener('click', clearFields);
 document.getElementById('btn-timer').addEventListener('click', openTimer);
-document.getElementById('btn-training-pr').addEventListener('click', () => toast('Records coming soon'));
+document.getElementById('btn-training-pr').addEventListener('click', openExerciseRecords);
+document.getElementById('btn-records-close').addEventListener('click', () => closeOverlay('records-overlay'));
+document.getElementById('btn-set-note-cancel').addEventListener('click', () => { noteEditIndex = null; closeOverlay('set-note-overlay'); });
+document.getElementById('btn-set-note-save').addEventListener('click', saveSetNote);
 document.getElementById('btn-training-info').addEventListener('click', () => { if (currentExercise) openExerciseInfo(currentExercise, 'screen-training'); });
 document.getElementById('btn-back-exercise-info').addEventListener('click', () => goBack(exerciseInfoReturnScreen));
 document.getElementById('btn-chat-coach').addEventListener('click', () => toast('Coming soon!'));
