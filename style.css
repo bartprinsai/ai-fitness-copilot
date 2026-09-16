@@ -28,10 +28,8 @@
 
 html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-serif; font-size: 16px; color: var(--text-primary); -webkit-font-smoothing: antialiased; overscroll-behavior: none; }
 
-.screen { position: fixed; inset: 0; padding-bottom: var(--ai-bar-space); display: none; flex-direction: column; background: var(--bg); }
+.screen { position: fixed; inset: 0; display: none; flex-direction: column; background: var(--bg); }
 .screen.active { display: flex; }
-#screen-login, #screen-home { padding-bottom: 0; }
-#screen-fitness-tracker.has-day-actions { padding-bottom: calc(var(--ai-bar-space) + var(--day-actions-height)); }
 
 /* ── GLOBAL AI COACH PILL (floating, no bar) ─────────── */
 .global-ai-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; padding-bottom: calc(var(--safe-bottom) + 16px); display: flex; align-items: flex-end; justify-content: center; pointer-events: none; }
@@ -64,12 +62,13 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .day-nav-label { flex: 1; font-size: 12px; font-weight: 700; color: white; text-align: center; text-transform: uppercase; letter-spacing: 0.1em; }
 
 /* ── HOME ─────────────────────────────────────────────── */
-.home-content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; padding-bottom: calc(var(--safe-bottom) + 16px); }
+.home-content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; padding-bottom: calc(var(--ai-bar-space) + 16px); }
+#screen-fitness-tracker.has-day-actions .home-content { padding-bottom: calc(var(--ai-bar-space) + var(--day-actions-height) + 16px); }
 
 .home-empty { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 0 24px; }
 .home-empty-title-wrap { flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; }
 .home-empty-title { font-size: 20px; font-weight: 400; color: var(--text-hint); text-align: center; }
-.home-empty-action { flex: 0 0 auto; width: 120px; display: flex; flex-direction: column; align-items: center; gap: 8px; border: none; background: none; cursor: pointer; font-family: inherit; padding: 8px; margin-bottom: 24px; }
+.home-empty-action { flex: 0 0 auto; width: 120px; display: flex; flex-direction: column; align-items: center; gap: 8px; border: none; background: none; cursor: pointer; font-family: inherit; padding: 8px; margin-bottom: var(--ai-bar-space); }
 .home-empty-action:active { opacity: 0.7; }
 .home-empty-action svg { width: 48px; height: 48px; fill: var(--cyan); }
 .home-empty-action span { font-size: 14px; color: var(--text-secondary); text-align: center; }
@@ -117,7 +116,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .search-bar input { flex: 1; border: none; outline: none; font-family: inherit; font-size: 16px; color: var(--text-primary); background: transparent; }
 .search-bar input::placeholder { color: var(--text-hint); }
 
-.exercise-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; background: var(--bg); }
+.exercise-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; background: var(--bg); padding-bottom: var(--ai-bar-space); }
 
 .category-item { display: flex; align-items: center; padding: 18px 16px; border-bottom: 1px solid var(--border); font-size: 16px; color: var(--text-primary); cursor: pointer; background: var(--surface); transition: background 0.08s; }
 .category-item:active { background: #f5f5f5; }
@@ -159,7 +158,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .btn-clear:active { background: #1565c0; }
 
 /* ── SET LIST ─────────────────────────────────────────── */
-.set-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; background: var(--surface); }
+.set-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; background: var(--surface); padding-bottom: var(--ai-bar-space); }
 .set-row { display: grid; grid-template-columns: 28px 20px 32px 1fr 1fr; padding: 13px 8px; border-bottom: 1px solid var(--border); background: var(--surface); cursor: pointer; transition: background 0.08s; align-items: center; }
 .set-row.selected { grid-template-columns: 28px 20px 32px 1fr 1fr 40px; }
 .set-row:active, .set-row.selected { background: var(--cyan-light); }
@@ -178,7 +177,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .set-delete svg { width: 18px; height: 18px; fill: currentColor; }
 
 /* ── HISTORY TAB ──────────────────────────────────────── */
-.history-content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.history-content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: var(--ai-bar-space); }
 .history-day-header { padding: 12px 16px 6px; }
 .history-day-date { font-size: 12px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 5px; }
 .history-day-divider { height: 2px; background: var(--cyan); }
@@ -236,7 +235,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 
 /* ── CALENDAR ─────────────────────────────────────────── */
 .cal-grid-header { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 11px; font-weight: 700; color: var(--text-hint); padding: 6px 0 4px; text-transform: uppercase; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0; }
-.cal-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; background: var(--bg); }
+.cal-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; background: var(--bg); padding-bottom: var(--ai-bar-space); }
 .cal-month-header { padding: 16px 16px 4px; font-size: 13px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .06em; }
 .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; padding: 4px 12px; }
 .cal-day { aspect-ratio: 1; border: none; background: none; font-family: inherit; font-size: 14px; color: var(--text-primary); cursor: pointer; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.12s; position: relative; }
@@ -248,7 +247,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .cal-day.selected::after { background: rgba(255,255,255,.7); }
 .cal-day.empty { pointer-events: none; color: transparent; }
 
-.cal-footer { display: flex; align-items: center; background: var(--daynav); padding: 0 4px calc(var(--safe-bottom)); height: calc(46px + var(--safe-bottom)); flex-shrink: 0; border-top: 2px solid var(--cyan); }
+.cal-footer { display: flex; align-items: center; background: var(--daynav); padding: 0 4px calc(var(--safe-bottom)); height: calc(46px + var(--safe-bottom)); flex-shrink: 0; border-top: 2px solid var(--cyan); margin-bottom: var(--ai-bar-space); }
 
 /* ── CALENDAR WORKOUT DETAIL POPUP ────────────────────── */
 .cal-detail-panel { max-height: 78vh; }
@@ -343,7 +342,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .plan-create-ai-btn { border-color: rgba(124,77,255,.3); color: #9d7dff; }
 
 .plan-list-label { padding: 6px 16px 4px; font-size: 11px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: .08em; flex-shrink: 0; }
-.plan-list-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 4px 12px 16px; }
+.plan-list-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 4px 12px calc(var(--ai-bar-space) + 16px); }
 .plan-list-empty { text-align: center; color: #444; padding: 32px 16px; font-size: 14px; }
 
 .plan-item { display: flex; align-items: center; background: #1E1E1E; border-radius: 14px; padding: 14px; margin-bottom: 10px; gap: 10px; cursor: pointer; transition: background .1s; }
@@ -358,7 +357,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 
 .plan-active-ribbon { padding: 6px 16px; font-size: 11px; font-weight: 700; color: #7C4DFF; background: rgba(124,77,255,.1); letter-spacing: .06em; flex-shrink: 0; display: none; }
 .plan-active-ribbon.show { display: block; }
-.plan-detail-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 8px 12px 24px; }
+.plan-detail-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 8px 12px calc(var(--ai-bar-space) + 24px); }
 .plan-day-card { background: #1E1E1E; border-radius: 14px; margin-bottom: 12px; overflow: hidden; }
 .plan-day-header { display: flex; align-items: center; padding: 14px 14px 10px; gap: 10px; }
 .plan-day-num { width: 28px; height: 28px; border-radius: 50%; background: #7C4DFF; color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -371,7 +370,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .plan-day-ex-sets { font-size: 12px; color: #555; flex-shrink: 0; }
 
 /* ── AI GENERATE FORM ─────────────────────────────────── */
-.ai-gen-form { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px; display: flex; flex-direction: column; gap: 20px; }
+.ai-gen-form { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px 16px calc(var(--ai-bar-space) + 16px); display: flex; flex-direction: column; gap: 20px; }
 .ai-gen-section { display: flex; flex-direction: column; gap: 10px; }
 .ai-gen-label { font-size: 11px; font-weight: 700; color: #666; text-transform: uppercase; letter-spacing: .08em; }
 .chip-group { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -394,7 +393,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 
 /* ── LOAD WORKOUT SCREEN ──────────────────────────────── */
 .lw-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 10px 12px; }
-.lw-footer { padding: 12px 16px calc(var(--safe-bottom) + 12px); background: var(--surface); border-top: 1px solid var(--border); flex-shrink: 0; }
+.lw-footer { padding: 12px 16px calc(var(--safe-bottom) + 12px); background: var(--surface); border-top: 1px solid var(--border); flex-shrink: 0; margin-bottom: var(--ai-bar-space); }
 .lw-load-btn { width: 100%; padding: 16px; border: none; border-radius: 14px; background: var(--cyan); color: #fff; font-family: inherit; font-size: 16px; font-weight: 700; cursor: pointer; transition: filter .1s; }
 .lw-load-btn:active { filter: brightness(.85); }
 
@@ -447,7 +446,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 
 /* ── PLAN DAY EDIT SCREEN ─────────────────────────────── */
 .pde-hint-txt { padding: 8px 16px; font-size: 12px; color: #444; flex-shrink: 0; }
-.pde-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 4px 12px 24px; display: flex; flex-direction: column; gap: 2px; }
+.pde-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 4px 12px calc(var(--ai-bar-space) + 24px); display: flex; flex-direction: column; gap: 2px; }
 .pde-item { position: relative; border-radius: 10px; overflow: hidden; flex-shrink: 0; }
 .pde-item-inner { display: flex; align-items: center; background: #1E1E1E; border-radius: 10px; padding: 12px 4px 12px 14px; position: relative; z-index: 1; will-change: transform; }
 .pde-item.pde-dragging .pde-item-inner { box-shadow: 0 8px 28px rgba(0,0,0,.65); background: #272727; transform: scale(1.015); }
@@ -484,7 +483,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .dropdown-item-danger { color: #d32f2f; }
 
 /* ── NEW EXERCISE SCREEN ──────────────────────────────── */
-.new-ex-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.new-ex-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: var(--ai-bar-space); }
 .new-ex-section { padding: 16px 16px 0; border-bottom: 1px solid var(--border); background: var(--surface); }
 .new-ex-section:last-child { border-bottom: none; padding-bottom: 16px; }
 .new-ex-label { font-size: 11px; font-weight: 700; color: var(--text-secondary); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 10px; }
@@ -505,7 +504,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .new-ex-saveadd-btn { font-size: 16px; font-weight: 700; letter-spacing: -1px; }
 
 /* ── EXERCISE INFO SCREEN ─────────────────────────────── */
-.ei-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 12px; display: flex; flex-direction: column; gap: 12px; padding-bottom: calc(var(--safe-bottom) + 20px); }
+.ei-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 12px; display: flex; flex-direction: column; gap: 12px; padding-bottom: calc(var(--ai-bar-space) + 20px); }
 .ei-card { background: var(--surface); border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
 .ei-section-title { font-size: 11px; font-weight: 700; color: var(--cyan); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 12px; }
 .ei-gif-wrapper { display: flex; align-items: center; justify-content: center; min-height: 160px; }
