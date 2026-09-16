@@ -449,24 +449,15 @@ function renderHome() {
   if (exercises.length === 0) {
     container.innerHTML = `
       <div class="home-empty">
-        <div class="home-empty-middle">
+        <div class="home-empty-group">
           <span class="home-empty-title">Workout Log Empty</span>
-        </div>
-        <div class="home-empty-actions">
           <button class="home-empty-action" id="btn-start-new">
             <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
             <span>Start New Workout</span>
           </button>
-          <button class="home-empty-action ai-coach-tile" id="btn-ai-coach-tile">
-            <svg viewBox="0 0 24 24"><path d="M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25zm-7.5.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12zM19 15l-1.25 2.75L15 19l2.75 1.25L19 23l1.25-2.75L23 19l-2.75-1.25z"/></svg>
-            <span>AI Coach</span>
-          </button>
         </div>
       </div>`;
     document.getElementById('btn-start-new').addEventListener('click', openExerciseList);
-    document.getElementById('btn-ai-coach-tile').addEventListener('click', () => {
-      // TODO: link to the Chat Coach screen once it's built
-    });
     return;
   }
 
@@ -1836,7 +1827,9 @@ document.getElementById('btn-set-note-cancel').addEventListener('click', () => {
 document.getElementById('btn-set-note-save').addEventListener('click', saveSetNote);
 document.getElementById('btn-training-info').addEventListener('click', () => { if (currentExercise) openExerciseInfo(currentExercise, 'screen-training'); });
 document.getElementById('btn-back-exercise-info').addEventListener('click', () => goBack(exerciseInfoReturnScreen));
-document.getElementById('btn-chat-coach').addEventListener('click', () => toast('Coming soon!'));
+document.getElementById('btn-global-ai-coach').addEventListener('click', () => {
+  // TODO: link to the Chat Coach screen once it's built
+});
 
 document.getElementById('exercise-search').addEventListener('input', e => {
   const q = e.target.value.toLowerCase().trim();

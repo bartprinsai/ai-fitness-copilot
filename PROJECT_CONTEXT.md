@@ -107,11 +107,11 @@ callClaude(userMessage, sysPrompt) // Anthropic API call voor de AI plan generat
 - Geschiedenis en grafieken, PR-detectie
 - PWA installeerbaar op telefoon
 - **Hoofdmenu** met 4 secties: Fitness Tracker, Workout Plan Builder, Nutrition (coming soon), Progress (coming soon)
-- **Chat Coach**-knop in Fitness Tracker (scherm/logica nog niet gebouwd, toont "Coming soon!")
+- **Globale "AI Coach"-balk** onderaan op elk scherm in de app (pil-knop, groen, sparkle-icoon) — scherm/logica nog niet gebouwd, klik-handler is een lege TODO in `app.js` (`btn-global-ai-coach`)
 - **Workout Plan Builder** met presets (Push Pull Legs, Upper Lower), AI generator, koppeling aan Fitness Tracker
 - **Multi-select modus** voor meerdere oefeningen tegelijk verwijderen
 - **Drag-to-reorder** oefeningen in daglijst (ingedrukt houden → slepen)
-- **"AI Coach"-tegel** naast "Start New Workout" in het lege-workoutlog-scherm (placeholder, linkt nog nergens naartoe — komt bij het bouwen van Chat Coach)
+- Leeg-workoutlog-scherm toont nu alleen "Workout Log Empty" + "Start New Workout" gecentreerd (de losse "AI Coach"-tegel hier is vervallen — die functionaliteit zit nu in de globale AI Coach-balk hierboven)
 - **Exercise info scherm** (ⓘ bolletje bij elke oefening) — lokale video-animatie waar beschikbaar, spiergroepen en instructies uit free-exercise-db
 - **FitNotes-geïnspireerde** visuele stijl (lichtgrijs, cyaan accenten, witte kaarten)
 - **Dropdown** in All Exercises toolbar met plannen en "Create New Routine"
@@ -138,7 +138,7 @@ callClaude(userMessage, sysPrompt) // Anthropic API call voor de AI plan generat
 ---
 
 ## Volgende stappen
-1. Chat Coach activeren in Fitness Tracker
+1. Chat Coach activeren (koppelen aan de globale AI Coach-balk)
 2. Nutrition sectie bouwen
 3. Progress sectie bouwen
 4. Meer lokale video-animaties toevoegen voor oefeningen die er nog geen hebben

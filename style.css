@@ -15,15 +15,26 @@
   --blue-btn: #2196f3;
   --gray-btn: #e0e0e0;
   --color-ai-coach-accent: #22c55e;
+  --color-ai-coach-bg: #e8f9ee;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --toolbar-height: 56px;
+  --ai-bar-height: 64px;
+  --ai-bar-space: calc(var(--ai-bar-height) + var(--safe-bottom));
 }
 
 html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-serif; font-size: 16px; color: var(--text-primary); -webkit-font-smoothing: antialiased; overscroll-behavior: none; }
 
-.screen { position: fixed; inset: 0; display: none; flex-direction: column; background: var(--bg); }
+.screen { position: fixed; top: 0; left: 0; right: 0; bottom: var(--ai-bar-space); display: none; flex-direction: column; background: var(--bg); }
 .screen.active { display: flex; }
+#screen-login { bottom: 0; }
+
+/* ── GLOBAL AI COACH BAR ──────────────────────────────── */
+.global-ai-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; height: var(--ai-bar-height); padding-bottom: var(--safe-bottom); box-sizing: border-box; background: var(--surface); border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: center; }
+#screen-login.active ~ .global-ai-bar { display: none; }
+.global-ai-bar-pill { display: flex; align-items: center; gap: 8px; border: none; border-radius: 999px; background: var(--color-ai-coach-bg); color: var(--color-ai-coach-accent); font-family: inherit; font-size: 14px; font-weight: 700; padding: 12px 28px; cursor: pointer; transition: background 0.12s; }
+.global-ai-bar-pill:active { background: #d5f2e0; }
+.global-ai-bar-pill svg { width: 18px; height: 18px; fill: var(--color-ai-coach-accent); flex-shrink: 0; }
 
 /* ── TOOLBAR ──────────────────────────────────────────── */
 .toolbar { height: calc(var(--toolbar-height) + var(--safe-top)); padding-top: var(--safe-top); background: var(--toolbar); color: white; display: flex; align-items: center; padding-left: 4px; padding-right: 4px; flex-shrink: 0; box-shadow: 0 2px 4px rgba(0,0,0,.4); z-index: 10; }
@@ -44,15 +55,13 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 /* ── HOME ─────────────────────────────────────────────── */
 .home-content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; padding-bottom: calc(var(--safe-bottom) + 16px); }
 
-.home-empty { flex: 1; display: flex; flex-direction: column; align-items: center; }
-.home-empty-middle { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.home-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.home-empty-group { display: flex; flex-direction: column; align-items: center; gap: 28px; padding: 24px; }
 .home-empty-title { font-size: 20px; font-weight: 400; color: var(--text-hint); text-align: center; }
-.home-empty-actions { width: 100%; padding-bottom: 48px; display: flex; flex-direction: row; justify-content: center; align-items: flex-start; gap: 40px; }
 .home-empty-action { flex: 0 0 auto; width: 120px; display: flex; flex-direction: column; align-items: center; gap: 8px; border: none; background: none; cursor: pointer; font-family: inherit; padding: 8px; }
 .home-empty-action:active { opacity: 0.7; }
 .home-empty-action svg { width: 48px; height: 48px; fill: var(--cyan); }
 .home-empty-action span { font-size: 14px; color: var(--text-secondary); text-align: center; }
-.home-empty-action.ai-coach-tile svg { fill: var(--color-ai-coach-accent); }
 
 /* ── HOME SELECTION MODE ──────────────────────────────── */
 .sel-only { display: none !important; }
@@ -114,12 +123,6 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 
 .tab-content { display: none; flex: 1; overflow-y: auto; flex-direction: column; }
 .tab-content.active { display: flex; }
-
-/* ── TRAINING COACH BAR ───────────────────────────────── */
-.training-coach-bar { display: flex; gap: 10px; padding: 10px 12px calc(var(--safe-bottom) + 10px); background: var(--bg); border-top: 1px solid var(--border); flex-shrink: 0; }
-.coach-btn { flex: 1; padding: 15px 8px; border: none; border-radius: 10px; color: #fff; font-family: inherit; font-size: 15px; font-weight: 700; cursor: pointer; letter-spacing: .04em; transition: filter .1s; }
-.coach-btn:active { filter: brightness(.85); }
-.coach-btn-chat { background: #546e7a; }
 
 /* ── SET FIELDS ───────────────────────────────────────── */
 .set-fields { background: var(--surface); display: flex; flex-direction: column; flex-shrink: 0; box-shadow: 0 2px 4px rgba(0,0,0,.1); }
