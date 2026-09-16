@@ -18,8 +18,6 @@
   --color-ai-coach-gradient-start: #4ade80;
   --color-ai-coach-gradient-end: #16a34a;
   --color-ai-coach-glow: rgba(34,197,94,0.35);
-  --ai-bar-bg: #141414;
-  --ai-bar-border: #2a2a2a;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --toolbar-height: 56px;
@@ -30,22 +28,22 @@
 
 html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-serif; font-size: 16px; color: var(--text-primary); -webkit-font-smoothing: antialiased; overscroll-behavior: none; }
 
-.screen { position: fixed; top: 0; left: 0; right: 0; bottom: var(--ai-bar-space); display: none; flex-direction: column; background: var(--bg); }
+.screen { position: fixed; inset: 0; padding-bottom: var(--ai-bar-space); display: none; flex-direction: column; background: var(--bg); }
 .screen.active { display: flex; }
-#screen-login, #screen-home { bottom: 0; }
-#screen-fitness-tracker.has-day-actions { bottom: calc(var(--ai-bar-space) + var(--day-actions-height)); }
+#screen-login, #screen-home { padding-bottom: 0; }
+#screen-fitness-tracker.has-day-actions { padding-bottom: calc(var(--ai-bar-space) + var(--day-actions-height)); }
 
-/* ── GLOBAL AI COACH BAR ──────────────────────────────── */
-.global-ai-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; height: var(--ai-bar-height); padding-bottom: var(--safe-bottom); box-sizing: border-box; background: var(--ai-bar-bg); border-top: 1px solid var(--ai-bar-border); display: flex; align-items: center; justify-content: center; }
+/* ── GLOBAL AI COACH PILL (floating, no bar) ─────────── */
+.global-ai-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; padding-bottom: calc(var(--safe-bottom) + 16px); display: flex; align-items: flex-end; justify-content: center; pointer-events: none; }
 #screen-login.active ~ .global-ai-bar, #screen-home.active ~ .global-ai-bar { display: none; }
-.global-ai-bar-pill { display: flex; align-items: center; gap: 8px; border: none; border-radius: 22px; background: linear-gradient(135deg, var(--color-ai-coach-gradient-start), var(--color-ai-coach-gradient-end)); color: #fff; font-family: inherit; font-size: 14px; font-weight: 700; padding: 12px 28px; cursor: pointer; box-shadow: 0 3px 10px var(--color-ai-coach-glow); transition: transform 0.08s, box-shadow 0.12s; }
-.global-ai-bar-pill:active { transform: scale(0.97); box-shadow: 0 2px 6px var(--color-ai-coach-glow); }
+.global-ai-bar-pill { pointer-events: auto; display: flex; align-items: center; gap: 8px; border: none; border-radius: 22px; background: linear-gradient(135deg, var(--color-ai-coach-gradient-start), var(--color-ai-coach-gradient-end)); color: #fff; font-family: inherit; font-size: 14px; font-weight: 700; padding: 12px 28px; cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,.25), 0 3px 10px var(--color-ai-coach-glow); transition: transform 0.08s, box-shadow 0.12s; }
+.global-ai-bar-pill:active { transform: scale(0.97); box-shadow: 0 2px 8px rgba(0,0,0,.25), 0 2px 6px var(--color-ai-coach-glow); }
 
-/* ── DAY ACTIONS ROW (Recap / Comment) ───────────────── */
-.day-actions-row { position: fixed; left: 0; right: 0; bottom: var(--ai-bar-space); height: var(--day-actions-height); z-index: 55; box-sizing: border-box; background: var(--surface); border-top: 1px solid var(--border); display: none; align-items: center; justify-content: center; gap: 12px; padding: 0 16px; }
+/* ── DAY ACTIONS PILLS (floating, no bar — Recap / Comment) ── */
+.day-actions-row { position: fixed; left: 0; right: 0; bottom: var(--ai-bar-space); z-index: 55; padding-bottom: 12px; display: none; align-items: flex-end; justify-content: center; gap: 12px; pointer-events: none; }
 #screen-fitness-tracker.active.has-day-actions ~ .day-actions-row { display: flex; }
-.day-action-pill { display: flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text-primary); font-family: inherit; font-size: 14px; font-weight: 700; padding: 9px 20px; cursor: pointer; }
-.day-action-pill:active { background: var(--bg); }
+.day-action-pill { pointer-events: auto; display: flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text-primary); font-family: inherit; font-size: 14px; font-weight: 700; padding: 9px 20px; cursor: pointer; box-shadow: 0 3px 10px rgba(0,0,0,.15); transition: transform 0.08s, box-shadow 0.12s; }
+.day-action-pill:active { background: var(--bg); transform: scale(0.97); }
 .day-action-pill svg { width: 16px; height: 16px; fill: var(--text-secondary); flex-shrink: 0; }
 .global-ai-bar-pill svg { width: 18px; height: 18px; fill: #fff; flex-shrink: 0; }
 
@@ -69,8 +67,9 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .home-content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; padding-bottom: calc(var(--safe-bottom) + 16px); }
 
 .home-empty { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 0 24px; }
-.home-empty-title { font-size: 20px; font-weight: 400; color: var(--text-hint); text-align: center; padding-top: 72px; }
-.home-empty-action { flex: 0 0 auto; width: 120px; display: flex; flex-direction: column; align-items: center; gap: 8px; border: none; background: none; cursor: pointer; font-family: inherit; padding: 8px; margin-top: auto; margin-bottom: 40px; }
+.home-empty-title-wrap { flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; }
+.home-empty-title { font-size: 20px; font-weight: 400; color: var(--text-hint); text-align: center; }
+.home-empty-action { flex: 0 0 auto; width: 120px; display: flex; flex-direction: column; align-items: center; gap: 8px; border: none; background: none; cursor: pointer; font-family: inherit; padding: 8px; margin-bottom: 24px; }
 .home-empty-action:active { opacity: 0.7; }
 .home-empty-action svg { width: 48px; height: 48px; fill: var(--cyan); }
 .home-empty-action span { font-size: 14px; color: var(--text-secondary); text-align: center; }
