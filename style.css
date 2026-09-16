@@ -199,8 +199,10 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .btn-secondary:active { background: var(--border); }
 
 /* ── CALENDAR ─────────────────────────────────────────── */
-.cal-grid-header { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 11px; font-weight: 700; color: var(--text-hint); padding: 6px 0 4px; text-transform: uppercase; }
-.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; padding: 4px 0; }
+.cal-grid-header { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 11px; font-weight: 700; color: var(--text-hint); padding: 6px 0 4px; text-transform: uppercase; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.cal-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; background: var(--bg); }
+.cal-month-header { padding: 16px 16px 4px; font-size: 13px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .06em; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; padding: 4px 12px; }
 .cal-day { aspect-ratio: 1; border: none; background: none; font-family: inherit; font-size: 14px; color: var(--text-primary); cursor: pointer; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.12s; position: relative; }
 .cal-day:active { background: var(--cyan-light); }
 .cal-day.has-workout { font-weight: 700; color: var(--cyan); }
@@ -209,7 +211,16 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .cal-day.selected { background: var(--cyan); color: white; }
 .cal-day.selected::after { background: rgba(255,255,255,.7); }
 .cal-day.empty { pointer-events: none; color: transparent; }
-#cal-month-label { font-size: 16px; font-weight: 500; color: var(--text-primary); }
+
+.cal-footer { display: flex; align-items: center; background: var(--daynav); padding: 0 4px calc(var(--safe-bottom)); height: calc(46px + var(--safe-bottom)); flex-shrink: 0; border-top: 2px solid var(--cyan); }
+
+/* ── CALENDAR WORKOUT DETAIL POPUP ────────────────────── */
+.cal-detail-panel { max-height: 78vh; }
+.cal-detail-panel .cal-detail-date { font-size: 18px; font-weight: 700; color: var(--cyan); flex-shrink: 0; }
+.cal-detail-body { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; }
+.cal-detail-ex { padding-top: 12px; }
+.cal-detail-ex:first-child { padding-top: 0; }
+.cal-detail-ex-name { font-size: 15px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }
 
 /* ── TIMER ────────────────────────────────────────────── */
 .timer-panel { align-items: center; text-align: center; gap: 20px; }

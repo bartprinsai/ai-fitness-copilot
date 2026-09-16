@@ -157,6 +157,34 @@
   <div class="home-content" id="home-content"></div>
 </div>
 
+<!-- CALENDAR SCREEN -->
+<div id="screen-calendar" class="screen">
+  <div class="toolbar">
+    <button class="toolbar-btn" id="btn-cal-back" aria-label="Back">
+      <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </button>
+    <span class="toolbar-title">Calendar</span>
+    <div class="toolbar-actions">
+      <button class="toolbar-btn" id="btn-cal-today" aria-label="Go to today">
+        <svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="cal-grid-header">
+    <span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span><span>Su</span>
+  </div>
+  <div class="cal-scroll" id="cal-scroll"></div>
+  <div class="cal-footer" id="cal-footer">
+    <button class="day-nav-btn" id="cal-prev-workout" aria-label="Previous workout">
+      <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+    </button>
+    <span class="day-nav-label" id="cal-workout-count"></span>
+    <button class="day-nav-btn" id="cal-next-workout" aria-label="Next workout">
+      <svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+    </button>
+  </div>
+</div>
+
 <!-- EXERCISE ADD DROPDOWN -->
 <div id="exd-overlay" class="exd-overlay">
   <div class="exd-panel" id="exd-panel">
@@ -560,23 +588,15 @@
   </div>
 </div>
 
-<!-- CALENDAR OVERLAY -->
-<div class="overlay" id="calendar-overlay">
-  <div class="overlay-panel">
-    <div class="overlay-header">
-      <button class="icon-btn" id="cal-prev-month">
-        <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
-      </button>
-      <span id="cal-month-label"></span>
-      <button class="icon-btn" id="cal-next-month">
-        <svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
-      </button>
+<!-- CALENDAR WORKOUT DETAIL OVERLAY -->
+<div class="overlay" id="cal-detail-overlay">
+  <div class="overlay-panel cal-detail-panel">
+    <h3 class="cal-detail-date" id="cal-detail-date"></h3>
+    <div class="cal-detail-body" id="cal-detail-body"></div>
+    <div class="overlay-btns">
+      <button class="btn-secondary" id="cal-detail-cancel">Cancel</button>
+      <button class="btn-primary" id="cal-detail-goto">Go To</button>
     </div>
-    <div class="cal-grid-header">
-      <span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span><span>Su</span>
-    </div>
-    <div class="cal-grid" id="cal-grid"></div>
-    <button class="btn-text" id="cal-close">Close</button>
   </div>
 </div>
 

@@ -136,7 +136,11 @@ let timerRemaining = 90;
 let timerRunning = false;
 let currentGraph = 'max-weight';
 let currentTimeRange = 'all';
-let calMonth = new Date();
+let calLoadedMonths = []; // ascending {year, month} entries currently rendered in the calendar scroller
+let calSelectedDate = null;
+let calWorkoutDates = []; // ascending date strings that have a logged workout, cached while the calendar screen is open
+let calDetailDate = null;
+let calScrollLock = false;
 let exerciseBrowserMode = 'categories';
 let currentBrowseCategory = null;
 let currentEditDayIndex = null;
@@ -1402,26 +1406,35 @@ document.getElementById('btn-timer-cancel').addEventListener('click', () => {
   clearInterval(timerInterval); timerRunning = false; closeOverlay('timer-overlay');
 });
 
-// -- Calendar -------------------------------------------
-function openCalendar() {
-  calMonth = new Date(currentDate + 'T12:00:00');
-  calMonth.setDate(1);
-  renderCalendar();
-  openOverlay('calendar-overlay');
-}
+// -- Calendar ---------------------------------------------
+// A continuously scrollable list of months (screen-calendar). Months are
+// lazy-loaded a few at a time as the user nears the top/bottom of the
+// currently rendered range, so opening the screen never has to build more
+// than a handful of months up front regardless of how much workout history
+// exists.
+const calScrollEl = () => document.getElementById('cal-scroll');
+const CAL_BATCH = 3; // months to load per lazy-load step
+const CAL_LOAD_THRESHOLD = 400; // px from an edge that triggers loading more
 
-function renderCalendar() {
-  const label = calMonth.toLocaleDateString('en-GB', { month:'long', year:'numeric' });
-  document.getElementById('cal-month-label').textContent = label.charAt(0).toUpperCase() + label.slice(1);
+function calMonthKey(y, m) { return y * 12 + m; }
+function calHasWorkout(dateStr) { return !!(db.workouts[dateStr] && db.workouts[dateStr].length > 0); }
 
-  const grid = document.getElementById('cal-grid');
-  grid.innerHTML = '';
+function calBuildMonthEl(year, month) {
+  const wrap = document.createElement('div');
+  wrap.className = 'cal-month';
+  wrap.dataset.ym = `${year}-${String(month + 1).padStart(2, '0')}`;
 
-  const year = calMonth.getFullYear();
-  const month = calMonth.getMonth();
+  const label = new Date(year, month, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  const hdr = document.createElement('div');
+  hdr.className = 'cal-month-header';
+  hdr.textContent = label;
+  wrap.appendChild(hdr);
+
+  const grid = document.createElement('div');
+  grid.className = 'cal-grid';
+
   let startDow = new Date(year, month, 1).getDay();
   startDow = startDow === 0 ? 6 : startDow - 1;
-
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const today = todayStr();
 
@@ -1432,22 +1445,223 @@ function renderCalendar() {
   }
 
   for (let d = 1; d <= daysInMonth; d++) {
-    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const hasWorkout = db.workouts[dateStr] && db.workouts[dateStr].length > 0;
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     const el = document.createElement('button');
     el.className = 'cal-day' +
-      (hasWorkout ? ' has-workout' : '') +
+      (calHasWorkout(dateStr) ? ' has-workout' : '') +
       (dateStr === today ? ' today' : '') +
-      (dateStr === currentDate ? ' selected' : '');
+      (dateStr === calSelectedDate ? ' selected' : '');
     el.textContent = d;
-    el.addEventListener('click', () => { currentDate = dateStr; renderHome(); closeOverlay('calendar-overlay'); });
+    el.dataset.date = dateStr;
+    el.addEventListener('click', () => calDayClick(dateStr));
     grid.appendChild(el);
+  }
+
+  wrap.appendChild(grid);
+  return wrap;
+}
+
+function calDayClick(dateStr) {
+  calSetSelected(dateStr);
+  if (calHasWorkout(dateStr)) {
+    openWorkoutDetail(dateStr);
+  } else {
+    currentDate = dateStr;
+    goBack('screen-fitness-tracker');
   }
 }
 
-document.getElementById('cal-prev-month').addEventListener('click', () => { calMonth.setMonth(calMonth.getMonth() - 1); renderCalendar(); });
-document.getElementById('cal-next-month').addEventListener('click', () => { calMonth.setMonth(calMonth.getMonth() + 1); renderCalendar(); });
-document.getElementById('cal-close').addEventListener('click', () => closeOverlay('calendar-overlay'));
+function calSetSelected(dateStr) {
+  if (calSelectedDate) {
+    const prev = calScrollEl().querySelector(`.cal-day[data-date="${calSelectedDate}"]`);
+    if (prev) prev.classList.remove('selected');
+  }
+  calSelectedDate = dateStr;
+  const next = calScrollEl().querySelector(`.cal-day[data-date="${dateStr}"]`);
+  if (next) next.classList.add('selected');
+}
+
+// Extends the loaded range (one month at a time) until it covers (y, m).
+function calEnsureMonthLoaded(y, m) {
+  const targetKey = calMonthKey(y, m);
+  while (calLoadedMonths.length && targetKey < calMonthKey(calLoadedMonths[0].year, calLoadedMonths[0].month)) {
+    const f = calLoadedMonths[0];
+    const d = new Date(f.year, f.month - 1, 1);
+    const nm = { year: d.getFullYear(), month: d.getMonth() };
+    calScrollEl().insertBefore(calBuildMonthEl(nm.year, nm.month), calScrollEl().firstChild);
+    calLoadedMonths.unshift(nm);
+  }
+  while (calLoadedMonths.length && targetKey > calMonthKey(calLoadedMonths[calLoadedMonths.length - 1].year, calLoadedMonths[calLoadedMonths.length - 1].month)) {
+    const l = calLoadedMonths[calLoadedMonths.length - 1];
+    const d = new Date(l.year, l.month + 1, 1);
+    const nm = { year: d.getFullYear(), month: d.getMonth() };
+    calScrollEl().appendChild(calBuildMonthEl(nm.year, nm.month));
+    calLoadedMonths.push(nm);
+  }
+}
+
+function calScrollToMonth(y, m) {
+  const key = `${y}-${String(m + 1).padStart(2, '0')}`;
+  const el = calScrollEl().querySelector(`.cal-month[data-ym="${key}"]`);
+  if (el) el.scrollIntoView({ block: 'start' });
+}
+
+function calJumpTo(y, m, dateStr) {
+  calEnsureMonthLoaded(y, m);
+  calSetSelected(dateStr);
+  calScrollToMonth(y, m);
+}
+
+function calUpdateWorkoutCount() {
+  const n = calWorkoutDates.length;
+  document.getElementById('cal-workout-count').textContent = `${n} WORKOUT${n === 1 ? '' : 'S'}`;
+}
+
+function calFindAdjacentWorkoutDate(dir) {
+  if (!calWorkoutDates.length || !calSelectedDate) return null;
+  if (dir < 0) {
+    for (let i = calWorkoutDates.length - 1; i >= 0; i--) {
+      if (calWorkoutDates[i] < calSelectedDate) return calWorkoutDates[i];
+    }
+  } else {
+    for (let i = 0; i < calWorkoutDates.length; i++) {
+      if (calWorkoutDates[i] > calSelectedDate) return calWorkoutDates[i];
+    }
+  }
+  return null;
+}
+
+function calJumpToWorkoutDate(dir) {
+  const target = calFindAdjacentWorkoutDate(dir);
+  if (!target) return;
+  const d = new Date(target + 'T12:00:00');
+  calJumpTo(d.getFullYear(), d.getMonth(), target);
+}
+
+function calOnScroll() {
+  if (calScrollLock) return;
+  const el = calScrollEl();
+
+  if (el.scrollTop < CAL_LOAD_THRESHOLD && calLoadedMonths.length) {
+    calScrollLock = true;
+    const first = calLoadedMonths[0];
+    const newMonths = [];
+    for (let i = CAL_BATCH; i >= 1; i--) {
+      const d = new Date(first.year, first.month - i, 1);
+      newMonths.push({ year: d.getFullYear(), month: d.getMonth() });
+    }
+    const frag = document.createDocumentFragment();
+    newMonths.forEach(mo => frag.appendChild(calBuildMonthEl(mo.year, mo.month)));
+    const oldHeight = el.scrollHeight;
+    el.insertBefore(frag, el.firstChild);
+    el.scrollTop += (el.scrollHeight - oldHeight);
+    calLoadedMonths = newMonths.concat(calLoadedMonths);
+    calScrollLock = false;
+  }
+
+  if (el.scrollHeight - el.scrollTop - el.clientHeight < CAL_LOAD_THRESHOLD && calLoadedMonths.length) {
+    calScrollLock = true;
+    const last = calLoadedMonths[calLoadedMonths.length - 1];
+    const newMonths = [];
+    const frag = document.createDocumentFragment();
+    for (let i = 1; i <= CAL_BATCH; i++) {
+      const d = new Date(last.year, last.month + i, 1);
+      const nm = { year: d.getFullYear(), month: d.getMonth() };
+      newMonths.push(nm);
+      frag.appendChild(calBuildMonthEl(nm.year, nm.month));
+    }
+    el.appendChild(frag);
+    calLoadedMonths = calLoadedMonths.concat(newMonths);
+    calScrollLock = false;
+  }
+}
+
+function openCalendar() {
+  calWorkoutDates = Object.keys(db.workouts).filter(d => db.workouts[d] && db.workouts[d].length > 0).sort();
+
+  const scroll = calScrollEl();
+  scroll.innerHTML = '';
+  calLoadedMonths = [];
+  calSelectedDate = null;
+
+  const base = new Date(currentDate + 'T12:00:00');
+  const baseY = base.getFullYear(), baseM = base.getMonth();
+  const frag = document.createDocumentFragment();
+  for (let i = -CAL_BATCH; i <= CAL_BATCH; i++) {
+    const d = new Date(baseY, baseM + i, 1);
+    const nm = { year: d.getFullYear(), month: d.getMonth() };
+    calLoadedMonths.push(nm);
+    frag.appendChild(calBuildMonthEl(nm.year, nm.month));
+  }
+  scroll.appendChild(frag);
+  calSetSelected(currentDate);
+  calUpdateWorkoutCount();
+
+  showScreen('screen-calendar');
+  requestAnimationFrame(() => calScrollToMonth(baseY, baseM));
+}
+
+document.getElementById('cal-scroll').addEventListener('scroll', calOnScroll);
+document.getElementById('btn-cal-back').addEventListener('click', () => goBack('screen-fitness-tracker'));
+document.getElementById('btn-cal-today').addEventListener('click', () => {
+  const t = todayStr();
+  const d = new Date(t + 'T12:00:00');
+  calJumpTo(d.getFullYear(), d.getMonth(), t);
+});
+document.getElementById('cal-prev-workout').addEventListener('click', () => calJumpToWorkoutDate(-1));
+document.getElementById('cal-next-workout').addEventListener('click', () => calJumpToWorkoutDate(1));
+
+// -- Calendar workout detail popup ------------------------
+function formatDetailDate(str) {
+  const d = new Date(str + 'T12:00:00');
+  const weekday = d.toLocaleDateString('en-GB', { weekday: 'long' });
+  const month = d.toLocaleDateString('en-GB', { month: 'short' });
+  return `${weekday}, ${month} ${d.getDate()} ${d.getFullYear()}`;
+}
+
+function openWorkoutDetail(dateStr) {
+  calDetailDate = dateStr;
+  document.getElementById('cal-detail-date').textContent = formatDetailDate(dateStr);
+
+  const body = document.getElementById('cal-detail-body');
+  body.innerHTML = '';
+  const exercises = (db.workouts[dateStr] || []).filter(ex => (ex.sets || []).length > 0);
+  const records = db.records || {};
+
+  exercises.forEach(ex => {
+    const exRecords = records[ex.name] || {};
+    const exEl = document.createElement('div');
+    exEl.className = 'cal-detail-ex';
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'cal-detail-ex-name';
+    nameEl.textContent = ex.name;
+    exEl.appendChild(nameEl);
+
+    ex.sets.forEach(s => {
+      const isPR = exRecords[String(s.reps)] && Number(s.weight) >= exRecords[String(s.reps)];
+      const row = document.createElement('div');
+      row.className = 'history-set-row';
+      row.innerHTML = `
+        ${isPR ? `<svg class="history-set-pr" viewBox="0 0 24 24"><path d="M12 1L9 9H1l6.5 4.7L5 21l7-5 7 5-2.5-7.3L23 9h-8z"/></svg>` : `<span class="history-set-spacer"></span>`}
+        <span class="history-set-weight">${s.weight} kg</span>
+        <span class="history-set-reps">${s.reps} reps</span>
+      `;
+      exEl.appendChild(row);
+    });
+
+    body.appendChild(exEl);
+  });
+
+  openOverlay('cal-detail-overlay');
+}
+
+document.getElementById('cal-detail-cancel').addEventListener('click', () => closeOverlay('cal-detail-overlay'));
+document.getElementById('cal-detail-goto').addEventListener('click', () => {
+  closeOverlay('cal-detail-overlay');
+  currentDate = calDetailDate;
+  goBack('screen-fitness-tracker');
+});
 
 // -- New Exercise ---------------------------------------
 function openNewExercise() {
@@ -1599,7 +1813,7 @@ document.getElementById('exercise-search').addEventListener('input', e => {
   }
 });
 
-['calendar-overlay', 'timer-overlay', 'new-exercise-overlay'].forEach(id => {
+['cal-detail-overlay', 'timer-overlay', 'new-exercise-overlay'].forEach(id => {
   document.getElementById(id).addEventListener('click', e => {
     if (e.target === e.currentTarget) closeOverlay(id);
   });
