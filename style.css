@@ -1,4 +1,9 @@
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+
+/* App-wide long-press text selection is disabled above (native Android selection
+   toolbar has no place in an app-like UI). Re-enable it only where the user
+   actually types/edits or reads free-form text worth copying. */
+input, textarea, .comment-text { user-select: text; -webkit-user-select: text; -webkit-touch-callout: default; }
 
 :root {
   --toolbar: #212121;
