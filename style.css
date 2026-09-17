@@ -534,6 +534,10 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .new-ex-add-cat-btn:active { background: var(--bg); }
 
 /* ── FIELD PICKER OVERLAY (Category/Type/Weight Unit) ─── */
+/* Can be opened from within another already-open .overlay (e.g. the
+   exercise info bottom sheet), so it needs a higher z-index than the
+   base .overlay stack instead of relying on DOM order to win. */
+#field-picker-overlay { z-index: 120; }
 .field-picker-title { text-decoration: underline; }
 .field-picker-list { display: flex; flex-direction: column; max-height: 60vh; overflow-y: auto; }
 .field-picker-row { display: flex; align-items: center; gap: 14px; padding: 14px 2px; border-bottom: 1px solid var(--border); cursor: pointer; background: var(--surface); transition: background .08s; }
