@@ -1811,19 +1811,6 @@ document.getElementById('cal-detail-goto').addEventListener('click', () => {
   goBack('screen-fitness-tracker');
 });
 
-// -- New Exercise ---------------------------------------
-function openNewExercise() {
-  const sel = document.getElementById('new-exercise-category');
-  sel.innerHTML = '<option value="">Choose category...</option>';
-  [...new Set(EXERCISE_DB.map(e => e.category))].sort().forEach(c => {
-    const opt = document.createElement('option');
-    opt.value = c; opt.textContent = c;
-    sel.appendChild(opt);
-  });
-  document.getElementById('new-exercise-name').value = '';
-  openOverlay('new-exercise-overlay');
-}
-
 let pendingEditExerciseOriginalName = null;
 
 // -- Custom field picker (replaces native <select>/picker for Category/Type/Weight Unit) --
@@ -2048,24 +2035,6 @@ document.getElementById('btn-new-category-save').addEventListener('click', () =>
   closeOverlay('new-category-overlay');
 });
 
-document.getElementById('btn-new-exercise-save').addEventListener('click', () => {
-  const name = document.getElementById('new-exercise-name').value.trim();
-  const cat = document.getElementById('new-exercise-category').value;
-  if (!name) { toast('Enter a name'); return; }
-  if (!cat) { toast('Choose a category'); return; }
-  if (!db.custom_exercises) db.custom_exercises = [];
-  if (allExercises().find(e => e.name.toLowerCase() === name.toLowerCase())) { toast('Exercise already exists'); return; }
-  db.custom_exercises.push({ category: cat, name });
-  persistCustomExercises();
-  closeOverlay('new-exercise-overlay');
-  exerciseBrowserMode = 'categories';
-  currentBrowseCategory = null;
-  document.getElementById('exercises-title').textContent = 'All Exercises';
-  renderCategoryBrowser();
-  toast('Exercise created');
-});
-document.getElementById('btn-new-exercise-cancel').addEventListener('click', () => closeOverlay('new-exercise-overlay'));
-
 // -- Overlay helpers ------------------------------------
 function openOverlay(id) { document.getElementById(id).classList.add('open'); }
 function closeOverlay(id) { document.getElementById(id).classList.remove('open'); }
@@ -2201,7 +2170,7 @@ document.getElementById('exercise-search').addEventListener('input', e => {
   }
 });
 
-['cal-detail-overlay', 'timer-overlay', 'new-exercise-overlay', 'field-picker-overlay'].forEach(id => {
+['cal-detail-overlay', 'timer-overlay', 'field-picker-overlay'].forEach(id => {
   document.getElementById(id).addEventListener('click', e => {
     if (e.target === e.currentTarget) closeOverlay(id);
   });
