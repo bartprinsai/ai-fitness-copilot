@@ -1330,30 +1330,18 @@ function renderExerciseInfoView() {
   document.getElementById('exercise-info-edit-mode').classList.add('hidden');
 }
 
-const MUSCLE_PRIMARY_OPTIONS = MUSCLE_OPTIONS.map(m => ({ value: m, label: m }));
-const MUSCLE_SECONDARY_OPTIONS = [{ value: '', label: 'None' }, ...MUSCLE_PRIMARY_OPTIONS];
-
-console.log('[MuscleInfo] registering click handlers, primary btn found:', !!document.getElementById('info-primary-muscle'), '| secondary btn found:', !!document.getElementById('info-secondary-muscle'));
-document.getElementById('info-primary-muscle').addEventListener('click', () => {
-  console.log('[MuscleInfo] primary button clicked');
-  openFieldPicker('Primary', MUSCLE_PRIMARY_OPTIONS, getFieldBtnValue('info-primary-muscle'), value => {
-    setFieldBtnValue('info-primary-muscle', value, value);
-  });
-});
-document.getElementById('info-secondary-muscle').addEventListener('click', () => {
-  console.log('[MuscleInfo] secondary button clicked');
-  openFieldPicker('Secondary', MUSCLE_SECONDARY_OPTIONS, getFieldBtnValue('info-secondary-muscle'), value => {
-    setFieldBtnValue('info-secondary-muscle', value, value || 'None');
-  });
-});
+function populateMuscleSelect(id, includeNone) {
+  const options = includeNone ? ['None', ...MUSCLE_OPTIONS] : MUSCLE_OPTIONS;
+  document.getElementById(id).innerHTML = options.map(m => `<option value="${m === 'None' ? '' : m}">${m}</option>`).join('');
+}
 
 function showExerciseInfoEdit() {
   const info = getExerciseInfo(currentExercise) || {};
   document.getElementById('exercise-info-edit-title').textContent = currentExercise + ' info';
-  const primary = info.primaryMuscle || MUSCLE_OPTIONS[0];
-  setFieldBtnValue('info-primary-muscle', primary, primary);
-  const secondary = info.secondaryMuscle || '';
-  setFieldBtnValue('info-secondary-muscle', secondary, secondary || 'None');
+  populateMuscleSelect('info-primary-muscle', false);
+  populateMuscleSelect('info-secondary-muscle', true);
+  document.getElementById('info-primary-muscle').value = info.primaryMuscle || MUSCLE_OPTIONS[0];
+  document.getElementById('info-secondary-muscle').value = info.secondaryMuscle || '';
   EXERCISE_INFO_EQUIPMENT_FIELDS.forEach(f => {
     document.getElementById(f.inputId).value = (info[f.key] !== undefined && info[f.key] !== null) ? info[f.key] : '';
   });
@@ -1368,8 +1356,8 @@ function openExerciseInfo() {
 
 function saveExerciseInfo() {
   const info = {};
-  const primary = getFieldBtnValue('info-primary-muscle');
-  const secondary = getFieldBtnValue('info-secondary-muscle');
+  const primary = document.getElementById('info-primary-muscle').value;
+  const secondary = document.getElementById('info-secondary-muscle').value;
   if (primary) info.primaryMuscle = primary;
   if (secondary) info.secondaryMuscle = secondary;
   EXERCISE_INFO_EQUIPMENT_FIELDS.forEach(f => {
@@ -1477,12 +1465,6 @@ document.querySelectorAll('.field-btn').forEach(btn => {
   input.addEventListener('focus', () => input.select());
   input.addEventListener('click', () => input.select());
   input.addEventListener('contextmenu', e => e.preventDefault());
-  // Chrome's "previously entered values" suggestion list is keyed by the
-  // field's name (falling back to id when name is absent), so autocomplete="off"
-  // alone doesn't suppress it here. Giving the field a fresh random name on
-  // every load means Chrome never finds a history match for it.
-  input.setAttribute('autocomplete', 'off');
-  input.name = id + '-' + Math.random().toString(36).slice(2);
 });
 
 // -- Tabs -----------------------------------------------
