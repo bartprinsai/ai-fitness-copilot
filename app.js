@@ -128,7 +128,9 @@ async function persistExerciseInfo() {
 }
 function getExerciseInfo(name) { return (db.exerciseInfo || {})[name] || null; }
 async function loadUserData(userUid) {
+  console.log('[Load] loadUserData start, uid:', userUid);
   try {
+    console.log('[Load] firing Promise.all for 8 Firestore reads...');
     const [workoutsSnap, recordsSnap, customSnap, plansSnap, activePlanSnap, favoritesSnap, hiddenBuiltinsSnap, exerciseInfoSnap] = await Promise.all([
       fStore.collection('users/' + userUid + '/workouts').get(),
       fStore.doc('users/' + userUid + '/meta/records').get(),
@@ -139,6 +141,7 @@ async function loadUserData(userUid) {
       fStore.doc('users/' + userUid + '/meta/hidden_builtins').get(),
       fStore.doc('users/' + userUid + '/meta/exercise_info').get(),
     ]);
+    console.log('[Load] Promise.all resolved, exerciseInfoSnap.exists:', exerciseInfoSnap.exists);
     db.workouts = {};
     db.sessionNotes = {};
     workoutsSnap.forEach(doc => {
@@ -160,8 +163,9 @@ async function loadUserData(userUid) {
       (hiddenBuiltinsSnap.data().names || []).forEach(name => { db.hiddenBuiltins[name] = true; });
     }
     db.exerciseInfo = exerciseInfoSnap.exists ? (exerciseInfoSnap.data().data || {}) : {};
+    console.log('[Load] loadUserData finished OK');
   } catch(e) {
-    console.error('loadUserData', e);
+    console.error('[Load] loadUserData FAILED:', e && e.code, e && e.message, e);
   }
 }
 
@@ -315,6 +319,10 @@ window.addEventListener('popstate', e => {
   inPopstateNavigation = false;
 });
 
+// -- TEMP DEBUG: catch anything that would otherwise fail silently --------
+window.addEventListener('error', e => console.error('[GlobalError]', e.message, e.filename, e.lineno, e.error));
+window.addEventListener('unhandledrejection', e => console.error('[UnhandledRejection]', e.reason));
+
 // -- Auth -----------------------------------------------
 async function initAuth() {
   console.log('[Auth] initAuth start');
@@ -354,8 +362,11 @@ async function initAuth() {
     if (user) {
       console.log('[Auth] signing in via onAuthStateChanged');
       await loadUserData(user.uid);
+      console.log('[Auth] loadUserData await returned, calling renderMenuUserBar');
       renderMenuUserBar();
+      console.log('[Auth] renderMenuUserBar done, calling showScreen(screen-home)');
       showScreen('screen-home');
+      console.log('[Auth] showScreen(screen-home) done');
     } else {
       console.log('[Auth] no user, showing login screen');
       db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, favoriteExercises: {}, hiddenBuiltins: {} };
@@ -1319,18 +1330,27 @@ function renderExerciseInfoView() {
   document.getElementById('exercise-info-edit-mode').classList.add('hidden');
 }
 
-function populateMuscleSelect(id, includeNone) {
-  const options = includeNone ? ['None', ...MUSCLE_OPTIONS] : MUSCLE_OPTIONS;
-  document.getElementById(id).innerHTML = options.map(m => `<option value="${m === 'None' ? '' : m}">${m}</option>`).join('');
-}
+const MUSCLE_PRIMARY_OPTIONS = MUSCLE_OPTIONS.map(m => ({ value: m, label: m }));
+const MUSCLE_SECONDARY_OPTIONS = [{ value: '', label: 'None' }, ...MUSCLE_PRIMARY_OPTIONS];
+
+document.getElementById('info-primary-muscle').addEventListener('click', () => {
+  openFieldPicker('Primary', MUSCLE_PRIMARY_OPTIONS, getFieldBtnValue('info-primary-muscle'), value => {
+    setFieldBtnValue('info-primary-muscle', value, value);
+  });
+});
+document.getElementById('info-secondary-muscle').addEventListener('click', () => {
+  openFieldPicker('Secondary', MUSCLE_SECONDARY_OPTIONS, getFieldBtnValue('info-secondary-muscle'), value => {
+    setFieldBtnValue('info-secondary-muscle', value, value || 'None');
+  });
+});
 
 function showExerciseInfoEdit() {
   const info = getExerciseInfo(currentExercise) || {};
   document.getElementById('exercise-info-edit-title').textContent = currentExercise + ' info';
-  populateMuscleSelect('info-primary-muscle', false);
-  populateMuscleSelect('info-secondary-muscle', true);
-  document.getElementById('info-primary-muscle').value = info.primaryMuscle || MUSCLE_OPTIONS[0];
-  document.getElementById('info-secondary-muscle').value = info.secondaryMuscle || '';
+  const primary = info.primaryMuscle || MUSCLE_OPTIONS[0];
+  setFieldBtnValue('info-primary-muscle', primary, primary);
+  const secondary = info.secondaryMuscle || '';
+  setFieldBtnValue('info-secondary-muscle', secondary, secondary || 'None');
   EXERCISE_INFO_EQUIPMENT_FIELDS.forEach(f => {
     document.getElementById(f.inputId).value = (info[f.key] !== undefined && info[f.key] !== null) ? info[f.key] : '';
   });
@@ -1345,8 +1365,8 @@ function openExerciseInfo() {
 
 function saveExerciseInfo() {
   const info = {};
-  const primary = document.getElementById('info-primary-muscle').value;
-  const secondary = document.getElementById('info-secondary-muscle').value;
+  const primary = getFieldBtnValue('info-primary-muscle');
+  const secondary = getFieldBtnValue('info-secondary-muscle');
   if (primary) info.primaryMuscle = primary;
   if (secondary) info.secondaryMuscle = secondary;
   EXERCISE_INFO_EQUIPMENT_FIELDS.forEach(f => {
@@ -1454,6 +1474,12 @@ document.querySelectorAll('.field-btn').forEach(btn => {
   input.addEventListener('focus', () => input.select());
   input.addEventListener('click', () => input.select());
   input.addEventListener('contextmenu', e => e.preventDefault());
+  // Chrome's "previously entered values" suggestion list is keyed by the
+  // field's name (falling back to id when name is absent), so autocomplete="off"
+  // alone doesn't suppress it here. Giving the field a fresh random name on
+  // every load means Chrome never finds a history match for it.
+  input.setAttribute('autocomplete', 'off');
+  input.name = id + '-' + Math.random().toString(36).slice(2);
 });
 
 // -- Tabs -----------------------------------------------
