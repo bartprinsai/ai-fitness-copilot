@@ -1208,11 +1208,11 @@ function renderSetList() {
     return;
   }
 
-  const exRecords = (db.records || {})[currentExercise] || {};
+  const firstPRKeys = getFirstPRComboKeys(currentExercise);
   list.innerHTML = '';
 
   sets.forEach((s, i) => {
-    const isPR = exRecords[String(s.reps)] && parseFloat(s.weight) >= exRecords[String(s.reps)];
+    const isPR = firstPRKeys.has(currentDate + '#' + i);
     const hasNote = !!(s.note && s.note.trim());
     const isSelected = selectedSetIndex === i;
     const row = document.createElement('div');
@@ -1441,7 +1441,7 @@ function renderHistoryTab() {
     return;
   }
 
-  const exRecords = (db.records || {})[currentExercise] || {};
+  const firstPRKeys = getFirstPRComboKeys(currentExercise);
 
   relevantDates.forEach(date => {
     const ex = db.workouts[date].find(e => e.name === currentExercise);
@@ -1452,8 +1452,8 @@ function renderHistoryTab() {
     headerDiv.innerHTML = `<div class="history-day-date">${formatDateShort(date)}</div><div class="history-day-divider"></div>`;
     container.appendChild(headerDiv);
 
-    ex.sets.forEach(s => {
-      const isPR = exRecords[String(s.reps)] && parseFloat(s.weight) >= exRecords[String(s.reps)];
+    ex.sets.forEach((s, i) => {
+      const isPR = firstPRKeys.has(date + '#' + i);
       const row = document.createElement('div');
       row.className = 'history-set-row';
       row.innerHTML = `
@@ -1637,12 +1637,7 @@ function calBuildMonthEl(year, month) {
 
 function calDayClick(dateStr) {
   calSetSelected(dateStr);
-  if (calHasWorkout(dateStr)) {
-    openWorkoutDetail(dateStr);
-  } else {
-    currentDate = dateStr;
-    goBack('screen-fitness-tracker');
-  }
+  openWorkoutDetail(dateStr);
 }
 
 function calSetSelected(dateStr) {
@@ -1800,10 +1795,15 @@ function openWorkoutDetail(dateStr) {
   const body = document.getElementById('cal-detail-body');
   body.innerHTML = '';
   const exercises = (db.workouts[dateStr] || []).filter(ex => (ex.sets || []).length > 0);
-  const records = db.records || {};
+
+  if (exercises.length === 0) {
+    body.innerHTML = `<div class="records-empty">There is no workout saved for this day.</div>`;
+    openOverlay('cal-detail-overlay');
+    return;
+  }
 
   exercises.forEach(ex => {
-    const exRecords = records[ex.name] || {};
+    const firstPRKeys = getFirstPRComboKeys(ex.name);
     const exEl = document.createElement('div');
     exEl.className = 'cal-detail-ex';
 
@@ -1812,8 +1812,8 @@ function openWorkoutDetail(dateStr) {
     nameEl.textContent = ex.name;
     exEl.appendChild(nameEl);
 
-    ex.sets.forEach(s => {
-      const isPR = exRecords[String(s.reps)] && Number(s.weight) >= exRecords[String(s.reps)];
+    ex.sets.forEach((s, i) => {
+      const isPR = firstPRKeys.has(dateStr + '#' + i);
       const row = document.createElement('div');
       row.className = 'history-set-row';
       row.innerHTML = `
