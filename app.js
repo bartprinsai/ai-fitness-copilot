@@ -31,17 +31,12 @@ let homeExDragDy = 0;
 let currentBrowsePlan = null;
 const FAVORITES_CATEGORY = '__favorites__';
 
-// -- Exercise info screen state ------------------------
-let freeExerciseDB = null;
-let exerciseInfoReturnScreen = 'screen-exercises';
-
 // -- Splash coordination --------------------------------
 let splashDone = false, authDone = false;
 function checkAndReveal() {
   if (!splashDone || !authDone) return;
   const splash = document.getElementById('splash-screen');
   if (splash) splash.style.display = 'none';
-  loadFreeExerciseDB();
 }
 setTimeout(() => { splashDone = true; checkAndReveal(); }, 1200);
 
@@ -177,9 +172,6 @@ let bannerDismissed = false;
 let bannerSuggestedDayIndex = null;
 let loadWorkoutItems = [];
 let selectedSetIndex = null;
-let timerInterval = null;
-let timerRemaining = 90;
-let timerRunning = false;
 let currentGraph = 'max-weight';
 let currentTimeRange = 'all';
 let calLoadedMonths = []; // ascending {year, month} entries currently rendered in the calendar scroller
@@ -253,7 +245,58 @@ function goBack(fallbackId) {
   }
 }
 
+// -- Modal back-button handling --------------------------
+// Any open .overlay popup pushes its own history entry, so the hardware/
+// Android back button closes it (same as its own Cancel button) instead of
+// letting the press fall through to screen navigation underneath it.
+let openOverlayId = null;
+let suppressNextPopstate = false;
+
+function pushOverlayHistory(id) {
+  openOverlayId = id;
+  history.pushState({ overlay: id }, '', location.hash);
+}
+
+// Keeps the history stack in sync when an overlay is closed by anything
+// OTHER than the back button (Cancel/Save/backdrop tap): those don't consume
+// a history entry on their own, so without this, the next real back press
+// would just pop that stale entry and land back on the same screen — a dead
+// "nothing happened" press before the one that actually navigates.
+function popOverlayHistoryIfNeeded(id) {
+  if (openOverlayId !== id) return;
+  openOverlayId = null;
+  if (!inPopstateNavigation) {
+    suppressNextPopstate = true;
+    history.back();
+  }
+}
+
+// Emulates the given overlay's own Cancel/Close button so a back-triggered
+// dismissal runs exactly the same cleanup (no separate logic to keep in sync).
+function dismissOverlayForBack(id) {
+  if (id === 'comment-overlay') {
+    const editing = !document.getElementById('comment-edit-mode').classList.contains('hidden');
+    document.getElementById(editing ? 'btn-comment-cancel' : 'btn-comment-done').click();
+    return;
+  }
+  const btnId = OVERLAY_CANCEL_BUTTON[id];
+  if (btnId) document.getElementById(btnId).click();
+  else closeOverlay(id);
+}
+
 window.addEventListener('popstate', e => {
+  if (suppressNextPopstate) { suppressNextPopstate = false; return; }
+  if (openOverlayId) {
+    const id = openOverlayId;
+    openOverlayId = null;
+    dismissOverlayForBack(id);
+    // Some overlays' Cancel only steps back an internal mode instead of
+    // truly closing (comment-overlay's edit → view, when there's existing
+    // text to fall back to) — if it's still open, keep intercepting back
+    // presses for it instead of letting the next one fall through to screens.
+    if (document.getElementById(id).classList.contains('open')) pushOverlayHistory(id);
+    return;
+  }
   const id = (e.state && e.state.screen) || 'screen-home';
   inPopstateNavigation = true;
   showScreen(id);
@@ -373,11 +416,7 @@ document.getElementById('btn-overflow-home').addEventListener('click', e => {
   ], e.currentTarget);
 });
 document.getElementById('btn-overflow-training').addEventListener('click', e => {
-  showOverflowMenu([
-    { label: 'Rest Timer', action: openTimer },
-    { label: 'Exercise Info', action: () => { if (currentExercise) openExerciseInfo(currentExercise, 'screen-training'); } },
-    { label: 'Sign out', action: signOutUser },
-  ], e.currentTarget);
+  showOverflowMenu([{ label: 'Sign out', action: signOutUser }], e.currentTarget);
 });
 document.getElementById('btn-overflow-exercises').addEventListener('click', e => {
   showOverflowMenu([{ label: 'Sign out', action: signOutUser }], e.currentTarget);
@@ -1115,132 +1154,6 @@ function renderExerciseItem(list, ex) {
   list.appendChild(item);
 }
 
-// -- Exercise Info Screen -------------------------------
-async function loadFreeExerciseDB() {
-  if (freeExerciseDB) return freeExerciseDB;
-  const url = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/dist/exercises.json';
-  console.log('[ExerciseInfo] Fetching dataset:', url);
-  try {
-    const resp = await fetch(url);
-    console.log('[ExerciseInfo] Dataset status:', resp.status);
-    freeExerciseDB = await resp.json();
-    console.log('[ExerciseInfo] Dataset loaded, total:', freeExerciseDB.length);
-    console.log('[ExerciseInfo] First 5 names:', freeExerciseDB.slice(0, 5).map(e => e.name));
-  } catch (err) {
-    console.error('[ExerciseInfo] Dataset fetch failed:', err);
-    freeExerciseDB = [];
-  }
-  return freeExerciseDB;
-}
-
-function normalizeExName(name) {
-  return name.toLowerCase()
-    .replace(/[-/.,()]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function findExerciseInDB(name, db) {
-  const norm = normalizeExName(name);
-  console.log(`[ExerciseInfo] Searching for: "${name}" → normalized: "${norm}"`);
-
-  // 1. Exact match
-  let match = db.find(e => normalizeExName(e.name) === norm);
-  if (match) { console.log(`[ExerciseInfo] Exact match: "${match.name}"`); return match; }
-
-  // 2. Dataset name contains search term
-  match = db.find(e => normalizeExName(e.name).includes(norm));
-  if (match) { console.log(`[ExerciseInfo] DB contains search: "${match.name}"`); return match; }
-
-  // 3. Search term contains dataset name
-  match = db.find(e => norm.includes(normalizeExName(e.name)));
-  if (match) { console.log(`[ExerciseInfo] Search contains DB: "${match.name}"`); return match; }
-
-  // 4. Any individual word in search term matches any word in dataset name
-  const words = norm.split(' ').filter(w => w.length > 2);
-  let best = null, bestScore = 0;
-  db.forEach(e => {
-    const eWords = normalizeExName(e.name).split(' ');
-    const score = words.filter(w => eWords.includes(w)).length;
-    if (score > bestScore) { bestScore = score; best = e; }
-  });
-  if (bestScore >= 1 && best) {
-    console.log(`[ExerciseInfo] Word-match (score ${bestScore}): "${best.name}"`);
-    return best;
-  }
-
-  console.log('[ExerciseInfo] No match found');
-  return null;
-}
-
-function getLocalVideoPath(exerciseName) {
-  const normalized = exerciseName.toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
-  return `exercises/videos/${normalized}.mp4`;
-}
-
-function openExerciseInfo(name, returnScreen) {
-  exerciseInfoReturnScreen = returnScreen || 'screen-exercises';
-  document.getElementById('ei-title').textContent = name;
-  const placeholder = document.getElementById('ei-gif-placeholder');
-  placeholder.textContent = 'Loading...';
-  placeholder.classList.remove('hidden');
-  document.getElementById('ei-muscles-card').innerHTML = '';
-  document.getElementById('ei-steps-list').innerHTML = '';
-  document.getElementById('ei-loading').classList.remove('hidden');
-  showScreen('screen-exercise-info');
-  loadExerciseInfo(name);
-}
-
-async function loadExerciseInfo(name) {
-  const db = await loadFreeExerciseDB();
-  const entry = findExerciseInDB(name, db);
-  console.log('[ExerciseInfo] Entry found:', entry ? entry.name : 'null');
-
-  const placeholder = document.getElementById('ei-gif-placeholder');
-  const video = document.createElement('video');
-  video.src = getLocalVideoPath(name);
-  video.autoplay = true;
-  video.loop = true;
-  video.muted = true;
-  video.setAttribute('playsinline', '');
-  video.style.cssText = 'width:100%;border-radius:8px;display:block';
-  video.onerror = () => { placeholder.innerHTML = ''; placeholder.textContent = 'Animation not available'; };
-  placeholder.innerHTML = '';
-  placeholder.appendChild(video);
-  placeholder.classList.remove('hidden');
-
-  const primary = entry ? (entry.primaryMuscles || []) : [];
-  const secondary = entry ? (entry.secondaryMuscles || []) : [];
-  renderMuscles(document.getElementById('ei-muscles-card'), primary, secondary);
-
-  const instructions = entry ? (entry.instructions || []) : [];
-  renderInstructions(document.getElementById('ei-steps-list'), instructions);
-
-  document.getElementById('ei-loading').classList.add('hidden');
-}
-
-function renderMuscles(container, primary, secondary) {
-  let html = '';
-  if (primary.length) html += `<div class="ei-muscle-row"><span class="ei-muscle-label">Primary:</span>${primary.map(m => `<span class="ei-badge ei-badge-primary">${m}</span>`).join('')}</div>`;
-  if (secondary.length) html += `<div class="ei-muscle-row"><span class="ei-muscle-label">Secondary:</span>${secondary.map(m => `<span class="ei-badge ei-badge-secondary">${m}</span>`).join('')}</div>`;
-  container.innerHTML = html || '<div class="ei-step-empty">No muscle data available</div>';
-}
-
-function renderInstructions(container, instructions) {
-  if (!instructions.length) {
-    container.innerHTML = '<div class="ei-step-empty">Instructions not available for this exercise</div>';
-    return;
-  }
-  container.innerHTML = instructions.map((step, i) => `
-    <div class="ei-step">
-      <span class="ei-step-num">${i + 1}</span>
-      <span class="ei-step-text">${step}</span>
-    </div>
-  `).join('');
-}
-
 function addExerciseToWorkout(name) {
   const workout = getWorkout(currentDate);
   if (!workout.find(e => e.name === name)) {
@@ -1383,7 +1296,6 @@ function saveSet() {
   updateRecords(currentExercise, weight, reps);
   renderSetList();
   renderHome();
-  startTimerAuto();
 }
 
 function selectSet(i) {
@@ -1443,11 +1355,15 @@ document.querySelectorAll('.field-btn').forEach(btn => {
 });
 
 // Tap a weight/reps number to select it all, so typing overwrites it
-// instead of inserting a cursor at the tap position.
+// instead of inserting a cursor at the tap position. The resulting selection
+// would normally summon Android's native Cut/Copy/Translate action bar above
+// it; preventDefault on contextmenu suppresses that bar while leaving the
+// blue selection highlight itself alone.
 ['field-weight', 'field-reps'].forEach(id => {
   const input = document.getElementById(id);
   input.addEventListener('focus', () => input.select());
   input.addEventListener('click', () => input.select());
+  input.addEventListener('contextmenu', e => e.preventDefault());
 });
 
 // -- Tabs -----------------------------------------------
@@ -1458,6 +1374,58 @@ function switchTab(tab) {
   if (tab === 'graph') renderGraph();
 }
 document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
+
+// Swipe between Track/History/Graph, reusing the day-nav swipe's direction-
+// lock pattern. No wrap-around: a swipe past either end is simply a no-op.
+const TRAINING_TAB_ORDER = ['track', 'history', 'graph'];
+function navigateTrainingTab(delta) {
+  const current = document.querySelector('.tab.active').dataset.tab;
+  const nextIdx = TRAINING_TAB_ORDER.indexOf(current) + delta;
+  if (nextIdx < 0 || nextIdx >= TRAINING_TAB_ORDER.length) return;
+  switchTab(TRAINING_TAB_ORDER[nextIdx]);
+}
+
+function setupTrainingSwipeNav() {
+  const container = document.getElementById('training-content-wrap');
+  const SWIPE_THRESHOLD = 50;
+  const DIRECTION_LOCK = 10;
+  let startX = 0, startY = 0, tracking = false, direction = null;
+
+  container.addEventListener('touchstart', e => {
+    // Defer entirely to the set-row long-press-drag once it's taken over this
+    // gesture (see setupSetListDragReorder) so the two never fight over the
+    // same touch sequence.
+    if (e.touches.length !== 1 || setDragItem) { tracking = false; return; }
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    tracking = true;
+    direction = null;
+  }, { passive: true });
+
+  container.addEventListener('touchmove', e => {
+    if (!tracking) return;
+    if (setDragItem) { tracking = false; direction = null; return; }
+    const dx = e.touches[0].clientX - startX;
+    const dy = e.touches[0].clientY - startY;
+    if (!direction) {
+      if (Math.abs(dx) < DIRECTION_LOCK && Math.abs(dy) < DIRECTION_LOCK) return;
+      direction = Math.abs(dx) > Math.abs(dy) ? 'horizontal' : 'vertical';
+    }
+    if (direction === 'horizontal') e.preventDefault();
+  }, { passive: false });
+
+  const endSwipe = e => {
+    if (!tracking) return;
+    if (direction === 'horizontal' && !setDragItem) {
+      const dx = e.changedTouches[0].clientX - startX;
+      if (Math.abs(dx) > SWIPE_THRESHOLD) navigateTrainingTab(dx < 0 ? 1 : -1);
+    }
+    tracking = false;
+    direction = null;
+  };
+  container.addEventListener('touchend', endSwipe, { passive: true });
+  container.addEventListener('touchcancel', () => { tracking = false; direction = null; }, { passive: true });
+}
 
 // -- History Tab ----------------------------------------
 function renderHistoryTab() {
@@ -1611,75 +1579,6 @@ function renderGraph() {
   ctx.textAlign = 'right';
   ctx.fillText(new Date(data[data.length-1].date + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short' }), pad.left + gW, H - 8);
 }
-
-// -- Timer ----------------------------------------------
-function openTimer() {
-  timerRunning = false;
-  clearInterval(timerInterval);
-  timerRemaining = parseInt(document.getElementById('timer-slider').value);
-  updateTimerDisplay();
-  document.getElementById('btn-timer-start').textContent = 'Start';
-  openOverlay('timer-overlay');
-}
-
-function startTimerAuto() {
-  timerRemaining = parseInt(document.getElementById('timer-slider').value);
-  runTimer();
-}
-
-function runTimer() {
-  clearInterval(timerInterval);
-  timerRunning = true;
-  document.getElementById('btn-timer-start').textContent = 'Stop';
-  timerInterval = setInterval(() => {
-    timerRemaining--;
-    updateTimerDisplay();
-    if (timerRemaining <= 0) {
-      clearInterval(timerInterval);
-      timerRunning = false;
-      document.getElementById('btn-timer-start').textContent = 'Start';
-      playBeep();
-      toast('? Rest done!');
-    }
-  }, 1000);
-}
-
-function updateTimerDisplay() {
-  const m = Math.floor(Math.abs(timerRemaining) / 60);
-  const s = Math.abs(timerRemaining) % 60;
-  document.getElementById('timer-display').textContent =
-    String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
-}
-
-function playBeep() {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain); gain.connect(ctx.destination);
-    osc.frequency.value = 880;
-    gain.gain.setValueAtTime(0.3, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
-    osc.start(); osc.stop(ctx.currentTime + 0.8);
-  } catch(e) {}
-}
-
-document.getElementById('timer-slider').addEventListener('input', () => {
-  timerRemaining = parseInt(document.getElementById('timer-slider').value);
-  updateTimerDisplay();
-});
-document.getElementById('btn-timer-start').addEventListener('click', () => {
-  if (timerRunning) {
-    clearInterval(timerInterval);
-    timerRunning = false;
-    document.getElementById('btn-timer-start').textContent = 'Start';
-  } else {
-    runTimer();
-  }
-});
-document.getElementById('btn-timer-cancel').addEventListener('click', () => {
-  clearInterval(timerInterval); timerRunning = false; closeOverlay('timer-overlay');
-});
 
 // -- Calendar ---------------------------------------------
 // A continuously scrollable list of months (screen-calendar). Months are
@@ -2163,8 +2062,32 @@ document.getElementById('btn-new-category-save').addEventListener('click', () =>
 });
 
 // -- Overlay helpers ------------------------------------
-function openOverlay(id) { document.getElementById(id).classList.add('open'); }
-function closeOverlay(id) { document.getElementById(id).classList.remove('open'); }
+// Which button-click reproduces each overlay's "Cancel" (no-save close) for
+// the back-button handler above. null means "no dedicated button, just close"
+// (matches that overlay's existing backdrop-tap behavior). comment-overlay is
+// mode-dependent and handled separately in dismissOverlayForBack().
+const OVERLAY_CANCEL_BUTTON = {
+  'field-picker-overlay': null,
+  'new-plan-overlay': 'btn-new-plan-cancel',
+  'presets-overlay': 'btn-presets-close',
+  'cal-detail-overlay': 'cal-detail-cancel',
+  'set-note-overlay': 'btn-set-note-cancel',
+  'records-overlay': 'btn-records-close',
+  'new-category-overlay': 'btn-new-category-cancel',
+  'cat-edit-overlay': 'btn-cat-edit-cancel',
+  'delete-exercise-overlay': 'btn-delete-ex-cancel',
+  'cat-delete-overlay': 'btn-cat-delete-cancel',
+  'reset-overlay': 'btn-reset-cancel',
+};
+
+function openOverlay(id) {
+  document.getElementById(id).classList.add('open');
+  pushOverlayHistory(id);
+}
+function closeOverlay(id) {
+  document.getElementById(id).classList.remove('open');
+  popOverlayHistoryIfNeeded(id);
+}
 
 // -- Day navigation (arrows + swipe share this) ----------
 function navigateDay(delta) {
@@ -2225,6 +2148,7 @@ document.getElementById('btn-home-sel-delete').addEventListener('click', deleteH
 setupHomeExDragReorder();
 setupDaySwipeNav();
 setupSetListDragReorder();
+setupTrainingSwipeNav();
 document.getElementById('btn-back-exercises').addEventListener('click', () => {
   if (exerciseBrowserMode === 'exercises' || exerciseBrowserMode === 'plan-days') {
     exerciseBrowserMode = 'categories';
@@ -2257,7 +2181,6 @@ document.getElementById('btn-training-pr').addEventListener('click', openExercis
 document.getElementById('btn-records-close').addEventListener('click', () => closeOverlay('records-overlay'));
 document.getElementById('btn-set-note-cancel').addEventListener('click', () => { noteEditIndex = null; closeOverlay('set-note-overlay'); });
 document.getElementById('btn-set-note-save').addEventListener('click', saveSetNote);
-document.getElementById('btn-back-exercise-info').addEventListener('click', () => goBack(exerciseInfoReturnScreen));
 document.getElementById('btn-global-ai-coach').addEventListener('click', () => {
   // TODO: link to the Chat Coach screen once it's built
 });
@@ -2299,7 +2222,7 @@ document.getElementById('exercise-search').addEventListener('input', e => {
   }
 });
 
-['cal-detail-overlay', 'timer-overlay', 'field-picker-overlay'].forEach(id => {
+['cal-detail-overlay', 'field-picker-overlay'].forEach(id => {
   document.getElementById(id).addEventListener('click', e => {
     if (e.target === e.currentTarget) closeOverlay(id);
   });

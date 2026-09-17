@@ -5,6 +5,13 @@
    actually types/edits or reads free-form text worth copying. */
 input, textarea, .comment-text { user-select: text; -webkit-user-select: text; -webkit-touch-callout: default; }
 
+/* Weight/reps: select-on-tap (see app.js) highlights the whole value like
+   FitNotes, but the native Cut/Copy/Translate action bar that highlight would
+   normally summon has no use here — you're about to overtype it, not copy
+   it — so it's suppressed (paired with a contextmenu preventDefault in JS)
+   while keeping the selection highlight itself intact. */
+#field-weight, #field-reps { -webkit-touch-callout: none; }
+
 :root {
   --toolbar: #212121;
   --daynav: #303030;
@@ -164,6 +171,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .tab { flex: 1; padding: 14px 4px; border: none; background: none; color: rgba(255,255,255,.55); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: .08em; border-bottom: 2px solid transparent; transition: color 0.15s, border-color 0.15s; }
 .tab.active { color: var(--cyan); border-bottom-color: var(--cyan); }
 
+.training-content-wrap { flex: 1; display: flex; flex-direction: column; min-height: 0; touch-action: pan-y; }
 .tab-content { display: none; flex: 1; overflow-y: auto; flex-direction: column; }
 .tab-content.active { display: flex; }
 
@@ -291,13 +299,6 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .cal-detail-ex { padding-top: 12px; }
 .cal-detail-ex:first-child { padding-top: 0; }
 .cal-detail-ex-name { font-size: 15px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }
-
-/* ── TIMER ────────────────────────────────────────────── */
-.timer-panel { align-items: center; text-align: center; gap: 20px; }
-.timer-panel h3 { font-size: 18px; font-weight: 500; }
-.timer-display { font-size: 64px; font-weight: 300; color: var(--cyan); letter-spacing: -2px; font-variant-numeric: tabular-nums; line-height: 1; }
-.timer-panel input[type="range"] { width: 100%; accent-color: var(--cyan); }
-.timer-btns { display: flex; gap: 8px; width: 100%; }
 
 /* ── TOAST ────────────────────────────────────────────── */
 .toast { position: fixed; bottom: calc(var(--safe-bottom) + 72px); left: 50%; transform: translateX(-50%) translateY(16px); background: #323232; color: white; font-size: 14px; padding: 10px 24px; border-radius: 4px; opacity: 0; pointer-events: none; z-index: 200; transition: opacity .18s, transform .18s; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
@@ -525,25 +526,3 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .field-picker-row.selected .field-picker-radio-dot { opacity: 1; }
 .field-picker-label { font-size: 16px; color: var(--text-primary); }
 
-/* ── EXERCISE INFO SCREEN ─────────────────────────────── */
-.ei-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 12px; display: flex; flex-direction: column; gap: 12px; padding-bottom: calc(var(--ai-bar-space) + 20px); }
-.ei-card { background: var(--surface); border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
-.ei-section-title { font-size: 11px; font-weight: 700; color: var(--cyan); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 12px; }
-.ei-gif-wrapper { display: flex; align-items: center; justify-content: center; min-height: 160px; }
-.ei-gif { max-width: 100%; max-height: 300px; border-radius: 6px; display: block; }
-.ei-gif-placeholder { font-size: 14px; color: var(--text-hint); text-align: center; padding: 24px; }
-.ei-muscle-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
-.ei-muscle-row:last-child { margin-bottom: 0; }
-.ei-muscle-label { font-size: 12px; font-weight: 600; color: var(--text-secondary); min-width: 72px; flex-shrink: 0; }
-.ei-badge { padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; text-transform: capitalize; }
-.ei-badge-primary { background: var(--cyan-light); color: var(--cyan); }
-.ei-badge-secondary { background: var(--bg); color: var(--text-secondary); border: 1px solid var(--border); }
-.ei-muscle-empty { font-size: 14px; color: var(--text-hint); }
-.ei-loading { display: flex; align-items: center; justify-content: center; padding: 20px; }
-.ei-loading.hidden { display: none; }
-.ei-spinner { width: 28px; height: 28px; border: 3px solid var(--border); border-top-color: var(--cyan); border-radius: 50%; animation: spin .8s linear infinite; }
-.ei-steps-list { display: flex; flex-direction: column; gap: 12px; }
-.ei-step { display: flex; align-items: flex-start; gap: 12px; }
-.ei-step-num { width: 24px; height: 24px; border-radius: 50%; background: var(--cyan); color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
-.ei-step-text { font-size: 15px; color: var(--text-primary); line-height: 1.5; flex: 1; }
-.ei-step-empty { font-size: 14px; color: var(--text-hint); }
