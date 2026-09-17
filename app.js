@@ -1333,12 +1333,15 @@ function renderExerciseInfoView() {
 const MUSCLE_PRIMARY_OPTIONS = MUSCLE_OPTIONS.map(m => ({ value: m, label: m }));
 const MUSCLE_SECONDARY_OPTIONS = [{ value: '', label: 'None' }, ...MUSCLE_PRIMARY_OPTIONS];
 
+console.log('[MuscleInfo] registering click handlers, primary btn found:', !!document.getElementById('info-primary-muscle'), '| secondary btn found:', !!document.getElementById('info-secondary-muscle'));
 document.getElementById('info-primary-muscle').addEventListener('click', () => {
+  console.log('[MuscleInfo] primary button clicked');
   openFieldPicker('Primary', MUSCLE_PRIMARY_OPTIONS, getFieldBtnValue('info-primary-muscle'), value => {
     setFieldBtnValue('info-primary-muscle', value, value);
   });
 });
 document.getElementById('info-secondary-muscle').addEventListener('click', () => {
+  console.log('[MuscleInfo] secondary button clicked');
   openFieldPicker('Secondary', MUSCLE_SECONDARY_OPTIONS, getFieldBtnValue('info-secondary-muscle'), value => {
     setFieldBtnValue('info-secondary-muscle', value, value || 'None');
   });
