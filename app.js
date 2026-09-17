@@ -1656,7 +1656,6 @@ function renderGraph() {
     if (!ex || !ex.sets.length) return acc;
     let val = 0;
     if (currentGraph === 'max-weight') val = Math.max(...ex.sets.map(s => parseFloat(s.weight) || 0));
-    if (currentGraph === 'volume') val = ex.sets.reduce((sum, s) => sum + (parseFloat(s.weight)||0) * (parseInt(s.reps)||0), 0);
     if (currentGraph === 'max-reps') val = Math.max(...ex.sets.map(s => parseInt(s.reps) || 0));
     acc.push({ date, val });
     return acc;
@@ -1692,7 +1691,7 @@ function renderGraph() {
   for (let i = 0; i <= 4; i++) {
     const y = pad.top + (gH / 4) * i;
     ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + gW, y); ctx.stroke();
-    const label = (maxV - (range / 4) * i).toFixed(currentGraph === 'volume' ? 0 : 1);
+    const label = (maxV - (range / 4) * i).toFixed(1);
     ctx.fillStyle = '#9e9e9e'; ctx.font = '11px Roboto'; ctx.textAlign = 'right';
     ctx.fillText(label, pad.left - 4, y + 4);
   }
