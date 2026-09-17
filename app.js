@@ -1137,7 +1137,6 @@ function renderExerciseItem(list, ex) {
     <svg class="exercise-item-dots" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
   `;
   item.querySelector('.exercise-item-name').addEventListener('click', () => {
-    addExerciseToWorkout(ex.name);
     openTraining(ex.name);
   });
   item.querySelector('.exercise-item-dots').addEventListener('click', e => {
@@ -1152,14 +1151,6 @@ function renderExerciseItem(list, ex) {
     ], e.currentTarget);
   });
   list.appendChild(item);
-}
-
-function addExerciseToWorkout(name) {
-  const workout = getWorkout(currentDate);
-  if (!workout.find(e => e.name === name)) {
-    workout.push({ name, sets: [] });
-    setWorkout(currentDate, workout);
-  }
 }
 
 // -- Training Screen ------------------------------------
@@ -1448,23 +1439,56 @@ function renderHistoryTab() {
     if (!ex || !ex.sets.length) return;
 
     const headerDiv = document.createElement('div');
-    headerDiv.className = 'history-day-header';
+    headerDiv.className = 'history-day-header clickable';
     headerDiv.innerHTML = `<div class="history-day-date">${formatDateShort(date)}</div><div class="history-day-divider"></div>`;
+    headerDiv.addEventListener('click', () => openHistoryGotoDate(date));
     container.appendChild(headerDiv);
 
     ex.sets.forEach((s, i) => {
       const isPR = firstPRKeys.has(date + '#' + i);
       const row = document.createElement('div');
-      row.className = 'history-set-row';
+      row.className = 'history-set-row clickable';
       row.innerHTML = `
         ${isPR ? `<svg class="history-set-pr" viewBox="0 0 24 24"><path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V17H7v2h10v-2h-4v-1.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z"/></svg>` : `<span class="history-set-spacer"></span>`}
         <span class="history-set-weight">${s.weight} kg</span>
         <span class="history-set-reps">${s.reps} reps</span>
       `;
+      row.addEventListener('click', () => openHistoryGotoExercise(currentExercise, date));
       container.appendChild(row);
     });
   });
 }
+
+// -- History "Go to..." popup (date header / set row taps) ----
+let historyGotoAction = null;
+
+function openHistoryGoto(title, action) {
+  document.getElementById('history-goto-title').textContent = title;
+  historyGotoAction = action;
+  openOverlay('history-goto-overlay');
+}
+
+function openHistoryGotoDate(dateStr) {
+  openHistoryGoto('Go to ' + formatDateShort(dateStr), () => {
+    currentDate = dateStr;
+    showScreen('screen-fitness-tracker');
+  });
+}
+
+function openHistoryGotoExercise(exerciseName, dateStr) {
+  openHistoryGoto(`Go to ${exerciseName} on ${formatDateShort(dateStr)}`, () => {
+    currentDate = dateStr;
+    openTraining(exerciseName);
+  });
+}
+
+document.getElementById('history-goto-cancel').addEventListener('click', () => closeOverlay('history-goto-overlay'));
+document.getElementById('history-goto-confirm').addEventListener('click', () => {
+  const action = historyGotoAction;
+  historyGotoAction = null;
+  closeOverlay('history-goto-overlay');
+  if (action) action();
+});
 
 // -- Graph Tab ------------------------------------------
 document.querySelectorAll('.graph-tab').forEach(t => {
@@ -2078,6 +2102,7 @@ const OVERLAY_CANCEL_BUTTON = {
   'delete-exercise-overlay': 'btn-delete-ex-cancel',
   'cat-delete-overlay': 'btn-cat-delete-cancel',
   'reset-overlay': 'btn-reset-cancel',
+  'history-goto-overlay': 'history-goto-cancel',
 };
 
 function openOverlay(id) {

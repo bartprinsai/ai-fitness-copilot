@@ -218,6 +218,12 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .history-day-date { font-size: 12px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 5px; }
 .history-day-divider { height: 2px; background: var(--cyan); }
 .history-set-row { display: flex; align-items: center; padding: 11px 16px; border-bottom: 1px solid var(--border); background: var(--surface); gap: 8px; }
+/* Only the History-tab rows are tappable ("go to" popups) — the same
+   .history-day-header/.history-set-row classes are reused, un-clickable, in
+   the Calendar day-detail popup, so the pointer/active feedback is scoped to
+   this modifier instead of the base class. */
+.history-day-header.clickable, .history-set-row.clickable { cursor: pointer; transition: background 0.08s; }
+.history-day-header.clickable:active, .history-set-row.clickable:active { background: var(--cyan-light); }
 .history-set-pr { width: 14px; height: 14px; fill: var(--cyan); flex-shrink: 0; }
 .history-set-spacer { width: 14px; flex-shrink: 0; }
 .history-set-weight { font-size: 15px; font-weight: 700; color: var(--text-primary); }
