@@ -1330,18 +1330,27 @@ function renderExerciseInfoView() {
   document.getElementById('exercise-info-edit-mode').classList.add('hidden');
 }
 
-function populateMuscleSelect(id, includeNone) {
-  const options = includeNone ? ['None', ...MUSCLE_OPTIONS] : MUSCLE_OPTIONS;
-  document.getElementById(id).innerHTML = options.map(m => `<option value="${m === 'None' ? '' : m}">${m}</option>`).join('');
-}
+const MUSCLE_PRIMARY_OPTIONS = MUSCLE_OPTIONS.map(m => ({ value: m, label: m }));
+const MUSCLE_SECONDARY_OPTIONS = [{ value: '', label: 'None' }, ...MUSCLE_PRIMARY_OPTIONS];
+
+document.getElementById('info-primary-muscle').addEventListener('click', () => {
+  openFieldPicker('Primary', MUSCLE_PRIMARY_OPTIONS, getFieldBtnValue('info-primary-muscle'), value => {
+    setFieldBtnValue('info-primary-muscle', value, value);
+  });
+});
+document.getElementById('info-secondary-muscle').addEventListener('click', () => {
+  openFieldPicker('Secondary', MUSCLE_SECONDARY_OPTIONS, getFieldBtnValue('info-secondary-muscle'), value => {
+    setFieldBtnValue('info-secondary-muscle', value, value || 'None');
+  });
+});
 
 function showExerciseInfoEdit() {
   const info = getExerciseInfo(currentExercise) || {};
   document.getElementById('exercise-info-edit-title').textContent = currentExercise + ' info';
-  populateMuscleSelect('info-primary-muscle', false);
-  populateMuscleSelect('info-secondary-muscle', true);
-  document.getElementById('info-primary-muscle').value = info.primaryMuscle || MUSCLE_OPTIONS[0];
-  document.getElementById('info-secondary-muscle').value = info.secondaryMuscle || '';
+  const primary = info.primaryMuscle || MUSCLE_OPTIONS[0];
+  setFieldBtnValue('info-primary-muscle', primary, primary);
+  const secondary = info.secondaryMuscle || '';
+  setFieldBtnValue('info-secondary-muscle', secondary, secondary || 'None');
   EXERCISE_INFO_EQUIPMENT_FIELDS.forEach(f => {
     document.getElementById(f.inputId).value = (info[f.key] !== undefined && info[f.key] !== null) ? info[f.key] : '';
   });
@@ -1356,8 +1365,8 @@ function openExerciseInfo() {
 
 function saveExerciseInfo() {
   const info = {};
-  const primary = document.getElementById('info-primary-muscle').value;
-  const secondary = document.getElementById('info-secondary-muscle').value;
+  const primary = getFieldBtnValue('info-primary-muscle');
+  const secondary = getFieldBtnValue('info-secondary-muscle');
   if (primary) info.primaryMuscle = primary;
   if (secondary) info.secondaryMuscle = secondary;
   EXERCISE_INFO_EQUIPMENT_FIELDS.forEach(f => {
