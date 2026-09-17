@@ -1318,14 +1318,9 @@ function renderExerciseInfoView() {
     ).join(''));
   }
   const content = document.getElementById('exercise-info-view-content');
-  const closeBtn = document.getElementById('btn-exercise-info-close');
-  if (sections.length === 0) {
-    content.innerHTML = `<div class="exercise-info-empty">No info added yet</div>`;
-    closeBtn.classList.add('hidden');
-  } else {
-    content.innerHTML = sections.join('');
-    closeBtn.classList.remove('hidden');
-  }
+  content.innerHTML = sections.length === 0
+    ? `<div class="exercise-info-empty">No info added yet</div>`
+    : sections.join('');
   document.getElementById('exercise-info-view-mode').classList.remove('hidden');
   document.getElementById('exercise-info-edit-mode').classList.add('hidden');
 }
