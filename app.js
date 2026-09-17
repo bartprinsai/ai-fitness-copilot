@@ -1826,24 +1826,72 @@ function openNewExercise() {
 
 let pendingEditExerciseOriginalName = null;
 
-function populateNewExCategorySelect(selected) {
-  const sel = document.getElementById('new-ex-category');
-  sel.innerHTML = '<option value="">Choose category...</option>';
-  [...new Set(allExercises().map(e => e.category))].sort().forEach(c => {
-    const opt = document.createElement('option');
-    opt.value = c; opt.textContent = c;
-    sel.appendChild(opt);
+// -- Custom field picker (replaces native <select>/picker for Category/Type/Weight Unit) --
+const EX_TYPE_OPTIONS = [
+  { value: 'weight_reps', label: 'Weight and Reps' },
+  { value: 'reps_only', label: 'Reps Only' },
+  { value: 'duration', label: 'Duration' },
+  { value: 'distance', label: 'Distance' },
+];
+const EX_WEIGHT_UNIT_OPTIONS = [
+  { value: 'kg', label: 'Kilogram' },
+  { value: 'lbs', label: 'Pounds' },
+];
+
+function setFieldBtnValue(id, value, label) {
+  const btn = document.getElementById(id);
+  btn.dataset.value = value;
+  btn.textContent = label;
+}
+function getFieldBtnValue(id) { return document.getElementById(id).dataset.value || ''; }
+
+let fieldPickerOnSelect = null;
+function openFieldPicker(title, options, selectedValue, onSelect) {
+  document.getElementById('field-picker-title').textContent = title;
+  document.getElementById('field-picker-list').innerHTML = options.map(o => `
+    <div class="field-picker-row${o.value === selectedValue ? ' selected' : ''}" data-value="${o.value}">
+      <span class="field-picker-radio"><span class="field-picker-radio-dot"></span></span>
+      <span class="field-picker-label">${o.label}</span>
+    </div>
+  `).join('');
+  fieldPickerOnSelect = onSelect;
+  openOverlay('field-picker-overlay');
+}
+document.getElementById('field-picker-list').addEventListener('click', e => {
+  const row = e.target.closest('.field-picker-row');
+  if (!row || !fieldPickerOnSelect) return;
+  const cb = fieldPickerOnSelect;
+  fieldPickerOnSelect = null;
+  closeOverlay('field-picker-overlay');
+  cb(row.dataset.value);
+});
+document.getElementById('new-ex-category').addEventListener('click', () => {
+  const categories = [...new Set(allExercises().map(e => e.category))].sort();
+  openFieldPicker('Category', categories.map(c => ({ value: c, label: c })), getFieldBtnValue('new-ex-category'), value => {
+    setFieldBtnValue('new-ex-category', value, value);
   });
-  if (selected) sel.value = selected;
+});
+document.getElementById('new-ex-type').addEventListener('click', () => {
+  openFieldPicker('Type', EX_TYPE_OPTIONS, getFieldBtnValue('new-ex-type'), value => {
+    setFieldBtnValue('new-ex-type', value, EX_TYPE_OPTIONS.find(o => o.value === value).label);
+  });
+});
+document.getElementById('new-ex-weight-unit').addEventListener('click', () => {
+  openFieldPicker('Weight Unit', EX_WEIGHT_UNIT_OPTIONS, getFieldBtnValue('new-ex-weight-unit'), value => {
+    setFieldBtnValue('new-ex-weight-unit', value, EX_WEIGHT_UNIT_OPTIONS.find(o => o.value === value).label);
+  });
+});
+
+function populateNewExCategorySelect(selected) {
+  setFieldBtnValue('new-ex-category', selected || '', selected || 'Choose category...');
 }
 
 function openNewExerciseScreen() {
   pendingEditExerciseOriginalName = null;
   document.getElementById('new-ex-title').textContent = 'New Exercise';
-  document.getElementById('btn-new-ex-save-add').classList.remove('hidden');
   document.getElementById('new-ex-name').value = '';
-  document.getElementById('new-ex-type').value = 'weight_reps';
-  document.getElementById('new-ex-weight-unit').value = 'kg';
+  setFieldBtnValue('new-ex-type', 'weight_reps', 'Weight and Reps');
+  setFieldBtnValue('new-ex-weight-unit', 'kg', 'Kilogram');
   populateNewExCategorySelect();
   showScreen('screen-new-exercise');
   setTimeout(() => document.getElementById('new-ex-name').focus(), 300);
@@ -1852,10 +1900,11 @@ function openNewExerciseScreen() {
 function openEditExerciseScreen(ex) {
   pendingEditExerciseOriginalName = ex.name;
   document.getElementById('new-ex-title').textContent = 'Update Exercise';
-  document.getElementById('btn-new-ex-save-add').classList.add('hidden');
   document.getElementById('new-ex-name').value = ex.name;
-  document.getElementById('new-ex-type').value = ex.type || 'weight_reps';
-  document.getElementById('new-ex-weight-unit').value = ex.weightUnit === 'lbs' ? 'lbs' : 'kg';
+  const typeOpt = EX_TYPE_OPTIONS.find(o => o.value === ex.type) || EX_TYPE_OPTIONS[0];
+  setFieldBtnValue('new-ex-type', typeOpt.value, typeOpt.label);
+  const wuOpt = ex.weightUnit === 'lbs' ? EX_WEIGHT_UNIT_OPTIONS[1] : EX_WEIGHT_UNIT_OPTIONS[0];
+  setFieldBtnValue('new-ex-weight-unit', wuOpt.value, wuOpt.label);
   populateNewExCategorySelect(ex.category);
   showScreen('screen-new-exercise');
 }
@@ -1905,11 +1954,11 @@ function updateExistingExercise(originalName, updated) {
   toast('Exercise updated');
 }
 
-function saveNewExerciseFromScreen(andAddAnother) {
+function saveNewExerciseFromScreen() {
   const name = document.getElementById('new-ex-name').value.trim();
-  const cat = document.getElementById('new-ex-category').value;
-  const type = document.getElementById('new-ex-type').value;
-  const weightUnit = document.getElementById('new-ex-weight-unit').value;
+  const cat = getFieldBtnValue('new-ex-category');
+  const type = getFieldBtnValue('new-ex-type');
+  const weightUnit = getFieldBtnValue('new-ex-weight-unit');
   if (!name) { toast('Enter a name'); return; }
   if (!cat) { toast('Choose a category'); return; }
 
@@ -1932,15 +1981,11 @@ function saveNewExerciseFromScreen(andAddAnother) {
   db.custom_exercises.push({ category: cat, name, type, weightUnit });
   persistCustomExercises();
   toast('Exercise created');
-  if (andAddAnother) {
-    openNewExerciseScreen();
-  } else {
-    exerciseBrowserMode = 'categories';
-    currentBrowseCategory = null;
-    setExercisesTitle('All Exercises');
-    renderCategoryBrowser();
-    showScreen('screen-exercises');
-  }
+  exerciseBrowserMode = 'categories';
+  currentBrowseCategory = null;
+  setExercisesTitle('All Exercises');
+  renderCategoryBrowser();
+  showScreen('screen-exercises');
 }
 
 // -- Delete exercise (built-in or custom) ----------------
@@ -1989,8 +2034,7 @@ document.getElementById('btn-delete-ex-confirm').addEventListener('click', () =>
 });
 
 document.getElementById('btn-new-ex-back').addEventListener('click', () => goBack('screen-exercises'));
-document.getElementById('btn-new-ex-save').addEventListener('click', () => saveNewExerciseFromScreen(false));
-document.getElementById('btn-new-ex-save-add').addEventListener('click', () => saveNewExerciseFromScreen(true));
+document.getElementById('btn-new-ex-save').addEventListener('click', () => saveNewExerciseFromScreen());
 document.getElementById('btn-new-ex-add-cat').addEventListener('click', () => {
   document.getElementById('new-category-input').value = '';
   openOverlay('new-category-overlay');
@@ -2000,13 +2044,7 @@ document.getElementById('btn-new-category-cancel').addEventListener('click', () 
 document.getElementById('btn-new-category-save').addEventListener('click', () => {
   const newCat = document.getElementById('new-category-input').value.trim();
   if (!newCat) return;
-  const sel = document.getElementById('new-ex-category');
-  if (![...sel.options].some(o => o.value === newCat)) {
-    const opt = document.createElement('option');
-    opt.value = newCat; opt.textContent = newCat;
-    sel.appendChild(opt);
-  }
-  sel.value = newCat;
+  setFieldBtnValue('new-ex-category', newCat, newCat);
   closeOverlay('new-category-overlay');
 });
 
@@ -2032,14 +2070,64 @@ document.getElementById('btn-new-exercise-cancel').addEventListener('click', () 
 function openOverlay(id) { document.getElementById(id).classList.add('open'); }
 function closeOverlay(id) { document.getElementById(id).classList.remove('open'); }
 
+// -- Day navigation (arrows + swipe share this) ----------
+function navigateDay(delta) {
+  exitHomeSelMode();
+  changeDate(delta);
+  renderHome();
+  const content = document.getElementById('home-content');
+  content.classList.remove('slide-in-next', 'slide-in-prev');
+  void content.offsetWidth;
+  content.classList.add(delta > 0 ? 'slide-in-next' : 'slide-in-prev');
+}
+
+function setupDaySwipeNav() {
+  const container = document.getElementById('home-content');
+  const SWIPE_THRESHOLD = 50;
+  const DIRECTION_LOCK = 10;
+  let startX = 0, startY = 0, tracking = false, direction = null;
+
+  container.addEventListener('touchstart', e => {
+    if (homeSelMode || e.touches.length !== 1) { tracking = false; return; }
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    tracking = true;
+    direction = null;
+  }, { passive: true });
+
+  container.addEventListener('touchmove', e => {
+    if (!tracking) return;
+    const dx = e.touches[0].clientX - startX;
+    const dy = e.touches[0].clientY - startY;
+    if (!direction) {
+      if (Math.abs(dx) < DIRECTION_LOCK && Math.abs(dy) < DIRECTION_LOCK) return;
+      direction = Math.abs(dx) > Math.abs(dy) ? 'horizontal' : 'vertical';
+    }
+    if (direction === 'horizontal') e.preventDefault();
+  }, { passive: false });
+
+  const endSwipe = e => {
+    if (!tracking) return;
+    if (direction === 'horizontal') {
+      const dx = e.changedTouches[0].clientX - startX;
+      if (Math.abs(dx) > SWIPE_THRESHOLD) navigateDay(dx < 0 ? 1 : -1);
+    }
+    tracking = false;
+    direction = null;
+  };
+  container.addEventListener('touchend', endSwipe, { passive: true });
+  container.addEventListener('touchcancel', () => { tracking = false; direction = null; }, { passive: true });
+}
+
 // -- Event Listeners ------------------------------------
-document.getElementById('btn-prev-day').addEventListener('click', () => { exitHomeSelMode(); changeDate(-1); renderHome(); });
-document.getElementById('btn-next-day').addEventListener('click', () => { exitHomeSelMode(); changeDate(1); renderHome(); });
+document.getElementById('btn-prev-day').addEventListener('click', () => navigateDay(-1));
+document.getElementById('btn-next-day').addEventListener('click', () => navigateDay(1));
 document.getElementById('btn-calendar').addEventListener('click', openCalendar);
 document.getElementById('btn-add-exercise').addEventListener('click', openExerciseList);
 document.getElementById('btn-home-sel-done').addEventListener('click', exitHomeSelMode);
 document.getElementById('btn-home-sel-delete').addEventListener('click', deleteHomeSelectedEx);
 setupHomeExDragReorder();
+setupDaySwipeNav();
 document.getElementById('btn-back-exercises').addEventListener('click', () => {
   if (exerciseBrowserMode === 'exercises' || exerciseBrowserMode === 'plan-days') {
     exerciseBrowserMode = 'categories';
@@ -2113,7 +2201,7 @@ document.getElementById('exercise-search').addEventListener('input', e => {
   }
 });
 
-['cal-detail-overlay', 'timer-overlay', 'new-exercise-overlay'].forEach(id => {
+['cal-detail-overlay', 'timer-overlay', 'new-exercise-overlay', 'field-picker-overlay'].forEach(id => {
   document.getElementById(id).addEventListener('click', e => {
     if (e.target === e.currentTarget) closeOverlay(id);
   });

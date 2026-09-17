@@ -248,7 +248,6 @@
     </button>
     <span class="toolbar-title" id="new-ex-title">New Exercise</span>
     <div class="toolbar-actions">
-      <button class="toolbar-btn new-ex-saveadd-btn" id="btn-new-ex-save-add" aria-label="Save and add another">✓+</button>
       <button class="toolbar-btn" id="btn-new-ex-save" aria-label="Save">
         <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
       </button>
@@ -262,26 +261,26 @@
     <div class="new-ex-section">
       <div class="new-ex-label">CATEGORY</div>
       <div class="new-ex-field-row">
-        <select id="new-ex-category" class="new-ex-select"></select>
+        <button type="button" class="new-ex-select new-ex-select-btn" id="new-ex-category"></button>
         <button class="new-ex-add-cat-btn" id="btn-new-ex-add-cat" aria-label="New category">+</button>
       </div>
     </div>
     <div class="new-ex-section">
       <div class="new-ex-label">TYPE</div>
-      <select id="new-ex-type" class="new-ex-select">
-        <option value="weight_reps">Weight and Reps</option>
-        <option value="reps_only">Reps Only</option>
-        <option value="duration">Duration</option>
-        <option value="distance">Distance</option>
-      </select>
+      <button type="button" class="new-ex-select new-ex-select-btn" id="new-ex-type"></button>
     </div>
     <div class="new-ex-section">
       <div class="new-ex-label">WEIGHT UNIT</div>
-      <select id="new-ex-weight-unit" class="new-ex-select">
-        <option value="kg">Kilogram</option>
-        <option value="lbs">Pounds</option>
-      </select>
+      <button type="button" class="new-ex-select new-ex-select-btn" id="new-ex-weight-unit"></button>
     </div>
+  </div>
+</div>
+
+<!-- FIELD PICKER OVERLAY (Category / Type / Weight Unit) -->
+<div class="overlay" id="field-picker-overlay">
+  <div class="overlay-panel">
+    <h3 class="field-picker-title" id="field-picker-title"></h3>
+    <div class="field-picker-list" id="field-picker-list"></div>
   </div>
 </div>
 
