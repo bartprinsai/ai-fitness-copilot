@@ -295,6 +295,9 @@
       <button class="toolbar-btn" id="btn-training-pr" aria-label="Records">
         <svg class="icon-outline" viewBox="0 0 24 24"><path d="M7 4h10v4a5 5 0 0 1-10 0V4z"/><path d="M7 5H4a1 1 0 0 0-1 1v1a4 4 0 0 0 4 4M17 5h3a1 1 0 0 1 1 1v1a4 4 0 0 1-4 4"/><path d="M12 13v4M8 21h8"/></svg>
       </button>
+      <button class="toolbar-btn" id="btn-training-info" aria-label="Exercise info">
+        <svg class="icon-outline" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8v.01"/></svg>
+      </button>
       <button class="toolbar-btn" id="btn-overflow-training" aria-label="Menu">
         <svg class="icon-solid" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
       </button>
@@ -591,6 +594,65 @@
     <div class="records-list" id="records-list"></div>
     <div class="overlay-btns">
       <button class="btn-primary" id="btn-records-close">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- EXERCISE INFO OVERLAY (muscle group / equipment setup) -->
+<div class="overlay" id="exercise-info-overlay">
+  <div class="overlay-panel">
+    <div id="exercise-info-view-mode">
+      <h3 id="exercise-info-view-title"></h3>
+      <div class="exercise-info-scroll" id="exercise-info-view-content"></div>
+      <div class="overlay-btns">
+        <button class="btn-primary" id="btn-exercise-info-edit">Edit</button>
+        <button class="btn-secondary" id="btn-exercise-info-close">Close</button>
+      </div>
+    </div>
+    <div id="exercise-info-edit-mode" class="hidden">
+      <h3 id="exercise-info-edit-title"></h3>
+      <div class="exercise-info-scroll">
+        <div class="info-section-label">Muscle group</div>
+        <div class="info-two-col">
+          <div class="info-field">
+            <label class="info-field-label" for="info-primary-muscle">Primary</label>
+            <select id="info-primary-muscle"></select>
+          </div>
+          <div class="info-field">
+            <label class="info-field-label" for="info-secondary-muscle">Secondary</label>
+            <select id="info-secondary-muscle"></select>
+          </div>
+        </div>
+        <div class="info-section-label">Equipment setup</div>
+        <div class="info-field">
+          <label class="info-field-label" for="info-bench-setting">Bench setting</label>
+          <input type="number" id="info-bench-setting" inputmode="numeric" step="1" placeholder="Leave empty to hide"/>
+        </div>
+        <div class="info-field">
+          <label class="info-field-label" for="info-bench-height">Bench height</label>
+          <input type="number" id="info-bench-height" inputmode="decimal" step="0.1" placeholder="Leave empty to hide"/>
+        </div>
+        <div class="info-field">
+          <label class="info-field-label" for="info-old-cable-height">Old machine cable height</label>
+          <input type="number" id="info-old-cable-height" inputmode="numeric" step="1" placeholder="Leave empty to hide"/>
+        </div>
+        <div class="info-field">
+          <label class="info-field-label" for="info-new-cable-height">New machine cable height</label>
+          <input type="number" id="info-new-cable-height" inputmode="numeric" step="1" placeholder="Leave empty to hide"/>
+        </div>
+        <div class="info-field">
+          <label class="info-field-label" for="info-hand-position">Hand position</label>
+          <input type="text" id="info-hand-position" placeholder="Leave empty to hide"/>
+        </div>
+        <div class="info-field">
+          <label class="info-field-label" for="info-foot-position">Foot position</label>
+          <input type="text" id="info-foot-position" placeholder="Leave empty to hide"/>
+        </div>
+      </div>
+      <div class="overlay-btns">
+        <button class="btn-secondary" id="btn-exercise-info-cancel">Cancel</button>
+        <button class="btn-primary" id="btn-exercise-info-save">Save</button>
+      </div>
     </div>
   </div>
 </div>

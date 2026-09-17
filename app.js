@@ -18,7 +18,7 @@ const fStore = firebase.firestore();
 let currentUser = null;
 
 // -- In-memory state ------------------------------------
-let db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, favoriteExercises: {}, hiddenBuiltins: {} };
+let db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, favoriteExercises: {}, hiddenBuiltins: {}, exerciseInfo: {} };
 
 // -- Home selection mode state --------------------------
 let homeSelMode = false;
@@ -122,9 +122,14 @@ async function persistHiddenBuiltins() {
   if (!currentUser) return;
   uDoc('meta/hidden_builtins').set({ names: Object.keys(db.hiddenBuiltins || {}) }).catch(e => console.error(e));
 }
+async function persistExerciseInfo() {
+  if (!currentUser) return;
+  uDoc('meta/exercise_info').set({ data: db.exerciseInfo || {} }).catch(e => console.error(e));
+}
+function getExerciseInfo(name) { return (db.exerciseInfo || {})[name] || null; }
 async function loadUserData(userUid) {
   try {
-    const [workoutsSnap, recordsSnap, customSnap, plansSnap, activePlanSnap, favoritesSnap, hiddenBuiltinsSnap] = await Promise.all([
+    const [workoutsSnap, recordsSnap, customSnap, plansSnap, activePlanSnap, favoritesSnap, hiddenBuiltinsSnap, exerciseInfoSnap] = await Promise.all([
       fStore.collection('users/' + userUid + '/workouts').get(),
       fStore.doc('users/' + userUid + '/meta/records').get(),
       fStore.doc('users/' + userUid + '/meta/custom_exercises').get(),
@@ -132,6 +137,7 @@ async function loadUserData(userUid) {
       fStore.doc('users/' + userUid + '/meta/activeplan').get(),
       fStore.doc('users/' + userUid + '/meta/favorites').get(),
       fStore.doc('users/' + userUid + '/meta/hidden_builtins').get(),
+      fStore.doc('users/' + userUid + '/meta/exercise_info').get(),
     ]);
     db.workouts = {};
     db.sessionNotes = {};
@@ -153,6 +159,7 @@ async function loadUserData(userUid) {
     if (hiddenBuiltinsSnap.exists) {
       (hiddenBuiltinsSnap.data().names || []).forEach(name => { db.hiddenBuiltins[name] = true; });
     }
+    db.exerciseInfo = exerciseInfoSnap.exists ? (exerciseInfoSnap.data().data || {}) : {};
   } catch(e) {
     console.error('loadUserData', e);
   }
@@ -277,6 +284,11 @@ function dismissOverlayForBack(id) {
   if (id === 'comment-overlay') {
     const editing = !document.getElementById('comment-edit-mode').classList.contains('hidden');
     document.getElementById(editing ? 'btn-comment-cancel' : 'btn-comment-done').click();
+    return;
+  }
+  if (id === 'exercise-info-overlay') {
+    const editing = !document.getElementById('exercise-info-edit-mode').classList.contains('hidden');
+    document.getElementById(editing ? 'btn-exercise-info-cancel' : 'btn-exercise-info-close').click();
     return;
   }
   const btnId = OVERLAY_CANCEL_BUTTON[id];
@@ -1264,6 +1276,93 @@ function openExerciseRecords() {
   openOverlay('records-overlay');
 }
 
+// -- Exercise info (muscle group / equipment setup) ------
+// Exercise-own data, keyed by exercise name (same join key as favorites/
+// hiddenBuiltins) — not tied to any session/set, so it's stored and loaded
+// independently of db.workouts.
+const MUSCLE_OPTIONS = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Quadriceps', 'Hamstrings', 'Glutes', 'Core', 'Calves'];
+const EXERCISE_INFO_EQUIPMENT_FIELDS = [
+  { key: 'benchSetting', label: 'Bench setting', inputId: 'info-bench-setting', type: 'int' },
+  { key: 'benchHeight', label: 'Bench height', inputId: 'info-bench-height', type: 'float1' },
+  { key: 'oldMachineCableHeight', label: 'Old machine cable height', inputId: 'info-old-cable-height', type: 'int' },
+  { key: 'newMachineCableHeight', label: 'New machine cable height', inputId: 'info-new-cable-height', type: 'int' },
+  { key: 'handPosition', label: 'Hand position', inputId: 'info-hand-position', type: 'text' },
+  { key: 'footPosition', label: 'Foot position', inputId: 'info-foot-position', type: 'text' },
+];
+
+function renderExerciseInfoView() {
+  const info = getExerciseInfo(currentExercise) || {};
+  document.getElementById('exercise-info-view-title').textContent = currentExercise + ' info';
+  const sections = [];
+  if (info.primaryMuscle || info.secondaryMuscle) {
+    sections.push(`<div class="info-section-label">Muscle group</div><div class="info-two-col">
+      ${info.primaryMuscle ? `<div class="info-view-stat"><span class="info-view-stat-label">Primary</span><span class="info-view-stat-value">${info.primaryMuscle}</span></div>` : ''}
+      ${info.secondaryMuscle ? `<div class="info-view-stat"><span class="info-view-stat-label">Secondary</span><span class="info-view-stat-value">${info.secondaryMuscle}</span></div>` : ''}
+    </div>`);
+  }
+  const equipRows = EXERCISE_INFO_EQUIPMENT_FIELDS.filter(f => info[f.key] !== undefined && info[f.key] !== null && info[f.key] !== '');
+  if (equipRows.length > 0) {
+    sections.push('<div class="info-section-label">Equipment setup</div>' + equipRows.map(f =>
+      `<div class="info-view-row"><span class="info-view-row-label">${f.label}</span><span class="info-view-row-value">${info[f.key]}</span></div>`
+    ).join(''));
+  }
+  const content = document.getElementById('exercise-info-view-content');
+  const closeBtn = document.getElementById('btn-exercise-info-close');
+  if (sections.length === 0) {
+    content.innerHTML = `<div class="exercise-info-empty">No info added yet</div>`;
+    closeBtn.classList.add('hidden');
+  } else {
+    content.innerHTML = sections.join('');
+    closeBtn.classList.remove('hidden');
+  }
+  document.getElementById('exercise-info-view-mode').classList.remove('hidden');
+  document.getElementById('exercise-info-edit-mode').classList.add('hidden');
+}
+
+function populateMuscleSelect(id, includeNone) {
+  const options = includeNone ? ['None', ...MUSCLE_OPTIONS] : MUSCLE_OPTIONS;
+  document.getElementById(id).innerHTML = options.map(m => `<option value="${m === 'None' ? '' : m}">${m}</option>`).join('');
+}
+
+function showExerciseInfoEdit() {
+  const info = getExerciseInfo(currentExercise) || {};
+  document.getElementById('exercise-info-edit-title').textContent = currentExercise + ' info';
+  populateMuscleSelect('info-primary-muscle', false);
+  populateMuscleSelect('info-secondary-muscle', true);
+  document.getElementById('info-primary-muscle').value = info.primaryMuscle || MUSCLE_OPTIONS[0];
+  document.getElementById('info-secondary-muscle').value = info.secondaryMuscle || '';
+  EXERCISE_INFO_EQUIPMENT_FIELDS.forEach(f => {
+    document.getElementById(f.inputId).value = (info[f.key] !== undefined && info[f.key] !== null) ? info[f.key] : '';
+  });
+  document.getElementById('exercise-info-edit-mode').classList.remove('hidden');
+  document.getElementById('exercise-info-view-mode').classList.add('hidden');
+}
+
+function openExerciseInfo() {
+  renderExerciseInfoView();
+  openOverlay('exercise-info-overlay');
+}
+
+function saveExerciseInfo() {
+  const info = {};
+  const primary = document.getElementById('info-primary-muscle').value;
+  const secondary = document.getElementById('info-secondary-muscle').value;
+  if (primary) info.primaryMuscle = primary;
+  if (secondary) info.secondaryMuscle = secondary;
+  EXERCISE_INFO_EQUIPMENT_FIELDS.forEach(f => {
+    const raw = document.getElementById(f.inputId).value.trim();
+    if (raw === '') return;
+    if (f.type === 'int') info[f.key] = parseInt(raw, 10);
+    else if (f.type === 'float1') info[f.key] = Math.round(parseFloat(raw) * 10) / 10;
+    else info[f.key] = raw;
+  });
+  if (!db.exerciseInfo) db.exerciseInfo = {};
+  if (Object.keys(info).length === 0) delete db.exerciseInfo[currentExercise];
+  else db.exerciseInfo[currentExercise] = info;
+  persistExerciseInfo();
+  renderExerciseInfoView();
+}
+
 function saveSet() {
   const weight = parseFloat(document.getElementById('field-weight').value) || 0;
   const reps = parseInt(document.getElementById('field-reps').value) || 0;
@@ -1987,6 +2086,11 @@ function updateExistingExercise(originalName, updated) {
       delete db.favoriteExercises[originalName];
       persistFavorites();
     }
+    if (db.exerciseInfo && db.exerciseInfo[originalName]) {
+      db.exerciseInfo[updated.name] = db.exerciseInfo[originalName];
+      delete db.exerciseInfo[originalName];
+      persistExerciseInfo();
+    }
   }
   toast('Exercise updated');
 }
@@ -2063,6 +2167,7 @@ document.getElementById('btn-delete-ex-confirm').addEventListener('click', () =>
   });
   if (db.records && db.records[name]) { delete db.records[name]; persistRecords(); }
   if (db.favoriteExercises && db.favoriteExercises[name]) { delete db.favoriteExercises[name]; persistFavorites(); }
+  if (db.exerciseInfo && db.exerciseInfo[name]) { delete db.exerciseInfo[name]; persistExerciseInfo(); }
   pendingDeleteExercise = null;
   closeOverlay('delete-exercise-overlay');
   refreshExerciseList();
@@ -2204,6 +2309,11 @@ document.getElementById('btn-clear').addEventListener('click', () => {
 });
 document.getElementById('btn-training-pr').addEventListener('click', openExerciseRecords);
 document.getElementById('btn-records-close').addEventListener('click', () => closeOverlay('records-overlay'));
+document.getElementById('btn-training-info').addEventListener('click', openExerciseInfo);
+document.getElementById('btn-exercise-info-edit').addEventListener('click', showExerciseInfoEdit);
+document.getElementById('btn-exercise-info-close').addEventListener('click', () => closeOverlay('exercise-info-overlay'));
+document.getElementById('btn-exercise-info-cancel').addEventListener('click', renderExerciseInfoView);
+document.getElementById('btn-exercise-info-save').addEventListener('click', saveExerciseInfo);
 document.getElementById('btn-set-note-cancel').addEventListener('click', () => { noteEditIndex = null; closeOverlay('set-note-overlay'); });
 document.getElementById('btn-set-note-save').addEventListener('click', saveSetNote);
 document.getElementById('btn-global-ai-coach').addEventListener('click', () => {

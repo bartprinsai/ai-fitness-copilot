@@ -48,7 +48,7 @@ Een fitness tracker PWA (Progressive Web App) waarmee je workouts bijhoudt: sets
 - **Hosting**: GitHub Pages → https://bartprinsai.github.io/ai-fitness-copilot
 - **Database**: Firebase Firestore (workout data per gebruiker)
 - **Auth**: Firebase Authentication (Google login)
-- **Exercise data**: free-exercise-db (GitHub, `dist/exercises.json`) voor spiergroepen en instructies, lokale mp4's in `exercises/videos/` voor animaties (nu: squat, bench press — niet elke oefening heeft er een)
+- **Exercise data**: statische lijst in `exercises.js`, geen externe dataset meer
 - **AI (Workout Plan Builder)**: Anthropic API — rechtstreeks vanuit de browser via `anthropic-dangerous-direct-browser-access`, vereist een eigen API key in `app.js`
 - **Repo**: https://github.com/bartprinsai/ai-fitness-copilot
 - **Lokale map**: C:\Users\bartp\projecten\ai-fitness-copilot
@@ -63,7 +63,6 @@ ai-fitness-copilot/
 ├── exercises.js            # Lijst van oefeningen
 ├── style.css                # Styling
 ├── manifest.json            # PWA manifest (start_url/scope: /ai-fitness-copilot/)
-├── exercises/videos/         # Lokale mp4-animaties per oefening
 ├── scripts/                  # Eenmalige admin-scripts (niet onderdeel van de live app)
 │   └── cleanup-video-fields.js
 ├── icon-192.png
@@ -94,7 +93,7 @@ getWorkout(date)                   // Haal workout op voor datum
 setWorkout(date, workout)          // Sla workout op in Firestore
 renderSetList()                    // Herrender de set lijst
 toast(message)                     // Toon een toast melding
-openExerciseInfo(exerciseName)     // Open exercise info scherm (video + spieren + instructies)
+openExerciseInfo()                 // Open exercise info bottom-sheet (spiergroep + apparaat-instellingen)
 callClaude(userMessage, sysPrompt) // Anthropic API call voor de AI plan generator
 ```
 
@@ -113,7 +112,7 @@ callClaude(userMessage, sysPrompt) // Anthropic API call voor de AI plan generat
 - **Drag-to-reorder** oefeningen in daglijst (ingedrukt houden → slepen)
 - Leeg-workoutlog-scherm toont nu "Workout Log Empty" + "Start New Workout" (de losse "AI Coach"-tegel hier is vervallen — die functionaliteit zit nu in de globale AI Coach-pil hierboven)
 - **"Start New Workout"** opent niet meer direct "All Exercises", maar eerst het **New Workout-tussenscherm** (`#screen-new-workout`) met drie kaarten: Manual Workout (→ All Exercises, werkt), Load Schedule Manually (TODO) en Load Schedule Automatically (TODO, toont via `getTodaysScheduledDayName()` welke plandag er volgens de bestaande plan-rotatielogica vandaag aan de beurt zou zijn)
-- **Exercise info scherm** — lokale video-animatie waar beschikbaar, spiergroepen en instructies uit free-exercise-db. Bereikbaar via het ⓘ-icoon in de training-toolbar (niet meer per oefening in de All Exercises-lijst, dat icoon is verwijderd)
+- **Exercise info bottom-sheet** — per oefening: spiergroep (Primary/Secondary dropdown) en apparaat-instellingen (bench setting/height, oude/nieuwe cable height, hand/foot position). Bereikbaar via het ⓘ-icoon in de training-toolbar, tussen de trofee en het drie-puntjes-menu. View mode toont alleen ingevulde velden (leeg = lege staat met alleen Edit-knop); Edit mode heeft dropdowns voor spiergroep en losse velden voor apparaat-instellingen (leeg gelaten veld wordt niet opgeslagen). Data hoort bij de oefening zelf (net als favorite/hidden), opgeslagen in Firestore onder `meta/exercise_info`, keyed op oefeningnaam — migreert mee bij hernoemen, verwijderd bij delete
 - **FitNotes-geïnspireerde** visuele stijl (lichtgrijs, cyaan accenten, witte kaarten)
 - **Nieuw oefening aanmaken** scherm (NAME, CATEGORY, TYPE, WEIGHT UNIT — het NOTES-veld is verwijderd) — hetzelfde scherm dient ook als **Edit**-formulier voor élke oefening, ook ingebouwde (titel wisselt naar "Update Exercise"); categorie/type/dropdown-velden zijn onderlijnd (FitNotes-stijl), nieuwe categorie aanmaken gaat via een aparte "New Category"-modal
 - **Edit/Delete/Favorite per oefening** via drie puntjes menu in de All Exercises-lijst — identiek voor ingebouwde én zelf toegevoegde oefeningen (Edit van een ingebouwde oefening zet 'm om in een custom-override; Delete van een ingebouwde oefening verbergt 'm via `db.hiddenBuiltins`, zie `DESIGN_SYSTEM.md`). Favorieten krijgen een blauw sterretje en verschijnen gebundeld in een automatische "Favorites"-categorie bovenaan. Delete cascadeert door alle gelogde workouts/records/favorieten voor die oefening
@@ -129,13 +128,7 @@ callClaude(userMessage, sysPrompt) // Anthropic API call voor de AI plan generat
 - **Copy Previous Workout**-tegel (kopieerde oefeningsnamen van de laatste workout met sets naar de huidige dag, zonder sets) — vervangen door de "AI Coach"-placeholdertegel
 - Reden: persoonlijke app, deze features kostten meer onderhoud dan ze waarde opleverden
 - Oude `videoId`/`idbKey` velden in bestaande Firestore-documenten zijn opgeschoond via `scripts/cleanup-video-fields.js` (eenmalig, met Firebase Admin SDK — zie het bestand zelf voor gebruiksinstructies)
-
----
-
-## Opgeloste bugs
-### Exercise info pagina toonde "Animation not available" / "No muscle data" / "Could not load instructions"
-- **Oorzaak**: verkeerde dataset-URL (`.../exercises/exercises.json` i.p.v. `.../dist/exercises.json`) en een CORS-blokkade op directe Anthropic API calls voor instructies vanuit GitHub Pages
-- **Oplossing die uiteindelijk is gebouwd**: dataset-URL gefixt naar `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/dist/exercises.json`; spiergroepen en instructies komen rechtstreeks uit die dataset (geen wger of Anthropic API nodig); animaties zijn overgestapt van een externe GIF-API naar lokaal gehoste mp4's in `exercises/videos/` (nog niet voor elke oefening aanwezig — valt dan terug op "Animation not available")
+- **Video/instructies exercise info** (lokale mp4's in `exercises/videos/`, spiergroepen/instructies uit de free-exercise-db dataset `dist/exercises.json` met fuzzy-name-matching) — vervangen door het handmatig invulbare exercise info bottom-sheet hierboven (spiergroep + apparaat-instellingen, eigen Firestore-veld, geen externe dataset)
 
 ---
 
@@ -143,7 +136,6 @@ callClaude(userMessage, sysPrompt) // Anthropic API call voor de AI plan generat
 1. Chat Coach activeren (koppelen aan de globale AI Coach-balk)
 2. Nutrition sectie bouwen
 3. Progress sectie bouwen
-4. Meer lokale video-animaties toevoegen voor oefeningen die er nog geen hebben
 
 ---
 
