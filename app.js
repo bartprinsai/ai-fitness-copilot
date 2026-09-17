@@ -373,7 +373,11 @@ document.getElementById('btn-overflow-home').addEventListener('click', e => {
   ], e.currentTarget);
 });
 document.getElementById('btn-overflow-training').addEventListener('click', e => {
-  showOverflowMenu([{ label: 'Sign out', action: signOutUser }], e.currentTarget);
+  showOverflowMenu([
+    { label: 'Rest Timer', action: openTimer },
+    { label: 'Exercise Info', action: () => { if (currentExercise) openExerciseInfo(currentExercise, 'screen-training'); } },
+    { label: 'Sign out', action: signOutUser },
+  ], e.currentTarget);
 });
 document.getElementById('btn-overflow-exercises').addEventListener('click', e => {
   showOverflowMenu([{ label: 'Sign out', action: signOutUser }], e.currentTarget);
@@ -772,6 +776,113 @@ function setupHomeExDragReorder() {
   container.addEventListener('touchcancel', endDrag, { passive: true });
 }
 
+// -- Set list drag reorder (long-press a set row to drag it) --
+let setDragItem = null, setDragStartY = 0, setDragDy = 0;
+let setLongPressTimer = null, setDragSuppressClick = false;
+
+function startSetDrag(row, startY) {
+  setDragItem = row;
+  setDragStartY = startY;
+  setDragDy = 0;
+  row.classList.add('set-row-dragging');
+}
+
+function handleSetDragMove(touchY) {
+  setDragDy = touchY - setDragStartY;
+  setDragItem.style.transform = `translateY(${setDragDy}px)`;
+
+  const list = document.getElementById('set-list');
+  const rows = [...list.querySelectorAll('.set-row')];
+  const dragPos = rows.indexOf(setDragItem);
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i] === setDragItem) continue;
+    const sibRect = rows[i].getBoundingClientRect();
+    const sibCenter = sibRect.top + sibRect.height / 2;
+    if (dragPos < i && touchY > sibCenter) {
+      rows[i].insertAdjacentElement('afterend', setDragItem);
+      setDragStartY += sibRect.height;
+      setDragDy -= sibRect.height;
+      setDragItem.style.transform = `translateY(${setDragDy}px)`;
+      break;
+    } else if (dragPos > i && touchY < sibCenter) {
+      rows[i].insertAdjacentElement('beforebegin', setDragItem);
+      setDragStartY -= sibRect.height;
+      setDragDy += sibRect.height;
+      setDragItem.style.transform = `translateY(${setDragDy}px)`;
+      break;
+    }
+  }
+}
+
+function endSetDrag() {
+  if (!setDragItem) return;
+  setDragItem.classList.remove('set-row-dragging');
+  setDragItem.style.transform = '';
+
+  const list = document.getElementById('set-list');
+  const rows = [...list.querySelectorAll('.set-row')];
+  const oldIdxOrder = rows.map(r => parseInt(r.dataset.setIdx, 10));
+  const isReordered = oldIdxOrder.some((idx, pos) => idx !== pos);
+
+  if (isReordered) {
+    const workout = getWorkout(currentDate);
+    const ex = workout.find(e => e.name === currentExercise);
+    if (ex) {
+      const newSets = oldIdxOrder.map(idx => ex.sets[idx]);
+      if (selectedSetIndex !== null) selectedSetIndex = oldIdxOrder.indexOf(selectedSetIndex);
+      ex.sets = newSets;
+      setWorkout(currentDate, workout);
+      toast('Order saved');
+    }
+  }
+  setDragItem = null;
+  renderSetList();
+}
+
+function setupSetListDragReorder() {
+  const list = document.getElementById('set-list');
+
+  const cancelLongPress = () => { if (setLongPressTimer) { clearTimeout(setLongPressTimer); setLongPressTimer = null; } };
+
+  list.addEventListener('touchstart', e => {
+    const row = e.target.closest('.set-row');
+    if (!row || e.touches.length !== 1) return;
+    const startY = e.touches[0].clientY;
+    setLongPressTimer = setTimeout(() => {
+      setLongPressTimer = null;
+      setDragSuppressClick = true;
+      if (navigator.vibrate) navigator.vibrate(30);
+      startSetDrag(row, startY);
+    }, 500);
+  }, { passive: true });
+
+  list.addEventListener('touchmove', e => {
+    if (setDragItem) {
+      e.preventDefault();
+      handleSetDragMove(e.touches[0].clientY);
+      return;
+    }
+    cancelLongPress();
+  }, { passive: false });
+
+  const endTouch = () => {
+    cancelLongPress();
+    if (setDragItem) endSetDrag();
+  };
+  list.addEventListener('touchend', endTouch, { passive: true });
+  list.addEventListener('touchcancel', endTouch, { passive: true });
+
+  // Swallow the click a long-press-triggered drag would otherwise leave behind,
+  // so it never also fires selectSet() on the row.
+  list.addEventListener('click', e => {
+    if (setDragSuppressClick) {
+      e.stopPropagation();
+      e.preventDefault();
+      setDragSuppressClick = false;
+    }
+  }, true);
+}
+
 // -- Exercise Browser -----------------------------------
 function setExercisesTitle(text) {
   document.getElementById('exercises-title').textContent = text;
@@ -1164,10 +1275,20 @@ function prefillFromLastWorkout(name) {
   document.getElementById('field-reps').value = 0;
 }
 
+function updateActionButtonsUI() {
+  const isEditing = selectedSetIndex !== null;
+  const saveBtn = document.getElementById('btn-save-set');
+  const clearBtn = document.getElementById('btn-clear');
+  saveBtn.textContent = isEditing ? 'UPDATE' : 'SAVE';
+  clearBtn.textContent = isEditing ? 'DELETE' : 'CLEAR';
+  clearBtn.classList.toggle('btn-delete-mode', isEditing);
+}
+
 function renderSetList() {
   const list = document.getElementById('set-list');
   const ex = getCurrentExerciseData();
   const sets = ex ? ex.sets : [];
+  updateActionButtonsUI();
 
   if (sets.length === 0) {
     list.innerHTML = `<div style="padding:24px;text-align:center;color:#9e9e9e;font-size:14px">No sets yet. Enter weight and reps, then tap SAVE.</div>`;
@@ -1183,17 +1304,15 @@ function renderSetList() {
     const isSelected = selectedSetIndex === i;
     const row = document.createElement('div');
     row.className = 'set-row' + (isSelected ? ' selected' : '');
+    row.dataset.setIdx = i;
     row.innerHTML = `
       <span class="set-comment${hasNote ? ' has-note' : ''}" aria-label="Set note"><svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg></span>
       <span class="set-row-pr">${isPR ? `<svg class="set-pr-icon" viewBox="0 0 24 24"><path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V17H7v2h10v-2h-4v-1.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z"/></svg>` : ''}</span>
       <span class="set-num">${i + 1}</span>
       <span class="set-weight"><span class="set-weight-val">${s.weight}</span><span class="set-weight-unit">kgs</span></span>
       <span class="set-reps"><span class="set-reps-val">${s.reps}</span><span class="set-reps-unit">reps</span></span>
-      ${isSelected ? `<button class="set-delete" aria-label="Delete set ${i + 1}"><svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>` : ''}
     `;
     row.querySelector('.set-comment').addEventListener('click', e => { e.stopPropagation(); openSetNote(i); });
-    const delBtn = row.querySelector('.set-delete');
-    if (delBtn) delBtn.addEventListener('click', e => { e.stopPropagation(); deleteSet(i); });
     row.addEventListener('click', () => selectSet(i));
     list.appendChild(row);
   });
@@ -1321,6 +1440,14 @@ document.querySelectorAll('.field-btn').forEach(btn => {
     val = dir === '+' ? val + step : Math.max(0, val - step);
     input.value = field === 'weight' ? val.toFixed(1).replace('.0', '') : val;
   });
+});
+
+// Tap a weight/reps number to select it all, so typing overwrites it
+// instead of inserting a cursor at the tap position.
+['field-weight', 'field-reps'].forEach(id => {
+  const input = document.getElementById(id);
+  input.addEventListener('focus', () => input.select());
+  input.addEventListener('click', () => input.select());
 });
 
 // -- Tabs -----------------------------------------------
@@ -2097,6 +2224,7 @@ document.getElementById('btn-home-sel-done').addEventListener('click', exitHomeS
 document.getElementById('btn-home-sel-delete').addEventListener('click', deleteHomeSelectedEx);
 setupHomeExDragReorder();
 setupDaySwipeNav();
+setupSetListDragReorder();
 document.getElementById('btn-back-exercises').addEventListener('click', () => {
   if (exerciseBrowserMode === 'exercises' || exerciseBrowserMode === 'plan-days') {
     exerciseBrowserMode = 'categories';
@@ -2121,13 +2249,14 @@ document.getElementById('btn-nw-schema-auto').addEventListener('click', () => {
   // TODO: automatisch schema laden — nog niet gebouwd
 });
 document.getElementById('btn-save-set').addEventListener('click', saveSet);
-document.getElementById('btn-clear').addEventListener('click', clearFields);
-document.getElementById('btn-timer').addEventListener('click', openTimer);
+document.getElementById('btn-clear').addEventListener('click', () => {
+  if (selectedSetIndex !== null) deleteSet(selectedSetIndex);
+  else clearFields();
+});
 document.getElementById('btn-training-pr').addEventListener('click', openExerciseRecords);
 document.getElementById('btn-records-close').addEventListener('click', () => closeOverlay('records-overlay'));
 document.getElementById('btn-set-note-cancel').addEventListener('click', () => { noteEditIndex = null; closeOverlay('set-note-overlay'); });
 document.getElementById('btn-set-note-save').addEventListener('click', saveSetNote);
-document.getElementById('btn-training-info').addEventListener('click', () => { if (currentExercise) openExerciseInfo(currentExercise, 'screen-training'); });
 document.getElementById('btn-back-exercise-info').addEventListener('click', () => goBack(exerciseInfoReturnScreen));
 document.getElementById('btn-global-ai-coach').addEventListener('click', () => {
   // TODO: link to the Chat Coach screen once it's built

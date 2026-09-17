@@ -292,14 +292,8 @@
     </button>
     <span class="toolbar-title" id="training-title">Exercise</span>
     <div class="toolbar-actions">
-      <button class="toolbar-btn" id="btn-timer" aria-label="Rest timer">
-        <svg class="icon-outline" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 13.5"/></svg>
-      </button>
       <button class="toolbar-btn" id="btn-training-pr" aria-label="Records">
         <svg class="icon-outline" viewBox="0 0 24 24"><path d="M7 4h10v4a5 5 0 0 1-10 0V4z"/><path d="M7 5H4a1 1 0 0 0-1 1v1a4 4 0 0 0 4 4M17 5h3a1 1 0 0 1 1 1v1a4 4 0 0 1-4 4"/><path d="M12 13v4M8 21h8"/></svg>
-      </button>
-      <button class="toolbar-btn" id="btn-training-info" aria-label="Info">
-        <svg class="icon-outline" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><circle cx="12" cy="7.7" r="0.6" fill="white" stroke="none"/></svg>
       </button>
       <button class="toolbar-btn" id="btn-overflow-training" aria-label="Menu">
         <svg class="icon-solid" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
@@ -320,7 +314,7 @@
         <div class="field-cyan-line"></div>
         <div class="field-controls">
           <button class="field-btn" data-field="weight" data-dir="-">−</button>
-          <input type="number" id="field-weight" inputmode="decimal" step="0.5" min="0" value="0"/>
+          <input type="text" id="field-weight" inputmode="decimal" value="0"/>
           <button class="field-btn" data-field="weight" data-dir="+">+</button>
         </div>
       </div>
@@ -329,7 +323,7 @@
         <div class="field-cyan-line"></div>
         <div class="field-controls">
           <button class="field-btn" data-field="reps" data-dir="-">−</button>
-          <input type="number" id="field-reps" inputmode="numeric" step="1" min="0" value="0"/>
+          <input type="text" id="field-reps" inputmode="numeric" value="0"/>
           <button class="field-btn" data-field="reps" data-dir="+">+</button>
         </div>
       </div>
