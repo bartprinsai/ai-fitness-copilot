@@ -1469,6 +1469,12 @@ document.querySelectorAll('.field-btn').forEach(btn => {
   input.addEventListener('focus', () => input.select());
   input.addEventListener('click', () => input.select());
   input.addEventListener('contextmenu', e => e.preventDefault());
+  // Chrome's "previously entered values" suggestion list is keyed by the
+  // field's name (falling back to id when name is absent), so autocomplete="off"
+  // alone doesn't suppress it here. Giving the field a fresh random name on
+  // every load means Chrome never finds a history match for it.
+  input.setAttribute('autocomplete', 'off');
+  input.name = id + '-' + Math.random().toString(36).slice(2);
 });
 
 // -- Tabs -----------------------------------------------
