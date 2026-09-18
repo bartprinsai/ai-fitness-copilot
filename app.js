@@ -283,11 +283,18 @@ function goBack(fallbackId) {
 // Any open .overlay popup pushes its own history entry, so the hardware/
 // Android back button closes it (same as its own Cancel button) instead of
 // letting the press fall through to screen navigation underneath it.
-let openOverlayId = null;
+//
+// This is a STACK, not a single id: the field-picker overlay can open on top
+// of an already-open exercise-info-overlay (its Primary/Secondary muscle
+// pickers), so closing the top one via back must restore tracking of the
+// overlay still open underneath it instead of forgetting about it entirely.
+// Every other overlay in the app only ever reaches a stack depth of 1, so
+// this behaves exactly like the old single-id tracking for all of them.
+let overlayStack = [];
 let suppressNextPopstate = false;
 
 function pushOverlayHistory(id) {
-  openOverlayId = id;
+  overlayStack.push(id);
   history.pushState({ overlay: id }, '', location.hash);
 }
 
@@ -295,10 +302,13 @@ function pushOverlayHistory(id) {
 // OTHER than the back button (Cancel/Save/backdrop tap): those don't consume
 // a history entry on their own, so without this, the next real back press
 // would just pop that stale entry and land back on the same screen — a dead
-// "nothing happened" press before the one that actually navigates.
+// "nothing happened" press before the one that actually navigates. Only pops
+// when `id` is the current TOP of the stack — nothing in this app ever closes
+// an overlay while another is stacked on top of it (the top one's scrim
+// blocks all interaction with what's underneath), so this is never out of order.
 function popOverlayHistoryIfNeeded(id) {
-  if (openOverlayId !== id) return;
-  openOverlayId = null;
+  if (overlayStack[overlayStack.length - 1] !== id) return;
+  overlayStack.pop();
   if (!inPopstateNavigation) {
     suppressNextPopstate = true;
     history.back();
@@ -325,9 +335,8 @@ function dismissOverlayForBack(id) {
 
 window.addEventListener('popstate', e => {
   if (suppressNextPopstate) { suppressNextPopstate = false; return; }
-  if (openOverlayId) {
-    const id = openOverlayId;
-    openOverlayId = null;
+  if (overlayStack.length > 0) {
+    const id = overlayStack.pop();
     dismissOverlayForBack(id);
     // Some overlays' Cancel only steps back an internal mode instead of
     // truly closing (comment-overlay's edit → view, when there's existing
