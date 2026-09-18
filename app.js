@@ -41,6 +41,17 @@ setTimeout(() => { splashDone = true; checkAndReveal(); }, 1200);
 
 // -- Helpers --------------------------------------------
 function todayStr() { return new Date().toISOString().split('T')[0]; }
+
+// Shared PR-trophy icon markup, reused everywhere a personal record is shown
+// (home cards, set list, records overlay, history tab, calendar detail) —
+// `className` is optional since some call sites render it without one.
+function prTrophySvg(className) {
+  return `<svg${className ? ` class="${className}"` : ''} viewBox="0 0 24 24"><path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V17H7v2h10v-2h-4v-1.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z"/></svg>`;
+}
+
+// Shared comment/note speech-bubble icon markup (set-row and exercise-card comment indicators).
+const COMMENT_ICON_SVG = '<svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>';
+
 function formatDate(str) {
   const today = todayStr();
   const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
@@ -633,8 +644,8 @@ function renderHome() {
         const row = document.createElement('div');
         row.className = 'exercise-set-row';
         row.innerHTML = `
-          <span class="exercise-set-comment${hasNote ? ' has-note' : ''}" aria-label="Set comment">${hasNote ? `<svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>` : ''}</span>
-          ${isFirstPR ? `<svg class="exercise-set-pr" viewBox="0 0 24 24"><path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V17H7v2h10v-2h-4v-1.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z"/></svg>` : `<span class="exercise-set-spacer"></span>`}
+          <span class="exercise-set-comment${hasNote ? ' has-note' : ''}" aria-label="Set comment">${hasNote ? COMMENT_ICON_SVG : ''}</span>
+          ${isFirstPR ? prTrophySvg('exercise-set-pr') : `<span class="exercise-set-spacer"></span>`}
           <span class="exercise-set-weight"><span class="exercise-set-val">${s.weight}</span><span class="exercise-set-unit">kgs</span></span>
           <span class="exercise-set-reps"><span class="exercise-set-val">${s.reps}</span><span class="exercise-set-unit">reps</span></span>
         `;
@@ -1208,8 +1219,8 @@ function renderSetList() {
     row.className = 'set-row' + (isSelected ? ' selected' : '');
     row.dataset.setIdx = i;
     row.innerHTML = `
-      <span class="set-comment${hasNote ? ' has-note' : ''}" aria-label="Set note"><svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg></span>
-      <span class="set-row-pr">${isPR ? `<svg class="set-pr-icon" viewBox="0 0 24 24"><path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V17H7v2h10v-2h-4v-1.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z"/></svg>` : ''}</span>
+      <span class="set-comment${hasNote ? ' has-note' : ''}" aria-label="Set note">${COMMENT_ICON_SVG}</span>
+      <span class="set-row-pr">${isPR ? prTrophySvg('set-pr-icon') : ''}</span>
       <span class="set-num">${i + 1}</span>
       <span class="set-weight"><span class="set-weight-val">${s.weight}</span><span class="set-weight-unit">kgs</span></span>
       <span class="set-reps"><span class="set-reps-val">${s.reps}</span><span class="set-reps-unit">reps</span></span>
@@ -1255,7 +1266,7 @@ function openExerciseRecords() {
     list.innerHTML = reps.map(r => `
       <div class="records-row">
         <span class="records-row-reps">${r} rep${r === 1 ? '' : 's'}</span>
-        <span class="records-row-weight"><svg viewBox="0 0 24 24"><path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V17H7v2h10v-2h-4v-1.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z"/></svg>${exRecords[r]} kgs</span>
+        <span class="records-row-weight">${prTrophySvg()}${exRecords[r]} kgs</span>
       </div>
     `).join('');
   }
@@ -1544,7 +1555,7 @@ function renderHistoryTab() {
       const row = document.createElement('div');
       row.className = 'history-set-row clickable';
       row.innerHTML = `
-        ${isPR ? `<svg class="history-set-pr" viewBox="0 0 24 24"><path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V17H7v2h10v-2h-4v-1.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z"/></svg>` : `<span class="history-set-spacer"></span>`}
+        ${isPR ? prTrophySvg('history-set-pr') : `<span class="history-set-spacer"></span>`}
         <span class="history-set-weight">${s.weight} kg</span>
         <span class="history-set-reps">${s.reps} reps</span>
       `;
@@ -1935,7 +1946,7 @@ function openWorkoutDetail(dateStr) {
       const row = document.createElement('div');
       row.className = 'history-set-row';
       row.innerHTML = `
-        ${isPR ? `<svg class="history-set-pr" viewBox="0 0 24 24"><path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V17H7v2h10v-2h-4v-1.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z"/></svg>` : `<span class="history-set-spacer"></span>`}
+        ${isPR ? prTrophySvg('history-set-pr') : `<span class="history-set-spacer"></span>`}
         <span class="history-set-weight">${s.weight} kg</span>
         <span class="history-set-reps">${s.reps} reps</span>
       `;
