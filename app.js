@@ -787,6 +787,41 @@ function deleteHomeSelectedEx() {
   toast(n === 1 ? 'Exercise removed' : `${n} exercises removed`);
 }
 
+// Shared "follow the finger" swap loop for the app's three long-press/handle
+// vertical drag-to-reorder lists (home exercise cards, TRACK-tab set rows,
+// Plan Day Edit items). Each caller keeps its own trigger (selection-mode +
+// handle, built-in long-press timer, always-on handle), its own drag-state
+// variables (several of which — e.g. setDragItem/pdeDragItem — are also read
+// by unrelated gesture guards elsewhere, so they stay as separate globals)
+// and its own end-of-drag persistence; only the touch-Y-vs-sibling-midpoint
+// comparison and the insertAdjacentElement swap are shared here. Returns the
+// updated { startY, dy } for the caller to write back into its own state.
+function dragReorderStep({ item, startY, transformEl, items, touchY }) {
+  let dy = touchY - startY;
+  transformEl.style.transform = `translateY(${dy}px)`;
+
+  const dragPos = items.indexOf(item);
+  for (let i = 0; i < items.length; i++) {
+    if (items[i] === item) continue;
+    const sibRect = items[i].getBoundingClientRect();
+    const sibCenter = sibRect.top + sibRect.height / 2;
+    if (dragPos < i && touchY > sibCenter) {
+      items[i].insertAdjacentElement('afterend', item);
+      startY += sibRect.height;
+      dy -= sibRect.height;
+      transformEl.style.transform = `translateY(${dy}px)`;
+      break;
+    } else if (dragPos > i && touchY < sibCenter) {
+      items[i].insertAdjacentElement('beforebegin', item);
+      startY -= sibRect.height;
+      dy += sibRect.height;
+      transformEl.style.transform = `translateY(${dy}px)`;
+      break;
+    }
+  }
+  return { startY, dy };
+}
+
 function setupHomeExDragReorder() {
   const container = document.getElementById('home-content');
 
@@ -803,30 +838,11 @@ function setupHomeExDragReorder() {
   container.addEventListener('touchmove', e => {
     if (!homeExDragItem) return;
     e.preventDefault();
-    const touchY = e.touches[0].clientY;
-    homeExDragDy = touchY - homeExDragStartY;
-    homeExDragItem.style.transform = `translateY(${homeExDragDy}px)`;
-
     const cards = [...container.querySelectorAll('.exercise-card')];
-    const dragPos = cards.indexOf(homeExDragItem);
-    for (let i = 0; i < cards.length; i++) {
-      if (cards[i] === homeExDragItem) continue;
-      const sibRect = cards[i].getBoundingClientRect();
-      const sibCenter = sibRect.top + sibRect.height / 2;
-      if (dragPos < i && touchY > sibCenter) {
-        cards[i].insertAdjacentElement('afterend', homeExDragItem);
-        homeExDragStartY += sibRect.height;
-        homeExDragDy -= sibRect.height;
-        homeExDragItem.style.transform = `translateY(${homeExDragDy}px)`;
-        break;
-      } else if (dragPos > i && touchY < sibCenter) {
-        cards[i].insertAdjacentElement('beforebegin', homeExDragItem);
-        homeExDragStartY -= sibRect.height;
-        homeExDragDy += sibRect.height;
-        homeExDragItem.style.transform = `translateY(${homeExDragDy}px)`;
-        break;
-      }
-    }
+    ({ startY: homeExDragStartY, dy: homeExDragDy } = dragReorderStep({
+      item: homeExDragItem, startY: homeExDragStartY, transformEl: homeExDragItem,
+      items: cards, touchY: e.touches[0].clientY,
+    }));
   }, { passive: false });
 
   const endDrag = () => {
@@ -862,30 +878,11 @@ function startSetDrag(row, startY) {
 }
 
 function handleSetDragMove(touchY) {
-  setDragDy = touchY - setDragStartY;
-  setDragItem.style.transform = `translateY(${setDragDy}px)`;
-
   const list = document.getElementById('set-list');
   const rows = [...list.querySelectorAll('.set-row')];
-  const dragPos = rows.indexOf(setDragItem);
-  for (let i = 0; i < rows.length; i++) {
-    if (rows[i] === setDragItem) continue;
-    const sibRect = rows[i].getBoundingClientRect();
-    const sibCenter = sibRect.top + sibRect.height / 2;
-    if (dragPos < i && touchY > sibCenter) {
-      rows[i].insertAdjacentElement('afterend', setDragItem);
-      setDragStartY += sibRect.height;
-      setDragDy -= sibRect.height;
-      setDragItem.style.transform = `translateY(${setDragDy}px)`;
-      break;
-    } else if (dragPos > i && touchY < sibCenter) {
-      rows[i].insertAdjacentElement('beforebegin', setDragItem);
-      setDragStartY -= sibRect.height;
-      setDragDy += sibRect.height;
-      setDragItem.style.transform = `translateY(${setDragDy}px)`;
-      break;
-    }
-  }
+  ({ startY: setDragStartY, dy: setDragDy } = dragReorderStep({
+    item: setDragItem, startY: setDragStartY, transformEl: setDragItem, items: rows, touchY,
+  }));
 }
 
 function endSetDrag() {
@@ -2670,31 +2667,11 @@ function setupPdeDragReorder(list) {
   list.addEventListener('touchmove', e => {
     if (!pdeDragItem) return;
     e.preventDefault();
-    const touchY = e.touches[0].clientY;
-    pdeDragDy = touchY - pdeDragStartY;
-    pdeDragItem.querySelector('.pde-item-inner').style.transform = `translateY(${pdeDragDy}px)`;
-
     const items = [...list.querySelectorAll('.pde-item')];
-    const dragPos = items.indexOf(pdeDragItem);
-
-    for (let i = 0; i < items.length; i++) {
-      if (items[i] === pdeDragItem) continue;
-      const sibRect = items[i].getBoundingClientRect();
-      const sibCenter = sibRect.top + sibRect.height / 2;
-      if (dragPos < i && touchY > sibCenter) {
-        items[i].insertAdjacentElement('afterend', pdeDragItem);
-        pdeDragStartY += sibRect.height;
-        pdeDragDy -= sibRect.height;
-        pdeDragItem.querySelector('.pde-item-inner').style.transform = `translateY(${pdeDragDy}px)`;
-        break;
-      } else if (dragPos > i && touchY < sibCenter) {
-        items[i].insertAdjacentElement('beforebegin', pdeDragItem);
-        pdeDragStartY -= sibRect.height;
-        pdeDragDy += sibRect.height;
-        pdeDragItem.querySelector('.pde-item-inner').style.transform = `translateY(${pdeDragDy}px)`;
-        break;
-      }
-    }
+    ({ startY: pdeDragStartY, dy: pdeDragDy } = dragReorderStep({
+      item: pdeDragItem, startY: pdeDragStartY, transformEl: pdeDragItem.querySelector('.pde-item-inner'),
+      items, touchY: e.touches[0].clientY,
+    }));
   }, { passive: false });
 
   const endDrag = async () => {
