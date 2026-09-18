@@ -2632,9 +2632,7 @@ function openFitnessTracker() {
 
 document.getElementById('menu-card-fitness').addEventListener('click', openFitnessTracker);
 document.getElementById('menu-card-workout').addEventListener('click', openWorkoutPlan);
-document.getElementById('menu-card-calculator').addEventListener('click', () => {
-  // TODO: navigeert later naar het Calculator-scherm (1RM, warming-up, schijven) — nog niet gebouwd
-});
+document.getElementById('menu-card-calculator').addEventListener('click', () => showScreen('screen-calculator'));
 document.getElementById('menu-card-nutrition').addEventListener('click', () => showScreen('screen-nutrition'));
 document.getElementById('menu-card-progress').addEventListener('click', () => showScreen('screen-progress'));
 
@@ -2642,6 +2640,16 @@ document.getElementById('btn-home-from-tracker').addEventListener('click', () =>
 document.getElementById('btn-back-workout-plan').addEventListener('click', () => goBack('screen-home'));
 document.getElementById('btn-back-nutrition').addEventListener('click', () => goBack('screen-home'));
 document.getElementById('btn-back-progress').addEventListener('click', () => goBack('screen-home'));
+document.getElementById('btn-back-calculator').addEventListener('click', () => goBack('screen-home'));
+document.getElementById('btn-calc-1rm').addEventListener('click', () => {
+  // TODO: 1RM Calculator-scherm bouwen — nog niet gebouwd
+});
+document.getElementById('btn-calc-warmup').addEventListener('click', () => {
+  // TODO: Warm-up Calculator-scherm bouwen — nog niet gebouwd
+});
+document.getElementById('btn-calc-plate').addEventListener('click', () => {
+  // TODO: Plate Calculator-scherm bouwen — nog niet gebouwd
+});
 
 // ── Anthropic API helper ──────────────────────────────
 async function callClaude(userMessage, systemPrompt) {
