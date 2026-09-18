@@ -1479,17 +1479,23 @@ function navigateTrainingTab(delta) {
   switchTab(TRAINING_TAB_ORDER[nextIdx]);
 }
 
-function setupTrainingSwipeNav() {
-  const container = document.getElementById('training-content-wrap');
+// Shared horizontal-swipe-with-direction-lock gesture, used by the day-nav
+// swipe (Fitness Tracker) and the training-tab swipe (TRACK/HISTORY/GRAPH).
+// `startGuard`, if given, is checked once at touchstart alongside the
+// single-finger check. `duringGuard`, if given, is re-checked on every
+// touchmove AND at touchend — needed only by the training-tab swipe, which
+// must yield entirely to an in-progress set-row long-press-drag (see
+// setupSetListDragReorder) even if that drag starts *after* the swipe
+// already began tracking; the day-nav swipe has no such competing gesture
+// and only ever needs the touchstart check, exactly as before this refactor.
+function setupSwipeNav(containerId, onSwipe, { startGuard, duringGuard } = {}) {
+  const container = document.getElementById(containerId);
   const SWIPE_THRESHOLD = 50;
   const DIRECTION_LOCK = 10;
   let startX = 0, startY = 0, tracking = false, direction = null;
 
   container.addEventListener('touchstart', e => {
-    // Defer entirely to the set-row long-press-drag once it's taken over this
-    // gesture (see setupSetListDragReorder) so the two never fight over the
-    // same touch sequence.
-    if (e.touches.length !== 1 || setDragItem) { tracking = false; return; }
+    if (e.touches.length !== 1 || (startGuard && startGuard())) { tracking = false; return; }
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
     tracking = true;
@@ -1498,7 +1504,7 @@ function setupTrainingSwipeNav() {
 
   container.addEventListener('touchmove', e => {
     if (!tracking) return;
-    if (setDragItem) { tracking = false; direction = null; return; }
+    if (duringGuard && duringGuard()) { tracking = false; direction = null; return; }
     const dx = e.touches[0].clientX - startX;
     const dy = e.touches[0].clientY - startY;
     if (!direction) {
@@ -1510,15 +1516,25 @@ function setupTrainingSwipeNav() {
 
   const endSwipe = e => {
     if (!tracking) return;
-    if (direction === 'horizontal' && !setDragItem) {
+    if (direction === 'horizontal' && !(duringGuard && duringGuard())) {
       const dx = e.changedTouches[0].clientX - startX;
-      if (Math.abs(dx) > SWIPE_THRESHOLD) navigateTrainingTab(dx < 0 ? 1 : -1);
+      if (Math.abs(dx) > SWIPE_THRESHOLD) onSwipe(dx < 0 ? 1 : -1);
     }
     tracking = false;
     direction = null;
   };
   container.addEventListener('touchend', endSwipe, { passive: true });
   container.addEventListener('touchcancel', () => { tracking = false; direction = null; }, { passive: true });
+}
+
+function setupTrainingSwipeNav() {
+  // Defer entirely to the set-row long-press-drag once it's taken over this
+  // gesture (see setupSetListDragReorder) so the two never fight over the
+  // same touch sequence.
+  setupSwipeNav('training-content-wrap', navigateTrainingTab, {
+    startGuard: () => setDragItem,
+    duringGuard: () => setDragItem,
+  });
 }
 
 // -- History Tab ----------------------------------------
@@ -2235,41 +2251,7 @@ function navigateDay(delta) {
 }
 
 function setupDaySwipeNav() {
-  const container = document.getElementById('home-content');
-  const SWIPE_THRESHOLD = 50;
-  const DIRECTION_LOCK = 10;
-  let startX = 0, startY = 0, tracking = false, direction = null;
-
-  container.addEventListener('touchstart', e => {
-    if (homeSelMode || e.touches.length !== 1) { tracking = false; return; }
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-    tracking = true;
-    direction = null;
-  }, { passive: true });
-
-  container.addEventListener('touchmove', e => {
-    if (!tracking) return;
-    const dx = e.touches[0].clientX - startX;
-    const dy = e.touches[0].clientY - startY;
-    if (!direction) {
-      if (Math.abs(dx) < DIRECTION_LOCK && Math.abs(dy) < DIRECTION_LOCK) return;
-      direction = Math.abs(dx) > Math.abs(dy) ? 'horizontal' : 'vertical';
-    }
-    if (direction === 'horizontal') e.preventDefault();
-  }, { passive: false });
-
-  const endSwipe = e => {
-    if (!tracking) return;
-    if (direction === 'horizontal') {
-      const dx = e.changedTouches[0].clientX - startX;
-      if (Math.abs(dx) > SWIPE_THRESHOLD) navigateDay(dx < 0 ? 1 : -1);
-    }
-    tracking = false;
-    direction = null;
-  };
-  container.addEventListener('touchend', endSwipe, { passive: true });
-  container.addEventListener('touchcancel', () => { tracking = false; direction = null; }, { passive: true });
+  setupSwipeNav('home-content', navigateDay, { startGuard: () => homeSelMode });
 }
 
 // -- Event Listeners ------------------------------------
