@@ -409,8 +409,10 @@ function signOutUser() {
 }
 
 // -- Overflow / Dropdown Menu ---------------------------
+// Wired into the same generic overlay history/back-button system as the
+// .overlay bottom sheets (openOverlay/closeOverlay below) so the hardware
+// back button closes this menu instead of navigating the screen under it.
 function showOverflowMenu(items, anchorEl) {
-  const menu = document.getElementById('overflow-menu');
   const panel = document.getElementById('overflow-panel');
   panel.innerHTML = '';
   const rect = anchorEl.getBoundingClientRect();
@@ -426,9 +428,9 @@ function showOverflowMenu(items, anchorEl) {
     el.addEventListener('click', () => { closeOverflowMenu(); item.action(); });
     panel.appendChild(el);
   });
-  menu.classList.add('open');
+  openOverlay('overflow-menu');
 }
-function closeOverflowMenu() { document.getElementById('overflow-menu').classList.remove('open'); }
+function closeOverflowMenu() { closeOverlay('overflow-menu'); }
 document.getElementById('overflow-menu').addEventListener('click', e => {
   if (e.target === e.currentTarget) closeOverflowMenu();
 });
