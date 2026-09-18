@@ -593,17 +593,22 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .plate-bar-option.selected { background: var(--cyan-light); border-color: var(--blue); }
 .plate-bar-option-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
 .plate-bar-option-weight { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
-.plate-list-header { display: flex; align-items: center; gap: 10px; padding: 0 12px 6px; }
-.plate-list-header-spacer { flex: 1; min-width: 0; }
-.plate-list-header-col { width: 100px; flex-shrink: 0; text-align: center; font-size: 10px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .06em; }
+/* Both the header and each row share the exact same 3-column grid track
+   sizes (1fr for the name, 100px + 100px for the two stepper groups), so the
+   -/+ columns land on identical horizontal positions everywhere regardless
+   of whether a row's name wraps to 1, 2 or 3 lines — a flex row with a
+   variable-width name column (the previous approach) can't guarantee that,
+   since the name's own content width shifts everything after it. */
+.plate-list-header { display: grid; grid-template-columns: 1fr 100px 100px; gap: 10px; padding: 0 12px 6px; }
+.plate-list-header-col { text-align: center; font-size: 10px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .06em; }
 .plate-list-header-sub { font-size: 9px; font-weight: 500; color: var(--text-hint); text-transform: none; letter-spacing: normal; margin-top: 1px; }
 .plate-list { display: flex; flex-direction: column; background: var(--surface); border-radius: 12px; padding: 4px 12px; box-shadow: 0 1px 3px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.08); }
-.plate-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.plate-row { display: grid; grid-template-columns: 1fr 100px 100px; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
 .plate-row:last-child { border-bottom: none; }
 .plate-row-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .plate-row-name { font-size: 15px; font-weight: 600; color: var(--text-primary); }
 .plate-row-meta { font-size: 12px; color: var(--text-secondary); }
-.plate-stepper { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100px; flex-shrink: 0; }
+.plate-stepper { display: flex; align-items: center; justify-content: center; gap: 8px; }
 .plate-stepper-btn { width: 32px; height: 32px; border-radius: 50%; border: none; background: var(--gray-btn); color: var(--text-primary); font-size: 18px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .1s; line-height: 1; flex-shrink: 0; }
 .plate-stepper-btn:active { background: #bdbdbd; }
 .plate-stepper-btn:disabled { opacity: .5; cursor: not-allowed; }
