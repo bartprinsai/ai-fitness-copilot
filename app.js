@@ -2223,16 +2223,12 @@ document.getElementById('cal-detail-goto').addEventListener('click', () => {
 
 let pendingEditExerciseOriginalName = null;
 
-// -- Custom field picker (replaces native <select>/picker for Category/Type/Weight Unit) --
+// -- Custom field picker (replaces native <select>/picker for Category/Type) --
 const EX_TYPE_OPTIONS = [
   { value: 'weight_reps', label: 'Weight and Reps' },
   { value: 'reps_only', label: 'Reps Only' },
   { value: 'duration', label: 'Duration' },
   { value: 'distance', label: 'Distance' },
-];
-const EX_WEIGHT_UNIT_OPTIONS = [
-  { value: 'kg', label: 'Kilogram' },
-  { value: 'lbs', label: 'Pounds' },
 ];
 
 function setFieldBtnValue(id, value, label) {
@@ -2273,11 +2269,6 @@ document.getElementById('new-ex-type').addEventListener('click', () => {
     setFieldBtnValue('new-ex-type', value, EX_TYPE_OPTIONS.find(o => o.value === value).label);
   });
 });
-document.getElementById('new-ex-weight-unit').addEventListener('click', () => {
-  openFieldPicker('Weight Unit', EX_WEIGHT_UNIT_OPTIONS, getFieldBtnValue('new-ex-weight-unit'), value => {
-    setFieldBtnValue('new-ex-weight-unit', value, EX_WEIGHT_UNIT_OPTIONS.find(o => o.value === value).label);
-  });
-});
 
 function populateNewExCategorySelect(selected) {
   setFieldBtnValue('new-ex-category', selected || '', selected || 'Choose category...');
@@ -2288,7 +2279,6 @@ function getNewExerciseFormSnapshot() {
     name: document.getElementById('new-ex-name').value,
     category: getFieldBtnValue('new-ex-category'),
     type: getFieldBtnValue('new-ex-type'),
-    weightUnit: getFieldBtnValue('new-ex-weight-unit'),
   };
 }
 let newExerciseBaseline = null;
@@ -2298,7 +2288,6 @@ function openNewExerciseScreen() {
   document.getElementById('new-ex-title').textContent = 'New Exercise';
   document.getElementById('new-ex-name').value = '';
   setFieldBtnValue('new-ex-type', 'weight_reps', 'Weight and Reps');
-  setFieldBtnValue('new-ex-weight-unit', 'kg', 'Kilogram');
   populateNewExCategorySelect();
   newExerciseBaseline = getNewExerciseFormSnapshot();
   showScreen('screen-new-exercise');
@@ -2311,8 +2300,6 @@ function openEditExerciseScreen(ex) {
   document.getElementById('new-ex-name').value = ex.name;
   const typeOpt = EX_TYPE_OPTIONS.find(o => o.value === ex.type) || EX_TYPE_OPTIONS[0];
   setFieldBtnValue('new-ex-type', typeOpt.value, typeOpt.label);
-  const wuOpt = ex.weightUnit === 'lbs' ? EX_WEIGHT_UNIT_OPTIONS[1] : EX_WEIGHT_UNIT_OPTIONS[0];
-  setFieldBtnValue('new-ex-weight-unit', wuOpt.value, wuOpt.label);
   populateNewExCategorySelect(ex.category);
   newExerciseBaseline = getNewExerciseFormSnapshot();
   showScreen('screen-new-exercise');
@@ -2328,7 +2315,7 @@ function updateExistingExercise(originalName, updated) {
   if (!db.custom_exercises) db.custom_exercises = [];
   let entry = db.custom_exercises.find(e => e.name === originalName);
   if (!entry) {
-    entry = { category: updated.category, name: updated.name, type: updated.type, weightUnit: updated.weightUnit };
+    entry = { category: updated.category, name: updated.name, type: updated.type };
     db.custom_exercises.push(entry);
     if (!db.hiddenBuiltins) db.hiddenBuiltins = {};
     db.hiddenBuiltins[originalName] = true;
@@ -2338,7 +2325,6 @@ function updateExistingExercise(originalName, updated) {
   entry.category = updated.category;
   entry.name = updated.name;
   entry.type = updated.type;
-  entry.weightUnit = updated.weightUnit;
   persistCustomExercises();
 
   if (nameChanged) {
@@ -2372,7 +2358,6 @@ function saveNewExerciseFromScreen() {
   const name = document.getElementById('new-ex-name').value.trim();
   const cat = getFieldBtnValue('new-ex-category');
   const type = getFieldBtnValue('new-ex-type');
-  const weightUnit = getFieldBtnValue('new-ex-weight-unit');
   if (!name) { toast('Enter a name'); return; }
   if (!cat) { toast('Choose a category'); return; }
 
@@ -2380,7 +2365,7 @@ function saveNewExerciseFromScreen() {
     const nameTaken = name.toLowerCase() !== pendingEditExerciseOriginalName.toLowerCase()
       && allExercises().find(e => e.name.toLowerCase() === name.toLowerCase());
     if (nameTaken) { toast('Exercise already exists'); return; }
-    updateExistingExercise(pendingEditExerciseOriginalName, { category: cat, name, type, weightUnit });
+    updateExistingExercise(pendingEditExerciseOriginalName, { category: cat, name, type });
     pendingEditExerciseOriginalName = null;
     exerciseBrowserMode = 'categories';
     currentBrowseCategory = null;
@@ -2392,7 +2377,7 @@ function saveNewExerciseFromScreen() {
 
   if (allExercises().find(e => e.name.toLowerCase() === name.toLowerCase())) { toast('Exercise already exists'); return; }
   if (!db.custom_exercises) db.custom_exercises = [];
-  db.custom_exercises.push({ category: cat, name, type, weightUnit });
+  db.custom_exercises.push({ category: cat, name, type });
   persistCustomExercises();
   toast('Exercise created');
   exerciseBrowserMode = 'categories';
