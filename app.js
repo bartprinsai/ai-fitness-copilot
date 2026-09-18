@@ -18,7 +18,7 @@ const fStore = firebase.firestore();
 let currentUser = null;
 
 // -- In-memory state ------------------------------------
-let db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, favoriteExercises: {}, hiddenBuiltins: {}, exerciseInfo: {}, plateInventory: {} };
+let db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, favoriteExercises: {}, hiddenBuiltins: {}, exerciseInfo: {}, plateInventory: {}, plateOnBar: {} };
 
 // -- Home selection mode state --------------------------
 let homeSelMode = false;
@@ -154,11 +154,15 @@ async function persistPlateInventory() {
   if (!currentUser) return;
   uDoc('meta/plate_inventory').set({ counts: db.plateInventory || {} }).catch(e => console.error(e));
 }
+async function persistPlateOnBar() {
+  if (!currentUser) return;
+  uDoc('meta/plate_on_bar').set({ counts: db.plateOnBar || {} }).catch(e => console.error(e));
+}
 async function loadUserData(userUid) {
   console.log('[Load] loadUserData start, uid:', userUid);
   try {
-    console.log('[Load] firing Promise.all for 9 Firestore reads...');
-    const [workoutsSnap, recordsSnap, customSnap, plansSnap, activePlanSnap, favoritesSnap, hiddenBuiltinsSnap, exerciseInfoSnap, plateInventorySnap] = await Promise.all([
+    console.log('[Load] firing Promise.all for 10 Firestore reads...');
+    const [workoutsSnap, recordsSnap, customSnap, plansSnap, activePlanSnap, favoritesSnap, hiddenBuiltinsSnap, exerciseInfoSnap, plateInventorySnap, plateOnBarSnap] = await Promise.all([
       fStore.collection('users/' + userUid + '/workouts').get(),
       fStore.doc('users/' + userUid + '/meta/records').get(),
       fStore.doc('users/' + userUid + '/meta/custom_exercises').get(),
@@ -168,6 +172,7 @@ async function loadUserData(userUid) {
       fStore.doc('users/' + userUid + '/meta/hidden_builtins').get(),
       fStore.doc('users/' + userUid + '/meta/exercise_info').get(),
       fStore.doc('users/' + userUid + '/meta/plate_inventory').get(),
+      fStore.doc('users/' + userUid + '/meta/plate_on_bar').get(),
     ]);
     console.log('[Load] Promise.all resolved, exerciseInfoSnap.exists:', exerciseInfoSnap.exists);
     db.workouts = {};
@@ -192,6 +197,7 @@ async function loadUserData(userUid) {
     }
     db.exerciseInfo = exerciseInfoSnap.exists ? (exerciseInfoSnap.data().data || {}) : {};
     db.plateInventory = plateInventorySnap.exists ? (plateInventorySnap.data().counts || {}) : {};
+    db.plateOnBar = plateOnBarSnap.exists ? (plateOnBarSnap.data().counts || {}) : {};
     console.log('[Load] loadUserData finished OK');
   } catch(e) {
     console.error('[Load] loadUserData FAILED:', e && e.code, e && e.message, e);
@@ -2697,6 +2703,14 @@ function setPlateCount(id, count) {
   db.plateInventory[id] = count;
   persistPlateInventory();
 }
+// "Op stang" (per side, not a gym-wide total like `getPlateCount` above) —
+// always defaults to 0, no preset inventory to fall back to.
+function getPlateOnBarCount(id) { return (db.plateOnBar || {})[id] || 0; }
+function setPlateOnBarCount(id, count) {
+  if (!db.plateOnBar) db.plateOnBar = {};
+  db.plateOnBar[id] = count;
+  persistPlateOnBar();
+}
 
 // Dutch-locale kg formatting: 2 decimals max, trailing zeros trimmed, comma separator.
 function formatKg(n) {
@@ -2715,9 +2729,14 @@ function renderPlateList() {
           <span class="plate-row-name">${p.label}</span>
           <span class="plate-row-meta">${meta}</span>
         </div>
-        <div class="plate-stepper">
+        <div class="plate-stepper" data-kind="available">
           <button type="button" class="plate-stepper-btn" data-dir="-">−</button>
           <span class="plate-stepper-count">${getPlateCount(p.id)}</span>
+          <button type="button" class="plate-stepper-btn" data-dir="+">+</button>
+        </div>
+        <div class="plate-stepper" data-kind="onbar">
+          <button type="button" class="plate-stepper-btn" data-dir="-">−</button>
+          <span class="plate-stepper-count">${getPlateOnBarCount(p.id)}</span>
           <button type="button" class="plate-stepper-btn" data-dir="+">+</button>
         </div>
       </div>`;
@@ -2727,12 +2746,15 @@ function renderPlateList() {
 document.getElementById('plate-list').addEventListener('click', e => {
   const btn = e.target.closest('.plate-stepper-btn');
   if (!btn) return;
+  const stepper = btn.closest('.plate-stepper');
   const row = btn.closest('.plate-row');
   const id = row.dataset.plateId;
-  let count = getPlateCount(id);
+  const getCount = stepper.dataset.kind === 'onbar' ? getPlateOnBarCount : getPlateCount;
+  const setCount = stepper.dataset.kind === 'onbar' ? setPlateOnBarCount : setPlateCount;
+  let count = getCount(id);
   count = btn.dataset.dir === '+' ? Math.min(PLATE_MAX_COUNT, count + 1) : Math.max(0, count - 1);
-  setPlateCount(id, count);
-  row.querySelector('.plate-stepper-count').textContent = count;
+  setCount(id, count);
+  stepper.querySelector('.plate-stepper-count').textContent = count;
 });
 document.getElementById('btn-plate-reset').addEventListener('click', () => {
   db.plateInventory = {};
@@ -2744,6 +2766,12 @@ document.getElementById('btn-plate-clear').addEventListener('click', () => {
   db.plateInventory = {};
   PLATE_TYPES.forEach(p => { db.plateInventory[p.id] = 0; });
   persistPlateInventory();
+  renderPlateList();
+});
+document.getElementById('btn-plate-clear-onbar').addEventListener('click', () => {
+  db.plateOnBar = {};
+  PLATE_TYPES.forEach(p => { db.plateOnBar[p.id] = 0; });
+  persistPlateOnBar();
   renderPlateList();
 });
 document.getElementById('plate-bar-options').addEventListener('click', e => {
@@ -2876,18 +2904,61 @@ function calcPlateCombo(targetPerSideKg, countsObj) {
   return { perSideKg: bestS / 100, exact: bestS === targetUnits, used };
 }
 
-function renderPlateResult(result, targetWeight, barWeight) {
+// Per-side weight already mounted, straight from the "Op stang" column (a
+// direct per-side count, unlike `getPlateCount`'s gym-wide total).
+function calcOnBarWeightPerSide() {
+  return PLATE_TYPES.reduce((sum, p) => sum + getPlateOnBarCount(p.id) * p.weight, 0);
+}
+// What calcPlateCombo() may still ADD per side: floor(available/2) minus
+// what's already mounted, never negative. calcPlateCombo() itself halves
+// whatever raw count it's given, so this hands it `2 * maxUse` to get that
+// exact usable count back out unchanged.
+function buildAvailableForAddCounts() {
+  const adjusted = {};
+  PLATE_TYPES.forEach(p => {
+    const maxUse = Math.max(0, Math.floor(getPlateCount(p.id) / 2) - getPlateOnBarCount(p.id));
+    adjusted[p.id] = maxUse * 2;
+  });
+  return adjusted;
+}
+// What calcPlateCombo() may pick from when REMOVING: only what's currently
+// mounted per side, expressed the same "raw count" way as above.
+function buildOnBarCountsForRemoval() {
+  const adjusted = {};
+  PLATE_TYPES.forEach(p => { adjusted[p.id] = getPlateOnBarCount(p.id) * 2; });
+  return adjusted;
+}
+
+function renderPlateResult(remainingPerSide, targetWeight, barWeight, onBarWeightPerSide) {
   const card = document.getElementById('plate-result-card');
   card.classList.remove('hidden');
-  document.getElementById('plate-result-list').innerHTML = result.used.length === 0
+  const titleEl = document.getElementById('plate-result-title');
+  const listEl = document.getElementById('plate-result-list');
+  const noteEl = document.getElementById('plate-result-note');
+
+  if (Math.round(remainingPerSide * 100) === 0) {
+    titleEl.textContent = 'Per kant';
+    listEl.innerHTML = `<div class="plate-result-empty">Niets bijleggen of weghalen — je zit al op het doelgewicht.</div>`;
+    document.getElementById('plate-result-total').textContent = formatKg(barWeight + onBarWeightPerSide * 2) + ' kg';
+    noteEl.classList.add('hidden');
+    return;
+  }
+
+  const removing = remainingPerSide < 0;
+  const result = removing
+    ? calcPlateCombo(-remainingPerSide, buildOnBarCountsForRemoval())
+    : calcPlateCombo(remainingPerSide, buildAvailableForAddCounts());
+
+  titleEl.textContent = removing ? 'Haal per kant weg' : 'Erbij per kant';
+  listEl.innerHTML = result.used.length === 0
     ? `<div class="plate-result-empty">Geen schijven nodig</div>`
     : result.used.map(u => `<div class="plate-result-line">${u.count}x ${u.label}</div>`).join('');
 
-  const totalWeight = barWeight + result.perSideKg * 2;
+  const finalOnBarWeight = removing ? onBarWeightPerSide - result.perSideKg : onBarWeightPerSide + result.perSideKg;
+  const totalWeight = barWeight + finalOnBarWeight * 2;
   const hasDeviation = result.used.some(u => u.deviation > 0);
   document.getElementById('plate-result-total').textContent = (hasDeviation ? '±' : '') + formatKg(totalWeight) + ' kg';
 
-  const noteEl = document.getElementById('plate-result-note');
   if (!result.exact) {
     const diff = Math.abs(targetWeight - totalWeight);
     noteEl.textContent = `Doel niet exact haalbaar — dichtstbijzijnde combinatie, ${formatKg(diff)} kg verschil`;
@@ -2902,8 +2973,9 @@ document.getElementById('btn-plate-calculate').addEventListener('click', () => {
   const barOpt = document.querySelector('.plate-bar-option.selected');
   const barWeight = barOpt ? parseFloat(barOpt.dataset.val) : 20;
   const targetPerSide = (targetWeight - barWeight) / 2;
-  const result = calcPlateCombo(targetPerSide, db.plateInventory || {});
-  renderPlateResult(result, targetWeight, barWeight);
+  const onBarWeightPerSide = calcOnBarWeightPerSide();
+  const remainingPerSide = targetPerSide - onBarWeightPerSide;
+  renderPlateResult(remainingPerSide, targetWeight, barWeight, onBarWeightPerSide);
 });
 
 function openPlateCalculator() {

@@ -572,19 +572,33 @@
           <div class="plate-bar-option-title">Enkele ring</div>
           <div class="plate-bar-option-weight">16,5 kg</div>
         </button>
+        <button type="button" class="plate-bar-option" data-val="9">
+          <div class="plate-bar-option-title">EZ bar</div>
+          <div class="plate-bar-option-weight">9 kg</div>
+        </button>
+        <button type="button" class="plate-bar-option" data-val="0">
+          <div class="plate-bar-option-title">Leg press</div>
+          <div class="plate-bar-option-weight">0 kg</div>
+        </button>
       </div>
     </div>
     <div class="plate-section">
       <div class="plate-section-label">Beschikbare schijven</div>
+      <div class="plate-list-header">
+        <div class="plate-list-header-spacer"></div>
+        <div class="plate-list-header-col">Beschikbaar</div>
+        <div class="plate-list-header-col">Op stang</div>
+      </div>
       <div class="plate-list" id="plate-list"></div>
     </div>
     <div class="plate-actions-row">
-      <button type="button" class="btn-secondary" id="btn-plate-reset">Reset</button>
-      <button type="button" class="btn-secondary" id="btn-plate-clear">Clear</button>
+      <button type="button" class="btn-secondary" id="btn-plate-reset">Reset beschikbaar</button>
+      <button type="button" class="btn-secondary" id="btn-plate-clear">Clear beschikbaar</button>
+      <button type="button" class="btn-secondary" id="btn-plate-clear-onbar">Clear stang</button>
     </div>
     <button type="button" class="plate-calculate-btn" id="btn-plate-calculate">Bereken</button>
     <div class="plate-result-card hidden" id="plate-result-card">
-      <div class="plate-result-title">Per kant</div>
+      <div class="plate-result-title" id="plate-result-title">Per kant</div>
       <div class="plate-result-list" id="plate-result-list"></div>
       <div class="plate-result-total" id="plate-result-total"></div>
       <div class="plate-result-note hidden" id="plate-result-note"></div>
