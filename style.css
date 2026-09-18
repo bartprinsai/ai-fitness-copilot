@@ -295,6 +295,11 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .records-empty { text-align: center; color: var(--text-hint); padding: 24px 0; font-size: 14px; }
 
 /* ── EXERCISE INFO OVERLAY (muscle group / equipment setup) ─── */
+/* #exercise-info-view-mode/-edit-mode are plain divs nested one level inside
+   .overlay-panel, so its own flex `gap: 14px` (the h3-to-content-to-buttons
+   spacing every other overlay gets for free, e.g. Set note) never reaches
+   their children — same fix as .comment-panel above, same 14px value. */
+#exercise-info-view-mode, #exercise-info-edit-mode { display: flex; flex-direction: column; gap: 14px; }
 .exercise-info-scroll { display: flex; flex-direction: column; gap: 14px; max-height: 65vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .info-section-label { font-size: 11px; font-weight: 700; color: var(--text-secondary); letter-spacing: .08em; text-transform: uppercase; }
 .info-two-col { display: flex; gap: 10px; }
