@@ -2764,58 +2764,89 @@ function platePenaltyTenths(deviation) {
   return tenths > PLATE_DEVIATION_EQUIVALENT_MAX_TENTHS ? tenths : 0;
 }
 
+// Rank 0 = heaviest distinct plate weight, increasing for lighter weights;
+// plates that share an identical weight (e.g. the two 5kg or two 1kg types)
+// share a rank, since this only cares about the weight value, not which
+// plate it is.
+const PLATE_WEIGHT_RANKS = [...new Set(PLATE_TYPES.map(p => p.weight))].sort((a, b) => b - a);
+function plateWeightRank(weight) { return PLATE_WEIGHT_RANKS.indexOf(weight); }
+
+// Priority-cost encoding, as a BigInt so none of these tiers can ever bleed
+// into one another regardless of how many plates get combined:
+//   tier 1 (COUNT_WEIGHT): one integer step per plate used, dominating
+//     everything below it — comparing total cost always picks the fewest
+//     total plates first, exactly like before this comment was extended.
+//   tier 2 (rank place-value): among equal plate counts, a plate's rank
+//     SUBTRACTS RANK_UNIT * RANK_BASE^(rank-from-lightest) from its cost, so
+//     the minimizing DP is biased toward heavier plates. RANK_BASE
+//     comfortably exceeds any plausible per-rank plate count, so this is a
+//     positional number system — having even one more plate at a heavier
+//     rank always outweighs any number of plates at every lighter rank
+//     combined, which is exactly "compare the used weights largest-first,
+//     first difference wins" (a fixed-length leximax comparison, since the
+//     count is already pinned equal by tier 1).
+//   tier 3 (penaltyTenths): the existing deviation tie-break, only reached
+//     once both plate count AND the largest-plates-first comparison tie.
+// Plain JS numbers lose integer precision far before these magnitudes, so
+// this needs BigInt; DP costs and the `dp`/`next` arrays are BigInt
+// throughout (`null` stands in for the old `Infinity` = "unreachable").
+const PLATE_COUNT_WEIGHT = 10n ** 60n;
+const PLATE_RANK_UNIT = 100000n;
+const PLATE_RANK_BASE = 1000n;
+function platePriorityCost(p) {
+  const rankFromLightest = PLATE_WEIGHT_RANKS.length - 1 - plateWeightRank(p.weight);
+  const rankValue = PLATE_RANK_UNIT * (PLATE_RANK_BASE ** BigInt(rankFromLightest));
+  // Subtracted, not added: a heavier plate (bigger rankValue) must LOWER the
+  // total cost so the minimizing DP prefers it — that's what makes "largest
+  // first" actually win instead of "smallest first".
+  return PLATE_COUNT_WEIGHT - rankValue + BigInt(platePenaltyTenths(p.deviation));
+}
+
 // Bounded-knapsack DP: for every achievable per-side sum (in integer centikg
-// units, to avoid float drift), tracks the minimal "cost" needed to reach it,
-// plus (via `choice`) how many of the current plate type were used — enough
-// to both pick the best sum and reconstruct which plates make it up.
-// `cost` per plate used is encoded as `PLATE_COUNT_WEIGHT + penaltyTenths` so
-// that comparing two total costs as plain numbers automatically applies the
-// full priority order in one comparison: PLATE_COUNT_WEIGHT (10000) dwarfs any
-// realistic total penalty, so it always decides ties first — i.e. fewest
-// total plates wins outright — and only once the plate COUNT is equal does
-// the remaining penalty-tenths difference (0 for deviation <= 0.3kg, the
-// real deviation for >= 0.4kg) get to break the tie.
+// units, to avoid float drift), tracks the minimal priority-cost needed to
+// reach it, plus (via `choice`) how many of the current plate type were used
+// — enough to both pick the best sum and reconstruct which plates make it up.
 // `DP_MAX_UNITS` caps the search array at 600kg/side regardless of how large
 // user-entered counts get, so even a pathological "max every stepper" input
 // stays fast.
 const PLATE_DP_MAX_UNITS = 60000;
-const PLATE_COUNT_WEIGHT = 10000;
 function calcPlateCombo(targetPerSideKg, countsObj) {
   const items = PLATE_TYPES.map(p => {
     const count = countsObj[p.id] !== undefined ? countsObj[p.id] : p.defaultCount;
     return {
       ...p,
       weightUnits: Math.round(p.weight * 100),
-      unitCost: PLATE_COUNT_WEIGHT + platePenaltyTenths(p.deviation),
+      unitCost: platePriorityCost(p),
       maxUse: Math.max(0, Math.floor(Math.min(count, PLATE_MAX_COUNT) / 2)),
     };
   });
   const rangeMax = Math.min(PLATE_DP_MAX_UNITS, items.reduce((sum, it) => sum + it.weightUnits * it.maxUse, 0));
   const targetUnits = Math.round(Math.max(0, targetPerSideKg) * 100);
 
-  let dp = new Array(rangeMax + 1).fill(Infinity);
-  dp[0] = 0;
+  let dp = new Array(rangeMax + 1).fill(null);
+  dp[0] = 0n;
   const choice = items.map(() => new Array(rangeMax + 1).fill(0));
 
   items.forEach((it, i) => {
     const next = dp.slice();
     if (it.weightUnits > 0 && it.maxUse > 0) {
       for (let s = 0; s <= rangeMax; s++) {
-        if (dp[s] === Infinity) continue;
+        if (dp[s] === null) continue;
+        let cost = dp[s];
         for (let k = 1; k <= it.maxUse; k++) {
           const s2 = s + k * it.weightUnits;
           if (s2 > rangeMax) break;
-          const cost = dp[s] + k * it.unitCost;
-          if (cost < next[s2]) { next[s2] = cost; choice[i][s2] = k; }
+          cost += it.unitCost;
+          if (next[s2] === null || cost < next[s2]) { next[s2] = cost; choice[i][s2] = k; }
         }
       }
     }
     dp = next;
   });
 
-  let bestS = 0, bestDiff = Infinity, bestCost = Infinity;
+  let bestS = 0, bestDiff = Infinity, bestCost = null;
   for (let s = 0; s <= rangeMax; s++) {
-    if (dp[s] === Infinity) continue;
+    if (dp[s] === null) continue;
     const diff = Math.abs(s - targetUnits);
     if (diff < bestDiff || (diff === bestDiff && dp[s] < bestCost)) {
       bestDiff = diff; bestCost = dp[s]; bestS = s;
