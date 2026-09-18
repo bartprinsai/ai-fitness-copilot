@@ -2212,6 +2212,7 @@ const OVERLAY_CANCEL_BUTTON = {
   'cat-edit-overlay': 'btn-cat-edit-cancel',
   'delete-exercise-overlay': 'btn-delete-ex-cancel',
   'cat-delete-overlay': 'btn-cat-delete-cancel',
+  'delete-plan-overlay': 'btn-delete-plan-cancel',
   'reset-overlay': 'btn-reset-cancel',
   'history-goto-overlay': 'history-goto-cancel',
 };
@@ -2473,6 +2474,33 @@ async function deletePlan(planId) {
   toast('Plan deleted');
 }
 
+// -- Delete plan confirmation ----------------------------
+let pendingDeletePlanId = null;
+let pendingDeletePlanOnDeleted = null;
+
+function openDeletePlanConfirm(planId, planName, onDeleted) {
+  pendingDeletePlanId = planId;
+  pendingDeletePlanOnDeleted = onDeleted || null;
+  document.getElementById('delete-plan-msg').textContent = `Delete "${planName}"? This can't be undone.`;
+  openOverlay('delete-plan-overlay');
+}
+
+document.getElementById('btn-delete-plan-cancel').addEventListener('click', () => {
+  pendingDeletePlanId = null;
+  pendingDeletePlanOnDeleted = null;
+  closeOverlay('delete-plan-overlay');
+});
+document.getElementById('btn-delete-plan-confirm').addEventListener('click', async () => {
+  if (!pendingDeletePlanId) return;
+  const planId = pendingDeletePlanId;
+  const onDeleted = pendingDeletePlanOnDeleted;
+  pendingDeletePlanId = null;
+  pendingDeletePlanOnDeleted = null;
+  closeOverlay('delete-plan-overlay');
+  await deletePlan(planId);
+  if (onDeleted) onDeleted();
+});
+
 async function setActivePlan(planId) {
   const plan = db.plans[planId];
   if (!plan) return;
@@ -2522,7 +2550,7 @@ function renderPlanList() {
       showOverflowMenu([
         { label: isAct ? '★ Remove active' : 'Set as Active', action: async () => { await setActivePlan(plan.id); renderPlanList(); } },
         { label: 'Duplicate', action: () => duplicatePlan(plan.id) },
-        { label: 'Delete', action: () => { if (confirm('Delete "' + plan.name + '"?')) deletePlan(plan.id); } },
+        { label: 'Delete', action: () => openDeletePlanConfirm(plan.id, plan.name) },
       ], e.currentTarget);
     });
     scroll.appendChild(item);
@@ -2791,9 +2819,7 @@ document.getElementById('btn-overflow-plan-detail').addEventListener('click', e 
     { label: 'Duplicate', action: () => duplicatePlan(currentPlanId) },
     { label: 'Delete', action: () => {
       if (!currentPlanData) return;
-      if (confirm('Delete "' + currentPlanData.name + '"?')) {
-        deletePlan(currentPlanId).then(() => showScreen('screen-workout-plan'));
-      }
+      openDeletePlanConfirm(currentPlanId, currentPlanData.name, () => showScreen('screen-workout-plan'));
     }},
   ], e.currentTarget);
 });
