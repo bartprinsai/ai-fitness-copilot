@@ -2772,34 +2772,44 @@ const PLATE_WEIGHT_RANKS = [...new Set(PLATE_TYPES.map(p => p.weight))].sort((a,
 function plateWeightRank(weight) { return PLATE_WEIGHT_RANKS.indexOf(weight); }
 
 // Priority-cost encoding, as a BigInt so none of these tiers can ever bleed
-// into one another regardless of how many plates get combined:
-//   tier 1 (COUNT_WEIGHT): one integer step per plate used, dominating
-//     everything below it — comparing total cost always picks the fewest
-//     total plates first, exactly like before this comment was extended.
-//   tier 2 (rank place-value): among equal plate counts, a plate's rank
-//     SUBTRACTS RANK_UNIT * RANK_BASE^(rank-from-lightest) from its cost, so
-//     the minimizing DP is biased toward heavier plates. RANK_BASE
+// into one another regardless of how many plates get combined. From most to
+// least significant (each tier only ever breaks a tie left by the one above
+// it — this is a single exhaustive DP over ALL plate types together, not a
+// sequence of independent greedy passes, so an earlier tier can never be
+// undermined by a later one):
+//   tier 1 (BAD_DEVIATION_WEIGHT): one huge step per "last resort" plate
+//     (deviation >= 0.4kg) used — dominates every tier below it, so the DP
+//     always minimizes how many of these it needs FIRST, even if avoiding
+//     them costs more total plates or smaller ones. 0 for the "equivalent"
+//     tier (deviation <= 0.3kg).
+//   tier 2 (COUNT_WEIGHT): one step per plate used (bad or not), dominating
+//     tiers 3-4 — among combos tied on tier 1, fewest total plates wins.
+//   tier 3 (rank place-value): among combos ALSO tied on plate count, a
+//     plate's rank SUBTRACTS RANK_UNIT * RANK_BASE^(rank-from-lightest) from
+//     its cost, biasing the minimizing DP toward heavier plates. RANK_BASE
 //     comfortably exceeds any plausible per-rank plate count, so this is a
-//     positional number system — having even one more plate at a heavier
-//     rank always outweighs any number of plates at every lighter rank
-//     combined, which is exactly "compare the used weights largest-first,
-//     first difference wins" (a fixed-length leximax comparison, since the
-//     count is already pinned equal by tier 1).
-//   tier 3 (penaltyTenths): the existing deviation tie-break, only reached
-//     once both plate count AND the largest-plates-first comparison tie.
+//     positional number system — one more plate at a heavier rank always
+//     outweighs any number of plates at every lighter rank combined, i.e.
+//     "compare the used weights largest-first, first difference wins" (a
+//     fixed-length leximax comparison, since the count is already pinned).
+//   tier 4 (penaltyTenths): the deviation tie-break, only reached once plate
+//     count AND the largest-plates-first comparison also tie.
 // Plain JS numbers lose integer precision far before these magnitudes, so
 // this needs BigInt; DP costs and the `dp`/`next` arrays are BigInt
 // throughout (`null` stands in for the old `Infinity` = "unreachable").
+const PLATE_BAD_DEVIATION_WEIGHT = 10n ** 70n;
 const PLATE_COUNT_WEIGHT = 10n ** 60n;
 const PLATE_RANK_UNIT = 100000n;
 const PLATE_RANK_BASE = 1000n;
 function platePriorityCost(p) {
+  const penaltyTenths = platePenaltyTenths(p.deviation);
+  const badDeviationCost = penaltyTenths > 0 ? PLATE_BAD_DEVIATION_WEIGHT : 0n;
   const rankFromLightest = PLATE_WEIGHT_RANKS.length - 1 - plateWeightRank(p.weight);
   const rankValue = PLATE_RANK_UNIT * (PLATE_RANK_BASE ** BigInt(rankFromLightest));
-  // Subtracted, not added: a heavier plate (bigger rankValue) must LOWER the
-  // total cost so the minimizing DP prefers it — that's what makes "largest
-  // first" actually win instead of "smallest first".
-  return PLATE_COUNT_WEIGHT - rankValue + BigInt(platePenaltyTenths(p.deviation));
+  // rankValue is subtracted, not added: a heavier plate (bigger rankValue)
+  // must LOWER the total cost so the minimizing DP prefers it — that's what
+  // makes "largest first" actually win instead of "smallest first".
+  return badDeviationCost + PLATE_COUNT_WEIGHT - rankValue + BigInt(penaltyTenths);
 }
 
 // Bounded-knapsack DP: for every achievable per-side sum (in integer centikg
