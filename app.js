@@ -28,7 +28,6 @@ let homeExDragStartY = 0;
 let homeExDragDy = 0;
 
 // -- Exercise browser extended state -------------------
-let currentBrowsePlan = null;
 const FAVORITES_CATEGORY = '__favorites__';
 
 // -- Splash coordination --------------------------------
@@ -980,7 +979,6 @@ function renderNewWorkoutScreen() {
 function openExerciseList() {
   exerciseBrowserMode = 'categories';
   currentBrowseCategory = null;
-  currentBrowsePlan = null;
   document.getElementById('exercise-search').value = '';
   setExercisesTitle('All Exercises');
   renderCategoryBrowser();
@@ -1027,31 +1025,6 @@ function renderCategoryBrowser() {
         { label: 'Edit', action: () => editCategory(cat) },
         { label: 'Delete', action: () => deleteCategory(cat) }
       ], e.currentTarget);
-    });
-    list.appendChild(item);
-  });
-}
-
-function renderPlanDayBrowser(planId) {
-  const plan = db.plans[planId];
-  if (!plan) return;
-  exerciseBrowserMode = 'plan-days';
-  currentBrowsePlan = planId;
-  setExercisesTitle(plan.name);
-  const list = document.getElementById('exercise-list');
-  list.innerHTML = '';
-  (plan.days || []).forEach((day, idx) => {
-    const item = document.createElement('div');
-    item.className = 'category-item list-row';
-    const count = (day.exercises || []).length;
-    item.innerHTML = `
-      <div class="plan-day-badge">${idx + 1}</div>
-      <span class="category-item-name">${day.name}</span>
-      <span class="category-item-sub">${count} exercise${count !== 1 ? 's' : ''}</span>
-    `;
-    item.addEventListener('click', () => {
-      loadWorkoutReturnScreen = 'screen-exercises';
-      openLoadWorkout(planId, idx);
     });
     list.appendChild(item);
   });
@@ -2302,10 +2275,9 @@ setupDaySwipeNav();
 setupSetListDragReorder();
 setupTrainingSwipeNav();
 document.getElementById('btn-back-exercises').addEventListener('click', () => {
-  if (exerciseBrowserMode === 'exercises' || exerciseBrowserMode === 'plan-days') {
+  if (exerciseBrowserMode === 'exercises') {
     exerciseBrowserMode = 'categories';
     currentBrowseCategory = null;
-    currentBrowsePlan = null;
     document.getElementById('exercise-search').value = '';
     setExercisesTitle('All Exercises');
     renderCategoryBrowser();

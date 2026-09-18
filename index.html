@@ -164,7 +164,7 @@
     </button>
     <span class="toolbar-title">New Workout</span>
   </div>
-  <div class="new-workout-content" id="new-workout-content">
+  <div class="new-workout-content">
     <button class="new-workout-card" id="btn-nw-manual" style="--card-accent: var(--color-manual-accent)">
       <div class="new-workout-card-icon"><svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></div>
       <div class="new-workout-card-body">
@@ -206,7 +206,7 @@
     <span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span><span>Su</span>
   </div>
   <div class="cal-scroll" id="cal-scroll"></div>
-  <div class="cal-footer" id="cal-footer">
+  <div class="cal-footer">
     <button class="day-nav-btn" id="cal-prev-workout" aria-label="Previous workout">
       <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
     </button>
@@ -735,7 +735,7 @@
 <div class="toast" id="toast"></div>
 
 <!-- DAY ACTIONS ROW (Recap / Comment — Fitness Tracker day view only) -->
-<div class="day-actions-row" id="day-actions-row">
+<div class="day-actions-row">
   <button class="day-action-pill" id="btn-day-recap">
     <svg viewBox="0 0 24 24"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6a7 7 0 1 1 2.05 4.95l-1.42 1.42A9 9 0 1 0 13 3zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8z"/></svg>
     <span>Recap</span>
@@ -750,7 +750,7 @@
 <div class="overlay" id="comment-overlay">
   <div class="overlay-panel comment-panel">
     <div id="comment-view-mode">
-      <h3 class="comment-title">Comment</h3>
+      <h3>Comment</h3>
       <p class="comment-text" id="comment-view-text"></p>
       <div class="overlay-btns">
         <button class="btn-secondary" id="btn-comment-edit">Edit</button>
@@ -758,7 +758,7 @@
       </div>
     </div>
     <div id="comment-edit-mode" class="hidden">
-      <h3 class="comment-title">Comment</h3>
+      <h3>Comment</h3>
       <textarea id="comment-edit-input" placeholder="Add a comment..." maxlength="500"></textarea>
       <div class="overlay-btns">
         <button class="btn-secondary" id="btn-comment-cancel">Cancel</button>
@@ -770,7 +770,7 @@
 </div>
 
 <!-- GLOBAL AI COACH BAR -->
-<div class="global-ai-bar" id="global-ai-bar">
+<div class="global-ai-bar">
   <button class="global-ai-bar-pill" id="btn-global-ai-coach">
     <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25zm-7.5.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12zM19 15l-1.25 2.75L15 19l2.75 1.25L19 23l1.25-2.75L23 19l-2.75-1.25z"/></svg>
     <span>AI Coach</span>

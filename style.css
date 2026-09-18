@@ -133,7 +133,6 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 
 /* ── EXERCISE LIST SCREEN ─────────────────────────────── */
 .exercises-title-wrap { flex: 1; color: white; font-size: 20px; font-weight: 700; padding: 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.plan-day-badge { width: 24px; height: 24px; border-radius: 50%; background: var(--cyan); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-right: 4px; }
 .category-item-sub { font-size: 12px; color: var(--text-hint); flex-shrink: 0; }
 
 /* Shared horizontal box-model for every full-width row on this screen (the
@@ -283,10 +282,6 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .info-view-row-label { font-size: 14px; color: var(--text-secondary); }
 .info-view-row-value { font-size: 15px; font-weight: 500; color: var(--text-primary); text-align: right; }
 .exercise-info-empty { text-align: center; color: var(--text-hint); padding: 24px 0; font-size: 14px; }
-.overlay-header { display: flex; align-items: center; justify-content: space-between; }
-.icon-btn { width: 40px; height: 40px; border: none; background: none; cursor: pointer; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.12s; }
-.icon-btn:active { background: var(--bg); }
-.icon-btn svg { width: 22px; height: 22px; fill: var(--text-secondary); }
 .btn-text { border: none; background: none; color: var(--blue); font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer; padding: 8px 4px; border-radius: 8px; text-transform: uppercase; letter-spacing: .06em; align-self: flex-end; }
 .btn-text:active { background: var(--cyan-light); }
 .btn-primary { flex: 1; padding: 12px 8px; border: none; border-radius: 8px; background: var(--blue); color: white; font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.12s; text-transform: uppercase; letter-spacing: .06em; }
@@ -415,7 +410,8 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .plan-active-ribbon.show { display: block; }
 .plan-detail-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 8px 12px calc(var(--ai-bar-space) + 24px); }
 .plan-day-card { background: #1E1E1E; border-radius: 14px; margin-bottom: 12px; overflow: hidden; }
-.plan-day-header { display: flex; align-items: center; padding: 14px 14px 10px; gap: 10px; }
+.plan-day-header { display: flex; align-items: center; padding: 14px 14px 10px; gap: 10px; cursor: pointer; }
+.plan-day-header:active { opacity: .85; }
 .plan-day-num { width: 28px; height: 28px; border-radius: 50%; background: #7C4DFF; color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .plan-day-name { flex: 1; font-size: 16px; font-weight: 600; color: #fff; }
 .plan-day-load-btn { padding: 8px 14px; border: none; border-radius: 20px; background: var(--cyan-light); color: var(--cyan); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; flex-shrink: 0; transition: background .1s; }
@@ -491,8 +487,6 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .pde-delete-reveal { position: absolute; right: 0; top: 0; bottom: 0; width: 0; background: #C62828; border-radius: 0 10px 10px 0; display: flex; align-items: center; justify-content: center; overflow: hidden; z-index: 0; }
 .pde-delete-btn { width: 80px; height: 100%; border: none; background: none; color: #fff; font-family: inherit; font-size: 12px; font-weight: 700; letter-spacing: .05em; cursor: pointer; flex-shrink: 0; }
 .pde-empty { padding: 32px 16px; text-align: center; color: #444; font-size: 14px; }
-.plan-day-header { cursor: pointer; }
-.plan-day-header:active { opacity: .85; }
 
 /* ── PRESET OVERLAY ITEMS ─────────────────────────────── */
 .preset-item { padding: 13px; border: 1px solid #2e2e2e; border-radius: 10px; cursor: pointer; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; transition: background .1s; }
