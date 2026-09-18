@@ -2632,6 +2632,9 @@ function openFitnessTracker() {
 
 document.getElementById('menu-card-fitness').addEventListener('click', openFitnessTracker);
 document.getElementById('menu-card-workout').addEventListener('click', openWorkoutPlan);
+document.getElementById('menu-card-calculator').addEventListener('click', () => {
+  // TODO: navigeert later naar het Calculator-scherm (1RM, warming-up, schijven) — nog niet gebouwd
+});
 document.getElementById('menu-card-nutrition').addEventListener('click', () => showScreen('screen-nutrition'));
 document.getElementById('menu-card-progress').addEventListener('click', () => showScreen('screen-progress'));
 
