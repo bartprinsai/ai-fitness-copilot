@@ -326,7 +326,16 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 
 /* ── CALENDAR ─────────────────────────────────────────── */
 .cal-grid-header { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 11px; font-weight: 700; color: var(--text-hint); padding: 6px 0 4px; text-transform: uppercase; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0; }
-.cal-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; background: var(--bg); padding-bottom: var(--ai-bar-space); }
+/* calOnScroll() (app.js) prepends older months above the viewport and
+   manually compensates scrollTop by the exact height added, to keep the
+   visual position stable. The browser's own CSS scroll-anchoring does the
+   *same* compensation automatically for content inserted above the anchor
+   node — with both active at once the shift gets applied twice, so the
+   view overshoots and appears to snap back down toward whichever month was
+   centered on open every time another batch of months loads while
+   scrolling up. Turning off native scroll anchoring here leaves our manual
+   compensation as the only adjustment, which fixes the jump. */
+.cal-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; overflow-anchor: none; background: var(--bg); padding-bottom: var(--ai-bar-space); }
 .cal-month-header { padding: 16px 16px 4px; font-size: 13px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .06em; }
 .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; padding: 4px 12px; }
 .cal-day { aspect-ratio: 1; border: none; background: none; font-family: inherit; font-size: 14px; color: var(--text-primary); cursor: pointer; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.12s; position: relative; }
