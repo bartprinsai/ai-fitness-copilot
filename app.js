@@ -2753,22 +2753,40 @@ document.getElementById('plate-bar-options').addEventListener('click', e => {
   opt.classList.add('selected');
 });
 
+// A plate's max deviation only matters for tie-breaking once it's 0.4kg or
+// higher — 0 through 0.3 all count as "no deviation" and must never lose out
+// to a bigger, lower-plate-count combo just because a 0.1/0.2/0.3 plate was
+// involved. `penaltyTenths` is 0 for the equivalent tier, and the actual
+// deviation (in tenths) for the "last resort" tier.
+const PLATE_DEVIATION_EQUIVALENT_MAX_TENTHS = 3; // 0.3kg — anything <= this is "no deviation"
+function platePenaltyTenths(deviation) {
+  const tenths = Math.round(deviation * 10);
+  return tenths > PLATE_DEVIATION_EQUIVALENT_MAX_TENTHS ? tenths : 0;
+}
+
 // Bounded-knapsack DP: for every achievable per-side sum (in integer centikg
-// units, to avoid float drift), tracks the minimal total deviation-units
-// needed to reach it, plus (via `choice`) how many of the current plate type
-// were used — enough to both pick the best sum (closest to target, ties
-// broken by lowest deviation) and reconstruct which plates make it up.
+// units, to avoid float drift), tracks the minimal "cost" needed to reach it,
+// plus (via `choice`) how many of the current plate type were used — enough
+// to both pick the best sum and reconstruct which plates make it up.
+// `cost` per plate used is encoded as `PLATE_COUNT_WEIGHT + penaltyTenths` so
+// that comparing two total costs as plain numbers automatically applies the
+// full priority order in one comparison: PLATE_COUNT_WEIGHT (10000) dwarfs any
+// realistic total penalty, so it always decides ties first — i.e. fewest
+// total plates wins outright — and only once the plate COUNT is equal does
+// the remaining penalty-tenths difference (0 for deviation <= 0.3kg, the
+// real deviation for >= 0.4kg) get to break the tie.
 // `DP_MAX_UNITS` caps the search array at 600kg/side regardless of how large
 // user-entered counts get, so even a pathological "max every stepper" input
 // stays fast.
 const PLATE_DP_MAX_UNITS = 60000;
+const PLATE_COUNT_WEIGHT = 10000;
 function calcPlateCombo(targetPerSideKg, countsObj) {
   const items = PLATE_TYPES.map(p => {
     const count = countsObj[p.id] !== undefined ? countsObj[p.id] : p.defaultCount;
     return {
       ...p,
       weightUnits: Math.round(p.weight * 100),
-      deviationUnits: Math.round(p.deviation * 10),
+      unitCost: PLATE_COUNT_WEIGHT + platePenaltyTenths(p.deviation),
       maxUse: Math.max(0, Math.floor(Math.min(count, PLATE_MAX_COUNT) / 2)),
     };
   });
@@ -2787,20 +2805,20 @@ function calcPlateCombo(targetPerSideKg, countsObj) {
         for (let k = 1; k <= it.maxUse; k++) {
           const s2 = s + k * it.weightUnits;
           if (s2 > rangeMax) break;
-          const dev = dp[s] + k * it.deviationUnits;
-          if (dev < next[s2]) { next[s2] = dev; choice[i][s2] = k; }
+          const cost = dp[s] + k * it.unitCost;
+          if (cost < next[s2]) { next[s2] = cost; choice[i][s2] = k; }
         }
       }
     }
     dp = next;
   });
 
-  let bestS = 0, bestDiff = Infinity, bestDev = Infinity;
+  let bestS = 0, bestDiff = Infinity, bestCost = Infinity;
   for (let s = 0; s <= rangeMax; s++) {
     if (dp[s] === Infinity) continue;
     const diff = Math.abs(s - targetUnits);
-    if (diff < bestDiff || (diff === bestDiff && dp[s] < bestDev)) {
-      bestDiff = diff; bestDev = dp[s]; bestS = s;
+    if (diff < bestDiff || (diff === bestDiff && dp[s] < bestCost)) {
+      bestDiff = diff; bestCost = dp[s]; bestS = s;
     }
   }
 
