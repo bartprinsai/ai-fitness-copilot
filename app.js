@@ -1389,14 +1389,75 @@ function openExerciseRecords() {
 // hiddenBuiltins) — not tied to any session/set, so it's stored and loaded
 // independently of db.workouts.
 const MUSCLE_OPTIONS = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Quadriceps', 'Hamstrings', 'Glutes', 'Core', 'Calves'];
-const EXERCISE_INFO_EQUIPMENT_FIELDS = [
-  { key: 'benchSetting', label: 'Bench setting', inputId: 'info-bench-setting', type: 'int' },
-  { key: 'benchHeight', label: 'Bench height', inputId: 'info-bench-height', type: 'float1' },
-  { key: 'oldMachineCableHeight', label: 'Old machine cable height', inputId: 'info-old-cable-height', type: 'int' },
-  { key: 'newMachineCableHeight', label: 'New machine cable height', inputId: 'info-new-cable-height', type: 'int' },
-  { key: 'handPosition', label: 'Hand position', inputId: 'info-hand-position', type: 'text' },
-  { key: 'footPosition', label: 'Foot position', inputId: 'info-foot-position', type: 'text' },
+
+// Every equipment dropdown shares the same "Not set" first option, both so
+// it's the natural default for a new/empty exercise and so a dropdown opened
+// by accident can be closed by picking it, without a separate reset control.
+function equipmentRangeOptions(start, end, step) {
+  const opts = [{ value: '', label: 'Not set' }];
+  const count = Math.round((end - start) / step);
+  for (let i = 0; i <= count; i++) {
+    const v = Math.round((start + i * step) * 100) / 100;
+    opts.push({ value: String(v), label: String(v) });
+  }
+  return opts;
+}
+const BENCH_SETTING_OLD_OPTIONS = [
+  { value: '', label: 'Not set' },
+  ...[0, 15, 30, 45, 60, 90].map(v => ({ value: String(v), label: v + '°' })),
 ];
+const BENCH_SETTING_NEW_OPTIONS = [
+  { value: '', label: 'Not set' },
+  ...[0, 1, 2, 3, 4, 5, 6].map(v => ({ value: String(v), label: String(v) })),
+];
+const BENCH_HEIGHT_OPTIONS = equipmentRangeOptions(1, 9, 0.5);
+const CABLE_HEIGHT_OLD_OPTIONS = equipmentRangeOptions(1, 12, 1);
+const CABLE_HEIGHT_NEW_OPTIONS = equipmentRangeOptions(1, 14, 1);
+const SQUAT_RACK_HEIGHT_OPTIONS = equipmentRangeOptions(1, 10, 1);
+const SAFETY_BAR_OPTIONS = equipmentRangeOptions(1, 10, 1);
+
+// `kind: 'picker'` fields open the shared field-picker overlay (see the
+// generic click-listener loop below); `'checkbox'` and `'text'` read/write
+// their input directly. View mode pairs the picker/checkbox fields up
+// (EXERCISE_INFO_EQUIPMENT_PAIRS) the same way Muscle group pairs
+// Primary/Secondary, and only renders whichever half of a pair is filled;
+// the free-text fields stay full-width rows like before.
+const EXERCISE_INFO_EQUIPMENT_FIELDS = [
+  { key: 'benchSettingOld', label: 'Bench setting (old)', inputId: 'info-bench-setting-old', kind: 'picker', options: BENCH_SETTING_OLD_OPTIONS },
+  { key: 'benchSettingNew', label: 'Bench setting (new)', inputId: 'info-bench-setting-new', kind: 'picker', options: BENCH_SETTING_NEW_OPTIONS },
+  { key: 'benchHeight', label: 'Bench height', inputId: 'info-bench-height', kind: 'picker', options: BENCH_HEIGHT_OPTIONS },
+  { key: 'powerliftBench', label: 'Powerlift bench', inputId: 'info-powerlift-bench', kind: 'checkbox' },
+  { key: 'cableHeightOld', label: 'Cable height (old)', inputId: 'info-cable-height-old', kind: 'picker', options: CABLE_HEIGHT_OLD_OPTIONS },
+  { key: 'cableHeightNew', label: 'Cable height (new)', inputId: 'info-cable-height-new', kind: 'picker', options: CABLE_HEIGHT_NEW_OPTIONS },
+  { key: 'squatRackHeight', label: 'Squat rack height', inputId: 'info-squat-rack-height', kind: 'picker', options: SQUAT_RACK_HEIGHT_OPTIONS },
+  { key: 'safetyBar', label: 'Safety bar', inputId: 'info-safety-bar', kind: 'picker', options: SAFETY_BAR_OPTIONS },
+  { key: 'handPosition', label: 'Hand position', inputId: 'info-hand-position', kind: 'text' },
+  { key: 'footPosition', label: 'Foot position', inputId: 'info-foot-position', kind: 'text' },
+  { key: 'extra', label: 'Extra', inputId: 'info-extra', kind: 'text' },
+];
+const EXERCISE_INFO_EQUIPMENT_PAIRS = [
+  ['benchSettingOld', 'benchSettingNew'],
+  ['benchHeight', 'powerliftBench'],
+  ['cableHeightOld', 'cableHeightNew'],
+  ['squatRackHeight', 'safetyBar'],
+];
+const EXERCISE_INFO_FULLWIDTH_KEYS = ['handPosition', 'footPosition', 'extra'];
+const EXERCISE_INFO_FIELDS_BY_KEY = {};
+EXERCISE_INFO_EQUIPMENT_FIELDS.forEach(f => { EXERCISE_INFO_FIELDS_BY_KEY[f.key] = f; });
+
+function equipmentFieldIsFilled(f, info) {
+  if (f.kind === 'checkbox') return !!info[f.key];
+  const v = info[f.key];
+  return v !== undefined && v !== null && v !== '';
+}
+function equipmentFieldViewValue(f, info) {
+  if (f.kind === 'checkbox') return 'Yes';
+  if (f.kind === 'picker') {
+    const opt = f.options.find(o => o.value === String(info[f.key]));
+    return opt ? opt.label : String(info[f.key]);
+  }
+  return info[f.key];
+}
 
 function renderExerciseInfoView() {
   const info = getExerciseInfo(currentExercise) || {};
@@ -1408,12 +1469,20 @@ function renderExerciseInfoView() {
       ${info.secondaryMuscle ? `<div class="info-view-stat"><span class="info-view-stat-label">Secondary</span><span class="info-view-stat-value">${info.secondaryMuscle}</span></div>` : ''}
     </div>`);
   }
-  const equipRows = EXERCISE_INFO_EQUIPMENT_FIELDS.filter(f => info[f.key] !== undefined && info[f.key] !== null && info[f.key] !== '');
-  if (equipRows.length > 0) {
-    sections.push('<div class="info-section-label">Equipment setup</div>' + equipRows.map(f =>
-      `<div class="info-view-row"><span class="info-view-row-label">${f.label}</span><span class="info-view-row-value">${info[f.key]}</span></div>`
-    ).join(''));
-  }
+  let equipHtml = '';
+  EXERCISE_INFO_EQUIPMENT_PAIRS.forEach(pair => {
+    const cells = pair
+      .map(key => EXERCISE_INFO_FIELDS_BY_KEY[key])
+      .filter(f => equipmentFieldIsFilled(f, info))
+      .map(f => `<div class="info-view-stat"><span class="info-view-stat-label">${f.label}</span><span class="info-view-stat-value">${equipmentFieldViewValue(f, info)}</span></div>`);
+    if (cells.length > 0) equipHtml += `<div class="info-two-col">${cells.join('')}</div>`;
+  });
+  EXERCISE_INFO_FULLWIDTH_KEYS.forEach(key => {
+    const f = EXERCISE_INFO_FIELDS_BY_KEY[key];
+    if (!equipmentFieldIsFilled(f, info)) return;
+    equipHtml += `<div class="info-view-row"><span class="info-view-row-label">${f.label}</span><span class="info-view-row-value">${equipmentFieldViewValue(f, info)}</span></div>`;
+  });
+  if (equipHtml) sections.push('<div class="info-section-label">Equipment setup</div>' + equipHtml);
   const content = document.getElementById('exercise-info-view-content');
   content.innerHTML = sections.length === 0
     ? `<div class="exercise-info-empty">No info added yet</div>`
@@ -1436,6 +1505,19 @@ document.getElementById('info-secondary-muscle').addEventListener('click', () =>
   });
 });
 
+// Every equipment dropdown field opens the same shared field-picker overlay
+// and writes its selection back onto its own button — one listener covers
+// all of them instead of repeating the new-ex-category/type/weight-unit
+// pattern six times over.
+EXERCISE_INFO_EQUIPMENT_FIELDS.filter(f => f.kind === 'picker').forEach(f => {
+  document.getElementById(f.inputId).addEventListener('click', () => {
+    openFieldPicker(f.label, f.options, getFieldBtnValue(f.inputId), value => {
+      const opt = f.options.find(o => o.value === value);
+      setFieldBtnValue(f.inputId, value, opt ? opt.label : 'Not set');
+    });
+  });
+});
+
 // Reads the current, live state of every Exercise Info edit-mode field, in
 // the same shape whether used to capture the baseline (right after
 // populating the form) or to check for changes later (at Cancel/back time).
@@ -1445,7 +1527,9 @@ function getExerciseInfoFormSnapshot() {
     secondaryMuscle: getFieldBtnValue('info-secondary-muscle'),
   };
   EXERCISE_INFO_EQUIPMENT_FIELDS.forEach(f => {
-    snapshot[f.key] = document.getElementById(f.inputId).value;
+    if (f.kind === 'checkbox') snapshot[f.key] = document.getElementById(f.inputId).checked;
+    else if (f.kind === 'picker') snapshot[f.key] = getFieldBtnValue(f.inputId);
+    else snapshot[f.key] = document.getElementById(f.inputId).value;
   });
   return snapshot;
 }
@@ -1459,7 +1543,16 @@ function showExerciseInfoEdit() {
   const secondary = info.secondaryMuscle || '';
   setFieldBtnValue('info-secondary-muscle', secondary, secondary || 'None');
   EXERCISE_INFO_EQUIPMENT_FIELDS.forEach(f => {
-    document.getElementById(f.inputId).value = (info[f.key] !== undefined && info[f.key] !== null) ? info[f.key] : '';
+    const val = info[f.key];
+    if (f.kind === 'checkbox') {
+      document.getElementById(f.inputId).checked = !!val;
+    } else if (f.kind === 'picker') {
+      const strVal = (val !== undefined && val !== null) ? String(val) : '';
+      const opt = f.options.find(o => o.value === strVal) || f.options[0];
+      setFieldBtnValue(f.inputId, opt.value, opt.label);
+    } else {
+      document.getElementById(f.inputId).value = (val !== undefined && val !== null) ? val : '';
+    }
   });
   document.getElementById('exercise-info-edit-mode').classList.remove('hidden');
   document.getElementById('exercise-info-view-mode').classList.add('hidden');
@@ -1478,11 +1571,19 @@ function saveExerciseInfo() {
   if (primary) info.primaryMuscle = primary;
   if (secondary) info.secondaryMuscle = secondary;
   EXERCISE_INFO_EQUIPMENT_FIELDS.forEach(f => {
+    if (f.kind === 'checkbox') {
+      if (document.getElementById(f.inputId).checked) info[f.key] = true;
+      return;
+    }
+    if (f.kind === 'picker') {
+      const raw = getFieldBtnValue(f.inputId);
+      if (raw === '') return;
+      info[f.key] = parseFloat(raw);
+      return;
+    }
     const raw = document.getElementById(f.inputId).value.trim();
     if (raw === '') return;
-    if (f.type === 'int') info[f.key] = parseInt(raw, 10);
-    else if (f.type === 'float1') info[f.key] = Math.round(parseFloat(raw) * 10) / 10;
-    else info[f.key] = raw;
+    info[f.key] = raw;
   });
   if (!db.exerciseInfo) db.exerciseInfo = {};
   if (Object.keys(info).length === 0) delete db.exerciseInfo[currentExercise];

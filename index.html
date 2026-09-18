@@ -647,21 +647,45 @@
           </div>
         </div>
         <div class="info-section-label">Equipment setup</div>
-        <div class="info-field">
-          <label class="info-field-label" for="info-bench-setting">Bench setting</label>
-          <input type="number" id="info-bench-setting" inputmode="numeric" step="1" placeholder="Leave empty to hide"/>
+        <div class="info-two-col">
+          <div class="info-field">
+            <label class="info-field-label" for="info-bench-setting-old">Bench setting (old)</label>
+            <button type="button" class="new-ex-select new-ex-select-btn" id="info-bench-setting-old"></button>
+          </div>
+          <div class="info-field">
+            <label class="info-field-label" for="info-bench-setting-new">Bench setting (new)</label>
+            <button type="button" class="new-ex-select new-ex-select-btn" id="info-bench-setting-new"></button>
+          </div>
         </div>
-        <div class="info-field">
-          <label class="info-field-label" for="info-bench-height">Bench height</label>
-          <input type="number" id="info-bench-height" inputmode="decimal" step="0.1" placeholder="Leave empty to hide"/>
+        <div class="info-two-col">
+          <div class="info-field">
+            <label class="info-field-label" for="info-bench-height">Bench height</label>
+            <button type="button" class="new-ex-select new-ex-select-btn" id="info-bench-height"></button>
+          </div>
+          <div class="info-field">
+            <label class="info-field-label" for="info-powerlift-bench">Powerlift bench</label>
+            <input type="checkbox" class="info-checkbox" id="info-powerlift-bench"/>
+          </div>
         </div>
-        <div class="info-field">
-          <label class="info-field-label" for="info-old-cable-height">Old machine cable height</label>
-          <input type="number" id="info-old-cable-height" inputmode="numeric" step="1" placeholder="Leave empty to hide"/>
+        <div class="info-two-col">
+          <div class="info-field">
+            <label class="info-field-label" for="info-cable-height-old">Cable height (old)</label>
+            <button type="button" class="new-ex-select new-ex-select-btn" id="info-cable-height-old"></button>
+          </div>
+          <div class="info-field">
+            <label class="info-field-label" for="info-cable-height-new">Cable height (new)</label>
+            <button type="button" class="new-ex-select new-ex-select-btn" id="info-cable-height-new"></button>
+          </div>
         </div>
-        <div class="info-field">
-          <label class="info-field-label" for="info-new-cable-height">New machine cable height</label>
-          <input type="number" id="info-new-cable-height" inputmode="numeric" step="1" placeholder="Leave empty to hide"/>
+        <div class="info-two-col">
+          <div class="info-field">
+            <label class="info-field-label" for="info-squat-rack-height">Squat rack height</label>
+            <button type="button" class="new-ex-select new-ex-select-btn" id="info-squat-rack-height"></button>
+          </div>
+          <div class="info-field">
+            <label class="info-field-label" for="info-safety-bar">Safety bar</label>
+            <button type="button" class="new-ex-select new-ex-select-btn" id="info-safety-bar"></button>
+          </div>
         </div>
         <div class="info-field">
           <label class="info-field-label" for="info-hand-position">Hand position</label>
@@ -670,6 +694,10 @@
         <div class="info-field">
           <label class="info-field-label" for="info-foot-position">Foot position</label>
           <input type="text" id="info-foot-position" placeholder="Leave empty to hide"/>
+        </div>
+        <div class="info-field">
+          <label class="info-field-label" for="info-extra">Extra</label>
+          <input type="text" id="info-extra" placeholder="Leave empty to hide"/>
         </div>
       </div>
       <div class="overlay-btns">

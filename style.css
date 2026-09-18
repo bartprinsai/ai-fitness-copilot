@@ -301,6 +301,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .info-two-col > .info-field, .info-two-col > .info-view-stat { flex: 1; }
 .info-field { display: flex; flex-direction: column; gap: 4px; }
 .info-field-label { font-size: 13px; color: var(--text-secondary); }
+.info-checkbox { width: 24px; height: 24px; accent-color: var(--blue-btn); cursor: pointer; margin-top: 8px; }
 .info-view-stat { display: flex; flex-direction: column; gap: 2px; }
 .info-view-stat-label { font-size: 12px; color: var(--text-secondary); }
 .info-view-stat-value { font-size: 16px; font-weight: 600; color: var(--text-primary); }
