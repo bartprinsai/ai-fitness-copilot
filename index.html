@@ -548,6 +548,50 @@
   </div>
 </div>
 
+<!-- PLATE CALCULATOR SCREEN -->
+<div id="screen-calculator-plate" class="screen">
+  <div class="toolbar">
+    <button class="toolbar-btn" id="btn-back-calculator-plate" aria-label="Back">
+      <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </button>
+    <span class="toolbar-title">Plate Calculator</span>
+  </div>
+  <div class="plate-calc-scroll">
+    <div class="plate-section">
+      <div class="plate-section-label">Doelgewicht (kg)</div>
+      <input type="text" inputmode="decimal" id="plate-target-weight" class="plate-target-input" placeholder="bijv. 100" autocomplete="off"/>
+    </div>
+    <div class="plate-section">
+      <div class="plate-section-label">Stang</div>
+      <div class="plate-bar-options" id="plate-bar-options">
+        <button type="button" class="plate-bar-option selected" data-val="20">
+          <div class="plate-bar-option-title">Dubbele ringen</div>
+          <div class="plate-bar-option-weight">20 kg</div>
+        </button>
+        <button type="button" class="plate-bar-option" data-val="16.5">
+          <div class="plate-bar-option-title">Enkele ring</div>
+          <div class="plate-bar-option-weight">16,5 kg</div>
+        </button>
+      </div>
+    </div>
+    <div class="plate-section">
+      <div class="plate-section-label">Beschikbare schijven</div>
+      <div class="plate-list" id="plate-list"></div>
+    </div>
+    <div class="plate-actions-row">
+      <button type="button" class="btn-secondary" id="btn-plate-reset">Reset</button>
+      <button type="button" class="btn-secondary" id="btn-plate-clear">Clear</button>
+    </div>
+    <button type="button" class="plate-calculate-btn" id="btn-plate-calculate">Bereken</button>
+    <div class="plate-result-card hidden" id="plate-result-card">
+      <div class="plate-result-title">Per kant</div>
+      <div class="plate-result-list" id="plate-result-list"></div>
+      <div class="plate-result-total" id="plate-result-total"></div>
+      <div class="plate-result-note hidden" id="plate-result-note"></div>
+    </div>
+  </div>
+</div>
+
 <!-- PROGRESS SCREEN -->
 <div id="screen-progress" class="screen screen-placeholder">
   <div class="toolbar">

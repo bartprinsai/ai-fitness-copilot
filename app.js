@@ -18,7 +18,7 @@ const fStore = firebase.firestore();
 let currentUser = null;
 
 // -- In-memory state ------------------------------------
-let db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, favoriteExercises: {}, hiddenBuiltins: {}, exerciseInfo: {} };
+let db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, favoriteExercises: {}, hiddenBuiltins: {}, exerciseInfo: {}, plateInventory: {} };
 
 // -- Home selection mode state --------------------------
 let homeSelMode = false;
@@ -150,11 +150,15 @@ async function persistExerciseInfo() {
   uDoc('meta/exercise_info').set({ data: db.exerciseInfo || {} }).catch(e => console.error(e));
 }
 function getExerciseInfo(name) { return (db.exerciseInfo || {})[name] || null; }
+async function persistPlateInventory() {
+  if (!currentUser) return;
+  uDoc('meta/plate_inventory').set({ counts: db.plateInventory || {} }).catch(e => console.error(e));
+}
 async function loadUserData(userUid) {
   console.log('[Load] loadUserData start, uid:', userUid);
   try {
-    console.log('[Load] firing Promise.all for 8 Firestore reads...');
-    const [workoutsSnap, recordsSnap, customSnap, plansSnap, activePlanSnap, favoritesSnap, hiddenBuiltinsSnap, exerciseInfoSnap] = await Promise.all([
+    console.log('[Load] firing Promise.all for 9 Firestore reads...');
+    const [workoutsSnap, recordsSnap, customSnap, plansSnap, activePlanSnap, favoritesSnap, hiddenBuiltinsSnap, exerciseInfoSnap, plateInventorySnap] = await Promise.all([
       fStore.collection('users/' + userUid + '/workouts').get(),
       fStore.doc('users/' + userUid + '/meta/records').get(),
       fStore.doc('users/' + userUid + '/meta/custom_exercises').get(),
@@ -163,6 +167,7 @@ async function loadUserData(userUid) {
       fStore.doc('users/' + userUid + '/meta/favorites').get(),
       fStore.doc('users/' + userUid + '/meta/hidden_builtins').get(),
       fStore.doc('users/' + userUid + '/meta/exercise_info').get(),
+      fStore.doc('users/' + userUid + '/meta/plate_inventory').get(),
     ]);
     console.log('[Load] Promise.all resolved, exerciseInfoSnap.exists:', exerciseInfoSnap.exists);
     db.workouts = {};
@@ -186,6 +191,7 @@ async function loadUserData(userUid) {
       (hiddenBuiltinsSnap.data().names || []).forEach(name => { db.hiddenBuiltins[name] = true; });
     }
     db.exerciseInfo = exerciseInfoSnap.exists ? (exerciseInfoSnap.data().data || {}) : {};
+    db.plateInventory = plateInventorySnap.exists ? (plateInventorySnap.data().counts || {}) : {};
     console.log('[Load] loadUserData finished OK');
   } catch(e) {
     console.error('[Load] loadUserData FAILED:', e && e.code, e && e.message, e);
@@ -2647,9 +2653,208 @@ document.getElementById('btn-calc-1rm').addEventListener('click', () => {
 document.getElementById('btn-calc-warmup').addEventListener('click', () => {
   // TODO: Warm-up Calculator-scherm bouwen — nog niet gebouwd
 });
-document.getElementById('btn-calc-plate').addEventListener('click', () => {
-  // TODO: Plate Calculator-scherm bouwen — nog niet gebouwd
+document.getElementById('btn-calc-plate').addEventListener('click', openPlateCalculator);
+
+// -- Plate Calculator -------------------------------------
+// Counts are the TOTAL number of that plate owned by the gym; only floor(count/2)
+// of each type are usable per side of a symmetrically-loaded bar. `weight` is the
+// average real weight used for the actual math; `deviation` is that plate's max
+// deviation from its nominal weight (0 = exact), used both to flag an approximate
+// result (any deviation > 0 plate in the chosen combo) and as the tie-break when
+// multiple combinations land equally close to the target.
+const PLATE_TYPES = [
+  { id: 'p25', label: '25 kg', weight: 25, deviation: 0.2, defaultCount: 4 },
+  { id: 'p20White', label: '20 kg wit', weight: 20.8, deviation: 0.1, defaultCount: 4 },
+  { id: 'p20WhiteHandles', label: '20 kg wit met handvaten', weight: 20.3, deviation: 0, defaultCount: 2 },
+  { id: 'p20BlackHandles', label: '20 kg zwart met handvaten', weight: 20.4, deviation: 0, defaultCount: 2 },
+  { id: 'p15White', label: '15 kg wit', weight: 14.9, deviation: 0.4, defaultCount: 6 },
+  { id: 'p15WhiteHandles', label: '15 kg wit met handvaten', weight: 15.3, deviation: 0, defaultCount: 2 },
+  { id: 'p15BlackHandles', label: '15 kg zwart met handvaten', weight: 15, deviation: 0, defaultCount: 2 },
+  { id: 'p10New', label: '10 kg nieuwe schijven', weight: 9.7, deviation: 0.1, defaultCount: 10 },
+  { id: 'p10White', label: '10 kg wit', weight: 9.9, deviation: 0.4, defaultCount: 6 },
+  { id: 'p10WhiteHandles', label: '10 kg wit met handvaten', weight: 10.5, deviation: 0, defaultCount: 2 },
+  { id: 'p10BlackHandles', label: '10 kg zwart met handvaten', weight: 10.3, deviation: 0, defaultCount: 2 },
+  { id: 'p5New', label: '5 kg nieuwe schijven', weight: 5, deviation: 0, defaultCount: 10 },
+  { id: 'p5White', label: '5 kg wit', weight: 5, deviation: 0, defaultCount: 8 },
+  { id: 'p5Black', label: '5 kg zwart', weight: 5.2, deviation: 0, defaultCount: 2 },
+  { id: 'p2_5', label: '2,5 kg', weight: 2.5, deviation: 0, defaultCount: 6 },
+  { id: 'p2', label: '2 kg', weight: 2, deviation: 0, defaultCount: 6 },
+  { id: 'p1', label: '1 kg', weight: 1, deviation: 0, defaultCount: 6 },
+  { id: 'p1Own', label: '1 kg eigen schijven', weight: 1, deviation: 0, defaultCount: 2 },
+  { id: 'p0_5Own', label: '0,5 kg eigen schijven', weight: 0.5, deviation: 0, defaultCount: 2 },
+  { id: 'p0_25Own', label: '0,25 kg eigen schijven', weight: 0.25, deviation: 0, defaultCount: 2 },
+];
+const PLATE_MAX_COUNT = 40; // per-type stepper ceiling (20 usable per side) — already far beyond any real rack
+
+function getPlateCount(id) {
+  const stored = (db.plateInventory || {})[id];
+  if (stored !== undefined) return stored;
+  const def = PLATE_TYPES.find(p => p.id === id);
+  return def ? def.defaultCount : 0;
+}
+function setPlateCount(id, count) {
+  if (!db.plateInventory) db.plateInventory = {};
+  db.plateInventory[id] = count;
+  persistPlateInventory();
+}
+
+// Dutch-locale kg formatting: 2 decimals max, trailing zeros trimmed, comma separator.
+function formatKg(n) {
+  let s = (Math.round(n * 100) / 100).toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+  return s.replace('.', ',');
+}
+
+function renderPlateList() {
+  document.getElementById('plate-list').innerHTML = PLATE_TYPES.map(p => {
+    const meta = p.deviation > 0
+      ? `Gem. ${formatKg(p.weight)} kg · max ±${formatKg(p.deviation)} kg`
+      : `${formatKg(p.weight)} kg`;
+    return `
+      <div class="plate-row" data-plate-id="${p.id}">
+        <div class="plate-row-info">
+          <span class="plate-row-name">${p.label}</span>
+          <span class="plate-row-meta">${meta}</span>
+        </div>
+        <div class="plate-stepper">
+          <button type="button" class="plate-stepper-btn" data-dir="-">−</button>
+          <span class="plate-stepper-count">${getPlateCount(p.id)}</span>
+          <button type="button" class="plate-stepper-btn" data-dir="+">+</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+document.getElementById('plate-list').addEventListener('click', e => {
+  const btn = e.target.closest('.plate-stepper-btn');
+  if (!btn) return;
+  const row = btn.closest('.plate-row');
+  const id = row.dataset.plateId;
+  let count = getPlateCount(id);
+  count = btn.dataset.dir === '+' ? Math.min(PLATE_MAX_COUNT, count + 1) : Math.max(0, count - 1);
+  setPlateCount(id, count);
+  row.querySelector('.plate-stepper-count').textContent = count;
 });
+document.getElementById('btn-plate-reset').addEventListener('click', () => {
+  db.plateInventory = {};
+  PLATE_TYPES.forEach(p => { db.plateInventory[p.id] = p.defaultCount; });
+  persistPlateInventory();
+  renderPlateList();
+});
+document.getElementById('btn-plate-clear').addEventListener('click', () => {
+  db.plateInventory = {};
+  PLATE_TYPES.forEach(p => { db.plateInventory[p.id] = 0; });
+  persistPlateInventory();
+  renderPlateList();
+});
+document.getElementById('plate-bar-options').addEventListener('click', e => {
+  const opt = e.target.closest('.plate-bar-option');
+  if (!opt) return;
+  document.querySelectorAll('.plate-bar-option').forEach(o => o.classList.remove('selected'));
+  opt.classList.add('selected');
+});
+
+// Bounded-knapsack DP: for every achievable per-side sum (in integer centikg
+// units, to avoid float drift), tracks the minimal total deviation-units
+// needed to reach it, plus (via `choice`) how many of the current plate type
+// were used — enough to both pick the best sum (closest to target, ties
+// broken by lowest deviation) and reconstruct which plates make it up.
+// `DP_MAX_UNITS` caps the search array at 600kg/side regardless of how large
+// user-entered counts get, so even a pathological "max every stepper" input
+// stays fast.
+const PLATE_DP_MAX_UNITS = 60000;
+function calcPlateCombo(targetPerSideKg, countsObj) {
+  const items = PLATE_TYPES.map(p => {
+    const count = countsObj[p.id] !== undefined ? countsObj[p.id] : p.defaultCount;
+    return {
+      ...p,
+      weightUnits: Math.round(p.weight * 100),
+      deviationUnits: Math.round(p.deviation * 10),
+      maxUse: Math.max(0, Math.floor(Math.min(count, PLATE_MAX_COUNT) / 2)),
+    };
+  });
+  const rangeMax = Math.min(PLATE_DP_MAX_UNITS, items.reduce((sum, it) => sum + it.weightUnits * it.maxUse, 0));
+  const targetUnits = Math.round(Math.max(0, targetPerSideKg) * 100);
+
+  let dp = new Array(rangeMax + 1).fill(Infinity);
+  dp[0] = 0;
+  const choice = items.map(() => new Array(rangeMax + 1).fill(0));
+
+  items.forEach((it, i) => {
+    const next = dp.slice();
+    if (it.weightUnits > 0 && it.maxUse > 0) {
+      for (let s = 0; s <= rangeMax; s++) {
+        if (dp[s] === Infinity) continue;
+        for (let k = 1; k <= it.maxUse; k++) {
+          const s2 = s + k * it.weightUnits;
+          if (s2 > rangeMax) break;
+          const dev = dp[s] + k * it.deviationUnits;
+          if (dev < next[s2]) { next[s2] = dev; choice[i][s2] = k; }
+        }
+      }
+    }
+    dp = next;
+  });
+
+  let bestS = 0, bestDiff = Infinity, bestDev = Infinity;
+  for (let s = 0; s <= rangeMax; s++) {
+    if (dp[s] === Infinity) continue;
+    const diff = Math.abs(s - targetUnits);
+    if (diff < bestDiff || (diff === bestDiff && dp[s] < bestDev)) {
+      bestDiff = diff; bestDev = dp[s]; bestS = s;
+    }
+  }
+
+  const used = [];
+  let s = bestS;
+  for (let i = items.length - 1; i >= 0; i--) {
+    const k = choice[i][s];
+    if (k > 0) {
+      used.unshift({ id: items[i].id, label: items[i].label, deviation: items[i].deviation, count: k });
+      s -= k * items[i].weightUnits;
+    }
+  }
+
+  return { perSideKg: bestS / 100, exact: bestS === targetUnits, used };
+}
+
+function renderPlateResult(result, targetWeight, barWeight) {
+  const card = document.getElementById('plate-result-card');
+  card.classList.remove('hidden');
+  document.getElementById('plate-result-list').innerHTML = result.used.length === 0
+    ? `<div class="plate-result-empty">Geen schijven nodig</div>`
+    : result.used.map(u => `<div class="plate-result-line">${u.count}x ${u.label}</div>`).join('');
+
+  const totalWeight = barWeight + result.perSideKg * 2;
+  const hasDeviation = result.used.some(u => u.deviation > 0);
+  document.getElementById('plate-result-total').textContent = (hasDeviation ? '±' : '') + formatKg(totalWeight) + ' kg';
+
+  const noteEl = document.getElementById('plate-result-note');
+  if (!result.exact) {
+    const diff = Math.abs(targetWeight - totalWeight);
+    noteEl.textContent = `Doel niet exact haalbaar — dichtstbijzijnde combinatie, ${formatKg(diff)} kg verschil`;
+    noteEl.classList.remove('hidden');
+  } else {
+    noteEl.classList.add('hidden');
+  }
+}
+
+document.getElementById('btn-plate-calculate').addEventListener('click', () => {
+  const targetWeight = parseFloat((document.getElementById('plate-target-weight').value || '').replace(',', '.')) || 0;
+  const barOpt = document.querySelector('.plate-bar-option.selected');
+  const barWeight = barOpt ? parseFloat(barOpt.dataset.val) : 20;
+  const targetPerSide = (targetWeight - barWeight) / 2;
+  const result = calcPlateCombo(targetPerSide, db.plateInventory || {});
+  renderPlateResult(result, targetWeight, barWeight);
+});
+
+function openPlateCalculator() {
+  document.getElementById('plate-target-weight').value = '';
+  document.querySelectorAll('.plate-bar-option').forEach((o, i) => o.classList.toggle('selected', i === 0));
+  document.getElementById('plate-result-card').classList.add('hidden');
+  renderPlateList();
+  showScreen('screen-calculator-plate');
+}
+document.getElementById('btn-back-calculator-plate').addEventListener('click', () => goBack('screen-calculator'));
 
 // ── Anthropic API helper ──────────────────────────────
 async function callClaude(userMessage, systemPrompt) {
