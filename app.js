@@ -52,15 +52,28 @@ function prTrophySvg(className) {
 // Shared comment/note speech-bubble icon markup (set-row and exercise-card comment indicators).
 const COMMENT_ICON_SVG = '<svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>';
 
-function formatDate(str) {
-  const today = todayStr();
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-  if (str === today) return 'TODAY';
-  if (str === yesterday) return 'YESTERDAY';
-  return new Date(str + 'T12:00:00').toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' }).toUpperCase();
-}
-function formatDateShort(str) {
-  return new Date(str + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' }).toUpperCase();
+// Shared date-formatting helper — `format` selects which display variant to
+// produce for a given YYYY-MM-DD `str`:
+//   'long'   — day-nav label: "TODAY"/"YESTERDAY", else e.g. "SATURDAY, 20 SEPTEMBER"
+//   'short'  — history/calendar-goto labels, e.g. "20 SEP 2026"
+//   'detail' — calendar workout-detail popup title, e.g. "Saturday, Sep 20 2026" (not uppercased)
+function formatDateStr(str, format) {
+  const d = new Date(str + 'T12:00:00');
+  if (format === 'long') {
+    const today = todayStr();
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    if (str === today) return 'TODAY';
+    if (str === yesterday) return 'YESTERDAY';
+    return d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase();
+  }
+  if (format === 'short') {
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase();
+  }
+  if (format === 'detail') {
+    const weekday = d.toLocaleDateString('en-GB', { weekday: 'long' });
+    const month = d.toLocaleDateString('en-GB', { month: 'short' });
+    return `${weekday}, ${month} ${d.getDate()} ${d.getFullYear()}`;
+  }
 }
 function changeDate(delta) {
   const d = new Date(currentDate + 'T12:00:00');
@@ -592,7 +605,7 @@ function getFirstPRComboKeys(exerciseName) {
 }
 
 function renderHome() {
-  document.getElementById('day-nav-label').textContent = formatDate(currentDate);
+  document.getElementById('day-nav-label').textContent = formatDateStr(currentDate, 'long');
   const exercises = getWorkout(currentDate);
   const container = document.getElementById('home-content');
   const screenEl = document.getElementById('screen-fitness-tracker');
@@ -1545,7 +1558,7 @@ function renderHistoryTab() {
 
     const headerDiv = document.createElement('div');
     headerDiv.className = 'history-day-header clickable';
-    headerDiv.innerHTML = `<div class="history-day-date">${formatDateShort(date)}</div><div class="history-day-divider"></div>`;
+    headerDiv.innerHTML = `<div class="history-day-date">${formatDateStr(date, 'short')}</div><div class="history-day-divider"></div>`;
     headerDiv.addEventListener('click', () => openHistoryGotoDate(date));
     container.appendChild(headerDiv);
 
@@ -1574,14 +1587,14 @@ function openHistoryGoto(title, action) {
 }
 
 function openHistoryGotoDate(dateStr) {
-  openHistoryGoto('Go to ' + formatDateShort(dateStr), () => {
+  openHistoryGoto('Go to ' + formatDateStr(dateStr, 'short'), () => {
     currentDate = dateStr;
     showScreen('screen-fitness-tracker');
   });
 }
 
 function openHistoryGotoExercise(exerciseName, dateStr) {
-  openHistoryGoto(`Go to ${exerciseName} on ${formatDateShort(dateStr)}`, () => {
+  openHistoryGoto(`Go to ${exerciseName} on ${formatDateStr(dateStr, 'short')}`, () => {
     currentDate = dateStr;
     openTraining(exerciseName);
   });
@@ -1909,16 +1922,9 @@ document.getElementById('cal-prev-workout').addEventListener('click', () => calJ
 document.getElementById('cal-next-workout').addEventListener('click', () => calJumpToWorkoutDate(1));
 
 // -- Calendar workout detail popup ------------------------
-function formatDetailDate(str) {
-  const d = new Date(str + 'T12:00:00');
-  const weekday = d.toLocaleDateString('en-GB', { weekday: 'long' });
-  const month = d.toLocaleDateString('en-GB', { month: 'short' });
-  return `${weekday}, ${month} ${d.getDate()} ${d.getFullYear()}`;
-}
-
 function openWorkoutDetail(dateStr) {
   calDetailDate = dateStr;
-  document.getElementById('cal-detail-date').textContent = formatDetailDate(dateStr);
+  document.getElementById('cal-detail-date').textContent = formatDateStr(dateStr, 'detail');
 
   const body = document.getElementById('cal-detail-body');
   body.innerHTML = '';
