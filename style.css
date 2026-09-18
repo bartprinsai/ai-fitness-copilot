@@ -39,6 +39,27 @@ input, textarea, .comment-text { user-select: text; -webkit-user-select: text; -
   --ai-bar-height: 64px;
   --ai-bar-space: calc(var(--ai-bar-height) + var(--safe-bottom));
   --day-actions-height: 56px;
+
+  /* ── Overlay stacking tiers ──────────────────────────
+     Every .overlay bottom sheet shares base tier 1 (100) and relies on DOM
+     order to decide who's on top of whom — fine as long as nothing ever
+     needs to render above an already-open overlay. Two things do, so they
+     get their own tiers instead of one-off hardcoded numbers per case:
+       tier 2 (120): an overlay opened FROM WITHIN an already-open base
+         overlay (e.g. field-picker-overlay, opened from exercise-info's
+         muscle/category fields).
+       tier 3 (130): a confirmation overlay that can be triggered by the
+         Cancel/back path of ANY other overlay — base or tier 2 — and so
+         must always win regardless of which one is underneath
+         (discard-changes-overlay).
+     Any future overlay that can open on top of another open overlay should
+     reuse one of these tiers (or add tier 4, etc.) rather than a bespoke
+     z-index — that's what caused this same stacking bug twice already. */
+  --z-overlay: 100;
+  --z-overlay-nested: 120;
+  --z-overlay-confirm: 130;
+  --z-dropdown: 150;
+  --z-toast: 200;
 }
 
 html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-serif; font-size: 16px; color: var(--text-primary); -webkit-font-smoothing: antialiased; overscroll-behavior: none; }
@@ -246,8 +267,14 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
    - action buttons are loose blocks (rounded, gapped, no dividers/borders
      between them) — primary = blue, secondary = neutral gray, danger = red
 */
-.overlay { position: fixed; inset: 0; background: rgba(0,0,0,.46); z-index: 100; display: flex; align-items: flex-end; opacity: 0; pointer-events: none; transition: opacity 0.22s; }
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,.46); z-index: var(--z-overlay); display: flex; align-items: flex-end; opacity: 0; pointer-events: none; transition: opacity 0.22s; }
 .overlay.open { opacity: 1; pointer-events: all; }
+/* Shared "Discard changes?" confirmation (app.js confirmDiscardIfChanged) can
+   be triggered from the Cancel/back path of ANY other open overlay — base
+   tier or nested tier 2 (e.g. field-picker-overlay) — so it needs a z-index
+   above both instead of relying on DOM order. See the overlay stacking
+   tiers documented in :root. */
+#discard-changes-overlay { z-index: var(--z-overlay-confirm); }
 .overlay-panel { width: 100%; max-width: 480px; margin: 0 auto; background: var(--surface); border-radius: 12px 12px 0 0; padding: 20px 20px calc(var(--safe-bottom) + 20px); transform: translateY(100%); transition: transform 0.28s cubic-bezier(0.32,0.72,0,1); display: flex; flex-direction: column; gap: 14px; }
 .overlay.open .overlay-panel { transform: translateY(0); }
 .overlay-panel h3 { font-size: 18px; font-weight: 500; color: var(--blue); }
@@ -316,7 +343,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .cal-detail-ex-name { font-size: 15px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }
 
 /* ── TOAST ────────────────────────────────────────────── */
-.toast { position: fixed; bottom: calc(var(--safe-bottom) + 72px); left: 50%; transform: translateX(-50%) translateY(16px); background: #323232; color: white; font-size: 14px; padding: 10px 24px; border-radius: 4px; opacity: 0; pointer-events: none; z-index: 200; transition: opacity .18s, transform .18s; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+.toast { position: fixed; bottom: calc(var(--safe-bottom) + 72px); left: 50%; transform: translateX(-50%) translateY(16px); background: #323232; color: white; font-size: 14px; padding: 10px 24px; border-radius: 4px; opacity: 0; pointer-events: none; z-index: var(--z-toast); transition: opacity .18s, transform .18s; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 ::-webkit-scrollbar { width: 0; }
@@ -335,7 +362,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 /* ── USER BAR ─────────────────────────────────────────── */
 
 /* ── DROPDOWN MENU ────────────────────────────────────── */
-.dropdown-menu { position: fixed; inset: 0; z-index: 150; display: none; }
+.dropdown-menu { position: fixed; inset: 0; z-index: var(--z-dropdown); display: none; }
 .dropdown-menu.open { display: block; }
 .dropdown-panel { position: absolute; background: var(--surface); border-radius: 4px; box-shadow: 0 4px 20px rgba(0,0,0,.28); overflow: hidden; min-width: 180px; }
 .dropdown-item { padding: 14px 20px; font-size: 15px; color: var(--text-primary); cursor: pointer; border-bottom: 1px solid var(--border); }
@@ -528,8 +555,9 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 /* ── FIELD PICKER OVERLAY (Category/Type/Weight Unit) ─── */
 /* Can be opened from within another already-open .overlay (e.g. the
    exercise info bottom sheet), so it needs a higher z-index than the
-   base .overlay stack instead of relying on DOM order to win. */
-#field-picker-overlay { z-index: 120; }
+   base .overlay stack instead of relying on DOM order to win.
+   See the overlay stacking tiers documented in :root (style.css). */
+#field-picker-overlay { z-index: var(--z-overlay-nested); }
 .field-picker-title { text-decoration: underline; }
 .field-picker-list { display: flex; flex-direction: column; max-height: 60vh; overflow-y: auto; }
 .field-picker-row { display: flex; align-items: center; gap: 14px; padding: 14px 2px; border-bottom: 1px solid var(--border); cursor: pointer; background: var(--surface); transition: background .08s; }
