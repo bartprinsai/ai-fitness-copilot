@@ -1480,7 +1480,7 @@ function renderExerciseInfoView() {
   EXERCISE_INFO_FULLWIDTH_KEYS.forEach(key => {
     const f = EXERCISE_INFO_FIELDS_BY_KEY[key];
     if (!equipmentFieldIsFilled(f, info)) return;
-    equipHtml += `<div class="info-view-row"><span class="info-view-row-label">${f.label}</span><span class="info-view-row-value">${equipmentFieldViewValue(f, info)}</span></div>`;
+    equipHtml += `<div class="info-view-stat"><span class="info-view-stat-label">${f.label}</span><span class="info-view-stat-value">${equipmentFieldViewValue(f, info)}</span></div>`;
   });
   if (equipHtml) sections.push('<div class="info-section-label">Equipment setup</div>' + equipHtml);
   const content = document.getElementById('exercise-info-view-content');
