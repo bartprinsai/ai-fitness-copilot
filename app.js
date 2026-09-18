@@ -2711,6 +2711,25 @@ function setPlateOnBarCount(id, count) {
   db.plateOnBar[id] = count;
   persistPlateOnBar();
 }
+// Can never exceed half of what's available (you only have that many per side).
+function getPlateOnBarMax(id) { return Math.floor(getPlateCount(id) / 2); }
+// Called whenever "Beschikbaar" goes down (stepper, Reset, Clear) so "Op
+// stang" never gets left above the new max. Mutates in place without
+// persisting — callers persist once after clamping everything they touched.
+function clampOnBarToAvailable(id) {
+  const max = getPlateOnBarMax(id);
+  if (getPlateOnBarCount(id) > max) {
+    if (!db.plateOnBar) db.plateOnBar = {};
+    db.plateOnBar[id] = max;
+    return true;
+  }
+  return false;
+}
+function clampAllOnBarToAvailable() {
+  let changed = false;
+  PLATE_TYPES.forEach(p => { if (clampOnBarToAvailable(p.id)) changed = true; });
+  if (changed) persistPlateOnBar();
+}
 
 // Dutch-locale kg formatting: 2 decimals max, trailing zeros trimmed, comma separator.
 function formatKg(n) {
@@ -2723,6 +2742,8 @@ function renderPlateList() {
     const meta = p.deviation > 0
       ? `Gem. ${formatKg(p.weight)} kg · max ±${formatKg(p.deviation)} kg`
       : `${formatKg(p.weight)} kg`;
+    const onBarCount = getPlateOnBarCount(p.id);
+    const onBarAtMax = onBarCount >= getPlateOnBarMax(p.id);
     return `
       <div class="plate-row" data-plate-id="${p.id}">
         <div class="plate-row-info">
@@ -2736,8 +2757,8 @@ function renderPlateList() {
         </div>
         <div class="plate-stepper" data-kind="onbar">
           <button type="button" class="plate-stepper-btn" data-dir="-">−</button>
-          <span class="plate-stepper-count">${getPlateOnBarCount(p.id)}</span>
-          <button type="button" class="plate-stepper-btn" data-dir="+">+</button>
+          <span class="plate-stepper-count">${onBarCount}</span>
+          <button type="button" class="plate-stepper-btn" data-dir="+"${onBarAtMax ? ' disabled' : ''}>+</button>
         </div>
       </div>`;
   }).join('');
@@ -2749,23 +2770,31 @@ document.getElementById('plate-list').addEventListener('click', e => {
   const stepper = btn.closest('.plate-stepper');
   const row = btn.closest('.plate-row');
   const id = row.dataset.plateId;
-  const getCount = stepper.dataset.kind === 'onbar' ? getPlateOnBarCount : getPlateCount;
-  const setCount = stepper.dataset.kind === 'onbar' ? setPlateOnBarCount : setPlateCount;
-  let count = getCount(id);
-  count = btn.dataset.dir === '+' ? Math.min(PLATE_MAX_COUNT, count + 1) : Math.max(0, count - 1);
-  setCount(id, count);
-  stepper.querySelector('.plate-stepper-count').textContent = count;
+  if (stepper.dataset.kind === 'onbar') {
+    let count = getPlateOnBarCount(id);
+    const max = getPlateOnBarMax(id);
+    count = btn.dataset.dir === '+' ? Math.min(max, count + 1) : Math.max(0, count - 1);
+    setPlateOnBarCount(id, count);
+  } else {
+    let count = getPlateCount(id);
+    count = btn.dataset.dir === '+' ? Math.min(PLATE_MAX_COUNT, count + 1) : Math.max(0, count - 1);
+    setPlateCount(id, count);
+    if (clampOnBarToAvailable(id)) persistPlateOnBar();
+  }
+  renderPlateList();
 });
 document.getElementById('btn-plate-reset').addEventListener('click', () => {
   db.plateInventory = {};
   PLATE_TYPES.forEach(p => { db.plateInventory[p.id] = p.defaultCount; });
   persistPlateInventory();
+  clampAllOnBarToAvailable();
   renderPlateList();
 });
 document.getElementById('btn-plate-clear').addEventListener('click', () => {
   db.plateInventory = {};
   PLATE_TYPES.forEach(p => { db.plateInventory[p.id] = 0; });
   persistPlateInventory();
+  clampAllOnBarToAvailable();
   renderPlateList();
 });
 document.getElementById('btn-plate-clear-onbar').addEventListener('click', () => {
