@@ -245,6 +245,20 @@ const SCREEN_ON_ENTER = {
   'screen-plan-detail': () => renderPlanDetail(),
 };
 
+// Per-screen "does the CURRENTLY ACTIVE screen have unsaved input?" checks,
+// keyed by the screen being navigated AWAY FROM (not the destination). Used
+// by the popstate handler below to guard the hardware back button on
+// full-screen forms — unlike .overlay popups (which already flow through
+// dismissOverlayForBack), a full screen has no other interception point, so
+// this table is checked directly in the screen-navigation fallthrough. Each
+// entry's own snapshot/baseline functions and variables are defined next to
+// that screen's own code further down in this file.
+const SCREEN_HAS_CHANGES = {
+  'screen-new-exercise': () => hasChanges(newExerciseBaseline, getNewExerciseFormSnapshot()),
+  'screen-ai-generate': () => hasChanges(AI_GEN_DEFAULT_SNAPSHOT, getAiGenFormSnapshot()),
+  'screen-training': () => hasChanges(trackFieldsBaseline, getTrackFieldsSnapshot()),
+};
+
 let historyInitialized = false;
 let inPopstateNavigation = false;
 
@@ -271,9 +285,19 @@ function showScreen(id) {
 // they walk the same history stack the hardware back button uses instead
 // of pushing a redundant duplicate entry on top of it. `fallbackId` covers
 // the (normally unreachable) case where there's no app history yet.
-function goBack(fallbackId) {
+//
+// `hasChangedFn` is optional: when given, it guards the (normally
+// unreachable) direct showScreen(fallbackId) path with the shared discard
+// confirmation. The far more common `history.back()` path is deliberately
+// NOT checked here — it triggers a real popstate event, which the handler
+// below already guards via SCREEN_HAS_CHANGES (the same table hardware back
+// must use, since it never calls goBack() at all). Checking here too would
+// show the confirmation twice for the same tap.
+function goBack(fallbackId, hasChangedFn) {
   if (history.state && history.state.screen) {
     history.back();
+  } else if (hasChangedFn) {
+    confirmDiscardIfChanged(hasChangedFn, () => showScreen(fallbackId));
   } else {
     showScreen(fallbackId);
   }
@@ -333,21 +357,82 @@ function dismissOverlayForBack(id) {
   else closeOverlay(id);
 }
 
+// -- Unsaved-changes discard confirmation ----------------
+// Shared by every editable overlay/screen that can lose in-progress input.
+// Call this instead of performing the close/back action directly:
+//   - if `hasChangedFn()` is false, `proceedFn()` runs immediately (nothing
+//     to lose, no need to bother the user);
+//   - if true, shows the shared "Discard changes?" confirmation and only
+//     runs `proceedFn()` if the user picks Discard. "Keep editing" (or its
+//     back-button equivalent, via OVERLAY_CANCEL_BUTTON below) leaves the
+//     caller's screen/overlay exactly as it was, edit intact.
+// `baseline`/`current` snapshots are plain objects (or strings) compared by
+// value via JSON.stringify — each caller only needs to supply its own small
+// snapshot-shaped baseline and a getter for the live, current shape.
+function hasChanges(baseline, current) {
+  return JSON.stringify(baseline) !== JSON.stringify(current);
+}
+
+let pendingDiscardAction = null;
+
+function confirmDiscardIfChanged(hasChangedFn, proceedFn) {
+  if (!hasChangedFn()) { proceedFn(); return; }
+  pendingDiscardAction = proceedFn;
+  openOverlay('discard-changes-overlay');
+}
+
+document.getElementById('btn-discard-changes-cancel').addEventListener('click', () => {
+  pendingDiscardAction = null;
+  closeOverlay('discard-changes-overlay');
+});
+document.getElementById('btn-discard-changes-confirm').addEventListener('click', () => {
+  const action = pendingDiscardAction;
+  pendingDiscardAction = null;
+  closeOverlay('discard-changes-overlay');
+  if (action) action();
+});
+
 window.addEventListener('popstate', e => {
   if (suppressNextPopstate) { suppressNextPopstate = false; return; }
   if (overlayStack.length > 0) {
     const id = overlayStack.pop();
+    const stackLenBeforeDismiss = overlayStack.length;
     dismissOverlayForBack(id);
     // Some overlays' Cancel only steps back an internal mode instead of
     // truly closing (comment-overlay's edit → view, when there's existing
-    // text to fall back to) — if it's still open, keep intercepting back
-    // presses for it instead of letting the next one fall through to screens.
-    if (document.getElementById(id).classList.contains('open')) pushOverlayHistory(id);
+    // text to fall back to; exercise-info's edit → view) — if it's still
+    // open, keep intercepting back presses for it instead of letting the
+    // next one fall through to screens. Restore it at the position it was
+    // popped from (not necessarily the new top): dismissing it may itself
+    // have opened a NEW overlay on top of it (a "Discard changes?"
+    // confirmation) — that overlay already pushed itself onto the end of
+    // the stack, and `id` must go back UNDER it to keep the LIFO order
+    // (and thus which overlay the next back press actually dismisses) correct.
+    if (document.getElementById(id).classList.contains('open')) {
+      overlayStack.splice(stackLenBeforeDismiss, 0, id);
+      history.pushState({ overlay: id }, '', location.hash);
+    }
     return;
   }
-  const id = (e.state && e.state.screen) || 'screen-home';
+  const targetId = (e.state && e.state.screen) || 'screen-home';
+  // Full-screen forms have no overlay to intercept back through, so guard
+  // them here directly: if the screen we're navigating AWAY FROM (still the
+  // active one — showScreen() hasn't run yet) has unsaved input, restore the
+  // history entry the back press just consumed and show the same shared
+  // discard confirmation on top of it, exactly like a nested overlay.
+  const activeScreen = document.querySelector('.screen.active');
+  const guard = activeScreen && SCREEN_HAS_CHANGES[activeScreen.id];
+  if (guard && guard()) {
+    history.pushState({ screen: activeScreen.id }, '', location.hash);
+    confirmDiscardIfChanged(guard, () => {
+      inPopstateNavigation = true;
+      showScreen(targetId);
+      inPopstateNavigation = false;
+    });
+    return;
+  }
   inPopstateNavigation = true;
-  showScreen(id);
+  showScreen(targetId);
   inPopstateNavigation = false;
 });
 
@@ -719,6 +804,7 @@ function renderHome() {
 
 // -- Comment popup (per-set and per-session) ------------
 let commentPopupCtx = null;
+let commentEditBaseline = '';
 
 function openCommentPopup(ctx) {
   commentPopupCtx = ctx;
@@ -735,6 +821,7 @@ function showCommentView(text) {
 }
 
 function showCommentEdit(text) {
+  commentEditBaseline = text;
   document.getElementById('comment-edit-input').value = text;
   document.getElementById('comment-edit-mode').classList.remove('hidden');
   document.getElementById('comment-view-mode').classList.add('hidden');
@@ -1084,7 +1171,12 @@ function deleteCategory(cat) {
   openOverlay('cat-delete-overlay');
 }
 
-document.getElementById('btn-cat-edit-cancel').addEventListener('click', () => closeOverlay('cat-edit-overlay'));
+document.getElementById('btn-cat-edit-cancel').addEventListener('click', () => {
+  confirmDiscardIfChanged(
+    () => hasChanges(pendingEditCategory, document.getElementById('cat-edit-input').value),
+    () => closeOverlay('cat-edit-overlay')
+  );
+});
 document.getElementById('btn-cat-edit-save').addEventListener('click', () => {
   const newName = document.getElementById('cat-edit-input').value.trim();
   if (!newName || !pendingEditCategory) return;
@@ -1182,12 +1274,24 @@ function renderExerciseItem(list, ex) {
 }
 
 // -- Training Screen ------------------------------------
+// Read the current TRACK-tab weight/reps input values, in the same shape
+// used both for the baseline (right after they're set to a "known good"
+// resting state) and for checking whether the user has typed something new.
+function getTrackFieldsSnapshot() {
+  return {
+    weight: document.getElementById('field-weight').value,
+    reps: document.getElementById('field-reps').value,
+  };
+}
+let trackFieldsBaseline = { weight: '0', reps: '0' };
+
 function openTraining(name) {
   currentExercise = name;
   selectedSetIndex = null;
   document.getElementById('training-title').textContent = name;
   document.getElementById('field-weight').value = 0;
   document.getElementById('field-reps').value = 0;
+  trackFieldsBaseline = getTrackFieldsSnapshot();
   switchTab('track');
   showScreen('screen-training');
   renderSetList();
@@ -1237,12 +1341,14 @@ function renderSetList() {
 }
 
 let noteEditIndex = null;
+let setNoteBaseline = '';
 
 function openSetNote(i) {
   const ex = getCurrentExerciseData();
   if (!ex || !ex.sets[i]) return;
   noteEditIndex = i;
-  document.getElementById('set-note-input').value = ex.sets[i].note || '';
+  setNoteBaseline = ex.sets[i].note || '';
+  document.getElementById('set-note-input').value = setNoteBaseline;
   openOverlay('set-note-overlay');
 }
 
@@ -1330,6 +1436,21 @@ document.getElementById('info-secondary-muscle').addEventListener('click', () =>
   });
 });
 
+// Reads the current, live state of every Exercise Info edit-mode field, in
+// the same shape whether used to capture the baseline (right after
+// populating the form) or to check for changes later (at Cancel/back time).
+function getExerciseInfoFormSnapshot() {
+  const snapshot = {
+    primaryMuscle: getFieldBtnValue('info-primary-muscle'),
+    secondaryMuscle: getFieldBtnValue('info-secondary-muscle'),
+  };
+  EXERCISE_INFO_EQUIPMENT_FIELDS.forEach(f => {
+    snapshot[f.key] = document.getElementById(f.inputId).value;
+  });
+  return snapshot;
+}
+let exerciseInfoEditBaseline = null;
+
 function showExerciseInfoEdit() {
   const info = getExerciseInfo(currentExercise) || {};
   document.getElementById('exercise-info-edit-title').textContent = currentExercise + ' info';
@@ -1342,6 +1463,7 @@ function showExerciseInfoEdit() {
   });
   document.getElementById('exercise-info-edit-mode').classList.remove('hidden');
   document.getElementById('exercise-info-view-mode').classList.add('hidden');
+  exerciseInfoEditBaseline = getExerciseInfoFormSnapshot();
 }
 
 function openExerciseInfo() {
@@ -1390,6 +1512,7 @@ function saveSet() {
 
   setWorkout(currentDate, workout);
   updateRecords(currentExercise, weight, reps);
+  trackFieldsBaseline = getTrackFieldsSnapshot();
   renderSetList();
   renderHome();
 }
@@ -1403,6 +1526,10 @@ function selectSet(i) {
     document.getElementById('field-weight').value = ex.sets[i].weight;
     document.getElementById('field-reps').value = ex.sets[i].reps;
   }
+  // Whatever the fields show right after selecting/deselecting a set becomes
+  // the new "nothing to lose" baseline — editing an existing set's already-
+  // saved values isn't itself an unsaved change; only editing them FURTHER is.
+  trackFieldsBaseline = getTrackFieldsSnapshot();
   renderSetList();
 }
 
@@ -1410,6 +1537,7 @@ function clearFields() {
   selectedSetIndex = null;
   document.getElementById('field-weight').value = 0;
   document.getElementById('field-reps').value = 0;
+  trackFieldsBaseline = getTrackFieldsSnapshot();
   renderSetList();
 }
 
@@ -2042,6 +2170,16 @@ function populateNewExCategorySelect(selected) {
   setFieldBtnValue('new-ex-category', selected || '', selected || 'Choose category...');
 }
 
+function getNewExerciseFormSnapshot() {
+  return {
+    name: document.getElementById('new-ex-name').value,
+    category: getFieldBtnValue('new-ex-category'),
+    type: getFieldBtnValue('new-ex-type'),
+    weightUnit: getFieldBtnValue('new-ex-weight-unit'),
+  };
+}
+let newExerciseBaseline = null;
+
 function openNewExerciseScreen() {
   pendingEditExerciseOriginalName = null;
   document.getElementById('new-ex-title').textContent = 'New Exercise';
@@ -2049,6 +2187,7 @@ function openNewExerciseScreen() {
   setFieldBtnValue('new-ex-type', 'weight_reps', 'Weight and Reps');
   setFieldBtnValue('new-ex-weight-unit', 'kg', 'Kilogram');
   populateNewExCategorySelect();
+  newExerciseBaseline = getNewExerciseFormSnapshot();
   showScreen('screen-new-exercise');
   setTimeout(() => document.getElementById('new-ex-name').focus(), 300);
 }
@@ -2062,6 +2201,7 @@ function openEditExerciseScreen(ex) {
   const wuOpt = ex.weightUnit === 'lbs' ? EX_WEIGHT_UNIT_OPTIONS[1] : EX_WEIGHT_UNIT_OPTIONS[0];
   setFieldBtnValue('new-ex-weight-unit', wuOpt.value, wuOpt.label);
   populateNewExCategorySelect(ex.category);
+  newExerciseBaseline = getNewExerciseFormSnapshot();
   showScreen('screen-new-exercise');
 }
 
@@ -2195,14 +2335,19 @@ document.getElementById('btn-delete-ex-confirm').addEventListener('click', () =>
   toast('Exercise deleted');
 });
 
-document.getElementById('btn-new-ex-back').addEventListener('click', () => goBack('screen-exercises'));
+document.getElementById('btn-new-ex-back').addEventListener('click', () => goBack('screen-exercises', () => hasChanges(newExerciseBaseline, getNewExerciseFormSnapshot())));
 document.getElementById('btn-new-ex-save').addEventListener('click', () => saveNewExerciseFromScreen());
 document.getElementById('btn-new-ex-add-cat').addEventListener('click', () => {
   document.getElementById('new-category-input').value = '';
   openOverlay('new-category-overlay');
   setTimeout(() => document.getElementById('new-category-input').focus(), 100);
 });
-document.getElementById('btn-new-category-cancel').addEventListener('click', () => closeOverlay('new-category-overlay'));
+document.getElementById('btn-new-category-cancel').addEventListener('click', () => {
+  confirmDiscardIfChanged(
+    () => hasChanges('', document.getElementById('new-category-input').value),
+    () => closeOverlay('new-category-overlay')
+  );
+});
 document.getElementById('btn-new-category-save').addEventListener('click', () => {
   const newCat = document.getElementById('new-category-input').value.trim();
   if (!newCat) return;
@@ -2229,6 +2374,7 @@ const OVERLAY_CANCEL_BUTTON = {
   'delete-plan-overlay': 'btn-delete-plan-cancel',
   'reset-overlay': 'btn-reset-cancel',
   'history-goto-overlay': 'history-goto-cancel',
+  'discard-changes-overlay': 'btn-discard-changes-cancel',
 };
 
 function openOverlay(id) {
@@ -2279,7 +2425,7 @@ document.getElementById('btn-back-exercises').addEventListener('click', () => {
 });
 
 document.getElementById('btn-new-exercise').addEventListener('click', openNewExerciseScreen);
-document.getElementById('btn-back-training').addEventListener('click', () => goBack('screen-fitness-tracker'));
+document.getElementById('btn-back-training').addEventListener('click', () => goBack('screen-fitness-tracker', () => hasChanges(trackFieldsBaseline, getTrackFieldsSnapshot())));
 document.getElementById('btn-back-new-workout').addEventListener('click', () => goBack('screen-fitness-tracker'));
 document.getElementById('btn-nw-manual').addEventListener('click', openExerciseList);
 document.getElementById('btn-nw-schema-manual').addEventListener('click', () => {
@@ -2298,9 +2444,19 @@ document.getElementById('btn-records-close').addEventListener('click', () => clo
 document.getElementById('btn-training-info').addEventListener('click', openExerciseInfo);
 document.getElementById('btn-exercise-info-edit').addEventListener('click', showExerciseInfoEdit);
 document.getElementById('btn-exercise-info-close').addEventListener('click', () => closeOverlay('exercise-info-overlay'));
-document.getElementById('btn-exercise-info-cancel').addEventListener('click', renderExerciseInfoView);
+document.getElementById('btn-exercise-info-cancel').addEventListener('click', () => {
+  confirmDiscardIfChanged(
+    () => hasChanges(exerciseInfoEditBaseline, getExerciseInfoFormSnapshot()),
+    renderExerciseInfoView
+  );
+});
 document.getElementById('btn-exercise-info-save').addEventListener('click', saveExerciseInfo);
-document.getElementById('btn-set-note-cancel').addEventListener('click', () => { noteEditIndex = null; closeOverlay('set-note-overlay'); });
+document.getElementById('btn-set-note-cancel').addEventListener('click', () => {
+  confirmDiscardIfChanged(
+    () => hasChanges(setNoteBaseline, document.getElementById('set-note-input').value),
+    () => { noteEditIndex = null; closeOverlay('set-note-overlay'); }
+  );
+});
 document.getElementById('btn-set-note-save').addEventListener('click', saveSetNote);
 document.getElementById('btn-global-ai-coach').addEventListener('click', () => {
   // TODO: link to the Chat Coach screen once it's built
@@ -2312,9 +2468,14 @@ document.getElementById('btn-day-comment').addEventListener('click', openSession
 document.getElementById('btn-comment-edit').addEventListener('click', () => showCommentEdit(commentPopupCtx.getText()));
 document.getElementById('btn-comment-done').addEventListener('click', () => closeOverlay('comment-overlay'));
 document.getElementById('btn-comment-cancel').addEventListener('click', () => {
-  const text = commentPopupCtx && commentPopupCtx.getText();
-  if (text && text.trim()) showCommentView(text);
-  else closeOverlay('comment-overlay');
+  confirmDiscardIfChanged(
+    () => hasChanges(commentEditBaseline, document.getElementById('comment-edit-input').value),
+    () => {
+      const text = commentPopupCtx && commentPopupCtx.getText();
+      if (text && text.trim()) showCommentView(text);
+      else closeOverlay('comment-overlay');
+    }
+  );
 });
 document.getElementById('btn-comment-delete').addEventListener('click', () => {
   if (commentPopupCtx) commentPopupCtx.onDelete();
@@ -2787,6 +2948,23 @@ document.getElementById('btn-overflow-plan-detail').addEventListener('click', e 
 document.getElementById('btn-back-plan-detail').addEventListener('click', () => goBack('screen-workout-plan'));
 
 // ── AI Generate Screen ────────────────────────────────
+function getAiGenFormSnapshot() {
+  return {
+    goal: document.querySelector('#chips-goal .chip.active')?.dataset.val || '',
+    level: document.querySelector('#chips-level .chip.active')?.dataset.val || '',
+    days: document.querySelector('#chips-days .chip.active')?.dataset.val || '',
+    pref: document.getElementById('ai-gen-pref').value,
+  };
+}
+// The chip defaults as they appear in index.html's static markup. Note:
+// openAIGenerate() below only ever resets the Preference textarea, not the
+// chip selections themselves — so if a chip was left non-default from an
+// earlier visit, this baseline (matching the ORIGINAL defaults, not
+// "whatever's currently selected") could flag that leftover selection as an
+// "unsaved change" even if nothing was touched this visit. Pre-existing
+// screen behavior, not something this discard-check changes.
+const AI_GEN_DEFAULT_SNAPSHOT = { goal: 'Muscle Growth', level: 'Intermediate', days: '4', pref: '' };
+
 function openAIGenerate() {
   document.getElementById('ai-gen-form').classList.remove('hidden');
   document.getElementById('ai-gen-loading').classList.add('hidden');
@@ -2794,7 +2972,7 @@ function openAIGenerate() {
   showScreen('screen-ai-generate');
 }
 
-document.getElementById('btn-back-ai-generate').addEventListener('click', () => goBack('screen-workout-plan'));
+document.getElementById('btn-back-ai-generate').addEventListener('click', () => goBack('screen-workout-plan', () => hasChanges(AI_GEN_DEFAULT_SNAPSHOT, getAiGenFormSnapshot())));
 
 document.getElementById('btn-ai-generate-submit').addEventListener('click', async () => {
   if (!ANTHROPIC_API_KEY || ANTHROPIC_API_KEY.includes('YOUR_KEY')) {
@@ -2901,6 +3079,14 @@ function openPresetsOverlay() {
 }
 
 // ── Make your own ─────────────────────────────────────
+function getNewPlanFormSnapshot() {
+  return {
+    name: document.getElementById('new-plan-name').value,
+    days: document.querySelector('#chips-new-plan-days .chip.active')?.dataset.val || '',
+  };
+}
+const NEW_PLAN_DEFAULT_SNAPSHOT = { name: '', days: '3' };
+
 function openMakeYourOwn() {
   document.getElementById('new-plan-name').value = '';
   document.querySelectorAll('#chips-new-plan-days .chip').forEach(c => c.classList.remove('active'));
@@ -2911,7 +3097,12 @@ function openMakeYourOwn() {
 document.getElementById('btn-plan-make-own').addEventListener('click', openMakeYourOwn);
 document.getElementById('btn-plan-presets').addEventListener('click', openPresetsOverlay);
 document.getElementById('btn-plan-ai').addEventListener('click', openAIGenerate);
-document.getElementById('btn-new-plan-cancel').addEventListener('click', () => closeOverlay('new-plan-overlay'));
+document.getElementById('btn-new-plan-cancel').addEventListener('click', () => {
+  confirmDiscardIfChanged(
+    () => hasChanges(NEW_PLAN_DEFAULT_SNAPSHOT, getNewPlanFormSnapshot()),
+    () => closeOverlay('new-plan-overlay')
+  );
+});
 document.getElementById('btn-presets-close').addEventListener('click', () => closeOverlay('presets-overlay'));
 
 document.getElementById('btn-new-plan-save').addEventListener('click', async () => {
