@@ -1164,25 +1164,11 @@ function openTraining(name) {
   currentExercise = name;
   selectedSetIndex = null;
   document.getElementById('training-title').textContent = name;
-  prefillFromLastWorkout(name);
+  document.getElementById('field-weight').value = 0;
+  document.getElementById('field-reps').value = 0;
   switchTab('track');
   showScreen('screen-training');
   renderSetList();
-}
-
-function prefillFromLastWorkout(name) {
-  const dates = Object.keys(db.workouts).sort().reverse();
-  for (const date of dates) {
-    if (date === currentDate) continue;
-    const ex = db.workouts[date] && db.workouts[date].find(e => e.name === name);
-    if (ex && ex.sets && ex.sets.length > 0) {
-      document.getElementById('field-weight').value = ex.sets[0].weight || 0;
-      document.getElementById('field-reps').value = ex.sets[0].reps || 0;
-      return;
-    }
-  }
-  document.getElementById('field-weight').value = 0;
-  document.getElementById('field-reps').value = 0;
 }
 
 function updateActionButtonsUI() {
@@ -2924,18 +2910,6 @@ document.getElementById('btn-new-plan-save').addEventListener('click', async () 
 });
 
 // ── Load Workout Screen ───────────────────────────────
-function getLastSetForExercise(exName) {
-  const dates = Object.keys(db.workouts).sort().reverse();
-  for (const date of dates) {
-    const ex = db.workouts[date]?.find(e => e.name === exName);
-    if (ex && ex.sets && ex.sets.length > 0) {
-      const s = ex.sets[ex.sets.length - 1];
-      return { weight: s.weight, reps: s.reps, date };
-    }
-  }
-  return null;
-}
-
 async function openLoadWorkout(planId, dayIndex) {
   currentLoadPlanId = planId;
   currentLoadDayIndex = dayIndex;
@@ -2947,16 +2921,9 @@ async function openLoadWorkout(planId, dayIndex) {
   document.getElementById('lw-scroll').innerHTML = '<div style="padding:32px;text-align:center;color:#555">Loading...</div>';
   showScreen('screen-load-workout');
 
-  loadWorkoutItems = (day.exercises || []).map(ex => {
-    const prev = getLastSetForExercise(ex.name);
-    return { name: ex.name, sets: ex.sets, reps: ex.reps, prevWeight: prev?.weight ?? null, prevReps: prev?.reps ?? null, selected: true, suggestion: '' };
-  });
+  loadWorkoutItems = (day.exercises || []).map(ex => ({ name: ex.name, sets: ex.sets, reps: ex.reps, selected: true }));
 
   renderLoadWorkoutList();
-
-  if (ANTHROPIC_API_KEY && !ANTHROPIC_API_KEY.includes('YOUR_KEY') && loadWorkoutItems.some(i => i.prevWeight !== null)) {
-    fetchProgressionSuggestions();
-  }
 }
 
 function renderLoadWorkoutList() {
@@ -2977,16 +2944,12 @@ function renderLoadWorkoutList() {
   loadWorkoutItems.forEach((item, idx) => {
     const card = document.createElement('div');
     card.className = 'lw-ex-card';
-    const prevTxt = item.prevWeight !== null ? `Last: ${item.prevWeight}kg × ${item.prevReps} reps` : 'No previous data';
-    const suggHtml = item.suggestion ? `<div class="lw-suggestion">🤖 ${item.suggestion}</div>` : '';
     card.innerHTML = `
       <div class="lw-ex-header">
         <div class="lw-checkbox ${item.selected ? 'checked' : ''}" data-idx="${idx}"></div>
         <div class="lw-ex-name">${item.name}</div>
         <div class="lw-ex-sets">${item.sets}×${item.reps}</div>
       </div>
-      <div class="lw-prev">${prevTxt}</div>
-      ${suggHtml}
     `;
     card.querySelector('[data-idx]').addEventListener('click', e => {
       e.stopPropagation();
@@ -2995,24 +2958,6 @@ function renderLoadWorkoutList() {
     });
     scroll.appendChild(card);
   });
-}
-
-async function fetchProgressionSuggestions() {
-  const withPrev = loadWorkoutItems.filter(i => i.prevWeight !== null);
-  if (withPrev.length === 0) return;
-  const systemPrompt = `You are a fitness coach. Based on previous performance, suggest weight progression. Be brief, max 1 sentence per exercise. Respond ONLY in JSON: { "suggestions": [ { "exercise": "string", "suggestion": "string" } ] }`;
-  const userMsg = withPrev.map(i => `${i.name}: last ${i.prevWeight}kg × ${i.prevReps} reps (plan: ${i.sets}×${i.reps})`).join('\n');
-  try {
-    const raw = await callClaude(userMsg, systemPrompt);
-    const data = JSON.parse(raw);
-    if (Array.isArray(data.suggestions)) {
-      data.suggestions.forEach(s => {
-        const item = loadWorkoutItems.find(i => i.name === s.exercise);
-        if (item) item.suggestion = s.suggestion;
-      });
-      renderLoadWorkoutList();
-    }
-  } catch(e) { console.warn('Progression suggestions failed', e); }
 }
 
 document.getElementById('btn-confirm-load-workout').addEventListener('click', async () => {

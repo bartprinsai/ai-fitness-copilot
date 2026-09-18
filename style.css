@@ -457,8 +457,6 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .lw-checkbox.checked::after { content: ''; display: block; width: 5px; height: 9px; border: 2px solid #fff; border-top: none; border-left: none; transform: rotate(45deg) translate(-1px, -2px); }
 .lw-ex-name { flex: 1; font-size: 15px; font-weight: 600; color: var(--text-primary); }
 .lw-ex-sets { font-size: 12px; color: var(--text-secondary); flex-shrink: 0; }
-.lw-prev { font-size: 13px; color: var(--text-secondary); margin-top: 8px; }
-.lw-suggestion { font-size: 12px; color: var(--text-hint); margin-top: 4px; font-style: italic; }
 
 /* ── SMART DAY BANNER ─────────────────────────────────── */
 .smart-banner { display: flex; align-items: center; gap: 12px; background: var(--surface); border-left: 3px solid var(--cyan); padding: 11px 14px; flex-shrink: 0; }
