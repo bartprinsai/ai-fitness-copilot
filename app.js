@@ -2741,6 +2741,13 @@ function getPlateCount(id) {
   const def = PLATE_TYPES.find(p => p.id === id);
   return def ? def.defaultCount : 0;
 }
+// "Beschikbaar" ceiling: the gym's real stock, i.e. the same defaultCount that
+// "Reset beschikbaar" restores. (Not to be confused with PLATE_MAX_COUNT, the
+// far looser ceiling the solver applies to whatever count is stored.)
+function getPlateAvailableMax(id) {
+  const def = PLATE_TYPES.find(p => p.id === id);
+  return def ? def.defaultCount : 0;
+}
 function setPlateCount(id, count) {
   if (!db.plateInventory) db.plateInventory = {};
   db.plateInventory[id] = count;
@@ -2787,6 +2794,7 @@ function renderPlateList() {
       : `${formatKg(p.weight)} kg`;
     const onBarCount = getPlateOnBarCount(p.id);
     const onBarAtMax = onBarCount >= getPlateOnBarMax(p.id);
+    const availableAtMax = getPlateCount(p.id) >= getPlateAvailableMax(p.id);
     return `
       <div class="plate-row" data-plate-id="${p.id}">
         <div class="plate-row-info">
@@ -2796,7 +2804,7 @@ function renderPlateList() {
         <div class="plate-stepper" data-kind="available">
           <button type="button" class="plate-stepper-btn" data-dir="-">−</button>
           <span class="plate-stepper-count">${getPlateCount(p.id)}</span>
-          <button type="button" class="plate-stepper-btn" data-dir="+">+</button>
+          <button type="button" class="plate-stepper-btn" data-dir="+"${availableAtMax ? ' disabled' : ''}>+</button>
         </div>
         <div class="plate-stepper" data-kind="onbar">
           <button type="button" class="plate-stepper-btn" data-dir="-">−</button>
@@ -2820,7 +2828,10 @@ document.getElementById('plate-list').addEventListener('click', e => {
     setPlateOnBarCount(id, count);
   } else {
     let count = getPlateCount(id);
-    count = btn.dataset.dir === '+' ? Math.min(PLATE_MAX_COUNT, count + 1) : Math.max(0, count - 1);
+    const max = getPlateAvailableMax(id);
+    // A previously stored count above the cap is left alone by "+" (never snapped down).
+    if (btn.dataset.dir === '+') count = count >= max ? count : count + 1;
+    else count = Math.max(0, count - 1);
     setPlateCount(id, count);
     if (clampOnBarToAvailable(id)) persistPlateOnBar();
   }
