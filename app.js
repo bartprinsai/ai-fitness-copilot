@@ -2712,25 +2712,66 @@ const WARMUP_EXERCISES = {
   deadlift: { label: 'Deadlift', firstStep: 70,                 increment: 40, reps: [5, 3, 2, 1] },
 };
 
-// Largest multiple of 5 within [0.875 × W, 0.90 × W] (i.e. 10–12.5% below W), or
-// null if the band holds none. Integer maths on grams so W = 200 etc. can't be
-// knocked one step down by floating-point noise (0.9 × 200 → 180.00000000000003).
-function warmupLastStep(workKg) {
-  const g = Math.round(workKg * 1000);
-  const k = Math.floor(9 * g / 50000);          // largest k with 5000k <= 0.9 × g
-  if (k < 1 || 40000 * k < 7 * g) return null;   // 5000k must also be >= 0.875 × g
-  return k * 5;
+const WARMUP_EPS = 1e-9;
+const WARMUP_ROUND_KG = 2.5;
+function floorTo2_5(x) { return Math.floor(x / WARMUP_ROUND_KG + WARMUP_EPS) * WARMUP_ROUND_KG; }
+
+// Ladder steps (kg) strictly below 'last': firstStep, firstStep + increment, ...
+function warmupLadder(cfg, last) {
+  const steps = [];
+  for (let w = cfg.firstStep; w < last - WARMUP_EPS; w += cfg.increment) steps.push(w);
+  return steps;
 }
 
-// Weights (kg) of the loaded steps, ladder first, finale last. Empty bar not included.
+// Requirement 2: every jump (bar -> ladder -> last step -> work set) is <= the jump before it.
+function warmupJumpsDescend(steps, work) {
+  const seq = [WARMUP_BAR_KG].concat(steps, [work]);
+  for (let i = 2; i < seq.length; i++) {
+    if (seq[i] - seq[i - 1] > seq[i - 1] - seq[i - 2] + WARMUP_EPS) return false;
+  }
+  return true;
+}
+
+// Loaded steps (kg, empty bar not included; ladder first, last step at the end) for a work weight:
+//  1. Heaviest continuous last step L in [0.875 × W, 0.925 × W] whose whole schedule has
+//     descending jumps. Feasible L's end either at the band top or exactly on a ladder value
+//     (one step further the ladder gains a step and the last jump collapses), so those are
+//     the only candidates to try. L is then rounded DOWN to a multiple of 2.5 and re-checked.
+//  2. No such L: take the heaviest rounded L and lower the ladder step just before it (to a
+//     multiple of 2.5) so the jump into L is at least as big as the jump from L to the work set.
+//  3. Still irregular (very light work weights): return the best schedule anyway.
+// Returns { steps, fallback, regular }.
 function warmupLoadedSteps(exercise, workKg) {
   const cfg = WARMUP_EXERCISES[exercise];
-  const last = warmupLastStep(workKg);
-  if (last === null || last <= WARMUP_BAR_KG) return [];
-  const steps = [];
-  for (let w = cfg.firstStep; w < last; w += cfg.increment) steps.push(w);
-  if (steps[steps.length - 1] !== last) steps.push(last);
-  return steps;
+  const lo = 0.875 * workKg, hi = 0.925 * workKg;
+  const ok = (last) => last > WARMUP_BAR_KG + WARMUP_EPS && warmupJumpsDescend(warmupLadder(cfg, last).concat([last]), workKg);
+
+  const cands = [hi];
+  for (let w = cfg.firstStep; w <= hi + WARMUP_EPS; w += cfg.increment) if (w >= lo - WARMUP_EPS) cands.push(w);
+  cands.sort((a, b) => b - a);
+  const found = cands.find(ok);
+  if (found !== undefined) {
+    const floor = Math.max(WARMUP_BAR_KG + WARMUP_ROUND_KG, floorTo2_5(lo));
+    for (let last = floorTo2_5(found); last >= floor; last -= WARMUP_ROUND_KG) {
+      if (ok(last)) return { steps: warmupLadder(cfg, last).concat([last]), fallback: false, regular: true };
+    }
+  }
+
+  const last = floorTo2_5(hi);
+  if (last <= WARMUP_BAR_KG + WARMUP_EPS) return { steps: [], fallback: true, regular: true };
+  const ladder = warmupLadder(cfg, last);
+  if (ladder.length) {
+    const prev = ladder.length > 1 ? ladder[ladder.length - 2] : WARMUP_BAR_KG;
+    const lowered = Math.min(ladder[ladder.length - 1], floorTo2_5(2 * last - workKg));
+    if (lowered > prev + WARMUP_EPS) ladder[ladder.length - 1] = lowered;
+  }
+  const steps = ladder.concat([last]);
+  return { steps, fallback: true, regular: warmupJumpsDescend(steps, workKg) };
+}
+
+// Every loaded step is shown as a range: rounded weight ± 2.5 kg, e.g. 190 -> "187,5 - 192,5 kg".
+function warmupRangeText(kg) {
+  return formatKg(kg - WARMUP_ROUND_KG) + ' - ' + formatKg(kg + WARMUP_ROUND_KG) + ' kg';
 }
 
 // N <= reps.length: last N values of the series; N > length: full series for the
@@ -2746,7 +2787,7 @@ function parseWarmupNumber(str) {
   return Number(s);
 }
 
-// Returns { error } or { rows: [{ bar?, weight, reps?, work? }], tooLight }.
+// Returns { error } or { rows: [{ bar?, weight, reps?, work? }], tooLight, regular }.
 function computeWarmup(exercise, workStr) {
   const cfg = WARMUP_EXERCISES[exercise];
   if (!cfg) return { error: 'Kies een oefening.' };
@@ -2754,12 +2795,13 @@ function computeWarmup(exercise, workStr) {
   const work = parseWarmupNumber(workStr);
   if (!isFinite(work) || work <= 0) return { error: 'Werkgewicht moet een getal groter dan 0 zijn.' };
   if (work <= WARMUP_BAR_KG) return { error: 'Werkgewicht moet zwaarder zijn dan de lege stang (' + WARMUP_BAR_KG + ' kg).' };
-  const steps = warmupLoadedSteps(exercise, work);
+  const plan = warmupLoadedSteps(exercise, work);
+  const steps = plan.steps;
   const reps = warmupReps(steps.length, cfg.reps);
   const rows = [{ bar: true, weight: WARMUP_BAR_KG, reps: 10 }];
   steps.forEach((w, i) => rows.push({ weight: w, reps: reps[i] }));
   rows.push({ weight: work, work: true });
-  return { rows, tooLight: steps.length === 0 };
+  return { rows, tooLight: steps.length === 0, regular: plan.regular };
 }
 // </warmup-pure>
 
@@ -2791,7 +2833,7 @@ document.getElementById('btn-warmup-calculate').addEventListener('click', () => 
   document.getElementById('warmup-result-list').innerHTML = res.rows.map(r => {
     if (r.bar) return `<div class="plate-result-line">Lege stang × ${r.reps}</div>`;
     if (r.work) return `<div class="plate-result-line warmup-line-work">${formatKg(r.weight)} kg (werkset)</div>`;
-    return `<div class="plate-result-line">${formatKg(r.weight)} kg × ${r.reps}</div>`;
+    return `<div class="plate-result-line">${warmupRangeText(r.weight)} × ${r.reps}</div>`;
   }).join('');
   const noteEl = document.getElementById('warmup-result-note');
   noteEl.textContent = 'Werkgewicht te laag voor tussenstappen — alleen lege stang, dan de werkset.';
