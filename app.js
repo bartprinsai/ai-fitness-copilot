@@ -2733,40 +2733,45 @@ function warmupJumpsDescend(steps, work) {
 }
 
 // Loaded steps (kg, empty bar not included; ladder first, last step at the end) for a work weight:
-//  1. Heaviest continuous last step L in [0.875 × W, 0.925 × W] whose whole schedule has
-//     descending jumps. Feasible L's end either at the band top or exactly on a ladder value
-//     (one step further the ladder gains a step and the last jump collapses), so those are
-//     the only candidates to try. L is then rounded DOWN to a multiple of 2.5 and re-checked.
-//  2. No such L: take the heaviest rounded L and lower the ladder step just before it (to a
-//     multiple of 2.5) so the jump into L is at least as big as the jump from L to the work set.
-//  3. Still irregular (very light work weights): return the best schedule anyway.
+//  Candidates for the last step are all multiples of 2.5 in [0.875 × W, 0.925 × W], ordered by
+//  distance to exactly 10% below W (0.90 × W), heavier first on a tie.
+//  1. First candidate whose whole schedule (bar -> ladder below it -> candidate -> work set)
+//     has descending jumps.
+//  2. None does: walk the same order and lower the ladder step just before the candidate (to a
+//     multiple of 2.5) so the jump into it is at least as big as the jump on to the work set;
+//     take the first candidate where that makes the schedule regular (else the closest one).
+//  If the band holds no multiple of 2.5 (light work weights), the band top rounded down is used.
 // Returns { steps, fallback, regular }.
 function warmupLoadedSteps(exercise, workKg) {
   const cfg = WARMUP_EXERCISES[exercise];
-  const lo = 0.875 * workKg, hi = 0.925 * workKg;
-  const ok = (last) => last > WARMUP_BAR_KG + WARMUP_EPS && warmupJumpsDescend(warmupLadder(cfg, last).concat([last]), workKg);
+  const lo = 0.875 * workKg, hi = 0.925 * workKg, target = 0.9 * workKg;
 
-  const cands = [hi];
-  for (let w = cfg.firstStep; w <= hi + WARMUP_EPS; w += cfg.increment) if (w >= lo - WARMUP_EPS) cands.push(w);
-  cands.sort((a, b) => b - a);
-  const found = cands.find(ok);
-  if (found !== undefined) {
-    const floor = Math.max(WARMUP_BAR_KG + WARMUP_ROUND_KG, floorTo2_5(lo));
-    for (let last = floorTo2_5(found); last >= floor; last -= WARMUP_ROUND_KG) {
-      if (ok(last)) return { steps: warmupLadder(cfg, last).concat([last]), fallback: false, regular: true };
+  let cands = [];
+  for (let k = Math.ceil(lo / WARMUP_ROUND_KG - WARMUP_EPS); k * WARMUP_ROUND_KG <= hi + WARMUP_EPS; k++) cands.push(k * WARMUP_ROUND_KG);
+  if (!cands.length) cands = [floorTo2_5(hi)];
+  cands = cands.filter(c => c > WARMUP_BAR_KG + WARMUP_EPS);
+  if (!cands.length) return { steps: [], fallback: true, regular: true };
+  cands.sort((a, b) => {
+    const da = Math.abs(a - target), db = Math.abs(b - target);
+    return Math.abs(da - db) > WARMUP_EPS ? da - db : b - a;
+  });
+
+  for (const last of cands) {
+    const steps = warmupLadder(cfg, last).concat([last]);
+    if (warmupJumpsDescend(steps, workKg)) return { steps, fallback: false, regular: true };
+  }
+
+  const lowered = cands.map(last => {
+    const ladder = warmupLadder(cfg, last);
+    if (ladder.length) {
+      const prev = ladder.length > 1 ? ladder[ladder.length - 2] : WARMUP_BAR_KG;
+      const step = Math.min(ladder[ladder.length - 1], floorTo2_5(2 * last - workKg));
+      if (step > prev + WARMUP_EPS) ladder[ladder.length - 1] = step;
     }
-  }
-
-  const last = floorTo2_5(hi);
-  if (last <= WARMUP_BAR_KG + WARMUP_EPS) return { steps: [], fallback: true, regular: true };
-  const ladder = warmupLadder(cfg, last);
-  if (ladder.length) {
-    const prev = ladder.length > 1 ? ladder[ladder.length - 2] : WARMUP_BAR_KG;
-    const lowered = Math.min(ladder[ladder.length - 1], floorTo2_5(2 * last - workKg));
-    if (lowered > prev + WARMUP_EPS) ladder[ladder.length - 1] = lowered;
-  }
-  const steps = ladder.concat([last]);
-  return { steps, fallback: true, regular: warmupJumpsDescend(steps, workKg) };
+    const steps = ladder.concat([last]);
+    return { steps, fallback: true, regular: warmupJumpsDescend(steps, workKg) };
+  });
+  return lowered.find(r => r.regular) || lowered[0];
 }
 
 // N <= reps.length: last N values of the series; N > length: full series for the
