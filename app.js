@@ -2638,13 +2638,71 @@ document.getElementById('btn-back-workout-plan').addEventListener('click', () =>
 document.getElementById('btn-back-nutrition').addEventListener('click', () => goBack('screen-home'));
 document.getElementById('btn-back-progress').addEventListener('click', () => goBack('screen-home'));
 document.getElementById('btn-back-calculator').addEventListener('click', () => goBack('screen-home'));
-document.getElementById('btn-calc-1rm').addEventListener('click', () => {
-  // TODO: 1RM Calculator-scherm bouwen — nog niet gebouwd
-});
+document.getElementById('btn-calc-1rm').addEventListener('click', open1rmCalculator);
 document.getElementById('btn-calc-warmup').addEventListener('click', () => {
   // TODO: Warm-up Calculator-scherm bouwen — nog niet gebouwd
 });
 document.getElementById('btn-calc-plate').addEventListener('click', openPlateCalculator);
+
+// -- 1RM Calculator ---------------------------------------
+// Epley: 1RM = weight × (1 + reps / 30). Pure helpers sit between the markers
+// below so they can be unit-tested headless (extracted and eval'd in Node).
+// <1rm-pure>
+const ORM_TABLE_REPS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20];
+
+// One rep IS the max by definition: raw Epley would give 103,3% for 1 rep, so 1 rep
+// is special-cased (1RM = lifted weight; the 1-rep table row = 100%).
+function epley1rm(weight, reps) { return reps === 1 ? weight : weight * (1 + reps / 30); }
+function weightAtReps(oneRm, reps) { return reps === 1 ? oneRm : oneRm / (1 + reps / 30); }
+function percentAtReps(reps) { return reps === 1 ? 100 : Math.round(100 / (1 + reps / 30)); }
+
+function formatKg1(n) { return n.toFixed(1).replace('.', ','); }
+
+// Strict parse (Dutch comma allowed); NaN for empty/garbage like "5abc".
+function parseOrmNumber(str) {
+  const s = String(str == null ? '' : str).trim().replace(',', '.');
+  if (!/^(\d+\.?\d*|\.\d+)$/.test(s)) return NaN;
+  return Number(s);
+}
+
+// Returns { error } or { oneRm, rows: [{ reps, weight, percent }] }.
+function computeOneRm(weightStr, repsStr) {
+  if (String(weightStr).trim() === '' || String(repsStr).trim() === '') return { error: 'Vul zowel gewicht als herhalingen in.' };
+  const weight = parseOrmNumber(weightStr);
+  const reps = parseOrmNumber(repsStr);
+  if (!isFinite(weight) || weight <= 0) return { error: 'Gewicht moet een getal groter dan 0 zijn.' };
+  if (!isFinite(reps) || reps < 1 || !Number.isInteger(reps)) return { error: 'Herhalingen moet een geheel getal van minimaal 1 zijn.' };
+  const oneRm = epley1rm(weight, reps);
+  const rows = ORM_TABLE_REPS.map(n => ({ reps: n, weight: weightAtReps(oneRm, n), percent: percentAtReps(n) }));
+  return { oneRm, rows };
+}
+// </1rm-pure>
+
+function open1rmCalculator() {
+  document.getElementById('orm-weight').value = '';
+  document.getElementById('orm-reps').value = '';
+  ['orm-error', 'orm-result-card', 'orm-table-section'].forEach(id => document.getElementById(id).classList.add('hidden'));
+  showScreen('screen-calculator-1rm');
+}
+document.getElementById('btn-orm-calculate').addEventListener('click', () => {
+  const errEl = document.getElementById('orm-error');
+  const res = computeOneRm(document.getElementById('orm-weight').value, document.getElementById('orm-reps').value);
+  if (res.error) {
+    errEl.textContent = res.error;
+    errEl.classList.remove('hidden');
+    document.getElementById('orm-result-card').classList.add('hidden');
+    document.getElementById('orm-table-section').classList.add('hidden');
+    return;
+  }
+  errEl.classList.add('hidden');
+  document.getElementById('orm-result-value').textContent = formatKg1(res.oneRm) + ' kg';
+  document.getElementById('orm-table-body').innerHTML = res.rows.map(r =>
+    `<div class="orm-table-row"><div>${r.reps}</div><div>${formatKg1(r.weight)} kg</div><div>${r.percent}%</div></div>`
+  ).join('');
+  document.getElementById('orm-result-card').classList.remove('hidden');
+  document.getElementById('orm-table-section').classList.remove('hidden');
+});
+document.getElementById('btn-back-calculator-1rm').addEventListener('click', () => goBack('screen-calculator'));
 
 // -- Plate Calculator -------------------------------------
 // Counts are the TOTAL number of that plate owned by the gym; only floor(count/2)
