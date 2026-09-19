@@ -2769,11 +2769,6 @@ function warmupLoadedSteps(exercise, workKg) {
   return { steps, fallback: true, regular: warmupJumpsDescend(steps, workKg) };
 }
 
-// Every loaded step is shown as a range: rounded weight ± 2.5 kg, e.g. 190 -> "187,5 - 192,5 kg".
-function warmupRangeText(kg) {
-  return formatKg(kg - WARMUP_ROUND_KG) + ' - ' + formatKg(kg + WARMUP_ROUND_KG) + ' kg';
-}
-
 // N <= reps.length: last N values of the series; N > length: full series for the
 // first steps, then 1 rep for every extra step.
 function warmupReps(n, series) {
@@ -2833,7 +2828,7 @@ document.getElementById('btn-warmup-calculate').addEventListener('click', () => 
   document.getElementById('warmup-result-list').innerHTML = res.rows.map(r => {
     if (r.bar) return `<div class="plate-result-line">Lege stang × ${r.reps}</div>`;
     if (r.work) return `<div class="plate-result-line warmup-line-work">${formatKg(r.weight)} kg (werkset)</div>`;
-    return `<div class="plate-result-line">${warmupRangeText(r.weight)} × ${r.reps}</div>`;
+    return `<div class="plate-result-line">${formatKg(r.weight)} kg × ${r.reps}</div>`;
   }).join('');
   const noteEl = document.getElementById('warmup-result-note');
   noteEl.textContent = 'Werkgewicht te laag voor tussenstappen — alleen lege stang, dan de werkset.';
