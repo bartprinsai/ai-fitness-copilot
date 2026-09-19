@@ -2639,9 +2639,7 @@ document.getElementById('btn-back-nutrition').addEventListener('click', () => go
 document.getElementById('btn-back-progress').addEventListener('click', () => goBack('screen-home'));
 document.getElementById('btn-back-calculator').addEventListener('click', () => goBack('screen-home'));
 document.getElementById('btn-calc-1rm').addEventListener('click', open1rmCalculator);
-document.getElementById('btn-calc-warmup').addEventListener('click', () => {
-  // TODO: Warm-up Calculator-scherm bouwen — nog niet gebouwd
-});
+document.getElementById('btn-calc-warmup').addEventListener('click', openWarmupCalculator);
 document.getElementById('btn-calc-plate').addEventListener('click', openPlateCalculator);
 
 // -- 1RM Calculator ---------------------------------------
@@ -2703,6 +2701,104 @@ document.getElementById('btn-orm-calculate').addEventListener('click', () => {
   document.getElementById('orm-table-section').classList.remove('hidden');
 });
 document.getElementById('btn-back-calculator-1rm').addEventListener('click', () => goBack('screen-calculator'));
+
+// -- Warm-up Calculator -----------------------------------
+// Pure logic sits between the markers so it can be unit-tested headless.
+// <warmup-pure>
+const WARMUP_BAR_KG = 20;
+const WARMUP_EXERCISES = {
+  bench:    { label: 'Bench',    firstStep: WARMUP_BAR_KG + 20, increment: 20, reps: [8, 5, 3, 2, 1] },
+  squat:    { label: 'Squat',    firstStep: WARMUP_BAR_KG + 40, increment: 40, reps: [5, 3, 2, 1] },
+  deadlift: { label: 'Deadlift', firstStep: 70,                 increment: 40, reps: [5, 3, 2, 1] },
+};
+
+// Largest multiple of 5 within [0.875 × W, 0.90 × W] (i.e. 10–12.5% below W), or
+// null if the band holds none. Integer maths on grams so W = 200 etc. can't be
+// knocked one step down by floating-point noise (0.9 × 200 → 180.00000000000003).
+function warmupLastStep(workKg) {
+  const g = Math.round(workKg * 1000);
+  const k = Math.floor(9 * g / 50000);          // largest k with 5000k <= 0.9 × g
+  if (k < 1 || 40000 * k < 7 * g) return null;   // 5000k must also be >= 0.875 × g
+  return k * 5;
+}
+
+// Weights (kg) of the loaded steps, ladder first, finale last. Empty bar not included.
+function warmupLoadedSteps(exercise, workKg) {
+  const cfg = WARMUP_EXERCISES[exercise];
+  const last = warmupLastStep(workKg);
+  if (last === null || last <= WARMUP_BAR_KG) return [];
+  const steps = [];
+  for (let w = cfg.firstStep; w < last; w += cfg.increment) steps.push(w);
+  if (steps[steps.length - 1] !== last) steps.push(last);
+  return steps;
+}
+
+// N <= reps.length: last N values of the series; N > length: full series for the
+// first steps, then 1 rep for every extra step.
+function warmupReps(n, series) {
+  if (n <= series.length) return series.slice(series.length - n);
+  return series.concat(new Array(n - series.length).fill(1));
+}
+
+function parseWarmupNumber(str) {
+  const s = String(str == null ? '' : str).trim().replace(',', '.');
+  if (!/^(\d+\.?\d*|\.\d+)$/.test(s)) return NaN;
+  return Number(s);
+}
+
+// Returns { error } or { rows: [{ bar?, weight, reps?, work? }], tooLight }.
+function computeWarmup(exercise, workStr) {
+  const cfg = WARMUP_EXERCISES[exercise];
+  if (!cfg) return { error: 'Kies een oefening.' };
+  if (String(workStr == null ? '' : workStr).trim() === '') return { error: 'Vul een werkgewicht in.' };
+  const work = parseWarmupNumber(workStr);
+  if (!isFinite(work) || work <= 0) return { error: 'Werkgewicht moet een getal groter dan 0 zijn.' };
+  if (work <= WARMUP_BAR_KG) return { error: 'Werkgewicht moet zwaarder zijn dan de lege stang (' + WARMUP_BAR_KG + ' kg).' };
+  const steps = warmupLoadedSteps(exercise, work);
+  const reps = warmupReps(steps.length, cfg.reps);
+  const rows = [{ bar: true, weight: WARMUP_BAR_KG, reps: 10 }];
+  steps.forEach((w, i) => rows.push({ weight: w, reps: reps[i] }));
+  rows.push({ weight: work, work: true });
+  return { rows, tooLight: steps.length === 0 };
+}
+// </warmup-pure>
+
+let warmupExercise = 'bench';
+function openWarmupCalculator() {
+  warmupExercise = 'bench';
+  document.querySelectorAll('#warmup-ex-options .plate-bar-option').forEach(o => o.classList.toggle('selected', o.dataset.ex === warmupExercise));
+  document.getElementById('warmup-weight').value = '';
+  ['warmup-error', 'warmup-result-card'].forEach(id => document.getElementById(id).classList.add('hidden'));
+  showScreen('screen-calculator-warmup');
+}
+document.getElementById('warmup-ex-options').addEventListener('click', e => {
+  const opt = e.target.closest('.plate-bar-option');
+  if (!opt) return;
+  warmupExercise = opt.dataset.ex;
+  document.querySelectorAll('#warmup-ex-options .plate-bar-option').forEach(o => o.classList.toggle('selected', o === opt));
+});
+document.getElementById('btn-warmup-calculate').addEventListener('click', () => {
+  const errEl = document.getElementById('warmup-error');
+  const card = document.getElementById('warmup-result-card');
+  const res = computeWarmup(warmupExercise, document.getElementById('warmup-weight').value);
+  if (res.error) {
+    errEl.textContent = res.error;
+    errEl.classList.remove('hidden');
+    card.classList.add('hidden');
+    return;
+  }
+  errEl.classList.add('hidden');
+  document.getElementById('warmup-result-list').innerHTML = res.rows.map(r => {
+    if (r.bar) return `<div class="plate-result-line">Lege stang × ${r.reps}</div>`;
+    if (r.work) return `<div class="plate-result-line warmup-line-work">${formatKg(r.weight)} kg (werkset)</div>`;
+    return `<div class="plate-result-line">${formatKg(r.weight)} kg × ${r.reps}</div>`;
+  }).join('');
+  const noteEl = document.getElementById('warmup-result-note');
+  noteEl.textContent = 'Werkgewicht te laag voor tussenstappen — alleen lege stang, dan de werkset.';
+  noteEl.classList.toggle('hidden', !res.tooLight);
+  card.classList.remove('hidden');
+});
+document.getElementById('btn-back-calculator-warmup').addEventListener('click', () => goBack('screen-calculator'));
 
 // -- Plate Calculator -------------------------------------
 // Counts are the TOTAL number of that plate owned by the gym; only floor(count/2)

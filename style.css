@@ -633,3 +633,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .orm-table-row { display: grid; grid-template-columns: 1fr 1.4fr 1.2fr; text-align: center; padding: 12px 8px; font-size: 15px; color: var(--text-primary); }
 .orm-table-row:nth-child(even) { background: #f5f5f5; }
 .orm-table-head { background: var(--toolbar); color: #fff; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+
+/* Warm-up Calculator */
+.warmup-ex-options { grid-template-columns: repeat(3, 1fr); }
+.warmup-line-work { font-weight: 700; }
