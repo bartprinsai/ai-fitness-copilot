@@ -626,6 +626,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .plate-result-note { font-size: 13px; color: var(--text-secondary); margin-top: 2px; }
 
 /* 1RM Calculator */
+.orm-hint { font-size: 13px; color: var(--text-secondary); }
 .orm-error { font-size: 13px; color: #d32f2f; line-height: 1.4; }
 .orm-result-value { font-size: 36px; font-weight: 700; color: var(--text-primary); line-height: 1.1; }
 .orm-table-card { background: var(--surface); border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.08); overflow: hidden; }
