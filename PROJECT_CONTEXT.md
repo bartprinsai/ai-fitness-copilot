@@ -92,7 +92,7 @@ let db = { ... };                  // In-memory state: workouts, records, plans
 getWorkout(date)                   // Haal workout op voor datum
 setWorkout(date, workout)          // Sla workout op in Firestore
 renderSetList()                    // Herrender de set lijst
-toast(message)                     // Toon een toast melding
+toast(message, {type, duration})    // Banner onder de header: type "success" (standaard, teal) | "error" (rood, 4s) | "pr" (goud)
 openExerciseInfo()                 // Open exercise info bottom-sheet (spiergroep + apparaat-instellingen)
 callClaude(userMessage, sysPrompt) // Anthropic API call voor de AI plan generator
 ```
