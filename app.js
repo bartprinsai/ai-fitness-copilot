@@ -1428,24 +1428,27 @@ const CABLE_HEIGHT_NEW_OPTIONS = equipmentRangeOptions(1, 14, 1);
 const SQUAT_RACK_HEIGHT_OPTIONS = equipmentRangeOptions(1, 10, 1);
 const SAFETY_BAR_OPTIONS = equipmentRangeOptions(1, 10, 1);
 
-// `kind: 'picker'` fields open the shared field-picker overlay (see the
-// generic click-listener loop below); `'checkbox'` and `'text'` read/write
+// `kind: 'picker'` fields open the shared field-picker overlay (see
+// wireExerciseInfoFormPickers below); `'checkbox'` and `'text'` read/write
 // their input directly. View mode pairs the picker/checkbox fields up
 // (EXERCISE_INFO_EQUIPMENT_PAIRS) the same way Muscle group pairs
 // Primary/Secondary, and only renders whichever half of a pair is filled;
 // the free-text fields stay full-width rows like before.
+// The same field set is rendered twice — in the Exercise Info overlay
+// (prefix 'info') and in the New/Edit Exercise screen (prefix 'new-ex-info')
+// — so an element id is `<prefix>-<idSuffix>` (see EXERCISE_INFO_FORMS).
 const EXERCISE_INFO_EQUIPMENT_FIELDS = [
-  { key: 'benchSettingOld', label: 'Bench setting (old)', inputId: 'info-bench-setting-old', kind: 'picker', options: BENCH_SETTING_OLD_OPTIONS },
-  { key: 'benchSettingNew', label: 'Bench setting (new)', inputId: 'info-bench-setting-new', kind: 'picker', options: BENCH_SETTING_NEW_OPTIONS },
-  { key: 'benchHeight', label: 'Bench height', inputId: 'info-bench-height', kind: 'picker', options: BENCH_HEIGHT_OPTIONS },
-  { key: 'powerliftBench', label: 'Powerlift bench', inputId: 'info-powerlift-bench', kind: 'checkbox' },
-  { key: 'cableHeightOld', label: 'Cable height (old)', inputId: 'info-cable-height-old', kind: 'picker', options: CABLE_HEIGHT_OLD_OPTIONS },
-  { key: 'cableHeightNew', label: 'Cable height (new)', inputId: 'info-cable-height-new', kind: 'picker', options: CABLE_HEIGHT_NEW_OPTIONS },
-  { key: 'squatRackHeight', label: 'Squat rack height', inputId: 'info-squat-rack-height', kind: 'picker', options: SQUAT_RACK_HEIGHT_OPTIONS },
-  { key: 'safetyBar', label: 'Safety bar', inputId: 'info-safety-bar', kind: 'picker', options: SAFETY_BAR_OPTIONS },
-  { key: 'handPosition', label: 'Hand position', inputId: 'info-hand-position', kind: 'text' },
-  { key: 'footPosition', label: 'Foot position', inputId: 'info-foot-position', kind: 'text' },
-  { key: 'extra', label: 'Extra', inputId: 'info-extra', kind: 'text' },
+  { key: 'benchSettingOld', label: 'Bench setting (old)', idSuffix: 'bench-setting-old', kind: 'picker', options: BENCH_SETTING_OLD_OPTIONS },
+  { key: 'benchSettingNew', label: 'Bench setting (new)', idSuffix: 'bench-setting-new', kind: 'picker', options: BENCH_SETTING_NEW_OPTIONS },
+  { key: 'benchHeight', label: 'Bench height', idSuffix: 'bench-height', kind: 'picker', options: BENCH_HEIGHT_OPTIONS },
+  { key: 'powerliftBench', label: 'Powerlift bench', idSuffix: 'powerlift-bench', kind: 'checkbox' },
+  { key: 'cableHeightOld', label: 'Cable height (old)', idSuffix: 'cable-height-old', kind: 'picker', options: CABLE_HEIGHT_OLD_OPTIONS },
+  { key: 'cableHeightNew', label: 'Cable height (new)', idSuffix: 'cable-height-new', kind: 'picker', options: CABLE_HEIGHT_NEW_OPTIONS },
+  { key: 'squatRackHeight', label: 'Squat rack height', idSuffix: 'squat-rack-height', kind: 'picker', options: SQUAT_RACK_HEIGHT_OPTIONS },
+  { key: 'safetyBar', label: 'Safety bar', idSuffix: 'safety-bar', kind: 'picker', options: SAFETY_BAR_OPTIONS },
+  { key: 'handPosition', label: 'Hand position', idSuffix: 'hand-position', kind: 'text' },
+  { key: 'footPosition', label: 'Foot position', idSuffix: 'foot-position', kind: 'text' },
+  { key: 'extra', label: 'Extra', idSuffix: 'extra', kind: 'text' },
 ];
 const EXERCISE_INFO_EQUIPMENT_PAIRS = [
   ['benchSettingOld', 'benchSettingNew'],
@@ -1506,69 +1509,137 @@ function renderExerciseInfoView() {
 const MUSCLE_PRIMARY_OPTIONS = MUSCLE_OPTIONS.map(m => ({ value: m, label: m }));
 const MUSCLE_SECONDARY_OPTIONS = [{ value: '', label: 'None' }, ...MUSCLE_PRIMARY_OPTIONS];
 
-document.getElementById('info-primary-muscle').addEventListener('click', () => {
-  openFieldPicker('Primary', MUSCLE_PRIMARY_OPTIONS, getFieldBtnValue('info-primary-muscle'), value => {
-    setFieldBtnValue('info-primary-muscle', value, value);
-  });
-});
-document.getElementById('info-secondary-muscle').addEventListener('click', () => {
-  openFieldPicker('Secondary', MUSCLE_SECONDARY_OPTIONS, getFieldBtnValue('info-secondary-muscle'), value => {
-    setFieldBtnValue('info-secondary-muscle', value, value || 'None');
-  });
-});
+// The muscle-group/equipment fields live in two places — the Exercise Info
+// overlay and the New/Edit Exercise screen — and both are built, wired,
+// populated and read by the same generic functions below, parameterised by one
+// of these forms (element ids are `<prefix>-<field>`). primaryOptions[0] is
+// what Primary shows for an exercise without data: the info overlay has always
+// defaulted to Chest, whereas New/Edit Exercise shows "Not set" so saving an
+// untouched form doesn't invent a muscle group.
+const EXERCISE_INFO_FORMS = {
+  overlay: { prefix: 'info', primaryOptions: MUSCLE_PRIMARY_OPTIONS, textInputClass: '' },
+  newEx: { prefix: 'new-ex-info', primaryOptions: [{ value: '', label: 'Not set' }, ...MUSCLE_PRIMARY_OPTIONS], textInputClass: 'new-ex-input' },
+};
 
-// Every equipment dropdown field opens the same shared field-picker overlay
-// and writes its selection back onto its own button — one listener covers
-// all of them instead of repeating the new-ex-category/type/weight-unit
-// pattern six times over.
-EXERCISE_INFO_EQUIPMENT_FIELDS.filter(f => f.kind === 'picker').forEach(f => {
-  document.getElementById(f.inputId).addEventListener('click', () => {
-    openFieldPicker(f.label, f.options, getFieldBtnValue(f.inputId), value => {
-      const opt = f.options.find(o => o.value === value);
-      setFieldBtnValue(f.inputId, value, opt ? opt.label : 'Not set');
+function renderExerciseInfoFormFields(form) {
+  const p = form.prefix;
+  const pickerBtn = id => `<button type="button" class="new-ex-select new-ex-select-btn" id="${id}"></button>`;
+  const field = (id, label, control) => `<div class="info-field"><label class="info-field-label" for="${id}">${label}</label>${control}</div>`;
+  const equipmentField = key => {
+    const f = EXERCISE_INFO_FIELDS_BY_KEY[key];
+    const id = `${p}-${f.idSuffix}`;
+    let control;
+    if (f.kind === 'picker') control = pickerBtn(id);
+    else if (f.kind === 'checkbox') control = `<input type="checkbox" class="info-checkbox" id="${id}"/>`;
+    else control = `<input type="text" id="${id}"${form.textInputClass ? ` class="${form.textInputClass}"` : ''} placeholder="Leave empty to hide"/>`;
+    return field(id, f.label, control);
+  };
+  document.getElementById(`${p}-muscle-fields`).innerHTML =
+    field(`${p}-primary-muscle`, 'Primary', pickerBtn(`${p}-primary-muscle`)) +
+    field(`${p}-secondary-muscle`, 'Secondary', pickerBtn(`${p}-secondary-muscle`));
+  document.getElementById(`${p}-equipment-fields`).innerHTML =
+    EXERCISE_INFO_EQUIPMENT_PAIRS.map(pair => `<div class="info-two-col">${pair.map(equipmentField).join('')}</div>`).join('') +
+    EXERCISE_INFO_FULLWIDTH_KEYS.map(equipmentField).join('');
+}
+
+// Every picker field opens the same shared field-picker overlay and writes its
+// selection back onto its own button — one loop covers all of them instead of
+// repeating the new-ex-category/type/weight-unit pattern per field.
+function wireExerciseInfoFormPickers(form) {
+  const p = form.prefix;
+  const wire = (id, title, options) => {
+    document.getElementById(id).addEventListener('click', () => {
+      openFieldPicker(title, options, getFieldBtnValue(id), value => {
+        const opt = options.find(o => o.value === value);
+        setFieldBtnValue(id, value, opt ? opt.label : 'Not set');
+      });
     });
-  });
-});
+  };
+  wire(`${p}-primary-muscle`, 'Primary', form.primaryOptions);
+  wire(`${p}-secondary-muscle`, 'Secondary', MUSCLE_SECONDARY_OPTIONS);
+  EXERCISE_INFO_EQUIPMENT_FIELDS.filter(f => f.kind === 'picker').forEach(f => wire(`${p}-${f.idSuffix}`, f.label, f.options));
+}
 
-// Reads the current, live state of every Exercise Info edit-mode field, in
-// the same shape whether used to capture the baseline (right after
-// populating the form) or to check for changes later (at Cancel/back time).
-function getExerciseInfoFormSnapshot() {
+function setExerciseInfoPicker(id, options, val) {
+  const strVal = (val !== undefined && val !== null) ? String(val) : '';
+  const opt = options.find(o => o.value === strVal) || options[0];
+  setFieldBtnValue(id, opt.value, opt.label);
+}
+
+// Fills every field of a form from an exercise's stored info ({} = nothing set).
+function populateExerciseInfoForm(form, info) {
+  const p = form.prefix;
+  setExerciseInfoPicker(`${p}-primary-muscle`, form.primaryOptions, info.primaryMuscle);
+  setExerciseInfoPicker(`${p}-secondary-muscle`, MUSCLE_SECONDARY_OPTIONS, info.secondaryMuscle);
+  EXERCISE_INFO_EQUIPMENT_FIELDS.forEach(f => {
+    const id = `${p}-${f.idSuffix}`;
+    const val = info[f.key];
+    if (f.kind === 'checkbox') document.getElementById(id).checked = !!val;
+    else if (f.kind === 'picker') setExerciseInfoPicker(id, f.options, val);
+    else document.getElementById(id).value = (val !== undefined && val !== null) ? val : '';
+  });
+}
+
+// Reads the current, live state of every field of a form, in the same shape
+// whether used to capture the baseline (right after populating the form) or to
+// check for changes later (at Cancel/back time).
+function getExerciseInfoFormSnapshot(form) {
+  const p = form.prefix;
   const snapshot = {
-    primaryMuscle: getFieldBtnValue('info-primary-muscle'),
-    secondaryMuscle: getFieldBtnValue('info-secondary-muscle'),
+    primaryMuscle: getFieldBtnValue(`${p}-primary-muscle`),
+    secondaryMuscle: getFieldBtnValue(`${p}-secondary-muscle`),
   };
   EXERCISE_INFO_EQUIPMENT_FIELDS.forEach(f => {
-    if (f.kind === 'checkbox') snapshot[f.key] = document.getElementById(f.inputId).checked;
-    else if (f.kind === 'picker') snapshot[f.key] = getFieldBtnValue(f.inputId);
-    else snapshot[f.key] = document.getElementById(f.inputId).value;
+    const id = `${p}-${f.idSuffix}`;
+    if (f.kind === 'checkbox') snapshot[f.key] = document.getElementById(id).checked;
+    else if (f.kind === 'picker') snapshot[f.key] = getFieldBtnValue(id);
+    else snapshot[f.key] = document.getElementById(id).value;
   });
   return snapshot;
 }
+
+// Converts a form into the stored info object; unset fields are left out, so
+// an entirely empty form yields {}.
+function readExerciseInfoForm(form) {
+  const p = form.prefix;
+  const info = {};
+  const primary = getFieldBtnValue(`${p}-primary-muscle`);
+  const secondary = getFieldBtnValue(`${p}-secondary-muscle`);
+  if (primary) info.primaryMuscle = primary;
+  if (secondary) info.secondaryMuscle = secondary;
+  EXERCISE_INFO_EQUIPMENT_FIELDS.forEach(f => {
+    const id = `${p}-${f.idSuffix}`;
+    if (f.kind === 'checkbox') {
+      if (document.getElementById(id).checked) info[f.key] = true;
+      return;
+    }
+    if (f.kind === 'picker') {
+      const raw = getFieldBtnValue(id);
+      if (raw === '') return;
+      info[f.key] = parseFloat(raw);
+      return;
+    }
+    const raw = document.getElementById(id).value.trim();
+    if (raw === '') return;
+    info[f.key] = raw;
+  });
+  return info;
+}
+
+Object.values(EXERCISE_INFO_FORMS).forEach(form => {
+  renderExerciseInfoFormFields(form);
+  wireExerciseInfoFormPickers(form);
+});
+
 let exerciseInfoEditBaseline = null;
 
 function showExerciseInfoEdit() {
   const info = getExerciseInfo(currentExercise) || {};
   document.getElementById('exercise-info-edit-title').textContent = currentExercise + ' info';
-  const primary = info.primaryMuscle || MUSCLE_OPTIONS[0];
-  setFieldBtnValue('info-primary-muscle', primary, primary);
-  const secondary = info.secondaryMuscle || '';
-  setFieldBtnValue('info-secondary-muscle', secondary, secondary || 'None');
-  EXERCISE_INFO_EQUIPMENT_FIELDS.forEach(f => {
-    const val = info[f.key];
-    if (f.kind === 'checkbox') {
-      document.getElementById(f.inputId).checked = !!val;
-    } else if (f.kind === 'picker') {
-      const strVal = (val !== undefined && val !== null) ? String(val) : '';
-      const opt = f.options.find(o => o.value === strVal) || f.options[0];
-      setFieldBtnValue(f.inputId, opt.value, opt.label);
-    } else {
-      document.getElementById(f.inputId).value = (val !== undefined && val !== null) ? val : '';
-    }
-  });
+  populateExerciseInfoForm(EXERCISE_INFO_FORMS.overlay, info);
   document.getElementById('exercise-info-edit-mode').classList.remove('hidden');
   document.getElementById('exercise-info-view-mode').classList.add('hidden');
-  exerciseInfoEditBaseline = getExerciseInfoFormSnapshot();
+  exerciseInfoEditBaseline = getExerciseInfoFormSnapshot(EXERCISE_INFO_FORMS.overlay);
 }
 
 function openExerciseInfo() {
@@ -1576,31 +1647,18 @@ function openExerciseInfo() {
   openOverlay('exercise-info-overlay');
 }
 
-function saveExerciseInfo() {
-  const info = {};
-  const primary = getFieldBtnValue('info-primary-muscle');
-  const secondary = getFieldBtnValue('info-secondary-muscle');
-  if (primary) info.primaryMuscle = primary;
-  if (secondary) info.secondaryMuscle = secondary;
-  EXERCISE_INFO_EQUIPMENT_FIELDS.forEach(f => {
-    if (f.kind === 'checkbox') {
-      if (document.getElementById(f.inputId).checked) info[f.key] = true;
-      return;
-    }
-    if (f.kind === 'picker') {
-      const raw = getFieldBtnValue(f.inputId);
-      if (raw === '') return;
-      info[f.key] = parseFloat(raw);
-      return;
-    }
-    const raw = document.getElementById(f.inputId).value.trim();
-    if (raw === '') return;
-    info[f.key] = raw;
-  });
+// Stores (or, when empty, removes) one exercise's info. Skips the Firestore
+// write when nothing actually changed.
+function setExerciseInfoFor(name, info) {
   if (!db.exerciseInfo) db.exerciseInfo = {};
-  if (Object.keys(info).length === 0) delete db.exerciseInfo[currentExercise];
-  else db.exerciseInfo[currentExercise] = info;
-  persistExerciseInfo();
+  const unchanged = JSON.stringify(db.exerciseInfo[name] || {}) === JSON.stringify(info);
+  if (Object.keys(info).length === 0) delete db.exerciseInfo[name];
+  else db.exerciseInfo[name] = info;
+  if (!unchanged) persistExerciseInfo();
+}
+
+function saveExerciseInfo() {
+  setExerciseInfoFor(currentExercise, readExerciseInfoForm(EXERCISE_INFO_FORMS.overlay));
   renderExerciseInfoView();
 }
 
@@ -2279,9 +2337,20 @@ function getNewExerciseFormSnapshot() {
     name: document.getElementById('new-ex-name').value,
     category: getFieldBtnValue('new-ex-category'),
     type: getFieldBtnValue('new-ex-type'),
+    info: getExerciseInfoFormSnapshot(EXERCISE_INFO_FORMS.newEx),
   };
 }
 let newExerciseBaseline = null;
+
+// Muscle group is always visible; Equipment setup is a collapsible row that
+// starts collapsed every time the screen opens, even when it already has data.
+function setNewExEquipmentOpen(open) {
+  document.getElementById('btn-new-ex-equipment-toggle').setAttribute('aria-expanded', String(open));
+  document.getElementById('new-ex-info-equipment-fields').classList.toggle('hidden', !open);
+}
+document.getElementById('btn-new-ex-equipment-toggle').addEventListener('click', e => {
+  setNewExEquipmentOpen(e.currentTarget.getAttribute('aria-expanded') !== 'true');
+});
 
 function openNewExerciseScreen() {
   pendingEditExerciseOriginalName = null;
@@ -2289,6 +2358,8 @@ function openNewExerciseScreen() {
   document.getElementById('new-ex-name').value = '';
   setFieldBtnValue('new-ex-type', 'weight_reps', 'Weight and Reps');
   populateNewExCategorySelect();
+  populateExerciseInfoForm(EXERCISE_INFO_FORMS.newEx, {});
+  setNewExEquipmentOpen(false);
   newExerciseBaseline = getNewExerciseFormSnapshot();
   showScreen('screen-new-exercise');
   setTimeout(() => document.getElementById('new-ex-name').focus(), 300);
@@ -2301,6 +2372,8 @@ function openEditExerciseScreen(ex) {
   const typeOpt = EX_TYPE_OPTIONS.find(o => o.value === ex.type) || EX_TYPE_OPTIONS[0];
   setFieldBtnValue('new-ex-type', typeOpt.value, typeOpt.label);
   populateNewExCategorySelect(ex.category);
+  populateExerciseInfoForm(EXERCISE_INFO_FORMS.newEx, getExerciseInfo(ex.name) || {});
+  setNewExEquipmentOpen(false);
   newExerciseBaseline = getNewExerciseFormSnapshot();
   showScreen('screen-new-exercise');
 }
@@ -2366,6 +2439,8 @@ function saveNewExerciseFromScreen() {
       && allExercises().find(e => e.name.toLowerCase() === name.toLowerCase());
     if (nameTaken) { toast('Exercise already exists'); return; }
     updateExistingExercise(pendingEditExerciseOriginalName, { category: cat, name, type });
+    // After the rename above has moved any existing info over to the new name.
+    setExerciseInfoFor(name, readExerciseInfoForm(EXERCISE_INFO_FORMS.newEx));
     pendingEditExerciseOriginalName = null;
     exerciseBrowserMode = 'categories';
     currentBrowseCategory = null;
@@ -2379,6 +2454,7 @@ function saveNewExerciseFromScreen() {
   if (!db.custom_exercises) db.custom_exercises = [];
   db.custom_exercises.push({ category: cat, name, type });
   persistCustomExercises();
+  setExerciseInfoFor(name, readExerciseInfoForm(EXERCISE_INFO_FORMS.newEx));
   toast('Exercise created');
   exerciseBrowserMode = 'categories';
   currentBrowseCategory = null;
@@ -2544,7 +2620,7 @@ document.getElementById('btn-exercise-info-edit').addEventListener('click', show
 document.getElementById('btn-exercise-info-close').addEventListener('click', () => closeOverlay('exercise-info-overlay'));
 document.getElementById('btn-exercise-info-cancel').addEventListener('click', () => {
   confirmDiscardIfChanged(
-    () => hasChanges(exerciseInfoEditBaseline, getExerciseInfoFormSnapshot()),
+    () => hasChanges(exerciseInfoEditBaseline, getExerciseInfoFormSnapshot(EXERCISE_INFO_FORMS.overlay)),
     renderExerciseInfoView
   );
 });

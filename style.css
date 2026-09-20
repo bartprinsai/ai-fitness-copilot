@@ -304,6 +304,8 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .info-section-label { font-size: 11px; font-weight: 700; color: var(--text-secondary); letter-spacing: .08em; text-transform: uppercase; }
 .info-two-col { display: flex; gap: 10px; }
 .info-two-col > .info-field, .info-two-col > .info-view-stat { flex: 1; }
+/* Wrapper for the generated equipment fields (rendered into both the info overlay and the New/Edit Exercise screen) — keeps the same 14px row gap the fields had as direct children of .exercise-info-scroll. */
+.info-fields-group { display: flex; flex-direction: column; gap: 14px; }
 .info-field { display: flex; flex-direction: column; gap: 4px; }
 .info-field-label { font-size: 13px; color: var(--text-secondary); }
 .info-checkbox { width: 24px; height: 24px; accent-color: var(--blue-btn); cursor: pointer; margin-top: 8px; }
@@ -562,6 +564,13 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .new-ex-select-btn:active { border-bottom-color: var(--blue); }
 .new-ex-add-cat-btn { width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 50%; background: none; color: var(--text-secondary); font-size: 22px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-bottom: 4px; transition: background .1s; }
 .new-ex-add-cat-btn:active { background: var(--bg); }
+/* Collapsible "Equipment setup" row on the New/Edit Exercise screen: label + chevron in one tappable row; the chevron flips when expanded. */
+.new-ex-collapse-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; background: none; border: none; padding: 0 0 18px; font-family: inherit; cursor: pointer; text-align: left; }
+.new-ex-collapse-toggle .new-ex-label { margin-bottom: 0; }
+.new-ex-collapse-chevron { width: 24px; height: 24px; fill: var(--text-secondary); flex-shrink: 0; transition: transform .15s; }
+.new-ex-collapse-toggle[aria-expanded="true"] { padding-bottom: 10px; }
+.new-ex-collapse-toggle[aria-expanded="true"] .new-ex-collapse-chevron { transform: rotate(180deg); }
+#new-ex-info-equipment-fields { padding-bottom: 18px; }
 
 /* ── FIELD PICKER OVERLAY (Category/Type/Weight Unit) ─── */
 /* Can be opened from within another already-open .overlay (e.g. the

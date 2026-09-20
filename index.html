@@ -279,10 +279,21 @@
       <div class="new-ex-label">TYPE</div>
       <button type="button" class="new-ex-select new-ex-select-btn" id="new-ex-type"></button>
     </div>
+    <div class="new-ex-section">
+      <div class="new-ex-label">MUSCLE GROUP</div>
+      <div class="info-two-col" id="new-ex-info-muscle-fields"></div>
+    </div>
+    <div class="new-ex-section">
+      <button type="button" class="new-ex-collapse-toggle" id="btn-new-ex-equipment-toggle" aria-expanded="false" aria-controls="new-ex-info-equipment-fields">
+        <span class="new-ex-label">EQUIPMENT SETUP</span>
+        <svg class="new-ex-collapse-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+      </button>
+      <div class="info-fields-group hidden" id="new-ex-info-equipment-fields"></div>
+    </div>
   </div>
 </div>
 
-<!-- FIELD PICKER OVERLAY (Category / Type) -->
+<!-- FIELD PICKER OVERLAY (Category / Type / Muscle group / Equipment setup) -->
 <div class="overlay" id="field-picker-overlay">
   <div class="overlay-panel">
     <h3 class="field-picker-title" id="field-picker-title"></h3>
@@ -807,69 +818,9 @@
       <h3 id="exercise-info-edit-title"></h3>
       <div class="exercise-info-scroll">
         <div class="info-section-label">Muscle group</div>
-        <div class="info-two-col">
-          <div class="info-field">
-            <label class="info-field-label" for="info-primary-muscle">Primary</label>
-            <button type="button" class="new-ex-select new-ex-select-btn" id="info-primary-muscle"></button>
-          </div>
-          <div class="info-field">
-            <label class="info-field-label" for="info-secondary-muscle">Secondary</label>
-            <button type="button" class="new-ex-select new-ex-select-btn" id="info-secondary-muscle"></button>
-          </div>
-        </div>
+        <div class="info-two-col" id="info-muscle-fields"></div>
         <div class="info-section-label">Equipment setup</div>
-        <div class="info-two-col">
-          <div class="info-field">
-            <label class="info-field-label" for="info-bench-setting-old">Bench setting (old)</label>
-            <button type="button" class="new-ex-select new-ex-select-btn" id="info-bench-setting-old"></button>
-          </div>
-          <div class="info-field">
-            <label class="info-field-label" for="info-bench-setting-new">Bench setting (new)</label>
-            <button type="button" class="new-ex-select new-ex-select-btn" id="info-bench-setting-new"></button>
-          </div>
-        </div>
-        <div class="info-two-col">
-          <div class="info-field">
-            <label class="info-field-label" for="info-bench-height">Bench height</label>
-            <button type="button" class="new-ex-select new-ex-select-btn" id="info-bench-height"></button>
-          </div>
-          <div class="info-field">
-            <label class="info-field-label" for="info-powerlift-bench">Powerlift bench</label>
-            <input type="checkbox" class="info-checkbox" id="info-powerlift-bench"/>
-          </div>
-        </div>
-        <div class="info-two-col">
-          <div class="info-field">
-            <label class="info-field-label" for="info-cable-height-old">Cable height (old)</label>
-            <button type="button" class="new-ex-select new-ex-select-btn" id="info-cable-height-old"></button>
-          </div>
-          <div class="info-field">
-            <label class="info-field-label" for="info-cable-height-new">Cable height (new)</label>
-            <button type="button" class="new-ex-select new-ex-select-btn" id="info-cable-height-new"></button>
-          </div>
-        </div>
-        <div class="info-two-col">
-          <div class="info-field">
-            <label class="info-field-label" for="info-squat-rack-height">Squat rack height</label>
-            <button type="button" class="new-ex-select new-ex-select-btn" id="info-squat-rack-height"></button>
-          </div>
-          <div class="info-field">
-            <label class="info-field-label" for="info-safety-bar">Safety bar</label>
-            <button type="button" class="new-ex-select new-ex-select-btn" id="info-safety-bar"></button>
-          </div>
-        </div>
-        <div class="info-field">
-          <label class="info-field-label" for="info-hand-position">Hand position</label>
-          <input type="text" id="info-hand-position" placeholder="Leave empty to hide"/>
-        </div>
-        <div class="info-field">
-          <label class="info-field-label" for="info-foot-position">Foot position</label>
-          <input type="text" id="info-foot-position" placeholder="Leave empty to hide"/>
-        </div>
-        <div class="info-field">
-          <label class="info-field-label" for="info-extra">Extra</label>
-          <input type="text" id="info-extra" placeholder="Leave empty to hide"/>
-        </div>
+        <div class="info-fields-group" id="info-equipment-fields"></div>
       </div>
       <div class="overlay-btns">
         <button class="btn-secondary" id="btn-exercise-info-cancel">Cancel</button>
