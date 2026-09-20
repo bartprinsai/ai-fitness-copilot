@@ -1517,8 +1517,8 @@ const MUSCLE_SECONDARY_OPTIONS = [{ value: '', label: 'None' }, ...MUSCLE_PRIMAR
 // defaulted to Chest, whereas New/Edit Exercise shows "Not set" so saving an
 // untouched form doesn't invent a muscle group.
 const EXERCISE_INFO_FORMS = {
-  overlay: { prefix: 'info', primaryOptions: MUSCLE_PRIMARY_OPTIONS, textInputClass: '' },
-  newEx: { prefix: 'new-ex-info', primaryOptions: [{ value: '', label: 'Not set' }, ...MUSCLE_PRIMARY_OPTIONS], textInputClass: 'new-ex-input' },
+  overlay: { prefix: 'info', primaryOptions: MUSCLE_PRIMARY_OPTIONS },
+  newEx: { prefix: 'new-ex-info', primaryOptions: [{ value: '', label: 'Not set' }, ...MUSCLE_PRIMARY_OPTIONS] },
 };
 
 function renderExerciseInfoFormFields(form) {
@@ -1531,7 +1531,7 @@ function renderExerciseInfoFormFields(form) {
     let control;
     if (f.kind === 'picker') control = pickerBtn(id);
     else if (f.kind === 'checkbox') control = `<input type="checkbox" class="info-checkbox" id="${id}"/>`;
-    else control = `<input type="text" id="${id}"${form.textInputClass ? ` class="${form.textInputClass}"` : ''} placeholder="Leave empty to hide"/>`;
+    else control = `<input type="text" id="${id}" class="new-ex-input" placeholder="Leave empty to hide"/>`;
     return field(id, f.label, control);
   };
   document.getElementById(`${p}-muscle-fields`).innerHTML =
