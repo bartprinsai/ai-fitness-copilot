@@ -87,19 +87,21 @@ function setWorkout(date, exercises) {
   persistWorkout(date, exercises);
 }
 function getCurrentExerciseData() { return getWorkout(currentDate).find(e => e.name === currentExercise) || null; }
-// Optional 2nd argument: { type: 'error', duration } — error toasts get the red
-// style and stay a little longer. Plain toast('text') behaves as it always did.
-// Only one timer runs at a time: a new toast cancels the previous one's hide
-// timer, otherwise it would cut the new message short.
+// Full-width banner under the header (see .toast in style.css). Optional 2nd
+// argument: { type: 'success' | 'error' | 'pr', duration } picks the colour
+// variant; no type = success, so every plain toast('text') call gets the
+// success style. Errors stay longer. Only one timer runs at a time: a new
+// toast cancels the previous one's hide timer, otherwise it would cut the new
+// message short.
 let toastTimer = null;
-function toast(msg, { type, duration } = {}) {
+function toast(msg, { type = 'success', duration } = {}) {
   const el = document.getElementById('toast');
-  const isError = type === 'error';
-  el.textContent = msg;
-  el.classList.toggle('toast-error', isError);
+  document.getElementById('toast-msg').textContent = msg;
+  el.classList.toggle('toast-error', type === 'error');
+  el.classList.toggle('toast-pr', type === 'pr');
   el.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), duration || (isError ? 4000 : 2000));
+  toastTimer = setTimeout(() => el.classList.remove('show'), duration || (type === 'error' ? 4000 : 2000));
 }
 // Shared .catch() for every Firestore write: the UI has already updated
 // optimistically, so a failed write must not stay silent.
@@ -1711,10 +1713,11 @@ function saveSet() {
   }
 
   setWorkout(currentDate, workout);
-  // One combined toast — two consecutive toast() calls would just overwrite
-  // each other, hiding "Set saved" whenever a PR was hit.
+  // A PR replaces the plain confirmation entirely (two consecutive toast()
+  // calls would just overwrite each other anyway).
   const isPR = updateRecords(currentExercise, weight, reps);
-  toast(isPR ? savedMsg + ' \u00B7 \u{1F3C6} Personal record!' : savedMsg);
+  if (isPR) toast('\u{1F3C6} Personal record! \u{1F3C6}', { type: 'pr' });
+  else toast(savedMsg);
   trackFieldsBaseline = getTrackFieldsSnapshot();
   renderSetList();
   renderHome();
