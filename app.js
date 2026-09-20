@@ -1537,7 +1537,12 @@ function renderExerciseInfoFormFields(form) {
     let control;
     if (f.kind === 'picker') control = pickerBtn(id);
     else if (f.kind === 'checkbox') control = `<input type="checkbox" class="info-checkbox" id="${id}"/>`;
-    else control = `<input type="text" id="${id}" class="new-ex-input" placeholder="Leave empty to hide"/>`;
+    // Chrome keys its "previously entered values" suggestion list by the
+    // field's name (falling back to id), so autocomplete="off" alone doesn't
+    // suppress it. A fresh random name on every load means it never finds a
+    // history match — same trick as the weight/reps fields. The app itself
+    // only ever looks the field up by id, never by name.
+    else control = `<input type="text" id="${id}" name="${id}-${Math.random().toString(36).slice(2)}" class="new-ex-input" placeholder="Leave empty to hide" autocomplete="off"/>`;
     return field(id, f.label, control);
   };
   document.getElementById(`${p}-muscle-fields`).innerHTML =
