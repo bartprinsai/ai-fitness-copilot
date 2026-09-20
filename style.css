@@ -357,8 +357,9 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .cal-detail-ex-name { font-size: 15px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }
 
 /* ── TOAST ────────────────────────────────────────────── */
-.toast { position: fixed; bottom: calc(var(--safe-bottom) + 72px); left: 50%; transform: translateX(-50%) translateY(16px); background: #323232; color: white; font-size: 14px; padding: 10px 24px; border-radius: 4px; opacity: 0; pointer-events: none; z-index: var(--z-toast); transition: opacity .18s, transform .18s; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+.toast { position: fixed; bottom: calc(var(--safe-bottom) + 72px); left: 50%; transform: translateX(-50%) translateY(16px); background: #323232; color: white; font-size: 14px; padding: 10px 24px; border-radius: 4px; text-align: center; opacity: 0; pointer-events: none; z-index: var(--z-toast); transition: opacity .18s, transform .18s; width: max-content; max-width: calc(100vw - 32px); box-shadow: 0 2px 8px rgba(0,0,0,.3); }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.toast-error { background: #c62828; }
 
 ::-webkit-scrollbar { width: 0; }
 

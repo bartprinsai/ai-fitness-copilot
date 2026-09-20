@@ -87,10 +87,25 @@ function setWorkout(date, exercises) {
   persistWorkout(date, exercises);
 }
 function getCurrentExerciseData() { return getWorkout(currentDate).find(e => e.name === currentExercise) || null; }
-function toast(msg) {
+// Optional 2nd argument: { type: 'error', duration } — error toasts get the red
+// style and stay a little longer. Plain toast('text') behaves as it always did.
+// Only one timer runs at a time: a new toast cancels the previous one's hide
+// timer, otherwise it would cut the new message short.
+let toastTimer = null;
+function toast(msg, { type, duration } = {}) {
   const el = document.getElementById('toast');
-  el.textContent = msg; el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), 2000);
+  const isError = type === 'error';
+  el.textContent = msg;
+  el.classList.toggle('toast-error', isError);
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), duration || (isError ? 4000 : 2000));
+}
+// Shared .catch() for every Firestore write: the UI has already updated
+// optimistically, so a failed write must not stay silent.
+function persistFailed(e) {
+  console.error(e);
+  toast('Couldn\u2019t save \u2014 check your connection', { type: 'error' });
 }
 function allExercises() {
   const custom = db.custom_exercises || [];
@@ -106,9 +121,9 @@ function uDoc(path) { return fStore.doc('users/' + currentUser.uid + '/' + path)
 async function persistWorkout(date, exercises) {
   if (!currentUser) return;
   if (!exercises || exercises.length === 0) {
-    uDoc('workouts/' + date).delete().catch(() => {});
+    uDoc('workouts/' + date).delete().catch(persistFailed);
   } else {
-    uDoc('workouts/' + date).set({ exercises }, { merge: true }).catch(e => console.error(e));
+    uDoc('workouts/' + date).set({ exercises }, { merge: true }).catch(persistFailed);
   }
 }
 function getSessionNote(date) { return (db.sessionNotes || {})[date] || ''; }
@@ -118,19 +133,19 @@ function saveSessionNote(date, note) {
   if (trimmed) db.sessionNotes[date] = trimmed;
   else delete db.sessionNotes[date];
   if (!currentUser) return;
-  uDoc('workouts/' + date).set({ sessionNote: trimmed }, { merge: true }).catch(e => console.error(e));
+  uDoc('workouts/' + date).set({ sessionNote: trimmed }, { merge: true }).catch(persistFailed);
 }
 async function persistRecords() {
   if (!currentUser) return;
-  uDoc('meta/records').set({ data: db.records }).catch(e => console.error(e));
+  uDoc('meta/records').set({ data: db.records }).catch(persistFailed);
 }
 async function persistCustomExercises() {
   if (!currentUser) return;
-  uDoc('meta/custom_exercises').set({ list: db.custom_exercises || [] }).catch(e => console.error(e));
+  uDoc('meta/custom_exercises').set({ list: db.custom_exercises || [] }).catch(persistFailed);
 }
 async function persistFavorites() {
   if (!currentUser) return;
-  uDoc('meta/favorites').set({ names: Object.keys(db.favoriteExercises || {}) }).catch(e => console.error(e));
+  uDoc('meta/favorites').set({ names: Object.keys(db.favoriteExercises || {}) }).catch(persistFailed);
 }
 function isFavoriteExercise(name) { return !!(db.favoriteExercises || {})[name]; }
 function toggleFavoriteExercise(name) {
@@ -143,20 +158,20 @@ function toggleFavoriteExercise(name) {
 }
 async function persistHiddenBuiltins() {
   if (!currentUser) return;
-  uDoc('meta/hidden_builtins').set({ names: Object.keys(db.hiddenBuiltins || {}) }).catch(e => console.error(e));
+  uDoc('meta/hidden_builtins').set({ names: Object.keys(db.hiddenBuiltins || {}) }).catch(persistFailed);
 }
 async function persistExerciseInfo() {
   if (!currentUser) return;
-  uDoc('meta/exercise_info').set({ data: db.exerciseInfo || {} }).catch(e => console.error(e));
+  uDoc('meta/exercise_info').set({ data: db.exerciseInfo || {} }).catch(persistFailed);
 }
 function getExerciseInfo(name) { return (db.exerciseInfo || {})[name] || null; }
 async function persistPlateInventory() {
   if (!currentUser) return;
-  uDoc('meta/plate_inventory').set({ counts: db.plateInventory || {} }).catch(e => console.error(e));
+  uDoc('meta/plate_inventory').set({ counts: db.plateInventory || {} }).catch(persistFailed);
 }
 async function persistPlateOnBar() {
   if (!currentUser) return;
-  uDoc('meta/plate_on_bar').set({ counts: db.plateOnBar || {} }).catch(e => console.error(e));
+  uDoc('meta/plate_on_bar').set({ counts: db.plateOnBar || {} }).catch(persistFailed);
 }
 async function loadUserData(userUid) {
   console.log('[Load] loadUserData start, uid:', userUid);
@@ -1382,6 +1397,7 @@ function saveSetNote() {
   noteEditIndex = null;
   closeOverlay('set-note-overlay');
   renderSetList();
+  toast(note ? 'Comment saved' : 'Comment deleted');
 }
 
 function openExerciseRecords() {
@@ -1671,6 +1687,7 @@ function setExerciseInfoFor(name, info) {
 function saveExerciseInfo() {
   setExerciseInfoFor(currentExercise, readExerciseInfoForm(EXERCISE_INFO_FORMS.overlay));
   renderExerciseInfoView();
+  toast('Info saved');
 }
 
 function saveSet() {
@@ -1682,18 +1699,22 @@ function saveSet() {
   let ex = workout.find(e => e.name === currentExercise);
   if (!ex) { ex = { name: currentExercise, sets: [] }; workout.push(ex); }
 
+  let savedMsg;
   if (selectedSetIndex !== null) {
     const existingNote = ex.sets[selectedSetIndex] && ex.sets[selectedSetIndex].note;
     ex.sets[selectedSetIndex] = existingNote ? { weight, reps, note: existingNote } : { weight, reps };
     selectedSetIndex = null;
-    toast('Set updated');
+    savedMsg = 'Set updated';
   } else {
     ex.sets.push({ weight, reps });
-    toast('Set saved');
+    savedMsg = 'Set saved';
   }
 
   setWorkout(currentDate, workout);
-  updateRecords(currentExercise, weight, reps);
+  // One combined toast — two consecutive toast() calls would just overwrite
+  // each other, hiding "Set saved" whenever a PR was hit.
+  const isPR = updateRecords(currentExercise, weight, reps);
+  toast(isPR ? savedMsg + ' \u00B7 \u{1F3C6} Personal record!' : savedMsg);
   trackFieldsBaseline = getTrackFieldsSnapshot();
   renderSetList();
   renderHome();
@@ -1736,15 +1757,18 @@ function deleteSet(i) {
   toast('Set deleted');
 }
 
+// Returns true when this set is a new personal record worth announcing.
 function updateRecords(name, weight, reps) {
   if (!db.records) db.records = {};
   if (!db.records[name]) db.records[name] = {};
   const key = String(reps);
+  let isPR = false;
   if (!db.records[name][key] || weight > db.records[name][key]) {
     db.records[name][key] = weight;
-    if (weight > 0) toast('?? Personal record!');
+    isPR = weight > 0;
   }
   persistRecords();
+  return isPR;
 }
 
 // -- Field +/- Buttons ---------------------------------
@@ -2677,11 +2701,14 @@ document.getElementById('btn-comment-cancel').addEventListener('click', () => {
 document.getElementById('btn-comment-delete').addEventListener('click', () => {
   if (commentPopupCtx) commentPopupCtx.onDelete();
   closeOverlay('comment-overlay');
+  toast('Comment deleted');
 });
 document.getElementById('btn-comment-save').addEventListener('click', () => {
   const val = document.getElementById('comment-edit-input').value.trim();
   if (commentPopupCtx) commentPopupCtx.onSave(val);
   closeOverlay('comment-overlay');
+  // Saving an emptied comment removes it, same as Delete.
+  toast(val ? 'Comment saved' : 'Comment deleted');
 });
 
 document.getElementById('exercise-search').addEventListener('input', e => {
@@ -3336,18 +3363,21 @@ async function callClaude(userMessage, systemPrompt) {
 function plansCol() { return fStore.collection('users/' + currentUser.uid + '/plans'); }
 function activePlanDoc() { return fStore.doc('users/' + currentUser.uid + '/meta/activeplan'); }
 
+// Plan writes are awaited by their callers, which previously saw the rejection;
+// keep that (report, then rethrow) so a failed write still stops the flow
+// instead of the caller announcing success right after the error toast.
 async function persistPlan(planId, planData) {
   if (!currentUser) return;
-  await plansCol().doc(planId).set(planData);
+  try { await plansCol().doc(planId).set(planData); } catch (e) { persistFailed(e); throw e; }
 }
 async function deletePlanDoc(planId) {
   if (!currentUser) return;
-  await plansCol().doc(planId).delete();
+  try { await plansCol().doc(planId).delete(); } catch (e) { persistFailed(e); throw e; }
 }
 async function persistActivePlan(data) {
   if (!currentUser) return;
-  if (!data) { await activePlanDoc().delete().catch(() => {}); return; }
-  await activePlanDoc().set(data);
+  if (!data) { await activePlanDoc().delete().catch(persistFailed); return; }
+  try { await activePlanDoc().set(data); } catch (e) { persistFailed(e); throw e; }
 }
 
 // ── Plan CRUD ─────────────────────────────────────────
@@ -3688,7 +3718,7 @@ function setupPdeSwipeDelete(item) {
     if (currentPos >= 0 && currentPos < exercises.length) exercises.splice(currentPos, 1);
     await savePlanDayExercises(exercises);
     renderPlanDayEdit();
-    toast('Exercise removed');
+    toast('Removed from plan');
   });
 }
 
