@@ -839,27 +839,33 @@ function showCommentEdit(text) {
   document.getElementById('comment-view-mode').classList.add('hidden');
 }
 
-function openSetCommentPopup(exIdx, setIdx) {
+// `date` defaults to the day shown on the Fitness Tracker; the History tab
+// passes the (other) day its set row belongs to.
+function openSetCommentPopup(exIdx, setIdx, date = currentDate) {
+  const refresh = () => {
+    renderHome();
+    if (document.getElementById('tab-history').classList.contains('active')) renderHistoryTab();
+  };
   openCommentPopup({
     getText: () => {
-      const ex = getWorkout(currentDate)[exIdx];
+      const ex = getWorkout(date)[exIdx];
       return (ex && ex.sets[setIdx] && ex.sets[setIdx].note) || '';
     },
     onSave: val => {
-      const workout = getWorkout(currentDate);
+      const workout = getWorkout(date);
       const ex = workout[exIdx];
       if (!ex || !ex.sets[setIdx]) return;
       if (val) ex.sets[setIdx].note = val; else delete ex.sets[setIdx].note;
-      setWorkout(currentDate, workout);
-      renderHome();
+      setWorkout(date, workout);
+      refresh();
     },
     onDelete: () => {
-      const workout = getWorkout(currentDate);
+      const workout = getWorkout(date);
       const ex = workout[exIdx];
       if (!ex || !ex.sets[setIdx]) return;
       delete ex.sets[setIdx].note;
-      setWorkout(currentDate, workout);
-      renderHome();
+      setWorkout(date, workout);
+      refresh();
     }
   });
 }
@@ -1861,7 +1867,8 @@ function renderHistoryTab() {
   const firstPRKeys = getFirstPRComboKeys(currentExercise);
 
   relevantDates.forEach(date => {
-    const ex = db.workouts[date].find(e => e.name === currentExercise);
+    const exIdx = db.workouts[date].findIndex(e => e.name === currentExercise);
+    const ex = db.workouts[date][exIdx];
     if (!ex || !ex.sets.length) return;
 
     const headerDiv = document.createElement('div');
@@ -1872,13 +1879,24 @@ function renderHistoryTab() {
 
     ex.sets.forEach((s, i) => {
       const isPR = firstPRKeys.has(date + '#' + i);
+      const hasNote = !!(s.note && s.note.trim());
       const row = document.createElement('div');
       row.className = 'history-set-row clickable';
+      // Same comment indicator as the Fitness Tracker day overview: only drawn
+      // when the set has a note (the slot is always reserved so rows stay
+      // aligned), and tapping it opens the same comment popup.
       row.innerHTML = `
+        <span class="history-set-comment${hasNote ? ' has-note' : ''}" aria-label="Set comment">${hasNote ? COMMENT_ICON_SVG : ''}</span>
         ${isPR ? prTrophySvg('history-set-pr') : `<span class="history-set-spacer"></span>`}
         <span class="history-set-weight">${s.weight} kg</span>
         <span class="history-set-reps">${s.reps} reps</span>
       `;
+      if (hasNote) {
+        row.querySelector('.history-set-comment').addEventListener('click', e => {
+          e.stopPropagation();
+          openSetCommentPopup(exIdx, i, date);
+        });
+      }
       row.addEventListener('click', () => openHistoryGotoExercise(currentExercise, date));
       container.appendChild(row);
     });

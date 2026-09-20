@@ -142,9 +142,9 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .exercise-card-divider { height: 2px; background: var(--cyan); }
 .exercise-card-sets { padding: 6px 12px 10px; }
 .exercise-set-row { display: grid; grid-template-columns: 20px 16px 1fr 1fr; align-items: baseline; padding: 6px 0; gap: 10px; }
-.exercise-set-comment { display: flex; align-items: center; justify-content: center; cursor: default; }
-.exercise-set-comment.has-note { cursor: pointer; }
-.exercise-set-comment svg { width: 15px; height: 15px; fill: var(--cyan); }
+.exercise-set-comment, .history-set-comment { display: flex; align-items: center; justify-content: center; cursor: default; }
+.exercise-set-comment.has-note, .history-set-comment.has-note { cursor: pointer; }
+.exercise-set-comment svg, .history-set-comment svg { width: 15px; height: 15px; fill: var(--cyan); }
 .exercise-set-pr { width: 14px; height: 14px; fill: var(--cyan); flex-shrink: 0; }
 .exercise-set-spacer { width: 14px; flex-shrink: 0; }
 .exercise-set-weight, .exercise-set-reps { display: flex; align-items: baseline; justify-content: flex-end; gap: 4px; }
@@ -244,6 +244,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .history-day-header.clickable:active, .history-set-row.clickable:active { background: var(--cyan-light); }
 .history-set-pr { width: 14px; height: 14px; fill: var(--cyan); flex-shrink: 0; }
 .history-set-spacer { width: 14px; flex-shrink: 0; }
+.history-set-comment { width: 20px; flex-shrink: 0; }
 .history-set-weight { font-size: 15px; font-weight: 700; color: var(--text-primary); }
 .history-set-reps { font-size: 15px; color: var(--text-secondary); margin-left: auto; }
 
