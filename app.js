@@ -1939,8 +1939,13 @@ function renderHistoryTab() {
 // -- History "Go to..." popup (date header / set row taps) ----
 let historyGotoAction = null;
 
-function openHistoryGoto(title, action) {
+// `bodyEl` (optional) is shown between the title and the buttons — used by the Graph tab to list that day's sets.
+function openHistoryGoto(title, action, bodyEl) {
   document.getElementById('history-goto-title').textContent = title;
+  const body = document.getElementById('history-goto-body');
+  body.innerHTML = '';
+  if (bodyEl) body.appendChild(bodyEl);
+  body.classList.toggle('hidden', !bodyEl);
   historyGotoAction = action;
   openOverlay('history-goto-overlay');
 }
@@ -2059,12 +2064,19 @@ function filterDataByRange(data) {
   return data.filter(d => d.date >= cutoffStr);
 }
 
-function renderGraph() {
+// Point selection state. graphSeries is the series that is actually plotted (after the period AND
+// reps filters); graphSelected indexes into it; graphPlot holds the last drawn pixel positions for hit-testing.
+let graphSeries = [];
+let graphSelected = -1;
+let graphReps = 1;
+let graphPlot = null;
+const GRAPH_TAP_RADIUS = 28; // px around a point that counts as a tap on it (finger-sized)
+
+function renderGraph(keepSelection = false) {
   syncTimeFilterButtons();
   const canvas = document.getElementById('progress-chart');
   const emptyEl = document.getElementById('graph-empty');
-  const hintEl = document.getElementById('graph-hint');
-  const ctx = canvas.getContext('2d');
+  const panel = document.getElementById('graph-selection');
 
   const stats = getExerciseRepStats(currentExercise);
   const maxReps = Math.max(GRAPH_MIN_MAX_REPS, stats.highest);
@@ -2083,22 +2095,39 @@ function renderGraph() {
   }, []);
 
   data = filterDataByRange(data);
+  graphSeries = data;
+  graphReps = reps;
+  // A new series (other reps/period/exercise, or the screen just opened) starts on
+  // its most recent point; a plain re-render (e.g. rotation) keeps the selection.
+  if (!keepSelection || graphSelected < 0 || graphSelected >= data.length) graphSelected = data.length - 1;
 
-  // A single real data point is still data (unlike the old max-weight/max-reps
-  // lines, an exact-rep-count series is often sparse), so only "none" is empty.
+  // A single real data point is still data (an exact-rep-count series is often sparse), so only "none" is empty.
   if (data.length < 1) {
     canvas.style.display = 'none';
-    emptyEl.style.display = 'block';
-    hintEl.style.display = 'none';
+    emptyEl.style.display = 'flex';
+    panel.classList.add('hidden');
+    graphPlot = null;
     return;
   }
   canvas.style.display = 'block';
   emptyEl.style.display = 'none';
-  hintEl.style.display = 'block';
+  panel.classList.remove('hidden');
+  drawGraphChart();
+  updateGraphPanel();
+}
 
-  const W = canvas.offsetWidth || 340;
-  const H = 220;
-  canvas.width = W; canvas.height = H;
+// Draws graphSeries filling the chart area, with the selected point ringed in green.
+function drawGraphChart() {
+  const canvas = document.getElementById('progress-chart');
+  const wrap = document.getElementById('graph-chart-wrap');
+  const ctx = canvas.getContext('2d');
+  const data = graphSeries;
+
+  const W = wrap.clientWidth || 340;
+  const H = wrap.clientHeight || 220;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
   const vals = data.map(d => d.val);
   let minV = Math.min(...vals);
@@ -2106,7 +2135,7 @@ function renderGraph() {
   // All values equal (e.g. a single point): pad the axis so the point sits mid-chart instead of on the floor.
   if (maxV === minV) { minV -= 1; maxV += 1; }
   const range = maxV - minV;
-  const pad = { top: 20, right: 16, bottom: 32, left: 48 };
+  const pad = { top: 24, right: 20, bottom: 36, left: 48 };
   const gW = W - pad.left - pad.right;
   const gH = H - pad.top - pad.bottom;
 
@@ -2125,6 +2154,7 @@ function renderGraph() {
     x: data.length === 1 ? pad.left + gW / 2 : pad.left + (i / (data.length - 1)) * gW,
     y: pad.top + gH - ((d.val - minV) / range) * gH
   }));
+  graphPlot = { pts };
 
   const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + gH);
   grad.addColorStop(0, 'rgba(41,182,246,0.35)');
@@ -2146,18 +2176,92 @@ function renderGraph() {
   ctx.fillStyle = '#29b6f6';
   pts.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill(); });
 
+  // Selected point: green ring around its (still blue) dot.
+  const sel = pts[graphSelected];
+  if (sel) {
+    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--green').trim() || '#4CAF50';
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(sel.x, sel.y, 9, 0, Math.PI * 2); ctx.stroke();
+  }
+
   ctx.fillStyle = '#9e9e9e'; ctx.font = '11px Roboto';
   const dateLabel = d => new Date(d.date + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short' });
   if (data.length === 1) {
     ctx.textAlign = 'center';
-    ctx.fillText(dateLabel(data[0]), pts[0].x, H - 8);
+    ctx.fillText(dateLabel(data[0]), pts[0].x, H - 10);
   } else {
     ctx.textAlign = 'left';
-    ctx.fillText(dateLabel(data[0]), pad.left, H - 8);
+    ctx.fillText(dateLabel(data[0]), pad.left, H - 10);
     ctx.textAlign = 'right';
-    ctx.fillText(dateLabel(data[data.length-1]), pad.left + gW, H - 8);
+    ctx.fillText(dateLabel(data[data.length-1]), pad.left + gW, H - 10);
   }
 }
+
+// Bottom panel: ‹ [weight × reps / date] ›, arrows disabled at the ends of the series.
+function updateGraphPanel() {
+  const pt = graphSeries[graphSelected];
+  if (!pt) return;
+  document.getElementById('graph-sel-main').textContent = `${pt.val} kg × ${graphReps} rep${graphReps === 1 ? '' : 's'}`;
+  document.getElementById('graph-sel-date').textContent = formatDateStr(pt.date, 'detail');
+  document.getElementById('btn-graph-prev').disabled = graphSelected <= 0;
+  document.getElementById('btn-graph-next').disabled = graphSelected >= graphSeries.length - 1;
+}
+
+function selectGraphPoint(i) {
+  if (i < 0 || i >= graphSeries.length) return;
+  graphSelected = i;
+  drawGraphChart();
+  updateGraphPanel();
+}
+
+document.getElementById('btn-graph-prev').addEventListener('click', () => selectGraphPoint(graphSelected - 1));
+document.getElementById('btn-graph-next').addEventListener('click', () => selectGraphPoint(graphSelected + 1));
+
+// Tap on (or near) a point in the chart selects the nearest one within finger reach.
+document.getElementById('progress-chart').addEventListener('click', e => {
+  if (!graphPlot) return;
+  const r = e.currentTarget.getBoundingClientRect();
+  const x = e.clientX - r.left, y = e.clientY - r.top;
+  let best = -1, bestD = GRAPH_TAP_RADIUS;
+  graphPlot.pts.forEach((p, i) => {
+    const d = Math.hypot(p.x - x, p.y - y);
+    if (d <= bestD) { best = i; bestD = d; }
+  });
+  if (best >= 0) selectGraphPoint(best);
+});
+
+// Tapping the weight × reps text: overview of ALL of that day's sets for this exercise + "Go To" (same overlay as History/Calendar).
+document.getElementById('graph-sel-info').addEventListener('click', () => {
+  const pt = graphSeries[graphSelected];
+  if (!pt) return;
+  const ex = (db.workouts[pt.date] || []).find(e => e.name === currentExercise);
+  const body = document.createElement('div');
+  body.className = 'cal-detail-ex';
+  const nameEl = document.createElement('div');
+  nameEl.className = 'cal-detail-ex-name';
+  nameEl.textContent = currentExercise;
+  body.appendChild(nameEl);
+  ((ex && ex.sets) || []).forEach(s => {
+    const isPoint = parseInt(s.reps) === graphReps && (parseFloat(s.weight) || 0) === pt.val;
+    const row = document.createElement('div');
+    row.className = 'history-set-row' + (isPoint ? ' graph-goto-set-point' : '');
+    row.innerHTML = `
+      <span class="history-set-spacer"></span>
+      <span class="history-set-weight">${s.weight} kg</span>
+      <span class="history-set-reps">${s.reps} reps</span>
+    `;
+    body.appendChild(row);
+  });
+  openHistoryGoto('Go to ' + formatDateStr(pt.date, 'short'), () => {
+    currentDate = pt.date;
+    showScreen('screen-fitness-tracker');
+  }, body);
+});
+
+// The chart fills whatever space the screen has, so redraw when that changes (rotation, window resize).
+window.addEventListener('resize', () => {
+  if (document.getElementById('tab-graph').classList.contains('active')) renderGraph(true);
+});
 
 // -- Calendar ---------------------------------------------
 // A continuously scrollable list of months (screen-calendar). Months are

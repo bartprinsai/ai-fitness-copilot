@@ -372,9 +372,22 @@
       <label class="info-field-label" for="graph-reps">Reps</label>
       <button type="button" class="new-ex-select new-ex-select-btn" id="graph-reps"></button>
     </div>
-    <canvas id="progress-chart" width="340" height="220"></canvas>
-    <div class="graph-empty" id="graph-empty">No data available</div>
-    <div class="graph-hint" id="graph-hint">Tap a point to view more details</div>
+    <div class="graph-chart-wrap" id="graph-chart-wrap">
+      <canvas id="progress-chart"></canvas>
+      <div class="graph-empty" id="graph-empty">No data available</div>
+    </div>
+    <div class="graph-selection hidden" id="graph-selection">
+      <button type="button" class="graph-sel-arrow" id="btn-graph-prev" aria-label="Previous point">
+        <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+      </button>
+      <button type="button" class="graph-sel-info" id="graph-sel-info" aria-label="Show sets of this day">
+        <span class="graph-sel-main" id="graph-sel-main"></span>
+        <span class="graph-sel-date" id="graph-sel-date"></span>
+      </button>
+      <button type="button" class="graph-sel-arrow" id="btn-graph-next" aria-label="Next point">
+        <svg viewBox="0 0 24 24"><path d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z"/></svg>
+      </button>
+    </div>
   </div>
   </div>
 
@@ -773,6 +786,7 @@
 <div class="overlay" id="history-goto-overlay">
   <div class="overlay-panel">
     <h3 id="history-goto-title"></h3>
+    <div class="history-goto-body hidden" id="history-goto-body"></div>
     <div class="overlay-btns">
       <button class="btn-secondary" id="history-goto-cancel">Cancel</button>
       <button class="btn-primary" id="history-goto-confirm">Go To</button>
