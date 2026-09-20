@@ -235,7 +235,6 @@ let bannerDismissed = false;
 let bannerSuggestedDayIndex = null;
 let loadWorkoutItems = [];
 let selectedSetIndex = null;
-let currentGraph = 'max-weight';
 let currentTimeRange = 'all';
 let calLoadedMonths = []; // ascending {year, month} entries currently rendered in the calendar scroller
 let calSelectedDate = null;
@@ -1967,11 +1966,55 @@ document.getElementById('history-goto-confirm').addEventListener('click', () => 
 });
 
 // -- Graph Tab ------------------------------------------
-document.querySelectorAll('.graph-tab').forEach(t => {
-  t.addEventListener('click', () => {
-    document.querySelectorAll('.graph-tab').forEach(x => x.classList.remove('active'));
-    t.classList.add('active');
-    currentGraph = t.dataset.graph;
+// Reps dropdown: the graph shows, per session, the heaviest weight actually
+// logged for exactly the chosen rep count — never an estimate. The list is
+// 1..12, or up to the highest rep count ever logged for the exercise if that's
+// more. 1 is labelled "One Rep Max".
+const GRAPH_MIN_MAX_REPS = 12;
+const graphRepsByExercise = {}; // last explicit choice per exercise (this session)
+
+function graphRepsLabel(n) { return n === 1 ? 'One Rep Max' : String(n); }
+
+// Per rep count: in how many sessions (dates) it was logged; plus the highest rep count ever.
+function getExerciseRepStats(name) {
+  const sessions = {};
+  let highest = 0;
+  Object.keys(db.workouts).forEach(date => {
+    const ex = (db.workouts[date] || []).find(e => e.name === name);
+    if (!ex) return;
+    const seen = new Set();
+    (ex.sets || []).forEach(s => {
+      const r = parseInt(s.reps) || 0;
+      if (r < 1) return;
+      seen.add(r);
+      if (r > highest) highest = r;
+    });
+    seen.forEach(r => { sessions[r] = (sessions[r] || 0) + 1; });
+  });
+  return { sessions, highest };
+}
+
+// Explicit choice for this exercise if there is one, otherwise the rep count
+// logged in the most sessions (ties: the lower one) so the graph opens on real
+// data, otherwise One Rep Max.
+function resolveGraphReps(stats, maxReps) {
+  const chosen = graphRepsByExercise[currentExercise];
+  if (chosen && chosen <= maxReps) return chosen;
+  let best = 1, bestCount = 0;
+  Object.keys(stats.sessions).map(Number).sort((a, b) => a - b).forEach(r => {
+    if (stats.sessions[r] > bestCount) { best = r; bestCount = stats.sessions[r]; }
+  });
+  return best;
+}
+
+function graphRepOptions(maxReps) {
+  return Array.from({ length: maxReps }, (_, i) => ({ value: String(i + 1), label: graphRepsLabel(i + 1) }));
+}
+
+document.getElementById('graph-reps').addEventListener('click', () => {
+  const maxReps = Math.max(GRAPH_MIN_MAX_REPS, getExerciseRepStats(currentExercise).highest);
+  openFieldPicker('Reps', graphRepOptions(maxReps), getFieldBtnValue('graph-reps'), value => {
+    graphRepsByExercise[currentExercise] = parseInt(value);
     renderGraph();
   });
 });
@@ -2002,19 +2045,27 @@ function renderGraph() {
   const hintEl = document.getElementById('graph-hint');
   const ctx = canvas.getContext('2d');
 
+  const stats = getExerciseRepStats(currentExercise);
+  const maxReps = Math.max(GRAPH_MIN_MAX_REPS, stats.highest);
+  const reps = resolveGraphReps(stats, maxReps);
+  setFieldBtnValue('graph-reps', String(reps), graphRepsLabel(reps));
+
+  // Heaviest weight among sets with exactly `reps` reps, per session. A session
+  // without such a set gets no point at all.
   let data = Object.keys(db.workouts).sort().reduce((acc, date) => {
     const ex = db.workouts[date] && db.workouts[date].find(e => e.name === currentExercise);
-    if (!ex || !ex.sets.length) return acc;
-    let val = 0;
-    if (currentGraph === 'max-weight') val = Math.max(...ex.sets.map(s => parseFloat(s.weight) || 0));
-    if (currentGraph === 'max-reps') val = Math.max(...ex.sets.map(s => parseInt(s.reps) || 0));
-    acc.push({ date, val });
+    if (!ex) return acc;
+    const weights = (ex.sets || []).filter(s => parseInt(s.reps) === reps).map(s => parseFloat(s.weight) || 0);
+    if (weights.length === 0) return acc;
+    acc.push({ date, val: Math.max(...weights) });
     return acc;
   }, []);
 
   data = filterDataByRange(data);
 
-  if (data.length < 2) {
+  // A single real data point is still data (unlike the old max-weight/max-reps
+  // lines, an exact-rep-count series is often sparse), so only "none" is empty.
+  if (data.length < 1) {
     canvas.style.display = 'none';
     emptyEl.style.display = 'block';
     hintEl.style.display = 'none';
@@ -2029,9 +2080,11 @@ function renderGraph() {
   canvas.width = W; canvas.height = H;
 
   const vals = data.map(d => d.val);
-  const minV = Math.min(...vals);
-  const maxV = Math.max(...vals);
-  const range = maxV - minV || 1;
+  let minV = Math.min(...vals);
+  let maxV = Math.max(...vals);
+  // All values equal (e.g. a single point): pad the axis so the point sits mid-chart instead of on the floor.
+  if (maxV === minV) { minV -= 1; maxV += 1; }
+  const range = maxV - minV;
   const pad = { top: 20, right: 16, bottom: 32, left: 48 };
   const gW = W - pad.left - pad.right;
   const gH = H - pad.top - pad.bottom;
@@ -2048,7 +2101,7 @@ function renderGraph() {
   }
 
   const pts = data.map((d, i) => ({
-    x: pad.left + (i / (data.length - 1)) * gW,
+    x: data.length === 1 ? pad.left + gW / 2 : pad.left + (i / (data.length - 1)) * gW,
     y: pad.top + gH - ((d.val - minV) / range) * gH
   }));
 
@@ -2073,10 +2126,16 @@ function renderGraph() {
   pts.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill(); });
 
   ctx.fillStyle = '#9e9e9e'; ctx.font = '11px Roboto';
-  ctx.textAlign = 'left';
-  ctx.fillText(new Date(data[0].date + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short' }), pad.left, H - 8);
-  ctx.textAlign = 'right';
-  ctx.fillText(new Date(data[data.length-1].date + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short' }), pad.left + gW, H - 8);
+  const dateLabel = d => new Date(d.date + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short' });
+  if (data.length === 1) {
+    ctx.textAlign = 'center';
+    ctx.fillText(dateLabel(data[0]), pts[0].x, H - 8);
+  } else {
+    ctx.textAlign = 'left';
+    ctx.fillText(dateLabel(data[0]), pad.left, H - 8);
+    ctx.textAlign = 'right';
+    ctx.fillText(dateLabel(data[data.length-1]), pad.left + gW, H - 8);
+  }
 }
 
 // -- Calendar ---------------------------------------------
