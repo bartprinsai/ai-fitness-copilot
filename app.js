@@ -1321,6 +1321,8 @@ let trackFieldsBaseline = { weight: '0', reps: '0' };
 
 function openTraining(name) {
   currentExercise = name;
+  currentTimeRange = 'all'; // Graph tab period starts on "all" every time an exercise is opened
+  syncTimeFilterButtons();
   selectedSetIndex = null;
   document.getElementById('training-title').textContent = name;
   document.getElementById('field-weight').value = 0;
@@ -2019,27 +2021,46 @@ document.getElementById('graph-reps').addEventListener('click', () => {
   });
 });
 
+// currentTimeRange is the single source of truth for the period selector: the
+// highlighted button is always re-derived from it (syncTimeFilterButtons, run
+// on every render), so what is highlighted can never differ from what is
+// applied. Default is 'all', matching the button marked active in index.html.
 document.querySelectorAll('.time-filter').forEach(t => {
   t.addEventListener('click', () => {
-    document.querySelectorAll('.time-filter').forEach(x => x.classList.remove('active'));
-    t.classList.add('active');
     currentTimeRange = t.dataset.range;
     renderGraph();
   });
 });
 
+function syncTimeFilterButtons() {
+  document.querySelectorAll('.time-filter').forEach(b => b.classList.toggle('active', b.dataset.range === currentTimeRange));
+}
+
+// Pure string maths on YYYY-MM-DD (the format sessions are keyed by), so no
+// local-vs-UTC mixing. A day that doesn't exist in the target month clamps to
+// its last day: 31 Mar minus 1 month = 28/29 Feb (Date#setMonth would roll
+// over into March instead and make the window ~3 days too short).
+function dateStrMinusMonths(dateStr, months) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const total = y * 12 + (m - 1) - months;
+  const ty = Math.floor(total / 12), tm = total % 12;
+  const lastDay = new Date(Date.UTC(ty, tm + 1, 0)).getUTCDate();
+  return ty + '-' + String(tm + 1).padStart(2, '0') + '-' + String(Math.min(d, lastDay)).padStart(2, '0');
+}
+
+const TIME_RANGE_MONTHS = { '1m': 1, '3m': 3, '6m': 6, '1y': 12 };
+
+// Keeps sessions dated on/after (today - period). "Today" is todayStr(), the
+// same day source new sessions are dated with.
 function filterDataByRange(data) {
-  if (currentTimeRange === 'all') return data;
-  const cutoff = new Date();
-  if (currentTimeRange === '1m') cutoff.setMonth(cutoff.getMonth() - 1);
-  else if (currentTimeRange === '3m') cutoff.setMonth(cutoff.getMonth() - 3);
-  else if (currentTimeRange === '6m') cutoff.setMonth(cutoff.getMonth() - 6);
-  else if (currentTimeRange === '1y') cutoff.setFullYear(cutoff.getFullYear() - 1);
-  const cutoffStr = cutoff.toISOString().split('T')[0];
+  const months = TIME_RANGE_MONTHS[currentTimeRange];
+  if (!months) return data; // 'all'
+  const cutoffStr = dateStrMinusMonths(todayStr(), months);
   return data.filter(d => d.date >= cutoffStr);
 }
 
 function renderGraph() {
+  syncTimeFilterButtons();
   const canvas = document.getElementById('progress-chart');
   const emptyEl = document.getElementById('graph-empty');
   const hintEl = document.getElementById('graph-hint');
