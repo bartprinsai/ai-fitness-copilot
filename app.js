@@ -1607,10 +1607,10 @@ function saveSetNote() {
 // this exercise if that's more (same range as the Graph's Reps dropdown).
 // The weight shown for N reps is the LEADING weight: the heaviest weight of any
 // really logged set with N OR MORE reps — a set with more reps at some weight
-// proves that weight is doable for fewer reps too. Nothing is estimated. A row
-// whose leading weight comes from a set with exactly N reps shows that set's
-// workout date (+ trophy); one derived from a set with more reps shows "via MRM"
-// instead (no date, no trophy); no qualifying set at all = "No data".
+// proves that weight is doable for fewer reps too. Nothing is estimated. Every
+// row shows the workout date on which its current leading weight was FIRST reached;
+// when that set has exactly N reps it is a direct record (trophy), when it has more
+// reps the row says "via MRM" (no trophy); no qualifying set at all = "No data".
 // Everything here goes by WORKOUT DATE (the day a set is logged on), never by the
 // moment it was entered — a set added later to an older day counts as if it had
 // always been there.
@@ -1632,71 +1632,82 @@ function getExerciseValidSets(name) {
   return out;
 }
 
-// Leading weight for every rep count 1..maxReps (see above), computed in one pass.
-// Result[n] = { reps, weight, direct, date, viaReps } or null (no data):
-//   direct  - a set with exactly n reps has this weight; date = first workout date it was lifted
-//   viaReps - otherwise the fewest reps (> n) of a set that has this weight
-function getRepLeaders(name, maxReps) {
-  const best = {}, firstDate = {};
+// The whole progression of the leading weight for every rep count 1..maxReps:
+// steps[n] = [{ weight, date, sourceReps, direct }], oldest -> newest. Walking the
+// workout dates in order, the leading weight for n reps on a date is the heaviest
+// weight of any set logged up to and including that date with n OR MORE reps; each
+// time it becomes strictly heavier than before that is one step. sourceReps is the
+// rep count of the set that did it (the fewest reps >= n on that day at that
+// weight); direct = it had exactly n reps. One pass over the days, O(days * reps).
+function getRepProgressions(name, maxReps) {
+  const days = [];
+  let cur = null, top = maxReps;
   getExerciseValidSets(name).forEach(s => {
-    if (s.weight > (best[s.reps] || 0)) { best[s.reps] = s.weight; firstDate[s.reps] = s.date; }
+    if (!cur || cur.date !== s.date) { cur = { date: s.date, best: {} }; days.push(cur); }
+    if (s.weight > (cur.best[s.reps] || 0)) cur.best[s.reps] = s.weight;
+    if (s.reps > top) top = s.reps;
   });
-  const top = Math.max(maxReps, ...Object.keys(best).map(Number));
+  const steps = [], lead = [];
+  for (let n = 0; n <= top; n++) { steps[n] = []; lead[n] = 0; }
+  days.forEach(day => {
+    let weight = 0, src = 0;
+    for (let n = top; n >= 1; n--) {
+      // >= so that on equal weights the nearest (fewest-rep) source wins
+      if (day.best[n] && day.best[n] >= weight) { weight = day.best[n]; src = n; }
+      if (weight > lead[n]) { lead[n] = weight; steps[n].push({ weight, date: day.date, sourceReps: src, direct: src === n }); }
+    }
+  });
+  return steps;
+}
+
+// Current leading weight per rep count = the last step of its progression
+// ({ reps, weight, direct, date, viaReps } or null = no data).
+function getRepLeaders(name, maxReps) {
+  const steps = getRepProgressions(name, maxReps);
   const out = [];
-  let weight = 0, src = 0;
-  for (let n = top; n >= 1; n--) {
-    // >= so that on equal weights the nearest (fewest-rep) source wins
-    if (best[n] && best[n] >= weight) { weight = best[n]; src = n; }
-    out[n] = weight > 0
-      ? { reps: n, weight, direct: src === n, date: src === n ? firstDate[n] : null, viaReps: src === n ? null : src }
-      : null;
+  for (let n = 1; n < steps.length; n++) {
+    const last = steps[n][steps[n].length - 1];
+    out[n] = last ? { reps: n, weight: last.weight, direct: last.direct, date: last.date, viaReps: last.direct ? null : last.sourceReps } : null;
   }
   return out;
 }
 
-// Record detail popup for one rep count: the current (leading) record, then every
-// really logged set with exactly this rep count, newest workout date first.
+// Record detail popup for one rep count: the current (leading) record, then the
+// complete progression of the leading weight ("previous records"), newest first —
+// including the steps that came from a set with MORE reps ("via MRM").
 let recordsHistoryReps = null;
-function recordsDetailRowHtml(weight, date, { trophy = false, clickable = false } = {}) {
+// One record step / current record as a tappable row: weight + workout date, plus
+// "via MRM" when it came from a set with more reps. Tapping opens "Go to" for that
+// day with the source set highlighted.
+function recordsStepRowHtml(weight, date, sourceReps, direct) {
   return `
-    <div class="records-row${clickable ? ' records-row-clickable' : ''}"${clickable ? ` data-date="${date}" data-val="${weight}"` : ''}>
-      <span class="records-row-weight">${trophy ? prTrophySvg() : ''}${weight} kgs</span>
-      <span class="records-row-date">${formatDateStr(date, 'short')}</span>
+    <div class="records-row records-row-clickable" data-date="${date}" data-val="${weight}" data-src-reps="${sourceReps}">
+      <span class="records-row-weight">${weight} kgs</span>
+      <span class="records-row-date">${formatDateStr(date, 'short')}${direct ? '' : `<span class="records-row-via"> \u00b7 via ${recordsRepLabel(sourceReps)}</span>`}</span>
     </div>`;
 }
 function openRecordsHistory(reps) {
-  const leader = getRepLeaders(currentExercise, getExerciseMaxReps(currentExercise))[reps];
-  if (!leader) return;
+  const steps = getRepProgressions(currentExercise, getExerciseMaxReps(currentExercise))[reps] || [];
+  if (steps.length === 0) return;
   recordsHistoryReps = reps;
-  const exact = getExerciseValidSets(currentExercise).filter(s => s.reps === reps).reverse();
-  const currentRow = leader.direct
-    ? recordsDetailRowHtml(leader.weight, leader.date, { trophy: true, clickable: true })
-    : `<div class="records-row">
-         <span class="records-row-weight">${leader.weight} kgs</span>
-         <span class="records-row-via">via ${recordsRepLabel(leader.viaReps)}</span>
-       </div>`;
+  const cur = steps[steps.length - 1];
   document.getElementById('records-history-title').textContent = recordsRepLabel(reps) + ' history';
   document.getElementById('records-history-body').innerHTML = `
     <div class="info-section-label">Current record</div>
-    ${currentRow}
-    <div class="info-section-label">${recordsRepLabel(reps)} history</div>
-    ${exact.length ? exact.map(x => recordsDetailRowHtml(x.weight, x.date, { clickable: true })).join('') : '<div class="records-empty">No data</div>'}`;
+    ${recordsStepRowHtml(cur.weight, cur.date, cur.sourceReps, cur.direct)}
+    <div class="info-section-label">${recordsRepLabel(reps)} previous records</div>
+    ${steps.slice().reverse().map(st => recordsStepRowHtml(st.weight, st.date, st.sourceReps, st.direct)).join('')}`;
   openOverlay('records-history-overlay');
 }
 
-// Right-hand side of a record row/block: weight + date (+ trophy) when the leading
-// weight comes from a set with exactly this rep count, weight + "via MRM" when it is
-// derived from a set with more reps, or "No data".
+// Right-hand side of a record row/block: weight + workout date; a direct record
+// (set with exactly this rep count) also gets the trophy, a derived one gets
+// "via MRM" behind the date and no trophy; or "No data".
 function recordsValueHtml(rec) {
   if (!rec) return `<span class="records-row-nodata">No data</span>`;
-  return rec.direct
-    ? `<span class="records-row-value">
-        <span class="records-row-weight">${prTrophySvg()}${rec.weight} kgs</span>
-        <span class="records-row-date">${formatDateStr(rec.date, 'short')}</span>
-      </span>`
-    : `<span class="records-row-value">
-        <span class="records-row-weight">${rec.weight} kgs</span>
-        <span class="records-row-via">via ${recordsRepLabel(rec.viaReps)}</span>
+  return `<span class="records-row-value">
+        <span class="records-row-weight">${rec.direct ? prTrophySvg() : ''}${rec.weight} kgs</span>
+        <span class="records-row-date">${formatDateStr(rec.date, 'short')}${rec.direct ? '' : `<span class="records-row-via"> \u00b7 via ${recordsRepLabel(rec.viaReps)}</span>`}</span>
       </span>`;
 }
 const CROWN_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 16L3 6l5.5 4L12 4l3.5 6L21 6l-2 10H5zm0 2h14v2H5z"/></svg>';
@@ -3221,7 +3232,7 @@ document.getElementById('records-scroll').addEventListener('click', e => {
 });
 document.getElementById('records-history-body').addEventListener('click', e => {
   const row = e.target.closest('.records-row-clickable');
-  if (row) openHistoryGotoDaySets(row.dataset.date, recordsHistoryReps, parseFloat(row.dataset.val), 'records-history-overlay');
+  if (row) openHistoryGotoDaySets(row.dataset.date, parseInt(row.dataset.srcReps) || recordsHistoryReps, parseFloat(row.dataset.val), 'records-history-overlay');
 });
 document.getElementById('btn-records-history-ok').addEventListener('click', () => closeOverlay('records-history-overlay'));
 // Graph: straight to this exercise's Graph tab on the tapped rep count. History
