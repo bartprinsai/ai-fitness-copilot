@@ -144,7 +144,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 #screen-fitness-tracker.sel-single .exercise-card-selected .exercise-card-drag-handle { display: flex; }
 .exercise-card-divider { height: 2px; background: var(--cyan); }
 .exercise-card-sets { padding: 6px 12px 10px; }
-.exercise-set-row { display: grid; grid-template-columns: 20px 16px 1fr 1fr 52px; align-items: baseline; padding: 6px 0; gap: 10px; }
+.exercise-set-row { display: grid; grid-template-columns: 20px 16px 1fr 1fr 64px; align-items: baseline; padding: 6px 0; gap: 10px; }
 .exercise-set-comment, .history-set-comment { display: flex; align-items: center; justify-content: center; cursor: default; }
 .exercise-set-comment.has-note, .history-set-comment.has-note { cursor: pointer; }
 .exercise-set-comment svg, .history-set-comment svg { width: 15px; height: 15px; fill: var(--cyan); }
@@ -152,10 +152,13 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .exercise-set-spacer { width: 14px; flex-shrink: 0; }
 .exercise-set-weight, .exercise-set-reps { display: flex; align-items: baseline; justify-content: flex-end; gap: 4px; }
 /* RPE badge (day overview + History): grey chip with the value, or a muted dash when the set has no RPE */
-.set-rpe-cell { display: flex; align-items: center; justify-content: flex-end; }
-.set-rpe-badge { background: #f0f0f0; border-radius: 4px; padding: 2px 6px; font-size: 11px; color: var(--text-secondary); white-space: nowrap; }
-.set-rpe-none { font-size: 11px; color: var(--text-hint); }
-.history-set-rpe { width: 52px; flex-shrink: 0; }
+/* Effort marker (RPE badge + optional "+N partial/forced" line), one component for TRACK list, day overview and History.
+   Selectors are nested under .set-effort so they also beat the generic ".set-row span" rule of the TRACK list. */
+.set-effort { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 2px; text-align: right; }
+.set-effort .set-rpe-badge { background: #f0f0f0; border-radius: 4px; padding: 2px 6px; font-size: 11px; font-weight: 400; color: var(--text-secondary); white-space: nowrap; }
+.set-effort .set-effort-extra { font-size: 10px; font-weight: 400; color: var(--text-hint); white-space: nowrap; }
+.set-effort .set-effort-none { font-size: 11px; font-weight: 400; color: var(--text-hint); }
+.history-set-effort { width: 64px; flex-shrink: 0; }
 .exercise-set-val { font-size: 20px; font-weight: 700; color: var(--text-primary); }
 .exercise-set-unit { font-size: 12px; font-weight: 400; color: var(--text-secondary); }
 .exercise-card-empty { padding: 6px 12px 10px; font-size: 14px; color: var(--text-hint); }
@@ -213,6 +216,18 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .field-group input { flex: 1; min-width: 0; text-align: center; border: none; border-bottom: 1px solid var(--border); outline: none; font-family: inherit; font-size: 42px; font-weight: 600; color: var(--text-primary); background: transparent; -moz-appearance: textfield; padding-bottom: 4px; }
 /* RPE: optional third field — a bit more compact, lighter label */
 .field-group-rpe { padding: 10px 16px 12px; }
+/* RPE + Extra reps side by side, each half the width */
+.field-row-pair { display: flex; }
+.field-row-pair .field-group { flex: 1 1 0; min-width: 0; border-bottom: none; }
+.field-row-pair .field-group:first-child { padding-right: 8px; }
+.field-row-pair .field-group:last-child { padding-left: 8px; }
+.field-row-pair .field-controls { gap: 6px; }
+.field-row-pair .field-btn { width: 38px; }
+.field-row-pair .field-group input { font-size: 26px; }
+.extra-type { display: flex; gap: 6px; margin-top: 8px; }
+.extra-type-btn { flex: 1; min-width: 0; height: 30px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-secondary); font-family: inherit; font-size: 12px; font-weight: 500; cursor: pointer; transition: background .1s, color .1s, border-color .1s; }
+.extra-type-btn.active { background: var(--cyan); border-color: var(--cyan); color: #fff; }
+.extra-type-btn:disabled { opacity: .45; cursor: default; }
 .field-group-rpe .field-label { font-size: 10px; font-weight: 500; letter-spacing: .06em; margin-bottom: 5px; }
 .field-label-optional { font-weight: 400; color: var(--text-hint); letter-spacing: 0; }
 .field-group-rpe .field-cyan-line { margin-bottom: 10px; }
@@ -231,7 +246,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 
 /* ── SET LIST ─────────────────────────────────────────── */
 .set-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; background: var(--surface); padding-bottom: var(--ai-bar-space); }
-.set-row { display: grid; grid-template-columns: 28px 20px 32px 1fr 1fr; padding: 13px 8px; border-bottom: 1px solid var(--border); background: var(--surface); cursor: pointer; transition: background 0.08s; align-items: center; }
+.set-row { display: grid; grid-template-columns: 28px 20px 32px 1fr 1fr 64px; padding: 13px 8px; border-bottom: 1px solid var(--border); background: var(--surface); cursor: pointer; transition: background 0.08s; align-items: center; }
 .set-row:active, .set-row.selected { background: var(--cyan-light); }
 .set-row span { font-size: 15px; text-align: center; }
 .set-comment { display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 4px; border-radius: 50%; }

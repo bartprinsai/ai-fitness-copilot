@@ -815,7 +815,7 @@ function renderHome() {
           ${isFirstPR ? prTrophySvg('exercise-set-pr') : `<span class="exercise-set-spacer"></span>`}
           <span class="exercise-set-weight"><span class="exercise-set-val">${s.weight}</span><span class="exercise-set-unit">kgs</span></span>
           <span class="exercise-set-reps"><span class="exercise-set-val">${s.reps}</span><span class="exercise-set-unit">reps</span></span>
-          ${rpeCellHtml(s)}
+          ${effortCellHtml(s)}
         `;
         if (hasNote) {
           row.querySelector('.exercise-set-comment').addEventListener('click', e => {
@@ -1378,9 +1378,11 @@ function getTrackFieldsSnapshot() {
     weight: document.getElementById('field-weight').value,
     reps: document.getElementById('field-reps').value,
     rpe: document.getElementById('field-rpe').value,
+    extra: document.getElementById('field-extra').value,
+    extraType: getExtraType(),
   };
 }
-let trackFieldsBaseline = { weight: '0', reps: '0', rpe: '0' };
+let trackFieldsBaseline = { weight: '0', reps: '0', rpe: '0', extra: '0', extraType: '' };
 
 // RPE: 0 = not filled in; otherwise 6..10 in steps of 0.5. Whole numbers show
 // without a decimal ("8"), halves with one ("8.5").
@@ -1396,10 +1398,44 @@ function stepRpe(current, dir) {
   return v <= RPE_MIN ? 0 : Math.round((v - RPE_STEP) / RPE_STEP) * RPE_STEP;
 }
 function setRpeField(v) { document.getElementById('field-rpe').value = v ? formatRpe(v) : 0; }
-// Small RPE marker for a logged set: grey badge with the value, or a muted dash.
-function rpeCellHtml(s) {
+// Extra reps (partials / forced) on top of the set, 0 = not applicable. Only
+// possible at RPE 10: extra reps > 0 sets RPE to 10 (a real, editable value),
+// and lowering RPE below 10 again clears the extra reps.
+const EXTRA_MAX = 20;
+function getExtraReps() { return Math.max(0, Math.min(EXTRA_MAX, parseInt(document.getElementById('field-extra').value) || 0)); }
+function getExtraType() { const b = document.querySelector('.extra-type-btn.active'); return b ? b.dataset.type : ''; }
+// Type toggle follows the amount: disabled + nothing selected at 0, otherwise one
+// of Partial/Forced is selected (Partial unless the user already picked Forced).
+function syncExtraType(n, type) {
+  const on = n > 0, sel = on ? (type || 'partial') : '';
+  document.querySelectorAll('.extra-type-btn').forEach(b => {
+    b.disabled = !on;
+    b.classList.toggle('active', on && b.dataset.type === sel);
+  });
+}
+function setExtraField(n, type) {
+  document.getElementById('field-extra').value = n;
+  syncExtraType(n, type);
+}
+// Called whenever the amount changes (stepper or typing): keeps toggle + RPE in step.
+function onExtraChanged(n) {
+  syncExtraType(n, getExtraType());
+  if (n > 0) setRpeField(RPE_MAX);
+}
+// Called whenever RPE changes by hand: RPE below 10 can't have extra reps.
+function reconcileExtraWithRpe() {
+  if (getExtraReps() > 0 && parseRpe(document.getElementById('field-rpe').value) < RPE_MAX) setExtraField(0, '');
+}
+function resetEffortFields() { setRpeField(0); setExtraField(0, ''); }
+// Effort marker for a logged set — ONE component used by the TRACK list, the day
+// overview and History: RPE badge, plus a small "+N partial/forced" line under it
+// when there are extra reps; a muted dash when there is neither.
+function effortCellHtml(s) {
   const rpe = parseFloat(s.rpe) || 0;
-  return `<span class="set-rpe-cell">${rpe > 0 ? `<span class="set-rpe-badge">RPE ${formatRpe(rpe)}</span>` : '<span class="set-rpe-none">—</span>'}</span>`;
+  const extra = parseInt(s.extra) || 0;
+  const badge = rpe > 0 ? `<span class="set-rpe-badge">RPE ${formatRpe(rpe)}</span>` : '';
+  const extraLine = extra > 0 ? `<span class="set-effort-extra">+${extra} ${s.extraType === 'forced' ? 'forced' : 'partial'}</span>` : '';
+  return `<span class="set-effort">${badge || extraLine ? badge + extraLine : '<span class="set-effort-none">—</span>'}</span>`;
 }
 
 function openTraining(name) {
@@ -1410,7 +1446,7 @@ function openTraining(name) {
   document.getElementById('training-title').textContent = name;
   document.getElementById('field-weight').value = 0;
   document.getElementById('field-reps').value = 0;
-  setRpeField(0);
+  resetEffortFields();
   trackFieldsBaseline = getTrackFieldsSnapshot();
   switchTab('track');
   showScreen('screen-training');
@@ -1453,6 +1489,7 @@ function renderSetList() {
       <span class="set-num">${i + 1}</span>
       <span class="set-weight"><span class="set-weight-val">${s.weight}</span><span class="set-weight-unit">kgs</span></span>
       <span class="set-reps"><span class="set-reps-val">${s.reps}</span><span class="set-reps-unit">reps</span></span>
+      ${effortCellHtml(s)}
     `;
     row.querySelector('.set-comment').addEventListener('click', e => { e.stopPropagation(); openSetNote(i); });
     row.addEventListener('click', () => selectSet(i));
@@ -1846,8 +1883,11 @@ function saveSet() {
   const weight = parseFloat(document.getElementById('field-weight').value) || 0;
   const reps = parseInt(document.getElementById('field-reps').value) || 0;
   if (reps < 1) { toast('Enter reps', { type: 'error' }); return; }
+  reconcileExtraWithRpe(); // a typed RPE below 10 whose change event hasn't fired yet
   const rpe = parseRpe(document.getElementById('field-rpe').value);
   if (!isValidRpe(rpe)) { toast('RPE: 6 to 10, in steps of 0.5', { type: 'error' }); return; }
+  const extra = getExtraReps();
+  const extraType = extra > 0 ? (getExtraType() || 'partial') : '';
 
   const workout = getWorkout(currentDate);
   let ex = workout.find(e => e.name === currentExercise);
@@ -1856,12 +1896,12 @@ function saveSet() {
   let savedMsg, savedIdx;
   if (selectedSetIndex !== null) {
     const existingNote = ex.sets[selectedSetIndex] && ex.sets[selectedSetIndex].note;
-    ex.sets[selectedSetIndex] = { weight, reps, ...(rpe > 0 && { rpe }), ...(existingNote && { note: existingNote }) };
+    ex.sets[selectedSetIndex] = { weight, reps, ...(rpe > 0 && { rpe }), ...(extra > 0 && { extra, extraType }), ...(existingNote && { note: existingNote }) };
     savedIdx = selectedSetIndex;
     selectedSetIndex = null;
     savedMsg = 'Set updated';
   } else {
-    ex.sets.push({ weight, reps, ...(rpe > 0 && { rpe }) });
+    ex.sets.push({ weight, reps, ...(rpe > 0 && { rpe }), ...(extra > 0 && { extra, extraType }) });
     savedIdx = ex.sets.length - 1;
     savedMsg = 'Set saved';
   }
@@ -1886,6 +1926,7 @@ function selectSet(i) {
     document.getElementById('field-weight').value = ex.sets[i].weight;
     document.getElementById('field-reps').value = ex.sets[i].reps;
     setRpeField(parseFloat(ex.sets[i].rpe) || 0);
+    setExtraField(parseInt(ex.sets[i].extra) || 0, ex.sets[i].extraType);
   }
   // Whatever the fields show right after selecting/deselecting a set becomes
   // the new "nothing to lose" baseline — editing an existing set's already-
@@ -1898,7 +1939,7 @@ function clearFields() {
   selectedSetIndex = null;
   document.getElementById('field-weight').value = 0;
   document.getElementById('field-reps').value = 0;
-  setRpeField(0);
+  resetEffortFields();
   trackFieldsBaseline = getTrackFieldsSnapshot();
   renderSetList();
 }
@@ -1922,7 +1963,13 @@ document.querySelectorAll('.field-btn').forEach(btn => {
     const field = btn.dataset.field;
     const dir = btn.dataset.dir;
     const input = document.getElementById('field-' + field);
-    if (field === 'rpe') { setRpeField(stepRpe(input.value, dir)); return; }
+    if (field === 'rpe') { setRpeField(stepRpe(input.value, dir)); reconcileExtraWithRpe(); return; }
+    if (field === 'extra') {
+      const n = Math.max(0, Math.min(EXTRA_MAX, getExtraReps() + (dir === '+' ? 1 : -1)));
+      input.value = n;
+      onExtraChanged(n);
+      return;
+    }
     let val = parseFloat(input.value) || 0;
     const step = field === 'weight' ? 2.5 : 1;
     val = dir === '+' ? val + step : Math.max(0, val - step);
@@ -1935,7 +1982,7 @@ document.querySelectorAll('.field-btn').forEach(btn => {
 // would normally summon Android's native Cut/Copy/Translate action bar above
 // it; preventDefault on contextmenu suppresses that bar while leaving the
 // blue selection highlight itself alone.
-['field-weight', 'field-reps', 'field-rpe'].forEach(id => {
+['field-weight', 'field-reps', 'field-rpe', 'field-extra'].forEach(id => {
   const input = document.getElementById(id);
   input.addEventListener('focus', () => input.select());
   input.addEventListener('click', () => input.select());
@@ -1947,6 +1994,19 @@ document.querySelectorAll('.field-btn').forEach(btn => {
   input.setAttribute('autocomplete', 'off');
   input.name = id + '-' + Math.random().toString(36).slice(2);
 });
+
+// Typing: extra reps updates toggle + RPE as you type (digits only, capped);
+// a typed RPE is checked once you leave the field, so "10" isn't seen as "1" mid-typing.
+document.getElementById('field-extra').addEventListener('input', e => {
+  const digits = e.target.value.replace(/\D/g, '');
+  if (digits !== e.target.value) e.target.value = digits;
+  onExtraChanged(getExtraReps());
+});
+document.getElementById('field-extra').addEventListener('change', e => { e.target.value = getExtraReps(); });
+document.getElementById('field-rpe').addEventListener('change', reconcileExtraWithRpe);
+document.querySelectorAll('.extra-type-btn').forEach(b => b.addEventListener('click', () => {
+  if (getExtraReps() > 0) syncExtraType(getExtraReps(), b.dataset.type);
+}));
 
 // -- Tabs -----------------------------------------------
 function switchTab(tab) {
@@ -2065,7 +2125,7 @@ function renderHistoryTab() {
         ${isPR ? prTrophySvg('history-set-pr') : `<span class="history-set-spacer"></span>`}
         <span class="history-set-weight">${s.weight} kg</span>
         <span class="history-set-reps">${s.reps} reps</span>
-        <span class="history-set-rpe">${rpeCellHtml(s)}</span>
+        <span class="history-set-effort">${effortCellHtml(s)}</span>
       `;
       if (hasNote) {
         row.querySelector('.history-set-comment').addEventListener('click', e => {
