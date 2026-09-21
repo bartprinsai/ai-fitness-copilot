@@ -298,10 +298,13 @@ let inPopstateNavigation = false;
 // back is in flight (suppressNextPopstate), pushes are queued and replayed the
 // moment its popstate arrives (see the popstate handler).
 let deferredHistoryActions = [];
-// Runs `fn` now, or — while one of our own history.back() calls is still in
-// flight — as soon as its popstate has arrived (in order, one at a time).
+// While a back press is being handled (dismissHold) or one of our own history
+// steps is still in flight (suppressNextPopstate), history changes wait.
+let dismissHold = false;
+// Runs `fn` now, or — while such a step is in flight — as soon as its popstate
+// has arrived (in order, one at a time).
 function runAfterPendingBack(fn) {
-  if (suppressNextPopstate) deferredHistoryActions.push(fn);
+  if (suppressNextPopstate || dismissHold) deferredHistoryActions.push(fn);
   else fn();
 }
 function pushHistoryEntry(state, url) {
@@ -309,7 +312,7 @@ function pushHistoryEntry(state, url) {
 }
 function flushDeferredHistoryActions() {
   // an action may start a new back of its own: the rest then waits for that one
-  while (deferredHistoryActions.length && !suppressNextPopstate) deferredHistoryActions.shift()();
+  while (deferredHistoryActions.length && !suppressNextPopstate && !dismissHold) deferredHistoryActions.shift()();
 }
 // One history.back() that the popstate handler will swallow (it only pops an
 // overlay's entry, no navigation).
@@ -317,6 +320,19 @@ function popHistoryEntrySilently() {
   suppressNextPopstate = true;
   history.back();
   // Safety net: if the pop never produces a popstate, don't stay blocked forever.
+  setTimeout(() => {
+    if (suppressNextPopstate) { suppressNextPopstate = false; flushDeferredHistoryActions(); }
+  }, 500);
+}
+// A hardware back press just consumed the history entry of a popup / guarded
+// screen that is STAYING open (unsaved changes). Step forward onto that very same
+// entry again instead of pushing a copy of it: a pushState made from inside the
+// popstate handler (no user gesture) piled up extra entries — in the wrong order,
+// behind the "Discard changes?" popup's own — which Chrome's back button then skips,
+// so repeated "Keep editing" made the eventual Discard jump back too far.
+function restoreConsumedEntry() {
+  suppressNextPopstate = true;
+  history.forward();
   setTimeout(() => {
     if (suppressNextPopstate) { suppressNextPopstate = false; flushDeferredHistoryActions(); }
   }, 500);
@@ -461,7 +477,9 @@ window.addEventListener('popstate', e => {
   if (overlayStack.length > 0) {
     const id = overlayStack.pop();
     const stackLenBeforeDismiss = overlayStack.length;
+    dismissHold = true; // the discard popup's own history entry waits until the popup's entry is restored
     dismissOverlayForBack(id);
+    dismissHold = false;
     // Some overlays' Cancel only steps back an internal mode instead of
     // truly closing (comment-overlay's edit → view, when there's existing
     // text to fall back to; exercise-info's edit → view) — if it's still
@@ -474,7 +492,9 @@ window.addEventListener('popstate', e => {
     // (and thus which overlay the next back press actually dismisses) correct.
     if (document.getElementById(id).classList.contains('open')) {
       overlayStack.splice(stackLenBeforeDismiss, 0, id);
-      history.pushState({ overlay: id }, '', location.hash);
+      restoreConsumedEntry();
+    } else {
+      flushDeferredHistoryActions();
     }
     return;
   }
@@ -489,7 +509,7 @@ window.addEventListener('popstate', e => {
   if (skipScreenGuardOnce) {
     skipScreenGuardOnce = false;
   } else if (guard && guard()) {
-    history.pushState({ screen: activeScreen.id }, '', location.hash);
+    restoreConsumedEntry();
     confirmDiscardIfChanged(guard, () => {
       // "Discard": the stack is now [..., target, this screen (restored above)] and
       // the discard popup's own entry is being popped. Leave for real with one more
