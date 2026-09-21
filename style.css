@@ -377,7 +377,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 
 /* ── CALENDAR WORKOUT DETAIL POPUP ────────────────────── */
 .cal-detail-panel { max-height: 78vh; }
-.cal-detail-panel .cal-detail-date { font-size: 18px; font-weight: 700; color: var(--cyan); flex-shrink: 0; }
+.cal-detail-panel .cal-detail-date { flex-shrink: 0; }
 .cal-detail-body { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; }
 .cal-detail-ex { padding-top: 12px; }
 .cal-detail-ex:first-child { padding-top: 0; }
@@ -575,7 +575,6 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .btn-danger:disabled, .btn-secondary:disabled { opacity: .5; cursor: not-allowed; }
 .btn-danger:disabled:active { background: #C62828; }
 .cat-delete-msg { font-size: 14px; color: var(--text-secondary); line-height: 1.5; }
-.delete-ex-title { text-decoration: underline; }
 .delete-ex-check-row { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; color: var(--text-secondary); line-height: 1.4; cursor: pointer; }
 .delete-ex-check-row input[type="checkbox"] { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--blue-btn); margin-top: 1px; }
 
@@ -614,7 +613,6 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
    base .overlay stack instead of relying on DOM order to win.
    See the overlay stacking tiers documented in :root (style.css). */
 #field-picker-overlay { z-index: var(--z-overlay-nested); }
-.field-picker-title { text-decoration: underline; }
 .field-picker-list { display: flex; flex-direction: column; max-height: 60vh; overflow-y: auto; }
 .field-picker-row { display: flex; align-items: center; gap: 14px; padding: 14px 2px; border-bottom: 1px solid var(--border); cursor: pointer; background: var(--surface); transition: background .08s; }
 .field-picker-row:last-child { border-bottom: none; }
