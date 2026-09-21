@@ -110,7 +110,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 
 .home-empty { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 0 24px; }
 .home-empty-title-wrap { flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; }
-.home-empty-title { font-size: 20px; font-weight: 400; color: var(--text-hint); text-align: center; }
+.home-empty-title { font-size: 14px; font-weight: 400; color: var(--text-hint); text-align: center; }
 .home-empty-action { flex: 0 0 auto; width: 120px; display: flex; flex-direction: column; align-items: center; gap: 8px; border: none; background: none; cursor: pointer; font-family: inherit; padding: 8px; margin-bottom: var(--ai-bar-space); }
 .home-empty-action:active { opacity: 0.7; }
 .home-empty-action svg { width: 48px; height: 48px; fill: var(--cyan); }
@@ -228,7 +228,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .set-fields { background: var(--surface); display: flex; flex-direction: column; flex-shrink: 0; box-shadow: 0 2px 4px rgba(0,0,0,.1); }
 .field-group { padding: 12px 16px 14px; border-bottom: 1px solid var(--border); }
 .field-group:last-child { border-bottom: none; }
-.field-label { display: block; font-size: 11px; font-weight: 700; color: var(--text-secondary); letter-spacing: .08em; margin-bottom: 6px; }
+.field-label { display: block; font-size: 11px; line-height: 16px; font-weight: 700; color: var(--text-secondary); letter-spacing: .08em; margin-bottom: 6px; }
 .field-cyan-line { height: 2px; background: var(--cyan); margin-bottom: 12px; }
 .field-controls { display: flex; align-items: center; gap: 12px; width: 100%; overflow: hidden; }
 .field-btn { width: 44px; height: 44px; border-radius: 4px; border: none; background: var(--gray-btn); color: var(--text-primary); font-size: 22px; font-weight: 300; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.1s; flex-shrink: 0; user-select: none; line-height: 1; }
@@ -238,13 +238,14 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .field-group-rpe { padding: 10px 16px 12px; }
 /* RPE + Extra reps side by side, each half the width */
 .field-row-pair { display: flex; }
+.field-row-pair + .field-row-pair { border-top: 1px solid var(--border); }
 .field-row-pair .field-group { flex: 1 1 0; min-width: 0; border-bottom: none; }
 .field-row-pair .field-group:first-child { padding-right: 8px; }
 .field-row-pair .field-group:last-child { padding-left: 8px; }
 .field-row-pair .field-controls { gap: 6px; }
 .field-row-pair .field-btn { width: 38px; }
 /* DROPSET checkbox on the REPS label line: same label type (11px, tracking, weight) in the accent colour */
-.field-label-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.field-label-row { display: flex; align-items: center; justify-content: space-between; height: 16px; margin-bottom: 6px; }
 .field-label-row .field-label { margin-bottom: 0; }
 .dropset-check { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: .08em; color: var(--cyan); cursor: pointer; user-select: none; position: relative; padding: 6px 0 6px 12px; margin: -6px 0; }
 .field-group .dropset-check input { position: absolute; opacity: 0; width: 0; height: 0; flex: none; pointer-events: none; }
@@ -256,7 +257,6 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .extra-type-btn { flex: 1; min-width: 0; height: 30px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-secondary); font-family: inherit; font-size: 12px; font-weight: 500; cursor: pointer; transition: background .1s, color .1s, border-color .1s; }
 .extra-type-btn.active { background: var(--cyan); border-color: var(--cyan); color: #fff; }
 .extra-type-btn:disabled { opacity: .45; cursor: default; }
-.field-group-rpe .field-label { font-size: 10px; font-weight: 500; letter-spacing: .06em; margin-bottom: 5px; }
 .field-label-optional { font-weight: 400; color: var(--text-hint); letter-spacing: 0; }
 .field-group-rpe .field-cyan-line { margin-bottom: 10px; }
 .field-group input::-webkit-inner-spin-button, .field-group input::-webkit-outer-spin-button { -webkit-appearance: none; }
