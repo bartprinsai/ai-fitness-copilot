@@ -290,6 +290,24 @@ const SCREEN_HAS_CHANGES = {
 let historyInitialized = false;
 let inPopstateNavigation = false;
 
+// A history.back() we issued ourselves (closing an overlay, see
+// popOverlayHistoryIfNeeded) is asynchronous: its popstate arrives later.
+// Anything that pushes a history entry in between — e.g. the ⋮ menu closes and
+// a popup/screen opens in the same tick — would land BEFORE that pending pop and
+// be popped by it, silently losing one step of the back button. So while such a
+// back is in flight (suppressNextPopstate), pushes are queued and replayed the
+// moment its popstate arrives (see the popstate handler).
+let deferredHistoryPushes = [];
+function pushHistoryEntry(state, url) {
+  if (suppressNextPopstate) deferredHistoryPushes.push([state, url]);
+  else history.pushState(state, '', url);
+}
+function flushDeferredHistoryPushes() {
+  const queued = deferredHistoryPushes;
+  deferredHistoryPushes = [];
+  queued.forEach(([state, url]) => history.pushState(state, '', url));
+}
+
 function showScreen(id) {
   const el = document.getElementById(id);
   if (!el) return;
@@ -305,7 +323,7 @@ function showScreen(id) {
     historyInitialized = true;
     history.replaceState({ screen: id }, '', '#' + id);
   } else if (!wasActive) {
-    history.pushState({ screen: id }, '', '#' + id);
+    pushHistoryEntry({ screen: id }, '#' + id);
   }
 }
 
@@ -347,7 +365,7 @@ let suppressNextPopstate = false;
 
 function pushOverlayHistory(id) {
   overlayStack.push(id);
-  history.pushState({ overlay: id }, '', location.hash);
+  pushHistoryEntry({ overlay: id }, location.hash);
 }
 
 // Keeps the history stack in sync when an overlay is closed by anything
@@ -364,6 +382,10 @@ function popOverlayHistoryIfNeeded(id) {
   if (!inPopstateNavigation) {
     suppressNextPopstate = true;
     history.back();
+    // Safety net: if the pop never produces a popstate, don't stay blocked forever.
+    setTimeout(() => {
+      if (suppressNextPopstate) { suppressNextPopstate = false; flushDeferredHistoryPushes(); }
+    }, 500);
   }
 }
 
@@ -421,7 +443,11 @@ document.getElementById('btn-discard-changes-confirm').addEventListener('click',
 });
 
 window.addEventListener('popstate', e => {
-  if (suppressNextPopstate) { suppressNextPopstate = false; return; }
+  if (suppressNextPopstate) {
+    suppressNextPopstate = false;
+    flushDeferredHistoryPushes();
+    return;
+  }
   if (overlayStack.length > 0) {
     const id = overlayStack.pop();
     const stackLenBeforeDismiss = overlayStack.length;
@@ -1152,7 +1178,7 @@ function enterExerciseBrowseCategory(browseId, title, renderFn) {
   currentBrowseCategory = browseId;
   setExercisesTitle(title);
   renderFn();
-  history.pushState({ screen: 'screen-exercises', browse: browseId }, '', '#screen-exercises');
+  pushHistoryEntry({ screen: 'screen-exercises', browse: browseId }, '#screen-exercises');
 }
 
 // Back to the unfiltered category list (mirrors what the in-app back arrow does).
@@ -2083,14 +2109,6 @@ document.getElementById('history-goto-confirm').addEventListener('click', () => 
     history.go(-2);
     return;
   }
-  if (overlayStack[overlayStack.length - 1] === 'history-goto-overlay') {
-    // Let the popup's own history entry finish popping BEFORE navigating.
-    // Pushing the new screen straight after history.back() (as this used to)
-    // lands the push before the queued pop, so the next back press skipped a screen.
-    window.addEventListener('popstate', () => { if (action) action(); }, { once: true });
-    closeOverlay('history-goto-overlay');
-    return;
-  }
   closeOverlay('history-goto-overlay');
   if (action) action();
 });
@@ -2623,8 +2641,19 @@ function openWorkoutDetail(dateStr) {
 
 document.getElementById('cal-detail-cancel').addEventListener('click', () => closeOverlay('cal-detail-overlay'));
 document.getElementById('cal-detail-goto').addEventListener('click', () => {
-  closeOverlay('cal-detail-overlay');
   currentDate = calDetailDate;
+  if (overlayStack[overlayStack.length - 1] === 'cal-detail-overlay') {
+    // History is [day overview, calendar, popup]: leave the popup AND the
+    // calendar in ONE traversal (the popup's own entry is consumed by it, so no
+    // closeOverlay()). Two back() calls right after each other used to leave a
+    // dead back press behind.
+    overlayStack.pop();
+    document.getElementById('cal-detail-overlay').classList.remove('open');
+    window.addEventListener('popstate', () => showScreen('screen-fitness-tracker'), { once: true });
+    history.go(-2);
+    return;
+  }
+  closeOverlay('cal-detail-overlay');
   goBack('screen-fitness-tracker');
 });
 
