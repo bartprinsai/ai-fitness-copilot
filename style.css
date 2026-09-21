@@ -144,13 +144,18 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 #screen-fitness-tracker.sel-single .exercise-card-selected .exercise-card-drag-handle { display: flex; }
 .exercise-card-divider { height: 2px; background: var(--cyan); }
 .exercise-card-sets { padding: 6px 12px 10px; }
-.exercise-set-row { display: grid; grid-template-columns: 20px 16px 1fr 1fr; align-items: baseline; padding: 6px 0; gap: 10px; }
+.exercise-set-row { display: grid; grid-template-columns: 20px 16px 1fr 1fr 52px; align-items: baseline; padding: 6px 0; gap: 10px; }
 .exercise-set-comment, .history-set-comment { display: flex; align-items: center; justify-content: center; cursor: default; }
 .exercise-set-comment.has-note, .history-set-comment.has-note { cursor: pointer; }
 .exercise-set-comment svg, .history-set-comment svg { width: 15px; height: 15px; fill: var(--cyan); }
 .exercise-set-pr { width: 14px; height: 14px; fill: var(--cyan); flex-shrink: 0; }
 .exercise-set-spacer { width: 14px; flex-shrink: 0; }
 .exercise-set-weight, .exercise-set-reps { display: flex; align-items: baseline; justify-content: flex-end; gap: 4px; }
+/* RPE badge (day overview + History): grey chip with the value, or a muted dash when the set has no RPE */
+.set-rpe-cell { display: flex; align-items: center; justify-content: flex-end; }
+.set-rpe-badge { background: #f0f0f0; border-radius: 4px; padding: 2px 6px; font-size: 11px; color: var(--text-secondary); white-space: nowrap; }
+.set-rpe-none { font-size: 11px; color: var(--text-hint); }
+.history-set-rpe { width: 52px; flex-shrink: 0; }
 .exercise-set-val { font-size: 20px; font-weight: 700; color: var(--text-primary); }
 .exercise-set-unit { font-size: 12px; font-weight: 400; color: var(--text-secondary); }
 .exercise-card-empty { padding: 6px 12px 10px; font-size: 14px; color: var(--text-hint); }
@@ -206,6 +211,13 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .field-btn { width: 56px; height: 56px; border-radius: 4px; border: none; background: var(--gray-btn); color: var(--text-primary); font-size: 28px; font-weight: 300; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.1s; flex-shrink: 0; user-select: none; line-height: 1; }
 .field-btn:active { background: #bdbdbd; }
 .field-group input { flex: 1; min-width: 0; text-align: center; border: none; border-bottom: 1px solid var(--border); outline: none; font-family: inherit; font-size: 42px; font-weight: 600; color: var(--text-primary); background: transparent; -moz-appearance: textfield; padding-bottom: 4px; }
+/* RPE: optional third field — a bit more compact, lighter label */
+.field-group-rpe { padding: 10px 16px 12px; }
+.field-group-rpe .field-label { font-size: 10px; font-weight: 500; letter-spacing: .06em; margin-bottom: 5px; }
+.field-label-optional { font-weight: 400; color: var(--text-hint); letter-spacing: 0; }
+.field-group-rpe .field-cyan-line { margin-bottom: 10px; }
+.field-group-rpe .field-btn { width: 44px; height: 44px; font-size: 22px; }
+.field-group-rpe input { font-size: 30px; }
 .field-group input::-webkit-inner-spin-button, .field-group input::-webkit-outer-spin-button { -webkit-appearance: none; }
 
 /* ── ACTION BUTTONS ───────────────────────────────────── */

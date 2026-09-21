@@ -815,6 +815,7 @@ function renderHome() {
           ${isFirstPR ? prTrophySvg('exercise-set-pr') : `<span class="exercise-set-spacer"></span>`}
           <span class="exercise-set-weight"><span class="exercise-set-val">${s.weight}</span><span class="exercise-set-unit">kgs</span></span>
           <span class="exercise-set-reps"><span class="exercise-set-val">${s.reps}</span><span class="exercise-set-unit">reps</span></span>
+          ${rpeCellHtml(s)}
         `;
         if (hasNote) {
           row.querySelector('.exercise-set-comment').addEventListener('click', e => {
@@ -1376,9 +1377,30 @@ function getTrackFieldsSnapshot() {
   return {
     weight: document.getElementById('field-weight').value,
     reps: document.getElementById('field-reps').value,
+    rpe: document.getElementById('field-rpe').value,
   };
 }
-let trackFieldsBaseline = { weight: '0', reps: '0' };
+let trackFieldsBaseline = { weight: '0', reps: '0', rpe: '0' };
+
+// RPE: 0 = not filled in; otherwise 6..10 in steps of 0.5. Whole numbers show
+// without a decimal ("8"), halves with one ("8.5").
+const RPE_MIN = 6, RPE_MAX = 10, RPE_STEP = 0.5;
+// Decimal comma (Dutch keyboard) counts as a point.
+function parseRpe(str) { return parseFloat(String(str).replace(',', '.')) || 0; }
+function isValidRpe(v) { return v === 0 || (v >= RPE_MIN && v <= RPE_MAX && (v / RPE_STEP) % 1 === 0); }
+function formatRpe(v) { return Number.isInteger(v) ? String(v) : v.toFixed(1); }
+// Stepper: 0 -> 6 on +, 6 -> 0 on -, +/-0.5 in between (max 10).
+function stepRpe(current, dir) {
+  const v = parseRpe(current);
+  if (dir === '+') return v < RPE_MIN ? RPE_MIN : Math.min(RPE_MAX, Math.round((v + RPE_STEP) / RPE_STEP) * RPE_STEP);
+  return v <= RPE_MIN ? 0 : Math.round((v - RPE_STEP) / RPE_STEP) * RPE_STEP;
+}
+function setRpeField(v) { document.getElementById('field-rpe').value = v ? formatRpe(v) : 0; }
+// Small RPE marker for a logged set: grey badge with the value, or a muted dash.
+function rpeCellHtml(s) {
+  const rpe = parseFloat(s.rpe) || 0;
+  return `<span class="set-rpe-cell">${rpe > 0 ? `<span class="set-rpe-badge">RPE ${formatRpe(rpe)}</span>` : '<span class="set-rpe-none">—</span>'}</span>`;
+}
 
 function openTraining(name) {
   currentExercise = name;
@@ -1388,6 +1410,7 @@ function openTraining(name) {
   document.getElementById('training-title').textContent = name;
   document.getElementById('field-weight').value = 0;
   document.getElementById('field-reps').value = 0;
+  setRpeField(0);
   trackFieldsBaseline = getTrackFieldsSnapshot();
   switchTab('track');
   showScreen('screen-training');
@@ -1823,6 +1846,8 @@ function saveSet() {
   const weight = parseFloat(document.getElementById('field-weight').value) || 0;
   const reps = parseInt(document.getElementById('field-reps').value) || 0;
   if (reps < 1) { toast('Enter reps', { type: 'error' }); return; }
+  const rpe = parseRpe(document.getElementById('field-rpe').value);
+  if (!isValidRpe(rpe)) { toast('RPE: 6 to 10, in steps of 0.5', { type: 'error' }); return; }
 
   const workout = getWorkout(currentDate);
   let ex = workout.find(e => e.name === currentExercise);
@@ -1831,12 +1856,12 @@ function saveSet() {
   let savedMsg, savedIdx;
   if (selectedSetIndex !== null) {
     const existingNote = ex.sets[selectedSetIndex] && ex.sets[selectedSetIndex].note;
-    ex.sets[selectedSetIndex] = existingNote ? { weight, reps, note: existingNote } : { weight, reps };
+    ex.sets[selectedSetIndex] = { weight, reps, ...(rpe > 0 && { rpe }), ...(existingNote && { note: existingNote }) };
     savedIdx = selectedSetIndex;
     selectedSetIndex = null;
     savedMsg = 'Set updated';
   } else {
-    ex.sets.push({ weight, reps });
+    ex.sets.push({ weight, reps, ...(rpe > 0 && { rpe }) });
     savedIdx = ex.sets.length - 1;
     savedMsg = 'Set saved';
   }
@@ -1860,6 +1885,7 @@ function selectSet(i) {
     const ex = getCurrentExerciseData();
     document.getElementById('field-weight').value = ex.sets[i].weight;
     document.getElementById('field-reps').value = ex.sets[i].reps;
+    setRpeField(parseFloat(ex.sets[i].rpe) || 0);
   }
   // Whatever the fields show right after selecting/deselecting a set becomes
   // the new "nothing to lose" baseline — editing an existing set's already-
@@ -1872,6 +1898,7 @@ function clearFields() {
   selectedSetIndex = null;
   document.getElementById('field-weight').value = 0;
   document.getElementById('field-reps').value = 0;
+  setRpeField(0);
   trackFieldsBaseline = getTrackFieldsSnapshot();
   renderSetList();
 }
@@ -1895,6 +1922,7 @@ document.querySelectorAll('.field-btn').forEach(btn => {
     const field = btn.dataset.field;
     const dir = btn.dataset.dir;
     const input = document.getElementById('field-' + field);
+    if (field === 'rpe') { setRpeField(stepRpe(input.value, dir)); return; }
     let val = parseFloat(input.value) || 0;
     const step = field === 'weight' ? 2.5 : 1;
     val = dir === '+' ? val + step : Math.max(0, val - step);
@@ -1907,7 +1935,7 @@ document.querySelectorAll('.field-btn').forEach(btn => {
 // would normally summon Android's native Cut/Copy/Translate action bar above
 // it; preventDefault on contextmenu suppresses that bar while leaving the
 // blue selection highlight itself alone.
-['field-weight', 'field-reps'].forEach(id => {
+['field-weight', 'field-reps', 'field-rpe'].forEach(id => {
   const input = document.getElementById(id);
   input.addEventListener('focus', () => input.select());
   input.addEventListener('click', () => input.select());
@@ -2037,6 +2065,7 @@ function renderHistoryTab() {
         ${isPR ? prTrophySvg('history-set-pr') : `<span class="history-set-spacer"></span>`}
         <span class="history-set-weight">${s.weight} kg</span>
         <span class="history-set-reps">${s.reps} reps</span>
+        <span class="history-set-rpe">${rpeCellHtml(s)}</span>
       `;
       if (hasNote) {
         row.querySelector('.history-set-comment').addEventListener('click', e => {
