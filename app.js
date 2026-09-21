@@ -456,12 +456,14 @@ window.addEventListener('popstate', e => {
       inPopstateNavigation = true;
       showScreen(targetId);
       inPopstateNavigation = false;
+      if (targetId === 'screen-exercises') syncExerciseBrowseToHistory(e.state && e.state.browse);
     });
     return;
   }
   inPopstateNavigation = true;
   showScreen(targetId);
   inPopstateNavigation = false;
+  if (targetId === 'screen-exercises') syncExerciseBrowseToHistory(e.state && e.state.browse);
 });
 
 // -- TEMP DEBUG: catch anything that would otherwise fail silently --------
@@ -1136,6 +1138,41 @@ function openExerciseList() {
   showScreen('screen-exercises');
 }
 
+// Picking a category (or Favorites) filters the list in place, so it gets its
+// OWN history entry — otherwise the hardware back button would pop straight
+// past the unfiltered "All Exercises" list to whatever screen opened it. The
+// entry carries `browse` (the category id) so popstate can tell a filtered
+// entry from the plain screen entry and sync the list to whichever it lands on.
+function enterExerciseBrowseCategory(browseId, title, renderFn) {
+  exerciseBrowserMode = 'exercises';
+  currentBrowseCategory = browseId;
+  setExercisesTitle(title);
+  renderFn();
+  history.pushState({ screen: 'screen-exercises', browse: browseId }, '', '#screen-exercises');
+}
+
+// Back to the unfiltered category list (mirrors what the in-app back arrow does).
+function resetExerciseBrowseToCategories() {
+  exerciseBrowserMode = 'categories';
+  currentBrowseCategory = null;
+  document.getElementById('exercise-search').value = '';
+  renderCategoryBrowser();
+}
+
+// Called by the popstate handler whenever history lands on the exercises
+// screen: `browse` is that history entry's category id, or undefined for the
+// plain (unfiltered) entry. Only touches the list when it's out of step.
+function syncExerciseBrowseToHistory(browse) {
+  if (!browse) {
+    if (exerciseBrowserMode === 'exercises') resetExerciseBrowseToCategories();
+  } else if (exerciseBrowserMode !== 'exercises' || currentBrowseCategory !== browse) {
+    exerciseBrowserMode = 'exercises';
+    currentBrowseCategory = browse;
+    if (browse === FAVORITES_CATEGORY) { setExercisesTitle('Favorites'); renderFavoriteExercises(); }
+    else { setExercisesTitle(browse); renderExercisesInCategory(browse); }
+  }
+}
+
 function renderCategoryBrowser() {
   setExercisesTitle('All Exercises');
   const list = document.getElementById('exercise-list');
@@ -1149,10 +1186,7 @@ function renderCategoryBrowser() {
       <span class="category-item-name">Favorites</span>
     `;
     item.addEventListener('click', () => {
-      exerciseBrowserMode = 'exercises';
-      currentBrowseCategory = FAVORITES_CATEGORY;
-      setExercisesTitle('Favorites');
-      renderFavoriteExercises();
+      enterExerciseBrowseCategory(FAVORITES_CATEGORY, 'Favorites', renderFavoriteExercises);
     });
     list.appendChild(item);
   }
@@ -1165,10 +1199,7 @@ function renderCategoryBrowser() {
       <svg class="category-item-dots" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
     `;
     item.querySelector('.category-item-name').addEventListener('click', () => {
-      exerciseBrowserMode = 'exercises';
-      currentBrowseCategory = cat;
-      setExercisesTitle(cat);
-      renderExercisesInCategory(cat);
+      enterExerciseBrowseCategory(cat, cat, () => renderExercisesInCategory(cat));
     });
     item.querySelector('.category-item-dots').addEventListener('click', e => {
       e.stopPropagation();
@@ -2822,11 +2853,10 @@ setupSetListDragReorder();
 setupTrainingSwipeNav();
 document.getElementById('btn-back-exercises').addEventListener('click', () => {
   if (exerciseBrowserMode === 'exercises') {
-    exerciseBrowserMode = 'categories';
-    currentBrowseCategory = null;
-    document.getElementById('exercise-search').value = '';
-    setExercisesTitle('All Exercises');
-    renderCategoryBrowser();
+    // Walk the same history stack as the hardware back button: popstate then
+    // resets the list. Direct reset only if the filtered entry is missing.
+    if (history.state && history.state.browse) history.back();
+    else resetExerciseBrowseToCategories();
   } else {
     goBack('screen-fitness-tracker');
   }
