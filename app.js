@@ -3443,6 +3443,11 @@ function calcPlateCombo(targetPerSideKg, countsObj) {
 function calcOnBarWeightPerSide() {
   return PLATE_TYPES.reduce((sum, p) => sum + getPlateOnBarCount(p.id) * p.weight, 0);
 }
+// Everything currently on the bar: both sides' plates plus the bar itself
+// (0 for Leg press, which then is just the plates).
+function calcCurrentBarTotal(barWeight) {
+  return barWeight + calcOnBarWeightPerSide() * 2;
+}
 // What calcPlateCombo() may still ADD per side: floor(available/2) minus
 // what's already mounted, never negative. calcPlateCombo() itself halves
 // whatever raw count it's given, so this hands it `2 * maxUse` to get that
@@ -3469,6 +3474,7 @@ function renderPlateResult(remainingPerSide, targetWeight, barWeight, onBarWeigh
   const titleEl = document.getElementById('plate-result-title');
   const listEl = document.getElementById('plate-result-list');
   const noteEl = document.getElementById('plate-result-note');
+  document.getElementById('plate-result-current-total').textContent = formatKg(calcCurrentBarTotal(barWeight)) + ' kg';
 
   if (Math.round(remainingPerSide * 100) === 0) {
     titleEl.textContent = 'Per kant';

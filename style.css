@@ -659,6 +659,8 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .plate-result-line { font-size: 15px; color: var(--text-primary); }
 .plate-result-empty { font-size: 14px; color: var(--text-hint); }
 .plate-result-total { font-size: 20px; font-weight: 700; color: var(--text-primary); margin-top: 4px; }
+.plate-result-current { display: flex; flex-direction: column; gap: 4px; padding-bottom: 12px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
+.plate-result-current .plate-result-total { margin-top: 0; }
 .plate-result-note { font-size: 13px; color: var(--text-secondary); margin-top: 2px; }
 
 /* 1RM Calculator */
