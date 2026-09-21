@@ -767,17 +767,21 @@ document.getElementById('btn-reset-confirm').addEventListener('click', async () 
 });
 
 // -- Home Screen ----------------------------------------
-// Returns a Set of "date#setIndex" keys for every set of `exerciseName` that was
-// a personal record WHEN IT WAS LIFTED: walking all sets in chronological order
-// (date, then position within the day), a set counts when it has at least 1 rep,
-// a weight above 0 and is strictly heavier than every earlier set with exactly
-// the same rep count — so the first-ever set for a rep count is always a PR, and
-// equalling a record is not. Derived purely from the logged sets (no stored
-// record table that could drift from them), so it always agrees with the
-// Records screen / record history, which use the same rule.
+// Returns a Set of "date#setIndex" keys for the sets of `exerciseName` that are a
+// personal record under the DOMINANCE rule: a set only counts when no other set of
+// this exercise (any date — an earlier OR later set can beat it) matches or beats it
+// on BOTH weight and reps. So 100x5 loses its trophy once 100x6 exists, 120x5 loses
+// it to 240x5, while 100x5 and 120x3 keep one each (neither beats the other on both).
+// Dropset sets take part like any other set. Sets need >= 1 rep and > 0 kg.
+// Identical sets: only the first one logged keeps the trophy (equalling is not a PR).
+//
+// Efficient by construction (no set-vs-set comparison): per exact rep count keep the
+// heaviest weight and the first set that lifted it; then walk the rep counts from high
+// to low — that rep count's best set is a PR exactly when it is strictly heavier than
+// the best weight at ANY higher rep count. O(sets + distinct rep counts).
+// Derived purely from the logged sets (no stored record table that could drift).
 function getPRSetKeys(exerciseName) {
-  const best = {};
-  const result = new Set();
+  const bestWeight = {}, firstKey = {};
   Object.keys(db.workouts).sort().forEach(date => {
     const ex = (db.workouts[date] || []).find(e => e.name === exerciseName);
     if (!ex) return;
@@ -785,11 +789,15 @@ function getPRSetKeys(exerciseName) {
       const reps = parseInt(s.reps) || 0;
       const weight = parseFloat(s.weight) || 0;
       if (reps < 1 || weight <= 0) return;
-      if (weight > (best[reps] || 0)) {
-        best[reps] = weight;
-        result.add(date + '#' + i);
-      }
+      // strictly heavier only: among equal weights the chronologically first set stays
+      if (weight > (bestWeight[reps] || 0)) { bestWeight[reps] = weight; firstKey[reps] = date + '#' + i; }
     });
+  });
+  const result = new Set();
+  let heaviestWithMoreReps = 0;
+  Object.keys(bestWeight).map(Number).sort((x, y) => y - x).forEach(reps => {
+    if (bestWeight[reps] > heaviestWithMoreReps) result.add(firstKey[reps]);
+    heaviestWithMoreReps = Math.max(heaviestWithMoreReps, bestWeight[reps]);
   });
   return result;
 }
