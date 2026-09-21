@@ -1514,22 +1514,33 @@ function openRecordsHistory(reps) {
   openOverlay('records-history-overlay');
 }
 
+// Right-hand side of a record row/block: weight + date, or "No data".
+function recordsValueHtml(rec) {
+  return rec
+    ? `<span class="records-row-value">
+        <span class="records-row-weight">${prTrophySvg()}${rec.val} kgs</span>
+        <span class="records-row-date">${formatDateStr(rec.date, 'short')}</span>
+      </span>`
+    : `<span class="records-row-nodata">No data</span>`;
+}
+const CROWN_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 16L3 6l5.5 4L12 4l3.5 6L21 6l-2 10H5zm0 2h14v2H5z"/></svg>';
+
 function openExerciseRecords() {
-  const list = document.getElementById('records-list');
   document.getElementById('records-title').textContent = (currentExercise || '') + ' records';
-  list.innerHTML = Array.from({ length: getExerciseMaxReps(currentExercise) }, (_, k) => {
-    const reps = k + 1;
+  // One Rep Max: its own block on top; the list below starts at 2RM.
+  const oneRm = getExerciseRepRecord(currentExercise, 1);
+  const hero = document.getElementById('records-hero');
+  hero.className = 'records-hero' + (oneRm ? ' records-hero-clickable' : '');
+  if (oneRm) hero.dataset.reps = '1'; else delete hero.dataset.reps;
+  hero.innerHTML = `<span class="records-hero-label">${CROWN_SVG}One rep max</span>${recordsValueHtml(oneRm)}`;
+  const list = document.getElementById('records-list');
+  list.innerHTML = Array.from({ length: getExerciseMaxReps(currentExercise) - 1 }, (_, k) => {
+    const reps = k + 2;
     const rec = getExerciseRepRecord(currentExercise, reps);
-    const value = rec
-      ? `<span class="records-row-value">
-          <span class="records-row-weight">${prTrophySvg()}${rec.val} kgs</span>
-          <span class="records-row-date">${formatDateStr(rec.date, 'short')}</span>
-        </span>`
-      : `<span class="records-row-nodata">No data</span>`;
     return `
       <div class="records-row${rec ? ' records-row-clickable' : ''}"${rec ? ` data-reps="${reps}"` : ''}>
         <span class="records-row-reps">${recordsRepLabel(reps)}</span>
-        ${value}
+        ${recordsValueHtml(rec)}
       </div>`;
   }).join('');
   document.getElementById('records-scroll').scrollTop = 0;
@@ -2992,8 +3003,9 @@ document.getElementById('btn-clear').addEventListener('click', () => {
 });
 document.getElementById('btn-training-pr').addEventListener('click', openExerciseRecords);
 document.getElementById('btn-back-records').addEventListener('click', () => goBack('screen-training'));
-document.getElementById('records-list').addEventListener('click', e => {
-  const row = e.target.closest('.records-row-clickable');
+// One handler for the gold One Rep Max block and the list rows (both carry data-reps when they have data).
+document.getElementById('records-scroll').addEventListener('click', e => {
+  const row = e.target.closest('[data-reps]');
   if (row) openRecordsHistory(parseInt(row.dataset.reps));
 });
 document.getElementById('records-history-body').addEventListener('click', e => {
