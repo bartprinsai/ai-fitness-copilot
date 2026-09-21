@@ -849,8 +849,7 @@ function renderHome() {
         row.innerHTML = `
           <span class="exercise-set-comment${hasNote ? ' has-note' : ''}" aria-label="Set comment">${hasNote ? COMMENT_ICON_SVG : ''}</span>
           ${isFirstPR ? prTrophySvg('exercise-set-pr') : `<span class="exercise-set-spacer"></span>`}
-          ${hasDropChain(sets) ? dropGutterHtml(sets, setIdx) : ''}
-          <span class="exercise-set-weight"><span class="exercise-set-val">${s.weight}</span><span class="exercise-set-unit">kgs</span></span>
+          ${dropWeightHtml(sets, setIdx, `<span class="exercise-set-weight"><span class="exercise-set-val">${s.weight}</span><span class="exercise-set-unit">kgs</span></span>`)}
           <span class="exercise-set-reps"><span class="exercise-set-val">${s.reps}</span><span class="exercise-set-unit">reps</span></span>
           ${effortCellHtml(s)}
         `;
@@ -1471,9 +1470,14 @@ function resetEffortFields() { setRpeField(0); setExtraField(0, ''); setDropsetF
 // be a continuation. Shared by the TRACK list, the day overview and History.
 const DROP_ARROW_SVG = '<svg class="drop-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10"/><path d="M17 8v9H8"/></svg>';
 function isDropChild(sets, i) { return i > 0 && !!sets[i].isDropsetContinuation; }
-// A list that contains at least one chain gets the narrow gutter column on EVERY row (see style.css).
+// A list that contains at least one chain uses the fixed chain column layout on EVERY row (see style.css).
 function hasDropChain(sets) { return sets.some((s, i) => isDropChild(sets, i)); }
-function dropGutterHtml(sets, i) { return `<span class="drop-gutter">${isDropChild(sets, i) ? DROP_ARROW_SVG : ''}</span>`; }
+// Weight cell of a row: plain in lists without a chain; inside a chain list it is wrapped so
+// the connector line + arrow live in the weight column (only the weight indents, see style.css).
+function dropWeightHtml(sets, i, weightHtml) {
+  if (!hasDropChain(sets)) return weightHtml;
+  return `<span class="drop-wcell">${isDropChild(sets, i) ? DROP_ARROW_SVG : ''}${weightHtml}</span>`;
+}
 function dropsetRowClass(sets, i) {
   const child = isDropChild(sets, i);
   const next = i + 1 < sets.length && !!sets[i + 1].isDropsetContinuation;
@@ -1554,8 +1558,7 @@ function renderSetList() {
       <span class="set-comment${hasNote ? ' has-note' : ''}" aria-label="Set note">${COMMENT_ICON_SVG}</span>
       <span class="set-row-pr">${isPR ? prTrophySvg('set-pr-icon') : ''}</span>
       <span class="set-num">${i + 1}</span>
-      ${hasDropChain(sets) ? dropGutterHtml(sets, i) : ''}
-      <span class="set-weight"><span class="set-weight-val">${s.weight}</span><span class="set-weight-unit">kgs</span></span>
+      ${dropWeightHtml(sets, i, `<span class="set-weight"><span class="set-weight-val">${s.weight}</span><span class="set-weight-unit">kgs</span></span>`)}
       <span class="set-reps"><span class="set-reps-val">${s.reps}</span><span class="set-reps-unit">reps</span></span>
       ${effortCellHtml(s)}
     `;
@@ -2195,8 +2198,7 @@ function renderHistoryTab() {
       row.innerHTML = `
         <span class="history-set-comment${hasNote ? ' has-note' : ''}" aria-label="Set comment">${hasNote ? COMMENT_ICON_SVG : ''}</span>
         ${isPR ? prTrophySvg('history-set-pr') : `<span class="history-set-spacer"></span>`}
-        ${hasDropChain(ex.sets) ? dropGutterHtml(ex.sets, i) : ''}
-        <span class="history-set-weight">${s.weight} kg</span>
+        ${dropWeightHtml(ex.sets, i, `<span class="history-set-weight">${s.weight} kg</span>`)}
         <span class="history-set-reps">${s.reps} reps</span>
         <span class="history-set-effort">${effortCellHtml(s)}</span>
       `;
