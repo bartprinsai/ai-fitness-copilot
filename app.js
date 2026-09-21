@@ -1434,12 +1434,12 @@ function saveSetNote() {
   toast(note ? 'Comment saved' : 'Comment deleted');
 }
 
-// Personal Records: always 1..12 reps. Each row is the heaviest weight ever
+// Personal Records: 1..12 reps, or up to the highest rep count ever logged for
+// this exercise if that's more (same range as the Graph's Reps dropdown). Each
+// row is the heaviest weight ever
 // actually logged for EXACTLY that rep count (same series as the Graph tab),
 // dated by the first time it was lifted; "No data" when that rep count was never
 // logged. Nothing here is estimated or interpolated.
-const RECORDS_MAX_REPS = 12;
-
 function recordsRepLabel(n) { return n === 1 ? 'One Rep Max' : n + 'RM'; }
 
 // Heaviest point of a rep series; on equal weights the earliest date wins
@@ -1451,7 +1451,7 @@ function getExerciseRepRecord(name, reps) {
 function openExerciseRecords() {
   const list = document.getElementById('records-list');
   document.getElementById('records-title').textContent = 'Personal Records — ' + (currentExercise || '');
-  list.innerHTML = Array.from({ length: RECORDS_MAX_REPS }, (_, k) => {
+  list.innerHTML = Array.from({ length: getExerciseMaxReps(currentExercise) }, (_, k) => {
     const reps = k + 1;
     const rec = getExerciseRepRecord(currentExercise, reps);
     const value = rec
@@ -2062,12 +2062,18 @@ function resolveGraphReps(stats, maxReps) {
   return best;
 }
 
+// Top of the rep range shown for an exercise (Graph dropdown, Records overlay):
+// 1..12, or the highest rep count ever logged for it if that is more.
+function getExerciseMaxReps(name) {
+  return Math.max(GRAPH_MIN_MAX_REPS, getExerciseRepStats(name).highest);
+}
+
 function graphRepOptions(maxReps) {
   return Array.from({ length: maxReps }, (_, i) => ({ value: String(i + 1), label: graphRepsLabel(i + 1) }));
 }
 
 document.getElementById('graph-reps').addEventListener('click', () => {
-  const maxReps = Math.max(GRAPH_MIN_MAX_REPS, getExerciseRepStats(currentExercise).highest);
+  const maxReps = getExerciseMaxReps(currentExercise);
   openFieldPicker('Reps', graphRepOptions(maxReps), getFieldBtnValue('graph-reps'), value => {
     graphRepsByExercise[currentExercise] = parseInt(value);
     renderGraph();
@@ -2141,7 +2147,7 @@ function renderGraph(keepSelection = false) {
   const panel = document.getElementById('graph-selection');
 
   const stats = getExerciseRepStats(currentExercise);
-  const maxReps = Math.max(GRAPH_MIN_MAX_REPS, stats.highest);
+  const maxReps = getExerciseMaxReps(currentExercise);
   const reps = resolveGraphReps(stats, maxReps);
   setFieldBtnValue('graph-reps', String(reps), graphRepsLabel(reps));
 
