@@ -1464,7 +1464,7 @@ function getExerciseRepRecord(name, reps) {
 let recordsHistoryReps = null;
 function recordsHistoryRowHtml(p) {
   return `
-    <div class="records-row">
+    <div class="records-row records-row-clickable" data-date="${p.date}" data-val="${p.val}">
       <span class="records-row-weight">${prTrophySvg()}${p.val} kgs</span>
       <span class="records-row-date">${formatDateStr(p.date, 'short')}</span>
     </div>`;
@@ -2015,7 +2015,7 @@ function renderHistoryTab() {
           openSetCommentPopup(exIdx, i, date);
         });
       }
-      row.addEventListener('click', () => openHistoryGotoExercise(currentExercise, date));
+      row.addEventListener('click', () => openHistoryGotoDate(date));
       container.appendChild(row);
     });
   });
@@ -2023,9 +2023,11 @@ function renderHistoryTab() {
 
 // -- History "Go to..." popup (date header / set row taps) ----
 let historyGotoAction = null;
+let historyGotoUnderOverlay = null;
 
 // `bodyEl` (optional) is shown between the title and the buttons — used by the Graph tab to list that day's sets.
-function openHistoryGoto(title, action, bodyEl) {
+function openHistoryGoto(title, action, bodyEl, underOverlayId = null) {
+  historyGotoUnderOverlay = underOverlayId;
   document.getElementById('history-goto-title').textContent = title;
   const body = document.getElementById('history-goto-body');
   body.innerHTML = '';
@@ -2042,17 +2044,61 @@ function openHistoryGotoDate(dateStr) {
   });
 }
 
-function openHistoryGotoExercise(exerciseName, dateStr) {
-  openHistoryGoto(`Go to ${exerciseName} on ${formatDateStr(dateStr, 'short')}`, () => {
-    currentDate = dateStr;
-    openTraining(exerciseName);
+// Same popup as above, plus that day's sets of the current exercise with the
+// set(s) matching `markReps`/`markVal` highlighted — used by the Graph tab and
+// the record-history popup. `underOverlayId`: an overlay that is open beneath
+// this popup and must go away together with it on "Go To" (see confirm handler).
+function openHistoryGotoDaySets(dateStr, markReps, markVal, underOverlayId) {
+  const ex = (db.workouts[dateStr] || []).find(e => e.name === currentExercise);
+  const body = document.createElement('div');
+  body.className = 'cal-detail-ex';
+  const nameEl = document.createElement('div');
+  nameEl.className = 'cal-detail-ex-name';
+  nameEl.textContent = currentExercise;
+  body.appendChild(nameEl);
+  ((ex && ex.sets) || []).forEach(s => {
+    const isMarked = parseInt(s.reps) === markReps && (parseFloat(s.weight) || 0) === markVal;
+    const row = document.createElement('div');
+    row.className = 'history-set-row' + (isMarked ? ' graph-goto-set-point' : '');
+    row.innerHTML = `
+      <span class="history-set-spacer"></span>
+      <span class="history-set-weight">${s.weight} kg</span>
+      <span class="history-set-reps">${s.reps} reps</span>
+    `;
+    body.appendChild(row);
   });
+  openHistoryGoto('Go to ' + formatDateStr(dateStr, 'short'), () => {
+    currentDate = dateStr;
+    showScreen('screen-fitness-tracker');
+  }, body, underOverlayId);
 }
 
 document.getElementById('history-goto-cancel').addEventListener('click', () => closeOverlay('history-goto-overlay'));
 document.getElementById('history-goto-confirm').addEventListener('click', () => {
   const action = historyGotoAction;
+  const under = historyGotoUnderOverlay;
   historyGotoAction = null;
+  historyGotoUnderOverlay = null;
+  const n = overlayStack.length;
+  if (under && n >= 2 && overlayStack[n - 2] === under && overlayStack[n - 1] === 'history-goto-overlay') {
+    // Two popups stacked (e.g. record history -> Go to): both history entries go
+    // in ONE traversal, then the action runs once the screen underneath is back
+    // (registered after the app's own popstate handler, so it runs after it).
+    overlayStack.length = n - 2;
+    document.getElementById('history-goto-overlay').classList.remove('open');
+    document.getElementById(under).classList.remove('open');
+    window.addEventListener('popstate', () => { if (action) action(); }, { once: true });
+    history.go(-2);
+    return;
+  }
+  if (overlayStack[overlayStack.length - 1] === 'history-goto-overlay') {
+    // Let the popup's own history entry finish popping BEFORE navigating.
+    // Pushing the new screen straight after history.back() (as this used to)
+    // lands the push before the queued pop, so the next back press skipped a screen.
+    window.addEventListener('popstate', () => { if (action) action(); }, { once: true });
+    closeOverlay('history-goto-overlay');
+    return;
+  }
   closeOverlay('history-goto-overlay');
   if (action) action();
 });
@@ -2331,28 +2377,7 @@ document.getElementById('progress-chart').addEventListener('click', e => {
 document.getElementById('graph-sel-info').addEventListener('click', () => {
   const pt = graphSeries[graphSelected];
   if (!pt) return;
-  const ex = (db.workouts[pt.date] || []).find(e => e.name === currentExercise);
-  const body = document.createElement('div');
-  body.className = 'cal-detail-ex';
-  const nameEl = document.createElement('div');
-  nameEl.className = 'cal-detail-ex-name';
-  nameEl.textContent = currentExercise;
-  body.appendChild(nameEl);
-  ((ex && ex.sets) || []).forEach(s => {
-    const isPoint = parseInt(s.reps) === graphReps && (parseFloat(s.weight) || 0) === pt.val;
-    const row = document.createElement('div');
-    row.className = 'history-set-row' + (isPoint ? ' graph-goto-set-point' : '');
-    row.innerHTML = `
-      <span class="history-set-spacer"></span>
-      <span class="history-set-weight">${s.weight} kg</span>
-      <span class="history-set-reps">${s.reps} reps</span>
-    `;
-    body.appendChild(row);
-  });
-  openHistoryGoto('Go to ' + formatDateStr(pt.date, 'short'), () => {
-    currentDate = pt.date;
-    showScreen('screen-fitness-tracker');
-  }, body);
+  openHistoryGotoDaySets(pt.date, graphReps, pt.val);
 });
 
 // The chart fills whatever space the screen has, so redraw when that changes (rotation, window resize).
@@ -2948,6 +2973,10 @@ document.getElementById('btn-back-records').addEventListener('click', () => goBa
 document.getElementById('records-list').addEventListener('click', e => {
   const row = e.target.closest('.records-row-clickable');
   if (row) openRecordsHistory(parseInt(row.dataset.reps));
+});
+document.getElementById('records-history-body').addEventListener('click', e => {
+  const row = e.target.closest('.records-row-clickable');
+  if (row) openHistoryGotoDaySets(row.dataset.date, recordsHistoryReps, parseFloat(row.dataset.val), 'records-history-overlay');
 });
 document.getElementById('btn-records-history-ok').addEventListener('click', () => closeOverlay('records-history-overlay'));
 // Graph: straight to this exercise's Graph tab on the tapped rep count. History
