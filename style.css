@@ -151,13 +151,12 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .exercise-set-pr { width: 14px; height: 14px; fill: var(--cyan); flex-shrink: 0; }
 .exercise-set-spacer { width: 14px; flex-shrink: 0; }
 .exercise-set-weight, .exercise-set-reps { display: flex; align-items: baseline; justify-content: flex-end; gap: 4px; }
-/* RPE badge (day overview + History): grey chip with the value, or a muted dash when the set has no RPE */
+/* RPE badge (day overview + History): grey chip with the value (nothing at all when the set has no RPE / extra reps) */
 /* Effort marker (RPE badge + optional "+N partial/forced" line), one component for TRACK list, day overview and History.
    Selectors are nested under .set-effort so they also beat the generic ".set-row span" rule of the TRACK list. */
 .set-effort { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 2px; text-align: right; }
 .set-effort .set-rpe-badge { background: #f0f0f0; border-radius: 4px; padding: 2px 6px; font-size: 11px; font-weight: 400; color: var(--text-secondary); white-space: nowrap; }
 .set-effort .set-effort-extra { font-size: 10px; font-weight: 400; color: var(--text-hint); white-space: nowrap; }
-.set-effort .set-effort-none { font-size: 11px; font-weight: 400; color: var(--text-hint); }
 .history-set-effort { width: 64px; flex-shrink: 0; }
 /* Dropset chain: a set flagged isDropsetContinuation hangs under the previous set.
    In a list that contains a chain, every row uses the SAME fixed columns (comment, trophy, [number],
