@@ -159,25 +159,29 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .set-effort .set-effort-extra { font-size: 10px; font-weight: 400; color: var(--text-hint); white-space: nowrap; }
 .set-effort .set-effort-none { font-size: 11px; font-weight: 400; color: var(--text-hint); }
 .history-set-effort { width: 64px; flex-shrink: 0; }
-/* Dropset chain: a set flagged isDropsetContinuation hangs under the previous set —
-   2px accent line down the left, arrow before its values, slightly smaller numbers.
-   --drop-x is the arrow's centre for each list (where the weight column starts + indent). */
-.drop-child, .drop-parent { position: relative; }
-.drop-child::before, .drop-parent::after { content: ''; position: absolute; left: var(--drop-x); width: 2px; background: var(--cyan); border-radius: 1px; }
-.drop-child::before { top: 0; bottom: 50%; }
-.drop-child.drop-mid::before { bottom: 0; }
-.drop-parent::after { top: calc(50% + 10px); bottom: 0; }
-.drop-arrow { width: 14px; height: 14px; flex-shrink: 0; fill: none; stroke: var(--cyan); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; margin-right: 4px; align-self: center; }
-.set-row.drop-child, .set-row.drop-parent { --drop-x: 105px; }
-.exercise-set-row.drop-child, .exercise-set-row.drop-parent { --drop-x: 72px; }
-.history-set-row.drop-child, .history-set-row.drop-parent { --drop-x: 82px; }
-.set-row.drop-child .set-weight { justify-content: flex-start; padding-left: 10px; }
+/* Dropset chain: a set flagged isDropsetContinuation hangs under the previous set.
+   Every row of a list that contains a chain gets a narrow .drop-gutter column right BEFORE the
+   weight/reps values (part of the row's own layout, so the values always start to its right):
+   the 2px accent line and the arrow live in that column, never on top of the text.
+   The gutter stretches over the row's padding, so the line is continuous from row to row. */
+.set-row { --row-pad-y: 13px; }
+.exercise-set-row { --row-pad-y: 6px; }
+.history-set-row { --row-pad-y: 11px; }
+.drop-gutter { position: relative; align-self: stretch; width: 18px; flex-shrink: 0; margin: calc(-1 * var(--row-pad-y)) 0 calc(-1 * var(--row-pad-y) - 1px); }
+.set-row.has-drop { grid-template-columns: 28px 20px 32px 18px 1fr 1fr 64px; }
+.exercise-set-row.has-drop { grid-template-columns: 20px 16px 18px 1fr 1fr 64px; }
+.drop-gutter::before { content: ''; display: none; position: absolute; left: 2px; top: 0; bottom: 0; width: 2px; background: var(--cyan); border-radius: 1px; }
+.drop-child > .drop-gutter::before { display: block; bottom: 50%; }
+.drop-child.drop-mid > .drop-gutter::before { bottom: 0; }
+.drop-parent > .drop-gutter::before { display: block; top: calc(50% + 10px); }
+.drop-gutter .drop-arrow { position: absolute; left: 1px; top: calc(50% - 7px); width: 14px; height: 14px; fill: none; stroke: var(--cyan); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.set-row.drop-child .set-weight { justify-content: flex-start; padding-left: 4px; }
 .set-row.drop-child .set-weight-val, .set-row.drop-child .set-reps-val { font-size: 13px; }
 .set-row.drop-child .set-weight-unit, .set-row.drop-child .set-reps-unit { font-size: 10px; }
-.exercise-set-row.drop-child .exercise-set-weight { justify-content: flex-start; padding-left: 10px; }
+.exercise-set-row.drop-child .exercise-set-weight { justify-content: flex-start; padding-left: 4px; }
 .exercise-set-row.drop-child .exercise-set-val { font-size: 17px; }
 .exercise-set-row.drop-child .exercise-set-unit { font-size: 10px; }
-.history-set-row.drop-child .history-set-weight { display: inline-flex; align-items: center; padding-left: 10px; font-size: 13px; }
+.history-set-row.drop-child .history-set-weight { padding-left: 4px; font-size: 13px; }
 .history-set-row.drop-child .history-set-reps { font-size: 13px; }
 .exercise-set-val { font-size: 20px; font-weight: 700; color: var(--text-primary); }
 .exercise-set-unit { font-size: 12px; font-weight: 400; color: var(--text-secondary); }
