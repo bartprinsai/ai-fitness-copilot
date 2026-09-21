@@ -297,16 +297,33 @@ let inPopstateNavigation = false;
 // be popped by it, silently losing one step of the back button. So while such a
 // back is in flight (suppressNextPopstate), pushes are queued and replayed the
 // moment its popstate arrives (see the popstate handler).
-let deferredHistoryPushes = [];
+let deferredHistoryActions = [];
+// Runs `fn` now, or — while one of our own history.back() calls is still in
+// flight — as soon as its popstate has arrived (in order, one at a time).
+function runAfterPendingBack(fn) {
+  if (suppressNextPopstate) deferredHistoryActions.push(fn);
+  else fn();
+}
 function pushHistoryEntry(state, url) {
-  if (suppressNextPopstate) deferredHistoryPushes.push([state, url]);
-  else history.pushState(state, '', url);
+  runAfterPendingBack(() => history.pushState(state, '', url));
 }
-function flushDeferredHistoryPushes() {
-  const queued = deferredHistoryPushes;
-  deferredHistoryPushes = [];
-  queued.forEach(([state, url]) => history.pushState(state, '', url));
+function flushDeferredHistoryActions() {
+  // an action may start a new back of its own: the rest then waits for that one
+  while (deferredHistoryActions.length && !suppressNextPopstate) deferredHistoryActions.shift()();
 }
+// One history.back() that the popstate handler will swallow (it only pops an
+// overlay's entry, no navigation).
+function popHistoryEntrySilently() {
+  suppressNextPopstate = true;
+  history.back();
+  // Safety net: if the pop never produces a popstate, don't stay blocked forever.
+  setTimeout(() => {
+    if (suppressNextPopstate) { suppressNextPopstate = false; flushDeferredHistoryActions(); }
+  }, 500);
+}
+// Set right before a deliberate back step that leaves a guarded screen after the
+// user already confirmed "Discard": the unsaved-changes guard must not ask again.
+let skipScreenGuardOnce = false;
 
 function showScreen(id) {
   const el = document.getElementById(id);
@@ -341,7 +358,7 @@ function showScreen(id) {
 // show the confirmation twice for the same tap.
 function goBack(fallbackId, hasChangedFn) {
   if (history.state && history.state.screen) {
-    history.back();
+    runAfterPendingBack(() => history.back());
   } else if (hasChangedFn) {
     confirmDiscardIfChanged(hasChangedFn, () => showScreen(fallbackId));
   } else {
@@ -379,14 +396,7 @@ function pushOverlayHistory(id) {
 function popOverlayHistoryIfNeeded(id) {
   if (overlayStack[overlayStack.length - 1] !== id) return;
   overlayStack.pop();
-  if (!inPopstateNavigation) {
-    suppressNextPopstate = true;
-    history.back();
-    // Safety net: if the pop never produces a popstate, don't stay blocked forever.
-    setTimeout(() => {
-      if (suppressNextPopstate) { suppressNextPopstate = false; flushDeferredHistoryPushes(); }
-    }, 500);
-  }
+  if (!inPopstateNavigation) runAfterPendingBack(popHistoryEntrySilently);
 }
 
 // Emulates the given overlay's own Cancel/Close button so a back-triggered
@@ -445,7 +455,7 @@ document.getElementById('btn-discard-changes-confirm').addEventListener('click',
 window.addEventListener('popstate', e => {
   if (suppressNextPopstate) {
     suppressNextPopstate = false;
-    flushDeferredHistoryPushes();
+    flushDeferredHistoryActions();
     return;
   }
   if (overlayStack.length > 0) {
@@ -476,13 +486,19 @@ window.addEventListener('popstate', e => {
   // discard confirmation on top of it, exactly like a nested overlay.
   const activeScreen = document.querySelector('.screen.active');
   const guard = activeScreen && SCREEN_HAS_CHANGES[activeScreen.id];
-  if (guard && guard()) {
+  if (skipScreenGuardOnce) {
+    skipScreenGuardOnce = false;
+  } else if (guard && guard()) {
     history.pushState({ screen: activeScreen.id }, '', location.hash);
     confirmDiscardIfChanged(guard, () => {
-      inPopstateNavigation = true;
-      showScreen(targetId);
-      inPopstateNavigation = false;
-      if (targetId === 'screen-exercises') syncExerciseBrowseToHistory(e.state && e.state.browse);
+      // "Discard": the stack is now [..., target, this screen (restored above)] and
+      // the discard popup's own entry is being popped. Leave for real with one more
+      // history step, once that pop is done — switching screens by hand instead
+      // would leave the restored entry behind, and the NEXT back press did nothing.
+      runAfterPendingBack(() => {
+        skipScreenGuardOnce = true;
+        history.back();
+      });
     });
     return;
   }
