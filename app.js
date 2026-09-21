@@ -1478,18 +1478,16 @@ function resetEffortFields() { setRpeField(0); setExtraField(0, ''); setDropsetF
 // be a continuation. Shared by the TRACK list, the day overview and History.
 const DROP_ARROW_SVG = '<svg class="drop-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10"/><path d="M17 8v9H8"/></svg>';
 function isDropChild(sets, i) { return i > 0 && !!sets[i].isDropsetContinuation; }
-// A list that contains at least one chain uses the fixed chain column layout on EVERY row (see style.css).
-function hasDropChain(sets) { return sets.some((s, i) => isDropChild(sets, i)); }
-// Weight cell of a row: plain in lists without a chain; inside a chain list it is wrapped so
-// the connector line + arrow live in the weight column (only the weight indents, see style.css).
+// Weight cell of EVERY row, in every list (chain or not): wrapped so the column layout is
+// always the same — the arrow of a dropset row lives in the weight column's indent, and adding
+// a dropset never moves any other row (see style.css).
 function dropWeightHtml(sets, i, weightHtml) {
-  if (!hasDropChain(sets)) return weightHtml;
   return `<span class="drop-wcell">${isDropChild(sets, i) ? DROP_ARROW_SVG : ''}${weightHtml}</span>`;
 }
 function dropsetRowClass(sets, i) {
   const child = isDropChild(sets, i);
   const next = i + 1 < sets.length && !!sets[i + 1].isDropsetContinuation;
-  return (hasDropChain(sets) ? ' has-drop' : '') + (child ? ' drop-child' : '') + (child && next ? ' drop-mid' : '') + (!child && next ? ' drop-parent' : '');
+  return (child ? ' drop-child' : '') + (child && next ? ' drop-mid' : '') + (!child && next ? ' drop-parent' : '');
 }
 // The checkbox only makes sense when there is a previous set to attach to: a new
 // set needs at least one saved set today, an edited set must not be the first one.

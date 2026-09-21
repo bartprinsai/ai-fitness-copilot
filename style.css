@@ -160,18 +160,18 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .set-effort .set-effort-none { font-size: 11px; font-weight: 400; color: var(--text-hint); }
 .history-set-effort { width: 64px; flex-shrink: 0; }
 /* Dropset chain: a set flagged isDropsetContinuation hangs under the previous set.
-   In a list that contains a chain, every row uses the SAME fixed columns (comment, trophy, [number],
-   weight, reps, RPE badge) — so Reps and the badge never move between normal and dropset rows.
+   EVERY row of EVERY list uses the same fixed columns (comment, trophy, [number], weight, reps, RPE
+   badge), whether or not the list has a dropset — so nothing ever shifts when one is added, and Reps
+   and the badge never move between normal and dropset rows.
    Only the weight column reacts: a dropset row's weight is indented (the arrow sits in that indent,
    inside the weight column), the row above keeps its weight at the column's left edge.
    .drop-wcell wraps the weight cell; it is an ordinary, vertically centred cell like every other one. */
-#history-content .history-set-row { display: grid; grid-template-columns: 20px 14px 1fr 1fr 64px; border-bottom: 1px solid transparent; }
-#history-content .history-set-row.has-drop { grid-template-columns: 20px 14px 1fr 84px 64px; }
+#history-content .history-set-row { display: grid; grid-template-columns: 20px 14px 1fr 84px 64px; border-bottom: 1px solid transparent; }
 #history-content .history-set-weight, #history-content .history-set-reps { display: flex; align-items: baseline; justify-content: flex-end; gap: 3px; margin-left: 0; font-size: inherit; font-weight: 400; color: var(--text-secondary); }
-#history-content .history-set-row.has-drop .history-set-weight { justify-content: flex-start; }
+#history-content .history-set-weight { justify-content: flex-start; }
 #history-content .history-set-val { font-size: 15px; font-weight: 700; color: var(--text-primary); }
 #history-content .history-set-unit { font-size: 12px; font-weight: 400; color: var(--text-secondary); }
-.set-row.has-drop .set-weight, .exercise-set-row.has-drop .exercise-set-weight { justify-content: flex-start; }
+.set-row .set-weight, .exercise-set-row .exercise-set-weight { justify-content: flex-start; }
 .drop-wcell { position: relative; display: flex; align-items: center; min-width: 0; }
 .drop-wcell > :not(.drop-arrow) { flex: 1; min-width: 0; }
 .drop-child .drop-wcell > :not(.drop-arrow) { padding-left: 20px; }
