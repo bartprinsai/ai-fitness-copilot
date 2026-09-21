@@ -3386,12 +3386,12 @@ document.getElementById('menu-card-fitness').addEventListener('click', openFitne
 document.getElementById('menu-card-workout').addEventListener('click', openWorkoutPlan);
 document.getElementById('menu-card-calculator').addEventListener('click', () => showScreen('screen-calculator'));
 document.getElementById('menu-card-nutrition').addEventListener('click', () => showScreen('screen-nutrition'));
-document.getElementById('menu-card-progress').addEventListener('click', () => showScreen('screen-progress'));
+document.getElementById('menu-card-insight').addEventListener('click', () => showScreen('screen-insight'));
 
 document.getElementById('btn-home-from-tracker').addEventListener('click', () => goBack('screen-home'));
 document.getElementById('btn-back-workout-plan').addEventListener('click', () => goBack('screen-home'));
 document.getElementById('btn-back-nutrition').addEventListener('click', () => goBack('screen-home'));
-document.getElementById('btn-back-progress').addEventListener('click', () => goBack('screen-home'));
+document.getElementById('btn-back-insight').addEventListener('click', () => goBack('screen-home'));
 document.getElementById('btn-back-calculator').addEventListener('click', () => goBack('screen-home'));
 document.getElementById('btn-calc-1rm').addEventListener('click', open1rmCalculator);
 document.getElementById('btn-calc-warmup').addEventListener('click', openWarmupCalculator);

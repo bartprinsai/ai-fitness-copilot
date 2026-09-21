@@ -105,7 +105,7 @@ callClaude(userMessage, sysPrompt) // Anthropic API call voor de AI plan generat
 - Oefeningen bijhouden met sets, reps en gewicht
 - Geschiedenis en grafieken, PR-detectie
 - PWA installeerbaar op telefoon
-- **Hoofdmenu** met 4 secties: Fitness Tracker, Workout Plan Builder, Nutrition (coming soon), Progress (coming soon)
+- **Hoofdmenu** met 4 secties: Fitness Tracker, Workout Plan Builder, Nutrition (coming soon), Insight (coming soon)
 - **Globale "AI Coach"-pil** zwevend onderaan op elk scherm behalve login/hoofdmenu (groen, sparkle-icoon, geen achtergrondbalk erachter) — scherm/logica nog niet gebouwd, klik-handler is een lege TODO in `app.js` (`btn-global-ai-coach`)
 - **Workout Plan Builder** met presets (Push Pull Legs, Upper Lower), AI generator, koppeling aan Fitness Tracker
 - **Multi-select modus** voor meerdere oefeningen tegelijk verwijderen
@@ -135,7 +135,7 @@ callClaude(userMessage, sysPrompt) // Anthropic API call voor de AI plan generat
 ## Volgende stappen
 1. Chat Coach activeren (koppelen aan de globale AI Coach-balk)
 2. Nutrition sectie bouwen
-3. Progress sectie bouwen
+3. Insight sectie bouwen
 
 ---
 
