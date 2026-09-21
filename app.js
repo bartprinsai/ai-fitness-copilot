@@ -1449,7 +1449,7 @@ function dropsetEligible() {
 function setDropsetField(on) { document.getElementById('field-dropset').checked = !!on; }
 function updateDropsetToggle() {
   const ok = dropsetEligible();
-  document.getElementById('dropset-row').classList.toggle('hidden', !ok);
+  document.getElementById('dropset-toggle').classList.toggle('hidden', !ok);
   if (!ok) setDropsetField(false);
 }
 

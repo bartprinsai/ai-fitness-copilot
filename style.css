@@ -229,9 +229,9 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .field-label { display: block; font-size: 11px; font-weight: 700; color: var(--text-secondary); letter-spacing: .1em; margin-bottom: 6px; }
 .field-cyan-line { height: 2px; background: var(--cyan); margin-bottom: 12px; }
 .field-controls { display: flex; align-items: center; gap: 12px; width: 100%; overflow: hidden; }
-.field-btn { width: 56px; height: 56px; border-radius: 4px; border: none; background: var(--gray-btn); color: var(--text-primary); font-size: 28px; font-weight: 300; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.1s; flex-shrink: 0; user-select: none; line-height: 1; }
+.field-btn { width: 44px; height: 44px; border-radius: 4px; border: none; background: var(--gray-btn); color: var(--text-primary); font-size: 22px; font-weight: 300; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.1s; flex-shrink: 0; user-select: none; line-height: 1; }
 .field-btn:active { background: #bdbdbd; }
-.field-group input { flex: 1; min-width: 0; text-align: center; border: none; border-bottom: 1px solid var(--border); outline: none; font-family: inherit; font-size: 42px; font-weight: 600; color: var(--text-primary); background: transparent; -moz-appearance: textfield; padding-bottom: 4px; }
+.field-group input { flex: 1; min-width: 0; text-align: center; border: none; border-bottom: 1px solid var(--border); outline: none; font-family: inherit; font-size: 22px; font-weight: 600; color: var(--text-primary); background: transparent; -moz-appearance: textfield; padding-bottom: 4px; }
 /* RPE: optional third field — a bit more compact, lighter label */
 .field-group-rpe { padding: 10px 16px 12px; }
 /* RPE + Extra reps side by side, each half the width */
@@ -241,15 +241,15 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .field-row-pair .field-group:last-child { padding-left: 8px; }
 .field-row-pair .field-controls { gap: 6px; }
 .field-row-pair .field-btn { width: 38px; }
-.field-row-pair .field-group input { font-size: 26px; }
-/* "Part of dropset with previous set" */
-.dropset-row { padding: 2px 16px 14px; }
-.dropset-toggle { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #eaf3fb; border-radius: 8px; color: #185fa5; font-size: 14px; cursor: pointer; user-select: none; position: relative; }
-.dropset-toggle input { position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none; }
-.dropset-box { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #185fa5; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-sizing: border-box; transition: background .1s; }
-.dropset-box svg { width: 14px; height: 14px; fill: #fff; opacity: 0; }
-.dropset-toggle input:checked + .dropset-box { background: #185fa5; }
-.dropset-toggle input:checked + .dropset-box svg { opacity: 1; }
+/* DROPSET checkbox on the REPS label line: same label type (11px, tracking, weight) in the accent colour */
+.field-label-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.field-label-row .field-label { margin-bottom: 0; }
+.dropset-check { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: .1em; color: var(--cyan); cursor: pointer; user-select: none; position: relative; padding: 6px 0 6px 12px; margin: -6px 0; }
+.field-group .dropset-check input { position: absolute; opacity: 0; width: 0; height: 0; flex: none; pointer-events: none; }
+.dropset-box { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--cyan); display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-sizing: border-box; transition: background .1s; }
+.dropset-box svg { width: 10px; height: 10px; fill: #fff; opacity: 0; }
+.dropset-check input:checked + .dropset-box { background: var(--cyan); }
+.dropset-check input:checked + .dropset-box svg { opacity: 1; }
 .extra-type { display: flex; gap: 6px; margin-top: 8px; }
 .extra-type-btn { flex: 1; min-width: 0; height: 30px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-secondary); font-family: inherit; font-size: 12px; font-weight: 500; cursor: pointer; transition: background .1s, color .1s, border-color .1s; }
 .extra-type-btn.active { background: var(--cyan); border-color: var(--cyan); color: #fff; }
@@ -257,8 +257,6 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .field-group-rpe .field-label { font-size: 10px; font-weight: 500; letter-spacing: .06em; margin-bottom: 5px; }
 .field-label-optional { font-weight: 400; color: var(--text-hint); letter-spacing: 0; }
 .field-group-rpe .field-cyan-line { margin-bottom: 10px; }
-.field-group-rpe .field-btn { width: 44px; height: 44px; font-size: 22px; }
-.field-group-rpe input { font-size: 30px; }
 .field-group input::-webkit-inner-spin-button, .field-group input::-webkit-outer-spin-button { -webkit-appearance: none; }
 
 /* ── ACTION BUTTONS ───────────────────────────────────── */
