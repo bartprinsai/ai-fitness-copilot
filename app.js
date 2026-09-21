@@ -1442,10 +1442,46 @@ function saveSetNote() {
 // logged. Nothing here is estimated or interpolated.
 function recordsRepLabel(n) { return n === 1 ? 'One Rep Max' : n + 'RM'; }
 
-// Heaviest point of a rep series; on equal weights the earliest date wins
-// (series are date-ascending, so only a strictly heavier point replaces it).
+// Every moment the record for exactly `reps` reps was broken, oldest first: a
+// session counts when its heaviest set beats the best of all sessions before
+// it (strictly heavier, so equalling a record is not a new one). The last entry
+// is the current record, dated the first time that weight was lifted.
+function getExerciseRepRecordHistory(name, reps) {
+  const history = [];
+  getExerciseRepSeries(name, reps).forEach(p => {
+    if (!history.length || p.val > history[history.length - 1].val) history.push(p);
+  });
+  return history;
+}
+
 function getExerciseRepRecord(name, reps) {
-  return getExerciseRepSeries(name, reps).reduce((best, p) => (!best || p.val > best.val ? p : best), null);
+  const history = getExerciseRepRecordHistory(name, reps);
+  return history.length ? history[history.length - 1] : null;
+}
+
+// Record history popup for one rep count: the current record plus every earlier
+// record, newest first.
+let recordsHistoryReps = null;
+function recordsHistoryRowHtml(p) {
+  return `
+    <div class="records-row">
+      <span class="records-row-weight">${prTrophySvg()}${p.val} kgs</span>
+      <span class="records-row-date">${formatDateStr(p.date, 'short')}</span>
+    </div>`;
+}
+function openRecordsHistory(reps) {
+  const history = getExerciseRepRecordHistory(currentExercise, reps);
+  if (history.length === 0) return;
+  recordsHistoryReps = reps;
+  const current = history[history.length - 1];
+  const previous = history.slice(0, -1).reverse();
+  document.getElementById('records-history-title').textContent = recordsRepLabel(reps) + ' history';
+  document.getElementById('records-history-body').innerHTML = `
+    <div class="info-section-label">Current record</div>
+    ${recordsHistoryRowHtml(current)}
+    <div class="info-section-label">Previous records</div>
+    ${previous.length ? previous.map(recordsHistoryRowHtml).join('') : '<div class="records-empty">No previous records</div>'}`;
+  openOverlay('records-history-overlay');
 }
 
 function openExerciseRecords() {
@@ -1461,7 +1497,7 @@ function openExerciseRecords() {
         </span>`
       : `<span class="records-row-nodata">No data</span>`;
     return `
-      <div class="records-row">
+      <div class="records-row${rec ? ' records-row-clickable' : ''}"${rec ? ` data-reps="${reps}"` : ''}>
         <span class="records-row-reps">${recordsRepLabel(reps)}</span>
         ${value}
       </div>`;
@@ -2835,6 +2871,7 @@ const OVERLAY_CANCEL_BUTTON = {
   'presets-overlay': 'btn-presets-close',
   'cal-detail-overlay': 'cal-detail-cancel',
   'set-note-overlay': 'btn-set-note-cancel',
+  'records-history-overlay': 'btn-records-history-ok',
   'new-category-overlay': 'btn-new-category-cancel',
   'cat-edit-overlay': 'btn-cat-edit-cancel',
   'delete-exercise-overlay': 'btn-delete-ex-cancel',
@@ -2908,6 +2945,25 @@ document.getElementById('btn-clear').addEventListener('click', () => {
 });
 document.getElementById('btn-training-pr').addEventListener('click', openExerciseRecords);
 document.getElementById('btn-back-records').addEventListener('click', () => goBack('screen-training'));
+document.getElementById('records-list').addEventListener('click', e => {
+  const row = e.target.closest('.records-row-clickable');
+  if (row) openRecordsHistory(parseInt(row.dataset.reps));
+});
+document.getElementById('btn-records-history-ok').addEventListener('click', () => closeOverlay('records-history-overlay'));
+// Graph: straight to this exercise's Graph tab on the tapped rep count. History
+// is [training, records, popup], so one go(-2) lands on the training screen via
+// the normal popstate handler (the popup's own entry is consumed by it too,
+// hence no closeOverlay()); the tab switch waits until that screen is showing.
+document.getElementById('btn-records-history-graph').addEventListener('click', () => {
+  const overlayId = 'records-history-overlay';
+  if (overlayStack[overlayStack.length - 1] !== overlayId) return;
+  overlayStack.pop();
+  document.getElementById(overlayId).classList.remove('open');
+  graphRepsByExercise[currentExercise] = recordsHistoryReps;
+  currentTimeRange = 'all'; // same period the Graph tab opens on, so no record date is filtered out
+  window.addEventListener('popstate', () => switchTab('graph'), { once: true });
+  history.go(-2);
+});
 document.getElementById('btn-training-info').addEventListener('click', openExerciseInfo);
 document.getElementById('btn-exercise-info-edit').addEventListener('click', showExerciseInfoEdit);
 document.getElementById('btn-exercise-info-close').addEventListener('click', () => closeOverlay('exercise-info-overlay'));
