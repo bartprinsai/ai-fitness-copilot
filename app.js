@@ -1673,8 +1673,9 @@ function getRepLeaders(name, maxReps) {
 }
 
 // Record detail popup for one rep count: the current (leading) record, then the
-// complete progression of the leading weight ("previous records"), newest first —
-// including the steps that came from a set with MORE reps ("via MRM").
+// progression that led up to it ("previous records": every earlier step of the leading
+// weight, newest first — the current record itself is NOT repeated), including the
+// steps that came from a set with MORE reps ("via MRM").
 let recordsHistoryReps = null;
 // One record step / current record as a tappable row: weight + workout date, plus
 // "via MRM" when it came from a set with more reps. Tapping opens "Go to" for that
@@ -1691,12 +1692,13 @@ function openRecordsHistory(reps) {
   if (steps.length === 0) return;
   recordsHistoryReps = reps;
   const cur = steps[steps.length - 1];
+  const previous = steps.slice(0, -1).reverse(); // everything BEFORE the current record, newest first
   document.getElementById('records-history-title').textContent = recordsRepLabel(reps) + ' history';
   document.getElementById('records-history-body').innerHTML = `
     <div class="info-section-label">Current record</div>
     ${recordsStepRowHtml(cur.weight, cur.date, cur.sourceReps, cur.direct)}
     <div class="info-section-label">${recordsRepLabel(reps)} previous records</div>
-    ${steps.slice().reverse().map(st => recordsStepRowHtml(st.weight, st.date, st.sourceReps, st.direct)).join('')}`;
+    ${previous.length ? previous.map(st => recordsStepRowHtml(st.weight, st.date, st.sourceReps, st.direct)).join('') : '<div class="records-empty">No previous records</div>'}`;
   openOverlay('records-history-overlay');
 }
 
