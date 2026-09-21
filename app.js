@@ -809,11 +809,11 @@ function renderHome() {
         const isFirstPR = firstPRKeys.has(currentDate + '#' + setIdx);
         const hasNote = !!(s.note && s.note.trim());
         const row = document.createElement('div');
-        row.className = 'exercise-set-row';
+        row.className = 'exercise-set-row' + dropsetRowClass(sets, setIdx);
         row.innerHTML = `
           <span class="exercise-set-comment${hasNote ? ' has-note' : ''}" aria-label="Set comment">${hasNote ? COMMENT_ICON_SVG : ''}</span>
           ${isFirstPR ? prTrophySvg('exercise-set-pr') : `<span class="exercise-set-spacer"></span>`}
-          <span class="exercise-set-weight"><span class="exercise-set-val">${s.weight}</span><span class="exercise-set-unit">kgs</span></span>
+          <span class="exercise-set-weight">${isDropChild(sets, setIdx) ? DROP_ARROW_SVG : ''}<span class="exercise-set-val">${s.weight}</span><span class="exercise-set-unit">kgs</span></span>
           <span class="exercise-set-reps"><span class="exercise-set-val">${s.reps}</span><span class="exercise-set-unit">reps</span></span>
           ${effortCellHtml(s)}
         `;
@@ -1380,9 +1380,10 @@ function getTrackFieldsSnapshot() {
     rpe: document.getElementById('field-rpe').value,
     extra: document.getElementById('field-extra').value,
     extraType: getExtraType(),
+    dropset: document.getElementById('field-dropset').checked,
   };
 }
-let trackFieldsBaseline = { weight: '0', reps: '0', rpe: '0', extra: '0', extraType: '' };
+let trackFieldsBaseline = { weight: '0', reps: '0', rpe: '0', extra: '0', extraType: '', dropset: false };
 
 // RPE: 0 = not filled in; otherwise 6..10 in steps of 0.5. Whole numbers show
 // without a decimal ("8"), halves with one ("8.5").
@@ -1426,7 +1427,32 @@ function onExtraChanged(n) {
 function reconcileExtraWithRpe() {
   if (getExtraReps() > 0 && parseRpe(document.getElementById('field-rpe').value) < RPE_MAX) setExtraField(0, '');
 }
-function resetEffortFields() { setRpeField(0); setExtraField(0, ''); }
+function resetEffortFields() { setRpeField(0); setExtraField(0, ''); setDropsetField(false); }
+// -- Dropsets -------------------------------------------------------------
+// A set with isDropsetContinuation hangs under the previous set of that exercise
+// that day (the chain simply follows the log order); the first set of a day can't
+// be a continuation. Shared by the TRACK list, the day overview and History.
+const DROP_ARROW_SVG = '<svg class="drop-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10"/><path d="M17 8v9H8"/></svg>';
+function isDropChild(sets, i) { return i > 0 && !!sets[i].isDropsetContinuation; }
+function dropsetRowClass(sets, i) {
+  const child = isDropChild(sets, i);
+  const next = i + 1 < sets.length && !!sets[i + 1].isDropsetContinuation;
+  return (child ? ' drop-child' : '') + (child && next ? ' drop-mid' : '') + (!child && next ? ' drop-parent' : '');
+}
+// The checkbox only makes sense when there is a previous set to attach to: a new
+// set needs at least one saved set today, an edited set must not be the first one.
+function dropsetEligible() {
+  const ex = getCurrentExerciseData();
+  const n = ex ? ex.sets.length : 0;
+  return selectedSetIndex !== null ? selectedSetIndex > 0 : n > 0;
+}
+function setDropsetField(on) { document.getElementById('field-dropset').checked = !!on; }
+function updateDropsetToggle() {
+  const ok = dropsetEligible();
+  document.getElementById('dropset-row').classList.toggle('hidden', !ok);
+  if (!ok) setDropsetField(false);
+}
+
 // Effort marker for a logged set — ONE component used by the TRACK list, the day
 // overview and History: RPE badge, plus a small "+N partial/forced" line under it
 // when there are extra reps; a muted dash when there is neither.
@@ -1467,6 +1493,7 @@ function renderSetList() {
   const ex = getCurrentExerciseData();
   const sets = ex ? ex.sets : [];
   updateActionButtonsUI();
+  updateDropsetToggle();
 
   if (sets.length === 0) {
     list.innerHTML = `<div style="padding:24px;text-align:center;color:#9e9e9e;font-size:14px">No sets yet. Enter weight and reps, then tap SAVE.</div>`;
@@ -1481,13 +1508,13 @@ function renderSetList() {
     const hasNote = !!(s.note && s.note.trim());
     const isSelected = selectedSetIndex === i;
     const row = document.createElement('div');
-    row.className = 'set-row' + (isSelected ? ' selected' : '');
+    row.className = 'set-row' + (isSelected ? ' selected' : '') + dropsetRowClass(sets, i);
     row.dataset.setIdx = i;
     row.innerHTML = `
       <span class="set-comment${hasNote ? ' has-note' : ''}" aria-label="Set note">${COMMENT_ICON_SVG}</span>
       <span class="set-row-pr">${isPR ? prTrophySvg('set-pr-icon') : ''}</span>
       <span class="set-num">${i + 1}</span>
-      <span class="set-weight"><span class="set-weight-val">${s.weight}</span><span class="set-weight-unit">kgs</span></span>
+      <span class="set-weight">${isDropChild(sets, i) ? DROP_ARROW_SVG : ''}<span class="set-weight-val">${s.weight}</span><span class="set-weight-unit">kgs</span></span>
       <span class="set-reps"><span class="set-reps-val">${s.reps}</span><span class="set-reps-unit">reps</span></span>
       ${effortCellHtml(s)}
     `;
@@ -1893,15 +1920,17 @@ function saveSet() {
   let ex = workout.find(e => e.name === currentExercise);
   if (!ex) { ex = { name: currentExercise, sets: [] }; workout.push(ex); }
 
+  // Link to the previous set only when there is one (new set: any saved set today; edited set: not the first).
+  const dropset = document.getElementById('field-dropset').checked && (selectedSetIndex !== null ? selectedSetIndex > 0 : ex.sets.length > 0);
   let savedMsg, savedIdx;
   if (selectedSetIndex !== null) {
     const existingNote = ex.sets[selectedSetIndex] && ex.sets[selectedSetIndex].note;
-    ex.sets[selectedSetIndex] = { weight, reps, ...(rpe > 0 && { rpe }), ...(extra > 0 && { extra, extraType }), ...(existingNote && { note: existingNote }) };
+    ex.sets[selectedSetIndex] = { weight, reps, ...(rpe > 0 && { rpe }), ...(extra > 0 && { extra, extraType }), ...(dropset && { isDropsetContinuation: true }), ...(existingNote && { note: existingNote }) };
     savedIdx = selectedSetIndex;
     selectedSetIndex = null;
     savedMsg = 'Set updated';
   } else {
-    ex.sets.push({ weight, reps, ...(rpe > 0 && { rpe }), ...(extra > 0 && { extra, extraType }) });
+    ex.sets.push({ weight, reps, ...(rpe > 0 && { rpe }), ...(extra > 0 && { extra, extraType }), ...(dropset && { isDropsetContinuation: true }) });
     savedIdx = ex.sets.length - 1;
     savedMsg = 'Set saved';
   }
@@ -1912,6 +1941,7 @@ function saveSet() {
   const isPR = getPRSetKeys(currentExercise).has(currentDate + '#' + savedIdx);
   if (isPR) toast('\u{1F3C6} Personal record! \u{1F3C6}', { type: 'pr' });
   else toast(savedMsg);
+  setDropsetField(false); // linking is per set — the next one starts unlinked again
   trackFieldsBaseline = getTrackFieldsSnapshot();
   renderSetList();
   renderHome();
@@ -1927,6 +1957,7 @@ function selectSet(i) {
     document.getElementById('field-reps').value = ex.sets[i].reps;
     setRpeField(parseFloat(ex.sets[i].rpe) || 0);
     setExtraField(parseInt(ex.sets[i].extra) || 0, ex.sets[i].extraType);
+    setDropsetField(isDropChild(ex.sets, i));
   }
   // Whatever the fields show right after selecting/deselecting a set becomes
   // the new "nothing to lose" baseline — editing an existing set's already-
@@ -2116,14 +2147,14 @@ function renderHistoryTab() {
       const isPR = firstPRKeys.has(date + '#' + i);
       const hasNote = !!(s.note && s.note.trim());
       const row = document.createElement('div');
-      row.className = 'history-set-row clickable';
+      row.className = 'history-set-row clickable' + dropsetRowClass(ex.sets, i);
       // Same comment indicator as the Fitness Tracker day overview: only drawn
       // when the set has a note (the slot is always reserved so rows stay
       // aligned), and tapping it opens the same comment popup.
       row.innerHTML = `
         <span class="history-set-comment${hasNote ? ' has-note' : ''}" aria-label="Set comment">${hasNote ? COMMENT_ICON_SVG : ''}</span>
         ${isPR ? prTrophySvg('history-set-pr') : `<span class="history-set-spacer"></span>`}
-        <span class="history-set-weight">${s.weight} kg</span>
+        <span class="history-set-weight">${isDropChild(ex.sets, i) ? DROP_ARROW_SVG : ''}${s.weight} kg</span>
         <span class="history-set-reps">${s.reps} reps</span>
         <span class="history-set-effort">${effortCellHtml(s)}</span>
       `;

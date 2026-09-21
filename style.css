@@ -159,6 +159,24 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .set-effort .set-effort-extra { font-size: 10px; font-weight: 400; color: var(--text-hint); white-space: nowrap; }
 .set-effort .set-effort-none { font-size: 11px; font-weight: 400; color: var(--text-hint); }
 .history-set-effort { width: 64px; flex-shrink: 0; }
+/* Dropset chain: a set flagged isDropsetContinuation hangs under the previous set —
+   2px accent line down the left, arrow before its values, slightly smaller numbers.
+   --drop-x is the arrow's centre for each list (where the weight column starts + indent). */
+.drop-child, .drop-parent { position: relative; }
+.drop-child::before, .drop-parent::after { content: ''; position: absolute; left: var(--drop-x); width: 2px; background: var(--cyan); border-radius: 1px; }
+.drop-child::before { top: 0; bottom: 50%; }
+.drop-child.drop-mid::before { bottom: 0; }
+.drop-parent::after { top: calc(50% + 10px); bottom: 0; }
+.drop-arrow { width: 14px; height: 14px; flex-shrink: 0; fill: none; stroke: var(--cyan); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; margin-right: 4px; align-self: center; }
+.set-row.drop-child, .set-row.drop-parent { --drop-x: 105px; }
+.exercise-set-row.drop-child, .exercise-set-row.drop-parent { --drop-x: 72px; }
+.history-set-row.drop-child, .history-set-row.drop-parent { --drop-x: 82px; }
+.set-row.drop-child .set-weight { justify-content: flex-start; padding-left: 10px; }
+.set-row.drop-child .set-weight-val, .set-row.drop-child .set-reps-val { font-size: 14px; }
+.exercise-set-row.drop-child .exercise-set-weight { justify-content: flex-start; padding-left: 10px; }
+.exercise-set-row.drop-child .exercise-set-val { font-size: 16px; }
+.history-set-row.drop-child .history-set-weight { display: inline-flex; align-items: center; padding-left: 10px; font-size: 14px; }
+.history-set-row.drop-child .history-set-reps { font-size: 14px; }
 .exercise-set-val { font-size: 20px; font-weight: 700; color: var(--text-primary); }
 .exercise-set-unit { font-size: 12px; font-weight: 400; color: var(--text-secondary); }
 .exercise-card-empty { padding: 6px 12px 10px; font-size: 14px; color: var(--text-hint); }
@@ -224,6 +242,14 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .field-row-pair .field-controls { gap: 6px; }
 .field-row-pair .field-btn { width: 38px; }
 .field-row-pair .field-group input { font-size: 26px; }
+/* "Part of dropset with previous set" */
+.dropset-row { padding: 2px 16px 14px; }
+.dropset-toggle { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #eaf3fb; border-radius: 8px; color: #185fa5; font-size: 14px; cursor: pointer; user-select: none; position: relative; }
+.dropset-toggle input { position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none; }
+.dropset-box { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #185fa5; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-sizing: border-box; transition: background .1s; }
+.dropset-box svg { width: 14px; height: 14px; fill: #fff; opacity: 0; }
+.dropset-toggle input:checked + .dropset-box { background: #185fa5; }
+.dropset-toggle input:checked + .dropset-box svg { opacity: 1; }
 .extra-type { display: flex; gap: 6px; margin-top: 8px; }
 .extra-type-btn { flex: 1; min-width: 0; height: 30px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-secondary); font-family: inherit; font-size: 12px; font-weight: 500; cursor: pointer; transition: background .1s, color .1s, border-color .1s; }
 .extra-type-btn.active { background: var(--cyan); border-color: var(--cyan); color: #fff; }
