@@ -172,7 +172,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 #history-content .history-set-val { font-size: 15px; font-weight: 700; color: var(--text-primary); }
 #history-content .history-set-unit { font-size: 12px; font-weight: 400; color: var(--text-secondary); }
 .set-row .set-weight, .exercise-set-row .exercise-set-weight { justify-content: flex-start; }
-.drop-wcell { position: relative; display: flex; align-items: center; min-width: 0; }
+.drop-wcell { position: relative; display: flex; align-items: center; min-width: 0; margin-left: 12px; }
 .drop-wcell > :not(.drop-arrow) { flex: 1; min-width: 0; }
 .drop-child .drop-wcell > :not(.drop-arrow) { padding-left: 20px; }
 .drop-wcell .drop-arrow { position: absolute; left: 1px; top: calc(50% - 7px); width: 14px; height: 14px; fill: none; stroke: var(--cyan); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
