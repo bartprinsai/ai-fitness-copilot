@@ -705,24 +705,28 @@ document.getElementById('btn-reset-confirm').addEventListener('click', async () 
 });
 
 // -- Home Screen ----------------------------------------
-// Returns a Set of "date#setIndex" keys marking, per exercise, only the very
-// first chronological set that ever hit a given (reps, weight) PR combo —
-// so repeats of an already-celebrated combo (same day or later) don't re-trophy.
-function getFirstPRComboKeys(exerciseName) {
-  const exRecords = (db.records || {})[exerciseName] || {};
-  const dates = Object.keys(db.workouts).sort();
-  const seenCombos = new Set();
+// Returns a Set of "date#setIndex" keys for every set of `exerciseName` that was
+// a personal record WHEN IT WAS LIFTED: walking all sets in chronological order
+// (date, then position within the day), a set counts when it has at least 1 rep,
+// a weight above 0 and is strictly heavier than every earlier set with exactly
+// the same rep count — so the first-ever set for a rep count is always a PR, and
+// equalling a record is not. Derived purely from the logged sets (no stored
+// record table that could drift from them), so it always agrees with the
+// Records screen / record history, which use the same rule.
+function getPRSetKeys(exerciseName) {
+  const best = {};
   const result = new Set();
-  dates.forEach(date => {
+  Object.keys(db.workouts).sort().forEach(date => {
     const ex = (db.workouts[date] || []).find(e => e.name === exerciseName);
     if (!ex) return;
     (ex.sets || []).forEach((s, i) => {
-      const isPR = exRecords[String(s.reps)] && parseFloat(s.weight) >= exRecords[String(s.reps)];
-      if (!isPR) return;
-      const combo = s.reps + '_' + s.weight;
-      if (seenCombos.has(combo)) return;
-      seenCombos.add(combo);
-      result.add(date + '#' + i);
+      const reps = parseInt(s.reps) || 0;
+      const weight = parseFloat(s.weight) || 0;
+      if (reps < 1 || weight <= 0) return;
+      if (weight > (best[reps] || 0)) {
+        best[reps] = weight;
+        result.add(date + '#' + i);
+      }
     });
   });
   return result;
@@ -755,7 +759,7 @@ function renderHome() {
 
   exercises.forEach((ex, idx) => {
     const sets = ex.sets || [];
-    const firstPRKeys = getFirstPRComboKeys(ex.name);
+    const firstPRKeys = getPRSetKeys(ex.name);
     const card = document.createElement('div');
     card.className = 'exercise-card';
     card.dataset.exIdx = idx;
@@ -1384,7 +1388,7 @@ function renderSetList() {
     return;
   }
 
-  const firstPRKeys = getFirstPRComboKeys(currentExercise);
+  const firstPRKeys = getPRSetKeys(currentExercise);
   list.innerHTML = '';
 
   sets.forEach((s, i) => {
@@ -1781,27 +1785,29 @@ function saveExerciseInfo() {
 function saveSet() {
   const weight = parseFloat(document.getElementById('field-weight').value) || 0;
   const reps = parseInt(document.getElementById('field-reps').value) || 0;
-  if (reps === 0 && weight === 0) { toast('Enter weight or reps'); return; }
+  if (reps < 1) { toast('Enter reps', { type: 'error' }); return; }
 
   const workout = getWorkout(currentDate);
   let ex = workout.find(e => e.name === currentExercise);
   if (!ex) { ex = { name: currentExercise, sets: [] }; workout.push(ex); }
 
-  let savedMsg;
+  let savedMsg, savedIdx;
   if (selectedSetIndex !== null) {
     const existingNote = ex.sets[selectedSetIndex] && ex.sets[selectedSetIndex].note;
     ex.sets[selectedSetIndex] = existingNote ? { weight, reps, note: existingNote } : { weight, reps };
+    savedIdx = selectedSetIndex;
     selectedSetIndex = null;
     savedMsg = 'Set updated';
   } else {
     ex.sets.push({ weight, reps });
+    savedIdx = ex.sets.length - 1;
     savedMsg = 'Set saved';
   }
 
   setWorkout(currentDate, workout);
   // A PR replaces the plain confirmation entirely (two consecutive toast()
   // calls would just overwrite each other anyway).
-  const isPR = updateRecords(currentExercise, weight, reps);
+  const isPR = getPRSetKeys(currentExercise).has(currentDate + '#' + savedIdx);
   if (isPR) toast('\u{1F3C6} Personal record! \u{1F3C6}', { type: 'pr' });
   else toast(savedMsg);
   trackFieldsBaseline = getTrackFieldsSnapshot();
@@ -1844,20 +1850,6 @@ function deleteSet(i) {
   renderSetList();
   renderHome();
   toast('Set deleted');
-}
-
-// Returns true when this set is a new personal record worth announcing.
-function updateRecords(name, weight, reps) {
-  if (!db.records) db.records = {};
-  if (!db.records[name]) db.records[name] = {};
-  const key = String(reps);
-  let isPR = false;
-  if (!db.records[name][key] || weight > db.records[name][key]) {
-    db.records[name][key] = weight;
-    isPR = weight > 0;
-  }
-  persistRecords();
-  return isPR;
 }
 
 // -- Field +/- Buttons ---------------------------------
@@ -1982,7 +1974,7 @@ function renderHistoryTab() {
     return;
   }
 
-  const firstPRKeys = getFirstPRComboKeys(currentExercise);
+  const firstPRKeys = getPRSetKeys(currentExercise);
 
   relevantDates.forEach(date => {
     const exIdx = db.workouts[date].findIndex(e => e.name === currentExercise);
@@ -2213,6 +2205,7 @@ const GRAPH_TAP_RADIUS = 28; // px around a point that counts as a tap on it (fi
 // `reps` reps. A session without such a set gets no entry — never an estimate.
 // Shared by the Graph tab and the Personal Records overlay.
 function getExerciseRepSeries(name, reps) {
+  if (!(reps >= 1)) return [];
   return Object.keys(db.workouts).sort().reduce((acc, date) => {
     const ex = db.workouts[date] && db.workouts[date].find(e => e.name === name);
     if (!ex) return acc;
@@ -2601,7 +2594,7 @@ function openWorkoutDetail(dateStr) {
   }
 
   exercises.forEach(ex => {
-    const firstPRKeys = getFirstPRComboKeys(ex.name);
+    const firstPRKeys = getPRSetKeys(ex.name);
     const exEl = document.createElement('div');
     exEl.className = 'cal-detail-ex';
 
