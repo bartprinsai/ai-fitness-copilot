@@ -2446,6 +2446,24 @@ function filterDataByRange(data) {
 
 // Point selection state. graphSeries is the series that is actually plotted (after the period AND
 // reps filters); graphSelected indexes into it; graphPlot holds the last drawn pixel positions for hit-testing.
+// "Include derived": also plot the moments the leading N-rep weight rose thanks to a set
+// with MORE reps (the same progression the Records screen shows), in their own colour.
+let graphIncludeDerived = true;
+// Points of the graph for `reps` reps, oldest first: { date, val, reps, derived }. Direct
+// points = the heaviest set with exactly `reps` reps per session (reps = that count);
+// derived points (only when asked) = each step of the leading-weight progression that came
+// from a set with more reps (reps = that set's real rep count). Workout-date order.
+function getGraphPoints(name, reps, includeDerived) {
+  const points = getExerciseRepSeries(name, reps).map(p => ({ date: p.date, val: p.val, reps, derived: false }));
+  if (includeDerived) {
+    (getRepProgressions(name, getExerciseMaxReps(name))[reps] || []).forEach(st => {
+      if (!st.direct) points.push({ date: st.date, val: st.weight, reps: st.sourceReps, derived: true });
+    });
+    points.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : (a.derived ? 1 : 0) - (b.derived ? 1 : 0)));
+  }
+  return points;
+}
+
 let graphSeries = [];
 let graphSelected = -1;
 let graphReps = 1;
@@ -2472,14 +2490,14 @@ function renderGraph(keepSelection = false) {
   const canvas = document.getElementById('progress-chart');
   const emptyEl = document.getElementById('graph-empty');
   const panel = document.getElementById('graph-selection');
+  const legend = document.getElementById('graph-legend');
 
   const stats = getExerciseRepStats(currentExercise);
   const maxReps = getExerciseMaxReps(currentExercise);
   const reps = resolveGraphReps(stats, maxReps);
   setFieldBtnValue('graph-reps', String(reps), graphRepsLabel(reps));
 
-  // Heaviest weight among sets with exactly `reps` reps, per session.
-  let data = getExerciseRepSeries(currentExercise, reps);
+  let data = getGraphPoints(currentExercise, reps, graphIncludeDerived);
 
   data = filterDataByRange(data);
   graphSeries = data;
@@ -2493,9 +2511,11 @@ function renderGraph(keepSelection = false) {
     canvas.style.display = 'none';
     emptyEl.style.display = 'flex';
     panel.classList.add('hidden');
+    legend.classList.add('hidden');
     graphPlot = null;
     return;
   }
+  legend.classList.toggle('hidden', !graphIncludeDerived);
   canvas.style.display = 'block';
   emptyEl.style.display = 'none';
   panel.classList.remove('hidden');
@@ -2560,10 +2580,19 @@ function drawGraphChart() {
   pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
   ctx.stroke();
 
-  ctx.fillStyle = '#29b6f6';
-  pts.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill(); });
+  // Direct points: blue dot. Derived ("via") points: the PR gold with a white edge.
+  const gold = getComputedStyle(document.documentElement).getPropertyValue('--toast-pr').trim() || '#d4a017';
+  pts.forEach((p, i) => {
+    if (data[i].derived) {
+      ctx.fillStyle = gold; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    } else {
+      ctx.fillStyle = '#29b6f6';
+      ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill();
+    }
+  });
 
-  // Selected point: green ring around its (still blue) dot.
+  // Selected point: green ring around its (still blue / gold) dot.
   const sel = pts[graphSelected];
   if (sel) {
     ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--green').trim() || '#4CAF50';
@@ -2588,8 +2617,16 @@ function drawGraphChart() {
 function updateGraphPanel() {
   const pt = graphSeries[graphSelected];
   if (!pt) return;
-  document.getElementById('graph-sel-main').textContent = `${pt.val} kg × ${graphReps} rep${graphReps === 1 ? '' : 's'}`;
-  document.getElementById('graph-sel-date').textContent = formatDateStr(pt.date, 'detail');
+  // A derived point shows the REAL rep count of its source set plus what it counts as.
+  document.getElementById('graph-sel-main').textContent = `${pt.val} kg × ${pt.reps} rep${pt.reps === 1 ? '' : 's'}`;
+  const dateEl = document.getElementById('graph-sel-date');
+  dateEl.textContent = formatDateStr(pt.date, 'detail');
+  if (pt.derived) {
+    const via = document.createElement('span');
+    via.className = 'graph-sel-via';
+    via.textContent = 'Derived \u2014 counts as ' + recordsRepLabel(graphReps);
+    dateEl.appendChild(via);
+  }
   document.getElementById('btn-graph-prev').disabled = graphSelected <= 0;
   document.getElementById('btn-graph-next').disabled = graphSelected >= graphSeries.length - 1;
 }
@@ -2618,10 +2655,15 @@ document.getElementById('progress-chart').addEventListener('click', e => {
 });
 
 // Tapping the weight × reps text: overview of ALL of that day's sets for this exercise + "Go To" (same overlay as History/Calendar).
+document.getElementById('graph-derived').addEventListener('change', e => {
+  graphIncludeDerived = e.target.checked;
+  renderGraph();
+});
+
 document.getElementById('graph-sel-info').addEventListener('click', () => {
   const pt = graphSeries[graphSelected];
   if (!pt) return;
-  openHistoryGotoDaySets(pt.date, graphReps, pt.val);
+  openHistoryGotoDaySets(pt.date, pt.reps, pt.val);
 });
 
 // The chart fills whatever space the screen has, so redraw when that changes (rotation, window resize).

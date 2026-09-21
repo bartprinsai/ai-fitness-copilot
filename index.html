@@ -403,11 +403,22 @@
     </div>
     <div class="graph-reps-field">
       <label class="info-field-label" for="graph-reps">Reps</label>
-      <button type="button" class="new-ex-select new-ex-select-btn" id="graph-reps"></button>
+      <div class="graph-reps-row">
+        <button type="button" class="new-ex-select new-ex-select-btn" id="graph-reps"></button>
+        <label class="graph-derived-check" id="graph-derived-toggle">
+          <input type="checkbox" id="graph-derived" checked/>
+          <span class="dropset-box" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg></span>
+          <span>Include derived</span>
+        </label>
+      </div>
     </div>
     <div class="graph-chart-wrap" id="graph-chart-wrap">
       <canvas id="progress-chart"></canvas>
       <div class="graph-empty" id="graph-empty">No data available</div>
+    </div>
+    <div class="graph-legend hidden" id="graph-legend">
+      <span class="graph-legend-item"><span class="graph-legend-dot graph-legend-direct"></span>Direct</span>
+      <span class="graph-legend-item"><span class="graph-legend-dot graph-legend-derived"></span>Derived (via)</span>
     </div>
     <div class="graph-selection hidden" id="graph-selection">
       <button type="button" class="graph-sel-arrow" id="btn-graph-prev" aria-label="Previous point">
