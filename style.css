@@ -311,6 +311,9 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .records-row-reps { font-size: 14px; color: var(--text-secondary); }
 .records-row-weight { display: flex; align-items: center; gap: 6px; font-size: 16px; font-weight: 700; color: var(--text-primary); }
 .records-row-weight svg { width: 14px; height: 14px; fill: var(--cyan); }
+.records-row-value { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.records-row-date { font-size: 12px; color: var(--text-secondary); }
+.records-row-nodata { font-size: 14px; color: var(--text-hint); }
 .records-empty { text-align: center; color: var(--text-hint); padding: 24px 0; font-size: 14px; }
 
 /* ── EXERCISE INFO OVERLAY (muscle group / equipment setup) ─── */

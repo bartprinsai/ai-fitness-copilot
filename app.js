@@ -1434,21 +1434,38 @@ function saveSetNote() {
   toast(note ? 'Comment saved' : 'Comment deleted');
 }
 
+// Personal Records: always 1..12 reps. Each row is the heaviest weight ever
+// actually logged for EXACTLY that rep count (same series as the Graph tab),
+// dated by the first time it was lifted; "No data" when that rep count was never
+// logged. Nothing here is estimated or interpolated.
+const RECORDS_MAX_REPS = 12;
+
+function recordsRepLabel(n) { return n === 1 ? 'One Rep Max' : n + 'RM'; }
+
+// Heaviest point of a rep series; on equal weights the earliest date wins
+// (series are date-ascending, so only a strictly heavier point replaces it).
+function getExerciseRepRecord(name, reps) {
+  return getExerciseRepSeries(name, reps).reduce((best, p) => (!best || p.val > best.val ? p : best), null);
+}
+
 function openExerciseRecords() {
   const list = document.getElementById('records-list');
   document.getElementById('records-title').textContent = 'Personal Records — ' + (currentExercise || '');
-  const exRecords = (db.records || {})[currentExercise] || {};
-  const reps = Object.keys(exRecords).map(Number).sort((a, b) => a - b);
-  if (reps.length === 0) {
-    list.innerHTML = `<div class="records-empty">No records yet for ${currentExercise}</div>`;
-  } else {
-    list.innerHTML = reps.map(r => `
+  list.innerHTML = Array.from({ length: RECORDS_MAX_REPS }, (_, k) => {
+    const reps = k + 1;
+    const rec = getExerciseRepRecord(currentExercise, reps);
+    const value = rec
+      ? `<span class="records-row-value">
+          <span class="records-row-weight">${prTrophySvg()}${rec.val} kgs</span>
+          <span class="records-row-date">${formatDateStr(rec.date, 'short')}</span>
+        </span>`
+      : `<span class="records-row-nodata">No data</span>`;
+    return `
       <div class="records-row">
-        <span class="records-row-reps">${r} rep${r === 1 ? '' : 's'}</span>
-        <span class="records-row-weight">${prTrophySvg()}${exRecords[r]} kgs</span>
-      </div>
-    `).join('');
-  }
+        <span class="records-row-reps">${recordsRepLabel(reps)}</span>
+        ${value}
+      </div>`;
+  }).join('');
   openOverlay('records-overlay');
 }
 
@@ -2103,6 +2120,20 @@ let graphReps = 1;
 let graphPlot = null;
 const GRAPH_TAP_RADIUS = 28; // px around a point that counts as a tap on it (finger-sized)
 
+// Per session (date, ascending), the heaviest weight actually logged for exactly
+// `reps` reps. A session without such a set gets no entry — never an estimate.
+// Shared by the Graph tab and the Personal Records overlay.
+function getExerciseRepSeries(name, reps) {
+  return Object.keys(db.workouts).sort().reduce((acc, date) => {
+    const ex = db.workouts[date] && db.workouts[date].find(e => e.name === name);
+    if (!ex) return acc;
+    const weights = (ex.sets || []).filter(s => parseInt(s.reps) === reps).map(s => parseFloat(s.weight) || 0);
+    if (weights.length === 0) return acc;
+    acc.push({ date, val: Math.max(...weights) });
+    return acc;
+  }, []);
+}
+
 function renderGraph(keepSelection = false) {
   syncTimeFilterButtons();
   const canvas = document.getElementById('progress-chart');
@@ -2114,16 +2145,8 @@ function renderGraph(keepSelection = false) {
   const reps = resolveGraphReps(stats, maxReps);
   setFieldBtnValue('graph-reps', String(reps), graphRepsLabel(reps));
 
-  // Heaviest weight among sets with exactly `reps` reps, per session. A session
-  // without such a set gets no point at all.
-  let data = Object.keys(db.workouts).sort().reduce((acc, date) => {
-    const ex = db.workouts[date] && db.workouts[date].find(e => e.name === currentExercise);
-    if (!ex) return acc;
-    const weights = (ex.sets || []).filter(s => parseInt(s.reps) === reps).map(s => parseFloat(s.weight) || 0);
-    if (weights.length === 0) return acc;
-    acc.push({ date, val: Math.max(...weights) });
-    return acc;
-  }, []);
+  // Heaviest weight among sets with exactly `reps` reps, per session.
+  let data = getExerciseRepSeries(currentExercise, reps);
 
   data = filterDataByRange(data);
   graphSeries = data;
