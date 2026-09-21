@@ -1604,78 +1604,117 @@ function saveSetNote() {
 }
 
 // Personal Records: 1..12 reps, or up to the highest rep count ever logged for
-// this exercise if that's more (same range as the Graph's Reps dropdown). Each
-// row is the heaviest weight ever
-// actually logged for EXACTLY that rep count (same series as the Graph tab),
-// dated by the first time it was lifted; "No data" when that rep count was never
-// logged. Nothing here is estimated or interpolated.
+// this exercise if that's more (same range as the Graph's Reps dropdown).
+// The weight shown for N reps is the LEADING weight: the heaviest weight of any
+// really logged set with N OR MORE reps — a set with more reps at some weight
+// proves that weight is doable for fewer reps too. Nothing is estimated. A row
+// whose leading weight comes from a set with exactly N reps shows that set's
+// workout date (+ trophy); one derived from a set with more reps shows "via MRM"
+// instead (no date, no trophy); no qualifying set at all = "No data".
+// Everything here goes by WORKOUT DATE (the day a set is logged on), never by the
+// moment it was entered — a set added later to an older day counts as if it had
+// always been there.
 function recordsRepLabel(n) { return n === 1 ? 'One Rep Max' : n + 'RM'; }
 
-// Every moment the record for exactly `reps` reps was broken, oldest first: a
-// session counts when its heaviest set beats the best of all sessions before
-// it (strictly heavier, so equalling a record is not a new one). The last entry
-// is the current record, dated the first time that weight was lifted.
-function getExerciseRepRecordHistory(name, reps) {
-  const history = [];
-  getExerciseRepSeries(name, reps).forEach(p => {
-    if (!history.length || p.val > history[history.length - 1].val) history.push(p);
+// Every valid set (>= 1 rep, > 0 kg) of an exercise in workout-date order: by day,
+// then by position within the day.
+function getExerciseValidSets(name) {
+  const out = [];
+  Object.keys(db.workouts).sort().forEach(date => {
+    const ex = (db.workouts[date] || []).find(e => e.name === name);
+    if (!ex) return;
+    (ex.sets || []).forEach((s, i) => {
+      const reps = parseInt(s.reps) || 0;
+      const weight = parseFloat(s.weight) || 0;
+      if (reps >= 1 && weight > 0) out.push({ date, i, reps, weight });
+    });
   });
-  return history;
+  return out;
 }
 
-function getExerciseRepRecord(name, reps) {
-  const history = getExerciseRepRecordHistory(name, reps);
-  return history.length ? history[history.length - 1] : null;
+// Leading weight for every rep count 1..maxReps (see above), computed in one pass.
+// Result[n] = { reps, weight, direct, date, viaReps } or null (no data):
+//   direct  - a set with exactly n reps has this weight; date = first workout date it was lifted
+//   viaReps - otherwise the fewest reps (> n) of a set that has this weight
+function getRepLeaders(name, maxReps) {
+  const best = {}, firstDate = {};
+  getExerciseValidSets(name).forEach(s => {
+    if (s.weight > (best[s.reps] || 0)) { best[s.reps] = s.weight; firstDate[s.reps] = s.date; }
+  });
+  const top = Math.max(maxReps, ...Object.keys(best).map(Number));
+  const out = [];
+  let weight = 0, src = 0;
+  for (let n = top; n >= 1; n--) {
+    // >= so that on equal weights the nearest (fewest-rep) source wins
+    if (best[n] && best[n] >= weight) { weight = best[n]; src = n; }
+    out[n] = weight > 0
+      ? { reps: n, weight, direct: src === n, date: src === n ? firstDate[n] : null, viaReps: src === n ? null : src }
+      : null;
+  }
+  return out;
 }
 
-// Record history popup for one rep count: the current record plus every earlier
-// record, newest first.
+// Record detail popup for one rep count: the current (leading) record, then every
+// really logged set with exactly this rep count, newest workout date first.
 let recordsHistoryReps = null;
-function recordsHistoryRowHtml(p) {
+function recordsDetailRowHtml(weight, date, { trophy = false, clickable = false } = {}) {
   return `
-    <div class="records-row records-row-clickable" data-date="${p.date}" data-val="${p.val}">
-      <span class="records-row-weight">${prTrophySvg()}${p.val} kgs</span>
-      <span class="records-row-date">${formatDateStr(p.date, 'short')}</span>
+    <div class="records-row${clickable ? ' records-row-clickable' : ''}"${clickable ? ` data-date="${date}" data-val="${weight}"` : ''}>
+      <span class="records-row-weight">${trophy ? prTrophySvg() : ''}${weight} kgs</span>
+      <span class="records-row-date">${formatDateStr(date, 'short')}</span>
     </div>`;
 }
 function openRecordsHistory(reps) {
-  const history = getExerciseRepRecordHistory(currentExercise, reps);
-  if (history.length === 0) return;
+  const leader = getRepLeaders(currentExercise, getExerciseMaxReps(currentExercise))[reps];
+  if (!leader) return;
   recordsHistoryReps = reps;
-  const current = history[history.length - 1];
-  const previous = history.slice(0, -1).reverse();
+  const exact = getExerciseValidSets(currentExercise).filter(s => s.reps === reps).reverse();
+  const currentRow = leader.direct
+    ? recordsDetailRowHtml(leader.weight, leader.date, { trophy: true, clickable: true })
+    : `<div class="records-row">
+         <span class="records-row-weight">${leader.weight} kgs</span>
+         <span class="records-row-via">via ${recordsRepLabel(leader.viaReps)}</span>
+       </div>`;
   document.getElementById('records-history-title').textContent = recordsRepLabel(reps) + ' history';
   document.getElementById('records-history-body').innerHTML = `
     <div class="info-section-label">Current record</div>
-    ${recordsHistoryRowHtml(current)}
-    <div class="info-section-label">Previous records</div>
-    ${previous.length ? previous.map(recordsHistoryRowHtml).join('') : '<div class="records-empty">No previous records</div>'}`;
+    ${currentRow}
+    <div class="info-section-label">${recordsRepLabel(reps)} history</div>
+    ${exact.length ? exact.map(x => recordsDetailRowHtml(x.weight, x.date, { clickable: true })).join('') : '<div class="records-empty">No data</div>'}`;
   openOverlay('records-history-overlay');
 }
 
-// Right-hand side of a record row/block: weight + date, or "No data".
+// Right-hand side of a record row/block: weight + date (+ trophy) when the leading
+// weight comes from a set with exactly this rep count, weight + "via MRM" when it is
+// derived from a set with more reps, or "No data".
 function recordsValueHtml(rec) {
-  return rec
+  if (!rec) return `<span class="records-row-nodata">No data</span>`;
+  return rec.direct
     ? `<span class="records-row-value">
-        <span class="records-row-weight">${prTrophySvg()}${rec.val} kgs</span>
+        <span class="records-row-weight">${prTrophySvg()}${rec.weight} kgs</span>
         <span class="records-row-date">${formatDateStr(rec.date, 'short')}</span>
       </span>`
-    : `<span class="records-row-nodata">No data</span>`;
+    : `<span class="records-row-value">
+        <span class="records-row-weight">${rec.weight} kgs</span>
+        <span class="records-row-via">via ${recordsRepLabel(rec.viaReps)}</span>
+      </span>`;
 }
 const CROWN_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 16L3 6l5.5 4L12 4l3.5 6L21 6l-2 10H5zm0 2h14v2H5z"/></svg>';
 
 function openExerciseRecords() {
   document.getElementById('records-title').textContent = (currentExercise || '') + ' records';
-  // One Rep Max: its own block on top; the list below starts at 2RM.
-  const oneRm = getExerciseRepRecord(currentExercise, 1);
+  const maxReps = getExerciseMaxReps(currentExercise);
+  const leaders = getRepLeaders(currentExercise, maxReps);
+  // One Rep Max: its own block on top (same rule as a normal row); the list below starts at 2RM.
+  const oneRm = leaders[1];
   const hero = document.getElementById('records-hero');
   hero.className = 'records-hero' + (oneRm ? ' records-hero-clickable' : '');
   if (oneRm) hero.dataset.reps = '1'; else delete hero.dataset.reps;
   hero.innerHTML = `<span class="records-hero-label">${CROWN_SVG}One rep max</span>${recordsValueHtml(oneRm)}`;
   const list = document.getElementById('records-list');
-  list.innerHTML = Array.from({ length: getExerciseMaxReps(currentExercise) - 1 }, (_, k) => {
+  list.innerHTML = Array.from({ length: maxReps - 1 }, (_, k) => {
     const reps = k + 2;
-    const rec = getExerciseRepRecord(currentExercise, reps);
+    const rec = leaders[reps];
     return `
       <div class="records-row${rec ? ' records-row-clickable' : ''}"${rec ? ` data-reps="${reps}"` : ''}>
         <span class="records-row-reps">${recordsRepLabel(reps)}</span>
