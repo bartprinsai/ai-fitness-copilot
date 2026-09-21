@@ -2126,7 +2126,7 @@ function renderHistoryTab() {
     .slice(0, 20);
 
   if (relevantDates.length === 0) {
-    container.innerHTML = `<div style="padding:32px;text-align:center;color:#9e9e9e">No previous sessions for ${currentExercise}</div>`;
+    container.innerHTML = `<div style="padding:32px;text-align:center;color:#9e9e9e;font-size:14px">No previous sessions for ${currentExercise}</div>`;
     return;
   }
 
@@ -4022,7 +4022,7 @@ function renderPlanDetail() {
         <div class="plan-day-name">${day.name}</div>
         <button class="plan-day-load-btn" data-idx="${idx}">Load ▶</button>
       </div>
-      <div class="plan-day-exercises">${exRows || '<div style="color:#444;font-size:13px;padding:0 0 4px">No exercises</div>'}</div>
+      <div class="plan-day-exercises">${exRows || '<div style="color:#444;font-size:14px;padding:0 0 4px">No exercises</div>'}</div>
     `;
     card.querySelector('.plan-day-load-btn').addEventListener('click', () => {
       loadWorkoutReturnScreen = 'screen-plan-detail';

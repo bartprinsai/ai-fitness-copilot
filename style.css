@@ -172,17 +172,19 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .exercise-set-row.drop-child, .exercise-set-row.drop-parent { --drop-x: 72px; }
 .history-set-row.drop-child, .history-set-row.drop-parent { --drop-x: 82px; }
 .set-row.drop-child .set-weight { justify-content: flex-start; padding-left: 10px; }
-.set-row.drop-child .set-weight-val, .set-row.drop-child .set-reps-val { font-size: 14px; }
+.set-row.drop-child .set-weight-val, .set-row.drop-child .set-reps-val { font-size: 13px; }
+.set-row.drop-child .set-weight-unit, .set-row.drop-child .set-reps-unit { font-size: 10px; }
 .exercise-set-row.drop-child .exercise-set-weight { justify-content: flex-start; padding-left: 10px; }
-.exercise-set-row.drop-child .exercise-set-val { font-size: 16px; }
-.history-set-row.drop-child .history-set-weight { display: inline-flex; align-items: center; padding-left: 10px; font-size: 14px; }
-.history-set-row.drop-child .history-set-reps { font-size: 14px; }
+.exercise-set-row.drop-child .exercise-set-val { font-size: 17px; }
+.exercise-set-row.drop-child .exercise-set-unit { font-size: 10px; }
+.history-set-row.drop-child .history-set-weight { display: inline-flex; align-items: center; padding-left: 10px; font-size: 13px; }
+.history-set-row.drop-child .history-set-reps { font-size: 13px; }
 .exercise-set-val { font-size: 20px; font-weight: 700; color: var(--text-primary); }
 .exercise-set-unit { font-size: 12px; font-weight: 400; color: var(--text-secondary); }
 .exercise-card-empty { padding: 6px 12px 10px; font-size: 14px; color: var(--text-hint); }
 
 /* ── EXERCISE LIST SCREEN ─────────────────────────────── */
-.exercises-title-wrap { flex: 1; color: white; font-size: 20px; font-weight: 700; padding: 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.exercises-title-wrap { flex: 1; color: white; font-size: 18px; font-weight: 500; padding: 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0.01em; }
 .category-item-sub { font-size: 12px; color: var(--text-hint); flex-shrink: 0; }
 
 /* Shared horizontal box-model for every full-width row on this screen (the
@@ -211,7 +213,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .exercise-item-custom .exercise-item-name { color: var(--cyan); }
 .exercise-item-fav-star { width: 18px; height: 18px; fill: var(--blue-btn); flex-shrink: 0; margin-right: 10px; }
 .exercise-item-dots { width: 20px; height: 20px; fill: var(--text-hint); flex-shrink: 0; }
-.exercise-empty { padding: 32px; text-align: center; color: var(--text-hint); font-size: 15px; }
+.exercise-empty { padding: 32px; text-align: center; color: var(--text-hint); font-size: 14px; }
 
 /* ── TRAINING TABS ────────────────────────────────────── */
 .training-tabs { display: flex; background: #212121; flex-shrink: 0; }
@@ -226,7 +228,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .set-fields { background: var(--surface); display: flex; flex-direction: column; flex-shrink: 0; box-shadow: 0 2px 4px rgba(0,0,0,.1); }
 .field-group { padding: 12px 16px 14px; border-bottom: 1px solid var(--border); }
 .field-group:last-child { border-bottom: none; }
-.field-label { display: block; font-size: 11px; font-weight: 700; color: var(--text-secondary); letter-spacing: .1em; margin-bottom: 6px; }
+.field-label { display: block; font-size: 11px; font-weight: 700; color: var(--text-secondary); letter-spacing: .08em; margin-bottom: 6px; }
 .field-cyan-line { height: 2px; background: var(--cyan); margin-bottom: 12px; }
 .field-controls { display: flex; align-items: center; gap: 12px; width: 100%; overflow: hidden; }
 .field-btn { width: 44px; height: 44px; border-radius: 4px; border: none; background: var(--gray-btn); color: var(--text-primary); font-size: 22px; font-weight: 300; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.1s; flex-shrink: 0; user-select: none; line-height: 1; }
@@ -244,7 +246,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 /* DROPSET checkbox on the REPS label line: same label type (11px, tracking, weight) in the accent colour */
 .field-label-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
 .field-label-row .field-label { margin-bottom: 0; }
-.dropset-check { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: .1em; color: var(--cyan); cursor: pointer; user-select: none; position: relative; padding: 6px 0 6px 12px; margin: -6px 0; }
+.dropset-check { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: .08em; color: var(--cyan); cursor: pointer; user-select: none; position: relative; padding: 6px 0 6px 12px; margin: -6px 0; }
 .field-group .dropset-check input { position: absolute; opacity: 0; width: 0; height: 0; flex: none; pointer-events: none; }
 .dropset-box { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--cyan); display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-sizing: border-box; transition: background .1s; }
 .dropset-box svg { width: 10px; height: 10px; fill: #fff; opacity: 0; }
@@ -261,9 +263,9 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 
 /* ── ACTION BUTTONS ───────────────────────────────────── */
 .action-buttons { display: flex; flex-shrink: 0; gap: 10px; padding: 12px 16px; }
-.btn-save { flex: 1; padding: 15px 8px; border: none; border-radius: 8px; background: var(--green); color: white; font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer; transition: background 0.1s; text-transform: uppercase; letter-spacing: .08em; }
+.btn-save { flex: 1; padding: 15px 8px; border: none; border-radius: 8px; background: var(--green); color: white; font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.1s; text-transform: uppercase; letter-spacing: .06em; }
 .btn-save:active { background: #388e3c; }
-.btn-clear { flex: 1; padding: 15px 8px; border: none; border-radius: 8px; background: var(--blue-btn); color: white; font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer; transition: background 0.1s; text-transform: uppercase; letter-spacing: .08em; }
+.btn-clear { flex: 1; padding: 15px 8px; border: none; border-radius: 8px; background: var(--blue-btn); color: white; font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.1s; text-transform: uppercase; letter-spacing: .06em; }
 .btn-clear:active { background: #1565c0; }
 .btn-clear.btn-delete-mode { background: #C62828; }
 .btn-clear.btn-delete-mode:active { background: #b71c1c; }
@@ -272,15 +274,15 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .set-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; background: var(--surface); padding-bottom: var(--ai-bar-space); }
 .set-row { display: grid; grid-template-columns: 28px 20px 32px 1fr 1fr 64px; padding: 13px 8px; border-bottom: 1px solid var(--border); background: var(--surface); cursor: pointer; transition: background 0.08s; align-items: center; }
 .set-row:active, .set-row.selected { background: var(--cyan-light); }
-.set-row span { font-size: 15px; text-align: center; }
+.set-row span { text-align: center; }
 .set-comment { display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 4px; border-radius: 50%; }
 .set-comment svg { width: 16px; height: 16px; fill: #d0d0d0; transition: fill 0.12s; }
 .set-comment.has-note svg { fill: var(--cyan); }
 .set-row-pr { display: flex; align-items: center; justify-content: center; }
 .set-num { font-size: 15px; font-weight: 700; color: var(--text-primary); }
 .set-weight, .set-reps { display: flex; align-items: baseline; justify-content: center; gap: 3px; }
-.set-weight-val, .set-reps-val { font-size: 18px; font-weight: 700; color: var(--text-primary); }
-.set-weight-unit, .set-reps-unit { font-size: 13px; color: var(--text-secondary); }
+.set-weight-val, .set-reps-val { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+.set-weight-unit, .set-reps-unit { font-size: 12px; font-weight: 400; color: var(--text-secondary); }
 .set-pr-icon { width: 14px; height: 14px; fill: var(--cyan); flex-shrink: 0; }
 .set-row-dragging { position: relative; z-index: 10; will-change: transform; box-shadow: 0 8px 28px rgba(0,0,0,.22); }
 
@@ -314,7 +316,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 #tab-graph { overflow: hidden; padding-bottom: var(--ai-bar-space); }
 .graph-chart-wrap { position: relative; flex: 1; min-height: 180px; }
 #progress-chart { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; touch-action: manipulation; }
-.graph-empty { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; text-align: center; color: var(--text-hint); padding: 16px; font-size: 15px; }
+.graph-empty { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; text-align: center; color: var(--text-hint); padding: 16px; font-size: 14px; }
 /* Selection panel: ‹ weight × reps / date › — arrows grey out at the ends of the series. */
 .graph-selection { display: flex; align-items: stretch; flex-shrink: 0; background: var(--surface); border-top: 1px solid var(--border); }
 .graph-sel-arrow { width: 64px; min-height: 64px; border: none; background: none; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .1s; }
@@ -411,7 +413,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .btn-text-danger:active { background: rgba(211,47,47,0.16); }
 
 /* ── CALENDAR ─────────────────────────────────────────── */
-.cal-grid-header { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 11px; font-weight: 700; color: var(--text-hint); padding: 6px 0 4px; text-transform: uppercase; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.cal-grid-header { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 11px; font-weight: 700; color: var(--text-hint); padding: 6px 0 4px; text-transform: uppercase; letter-spacing: .08em; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0; }
 /* calOnScroll() (app.js) prepends older months above the viewport and
    manually compensates scrollTop by the exact height added, to keep the
    visual position stable. The browser's own CSS scroll-anchoring does the
@@ -422,7 +424,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
    scrolling up. Turning off native scroll anchoring here leaves our manual
    compensation as the only adjustment, which fixes the jump. */
 .cal-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; overflow-anchor: none; background: var(--bg); padding-bottom: var(--ai-bar-space); }
-.cal-month-header { padding: 16px 16px 4px; font-size: 13px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .06em; }
+.cal-month-header { padding: 16px 16px 4px; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .08em; }
 .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; padding: 4px 12px; }
 .cal-day { aspect-ratio: 1; border: none; background: none; font-family: inherit; font-size: 14px; color: var(--text-primary); cursor: pointer; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.12s; position: relative; }
 .cal-day:active { background: var(--cyan-light); }
@@ -567,7 +569,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .ai-gen-textarea { width: 100%; padding: 12px; border: 1px solid #2e2e2e; border-radius: 10px; background: #1E1E1E; color: #fff; font-family: inherit; font-size: 14px; resize: none; height: 80px; outline: none; transition: border-color .15s; }
 .ai-gen-textarea:focus { border-color: #7C4DFF; }
 .ai-gen-textarea::placeholder { color: #444; }
-.ai-gen-submit-btn { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 16px; border: none; border-radius: 14px; background: #7C4DFF; color: #fff; font-family: inherit; font-size: 16px; font-weight: 700; cursor: pointer; transition: filter .1s; flex-shrink: 0; }
+.ai-gen-submit-btn { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 16px; border: none; border-radius: 14px; background: #7C4DFF; color: #fff; font-family: inherit; font-size: 14px; font-weight: 500; text-transform: uppercase; letter-spacing: .06em; cursor: pointer; transition: filter .1s; flex-shrink: 0; }
 .ai-gen-submit-btn:active { filter: brightness(.85); }
 .ai-gen-submit-btn svg { width: 18px; height: 18px; }
 .ai-gen-loading { flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
@@ -581,7 +583,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 /* ── LOAD WORKOUT SCREEN ──────────────────────────────── */
 .lw-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 10px 12px; }
 .lw-footer { padding: 12px 16px calc(var(--safe-bottom) + 12px); background: var(--surface); border-top: 1px solid var(--border); flex-shrink: 0; margin-bottom: var(--ai-bar-space); }
-.lw-load-btn { width: 100%; padding: 16px; border: none; border-radius: 14px; background: var(--cyan); color: #fff; font-family: inherit; font-size: 16px; font-weight: 700; cursor: pointer; transition: filter .1s; }
+.lw-load-btn { width: 100%; padding: 16px; border: none; border-radius: 14px; background: var(--cyan); color: #fff; font-family: inherit; font-size: 14px; font-weight: 500; text-transform: uppercase; letter-spacing: .06em; cursor: pointer; transition: filter .1s; }
 .lw-load-btn:active { filter: brightness(.85); }
 
 .lw-select-all-row { display: flex; align-items: center; gap: 10px; padding: 8px 4px 12px; cursor: pointer; color: var(--cyan); font-size: 13px; font-weight: 600; }
@@ -704,7 +706,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
    since the name's own content width shifts everything after it. */
 .plate-list-header { display: grid; grid-template-columns: 1fr 100px 100px; gap: 10px; padding: 0 12px 6px; }
 .plate-list-header-col { text-align: center; font-size: 10px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .06em; }
-.plate-list-header-sub { font-size: 9px; font-weight: 500; color: var(--text-hint); text-transform: none; letter-spacing: normal; margin-top: 1px; }
+.plate-list-header-sub { font-size: 10px; font-weight: 500; color: var(--text-hint); text-transform: none; letter-spacing: normal; margin-top: 1px; }
 .plate-list { display: flex; flex-direction: column; background: var(--surface); border-radius: 12px; padding: 4px 12px; box-shadow: 0 1px 3px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.08); }
 .plate-row { display: grid; grid-template-columns: 1fr 100px 100px; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
 .plate-row:last-child { border-bottom: none; }
@@ -721,7 +723,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 /* Screen background is var(--bg) too, so the default .btn-secondary fill would be invisible here — white with a border, like an unselected .plate-bar-option. */
 .plate-actions-row .btn-secondary { flex: 1 1 0; min-width: 0; padding: 9px 2px; font-size: 12px; line-height: 1.25; background: var(--surface); border: 1px solid #ccc; }
 .plate-actions-row .btn-secondary:active { background: var(--bg); }
-.plate-calculate-btn { width: 100%; padding: 16px; border: none; border-radius: 14px; background: var(--cyan); color: #fff; font-family: inherit; font-size: 16px; font-weight: 700; cursor: pointer; transition: filter .1s; text-transform: uppercase; letter-spacing: .04em; }
+.plate-calculate-btn { width: 100%; padding: 16px; border: none; border-radius: 14px; background: var(--cyan); color: #fff; font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer; transition: filter .1s; text-transform: uppercase; letter-spacing: .06em; }
 .plate-calculate-btn:active { filter: brightness(.85); }
 .plate-result-card { background: var(--surface); border-left: 4px solid var(--cyan); border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.08); padding: 16px; display: flex; flex-direction: column; gap: 8px; }
 .plate-result-title { font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .08em; }
