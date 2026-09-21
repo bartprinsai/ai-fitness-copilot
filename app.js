@@ -1450,7 +1450,7 @@ function getExerciseRepRecord(name, reps) {
 
 function openExerciseRecords() {
   const list = document.getElementById('records-list');
-  document.getElementById('records-title').textContent = 'Personal Records — ' + (currentExercise || '');
+  document.getElementById('records-title').textContent = (currentExercise || '') + ' records';
   list.innerHTML = Array.from({ length: getExerciseMaxReps(currentExercise) }, (_, k) => {
     const reps = k + 1;
     const rec = getExerciseRepRecord(currentExercise, reps);
@@ -1466,7 +1466,8 @@ function openExerciseRecords() {
         ${value}
       </div>`;
   }).join('');
-  openOverlay('records-overlay');
+  document.getElementById('records-scroll').scrollTop = 0;
+  showScreen('screen-records');
 }
 
 // -- Exercise info (muscle group / equipment setup) ------
@@ -2834,7 +2835,6 @@ const OVERLAY_CANCEL_BUTTON = {
   'presets-overlay': 'btn-presets-close',
   'cal-detail-overlay': 'cal-detail-cancel',
   'set-note-overlay': 'btn-set-note-cancel',
-  'records-overlay': 'btn-records-close',
   'new-category-overlay': 'btn-new-category-cancel',
   'cat-edit-overlay': 'btn-cat-edit-cancel',
   'delete-exercise-overlay': 'btn-delete-ex-cancel',
@@ -2907,7 +2907,7 @@ document.getElementById('btn-clear').addEventListener('click', () => {
   else clearFields();
 });
 document.getElementById('btn-training-pr').addEventListener('click', openExerciseRecords);
-document.getElementById('btn-records-close').addEventListener('click', () => closeOverlay('records-overlay'));
+document.getElementById('btn-back-records').addEventListener('click', () => goBack('screen-training'));
 document.getElementById('btn-training-info').addEventListener('click', openExerciseInfo);
 document.getElementById('btn-exercise-info-edit').addEventListener('click', showExerciseInfoEdit);
 document.getElementById('btn-exercise-info-close').addEventListener('click', () => closeOverlay('exercise-info-overlay'));

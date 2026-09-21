@@ -812,14 +812,16 @@
   </div>
 </div>
 
-<!-- EXERCISE RECORDS OVERLAY -->
-<div class="overlay" id="records-overlay">
-  <div class="overlay-panel">
-    <h3 id="records-title">Personal Records</h3>
+<!-- EXERCISE RECORDS SCREEN -->
+<div id="screen-records" class="screen">
+  <div class="toolbar">
+    <button class="toolbar-btn" id="btn-back-records" aria-label="Back">
+      <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </button>
+    <span class="toolbar-title" id="records-title">Records</span>
+  </div>
+  <div class="records-scroll" id="records-scroll">
     <div class="records-list" id="records-list"></div>
-    <div class="overlay-btns">
-      <button class="btn-primary" id="btn-records-close">Close</button>
-    </div>
   </div>
 </div>
 
