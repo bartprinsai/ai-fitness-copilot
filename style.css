@@ -144,7 +144,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 #screen-fitness-tracker.sel-single .exercise-card-selected .exercise-card-drag-handle { display: flex; }
 .exercise-card-divider { height: 2px; background: var(--cyan); }
 .exercise-card-sets { padding: 6px 12px 10px; }
-.exercise-set-row { display: grid; grid-template-columns: 20px 16px 1fr 1fr 64px; align-items: baseline; padding: 6px 0; gap: 10px; }
+.exercise-set-row { display: grid; grid-template-columns: 20px 16px 1fr 1fr 64px; align-items: baseline; padding: 6px 12px; margin: 0 -12px; gap: 10px; }
 .exercise-set-comment, .history-set-comment { display: flex; align-items: center; justify-content: center; cursor: default; }
 .exercise-set-comment.has-note, .history-set-comment.has-note { cursor: pointer; }
 .exercise-set-comment svg, .history-set-comment svg { width: 15px; height: 15px; fill: var(--cyan); }
@@ -167,8 +167,12 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .set-row { --row-pad-y: 13px; }
 .exercise-set-row { --row-pad-y: 6px; }
 .history-set-row { --row-pad-y: 11px; }
-.history-set-row.has-drop { display: grid; grid-template-columns: 20px 14px 1fr 84px 64px; }
-.history-set-row.has-drop .history-set-reps { margin-left: 0; text-align: right; }
+#history-content .history-set-row { display: grid; grid-template-columns: 20px 14px 1fr 1fr 64px; border-bottom: 1px solid transparent; }
+#history-content .history-set-row.has-drop { grid-template-columns: 20px 14px 1fr 84px 64px; }
+#history-content .history-set-weight, #history-content .history-set-reps { display: flex; align-items: baseline; justify-content: flex-end; gap: 3px; margin-left: 0; font-size: inherit; font-weight: 400; color: var(--text-secondary); }
+#history-content .history-set-row.has-drop .history-set-weight { justify-content: flex-start; }
+#history-content .history-set-val { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+#history-content .history-set-unit { font-size: 12px; font-weight: 400; color: var(--text-secondary); }
 .set-row.has-drop .set-weight, .exercise-set-row.has-drop .exercise-set-weight { justify-content: flex-start; }
 .drop-wcell { position: relative; align-self: stretch; display: flex; align-items: center; min-width: 0; margin: calc(-1 * var(--row-pad-y)) 0 calc(-1 * var(--row-pad-y) - 1px); }
 .drop-wcell > :not(.drop-arrow) { flex: 1; min-width: 0; }
@@ -182,8 +186,8 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .set-row.drop-child .set-weight-unit, .set-row.drop-child .set-reps-unit { font-size: 10px; }
 .exercise-set-row.drop-child .exercise-set-val { font-size: 17px; }
 .exercise-set-row.drop-child .exercise-set-unit { font-size: 10px; }
-.history-set-row.drop-child .history-set-weight { font-size: 13px; }
-.history-set-row.drop-child .history-set-reps { font-size: 13px; }
+#history-content .history-set-row.drop-child .history-set-val { font-size: 13px; }
+#history-content .history-set-row.drop-child .history-set-unit { font-size: 10px; }
 .exercise-set-val { font-size: 20px; font-weight: 700; color: var(--text-primary); }
 .exercise-set-unit { font-size: 12px; font-weight: 400; color: var(--text-secondary); }
 .exercise-card-empty { padding: 6px 12px 10px; font-size: 14px; color: var(--text-hint); }
@@ -277,15 +281,19 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 
 /* ── SET LIST ─────────────────────────────────────────── */
 .set-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; background: var(--surface); padding-bottom: var(--ai-bar-space); }
-.set-row { display: grid; grid-template-columns: 28px 20px 32px 1fr 1fr 64px; padding: 13px 8px; border-bottom: 1px solid var(--border); background: var(--surface); cursor: pointer; transition: background 0.08s; align-items: center; }
+.set-row { display: grid; grid-template-columns: 28px 20px 32px 1fr 1fr 64px; padding: 13px 8px; border-bottom: 1px solid transparent; background: var(--surface); cursor: pointer; transition: background 0.08s; align-items: center; }
+/* Zebra striping (TRACK list, day overview, History): every second set of a list is light grey — the
+   transparent 1px bottom border keeps the old row height. Listed BEFORE :active/.selected so those win. */
+.row-alt { background: #f5f5f5; }
+.set-row.row-alt { background: #f5f5f5; }
 .set-row:active, .set-row.selected { background: var(--cyan-light); }
 .set-row span { text-align: center; }
-.set-comment { display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 4px; border-radius: 50%; }
-.set-comment svg { width: 16px; height: 16px; fill: #d0d0d0; transition: fill 0.12s; }
+.set-comment { display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 4px; border-radius: 50%; box-sizing: border-box; min-height: 24px; }
+.set-comment svg { width: 15px; height: 15px; fill: #d0d0d0; transition: fill 0.12s; }
 .set-comment.has-note svg { fill: var(--cyan); }
 .set-row-pr { display: flex; align-items: center; justify-content: center; }
 .set-num { font-size: 15px; font-weight: 700; color: var(--text-primary); }
-.set-weight, .set-reps { display: flex; align-items: baseline; justify-content: center; gap: 3px; }
+.set-weight, .set-reps { display: flex; align-items: baseline; justify-content: flex-end; gap: 3px; }
 .set-weight-val, .set-reps-val { font-size: 15px; font-weight: 700; color: var(--text-primary); }
 .set-weight-unit, .set-reps-unit { font-size: 12px; font-weight: 400; color: var(--text-secondary); }
 .set-pr-icon { width: 14px; height: 14px; fill: var(--cyan); flex-shrink: 0; }
@@ -297,6 +305,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .history-day-date { font-size: 12px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 5px; }
 .history-day-divider { height: 2px; background: var(--cyan); }
 .history-set-row { display: flex; align-items: center; padding: 11px 16px; border-bottom: 1px solid var(--border); background: var(--surface); gap: 8px; }
+.history-set-row.row-alt { background: #f5f5f5; }
 /* Only the History-tab rows are tappable ("go to" popups) — the same
    .history-day-header/.history-set-row classes are reused, un-clickable, in
    the Calendar day-detail popup, so the pointer/active feedback is scoped to

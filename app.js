@@ -845,7 +845,7 @@ function renderHome() {
         const isFirstPR = firstPRKeys.has(currentDate + '#' + setIdx);
         const hasNote = !!(s.note && s.note.trim());
         const row = document.createElement('div');
-        row.className = 'exercise-set-row' + dropsetRowClass(sets, setIdx);
+        row.className = 'exercise-set-row' + (setIdx % 2 ? ' row-alt' : '') + dropsetRowClass(sets, setIdx);
         row.innerHTML = `
           <span class="exercise-set-comment${hasNote ? ' has-note' : ''}" aria-label="Set comment">${hasNote ? COMMENT_ICON_SVG : ''}</span>
           ${isFirstPR ? prTrophySvg('exercise-set-pr') : `<span class="exercise-set-spacer"></span>`}
@@ -1553,7 +1553,7 @@ function renderSetList() {
     const hasNote = !!(s.note && s.note.trim());
     const isSelected = selectedSetIndex === i;
     const row = document.createElement('div');
-    row.className = 'set-row' + (isSelected ? ' selected' : '') + dropsetRowClass(sets, i);
+    row.className = 'set-row' + (isSelected ? ' selected' : '') + (i % 2 ? ' row-alt' : '') + dropsetRowClass(sets, i);
     row.dataset.setIdx = i;
     row.innerHTML = `
       <span class="set-comment${hasNote ? ' has-note' : ''}" aria-label="Set note">${COMMENT_ICON_SVG}</span>
@@ -2192,15 +2192,15 @@ function renderHistoryTab() {
       const isPR = firstPRKeys.has(date + '#' + i);
       const hasNote = !!(s.note && s.note.trim());
       const row = document.createElement('div');
-      row.className = 'history-set-row clickable' + dropsetRowClass(ex.sets, i);
+      row.className = 'history-set-row clickable' + (i % 2 ? ' row-alt' : '') + dropsetRowClass(ex.sets, i);
       // Same comment indicator as the Fitness Tracker day overview: only drawn
       // when the set has a note (the slot is always reserved so rows stay
       // aligned), and tapping it opens the same comment popup.
       row.innerHTML = `
         <span class="history-set-comment${hasNote ? ' has-note' : ''}" aria-label="Set comment">${hasNote ? COMMENT_ICON_SVG : ''}</span>
         ${isPR ? prTrophySvg('history-set-pr') : `<span class="history-set-spacer"></span>`}
-        ${dropWeightHtml(ex.sets, i, `<span class="history-set-weight">${s.weight} kg</span>`)}
-        <span class="history-set-reps">${s.reps} reps</span>
+        ${dropWeightHtml(ex.sets, i, `<span class="history-set-weight"><span class="history-set-val">${s.weight}</span><span class="history-set-unit">kgs</span></span>`)}
+        <span class="history-set-reps"><span class="history-set-val">${s.reps}</span><span class="history-set-unit">reps</span></span>
         <span class="history-set-effort">${effortCellHtml(s)}</span>
       `;
       if (hasNote) {
