@@ -485,6 +485,71 @@
   <div class="plan-detail-scroll" id="plan-detail-scroll"></div>
 </div>
 
+<!-- PLAN SCHEDULE SCREEN (tapping a plan card in "Mijn plannen" opens this) -->
+<div id="screen-plan-schedule" class="screen plan-screen">
+  <div class="toolbar plan-toolbar">
+    <button class="toolbar-btn" id="btn-back-plan-schedule" aria-label="Back">
+      <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </button>
+    <span class="toolbar-title" id="plan-schedule-title">Plan</span>
+  </div>
+  <div class="plan-schedule-scroll" id="plan-schedule-scroll">
+    <div class="ps-section">
+      <div class="info-section-label">Aantal dagen</div>
+      <div class="ps-num-grid" id="ps-day-count-grid">
+        <button class="ps-num-box" data-days="1">1</button>
+        <button class="ps-num-box" data-days="2">2</button>
+        <button class="ps-num-box" data-days="3">3</button>
+        <button class="ps-num-box" data-days="4">4</button>
+        <button class="ps-num-box" data-days="5">5</button>
+        <button class="ps-num-box" data-days="6">6</button>
+        <button class="ps-num-box" data-days="7">7</button>
+        <button class="ps-num-box" data-days="8">8</button>
+        <button class="ps-num-box" data-days="9">9</button>
+        <button class="ps-num-box" data-days="10">10</button>
+        <button class="ps-num-box" data-days="11">11</button>
+        <button class="ps-num-box" data-days="12">12</button>
+        <button class="ps-num-box" data-days="13">13</button>
+        <button class="ps-num-box" data-days="14">14</button>
+      </div>
+    </div>
+    <div class="ps-section">
+      <div class="info-section-label">Dagindeling</div>
+      <div class="ps-toggle-row" id="ps-fixed-toggle">
+        <button class="ps-toggle-option selected" data-fixed="0">Geen vaste dagen</button>
+        <button class="ps-toggle-option" data-fixed="1">Vaste dagen in de week</button>
+      </div>
+    </div>
+    <div class="ps-section" id="ps-weekdays-section" style="display:none">
+      <div class="ps-weekdays-counter" id="ps-weekdays-counter"></div>
+      <div class="ps-week-block">
+        <div class="ps-week-label" id="ps-week-a-label">Week A</div>
+        <div class="ps-weekday-row" data-week="a">
+          <button class="ps-day-circle" data-day="0">Ma</button>
+          <button class="ps-day-circle" data-day="1">Di</button>
+          <button class="ps-day-circle" data-day="2">Wo</button>
+          <button class="ps-day-circle" data-day="3">Do</button>
+          <button class="ps-day-circle" data-day="4">Vr</button>
+          <button class="ps-day-circle" data-day="5">Za</button>
+          <button class="ps-day-circle" data-day="6">Zo</button>
+        </div>
+      </div>
+      <div class="ps-week-block" id="ps-week-b-block" style="display:none">
+        <div class="ps-week-label">Week B</div>
+        <div class="ps-weekday-row" data-week="b">
+          <button class="ps-day-circle" data-day="0">Ma</button>
+          <button class="ps-day-circle" data-day="1">Di</button>
+          <button class="ps-day-circle" data-day="2">Wo</button>
+          <button class="ps-day-circle" data-day="3">Do</button>
+          <button class="ps-day-circle" data-day="4">Vr</button>
+          <button class="ps-day-circle" data-day="5">Za</button>
+          <button class="ps-day-circle" data-day="6">Zo</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- AI GENERATE SCREEN -->
 <div id="screen-ai-generate" class="screen plan-screen">
   <div class="toolbar plan-toolbar">

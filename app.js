@@ -271,6 +271,7 @@ const SCREEN_ON_ENTER = {
   'screen-new-workout': () => renderNewWorkoutScreen(),
   'screen-workout-plan': () => renderPlanList(),
   'screen-plan-detail': () => renderPlanDetail(),
+  'screen-plan-schedule': () => renderPlanSchedule(),
 };
 
 // Per-screen "does the CURRENTLY ACTIVE screen have unsaved input?" checks,
@@ -4121,7 +4122,7 @@ function renderPlanList() {
       </div>
       <button class="plan-item-dots" aria-label="Options"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button>
     `;
-    item.querySelector('.plan-item-info').addEventListener('click', () => openPlanDetail(plan.id));
+    item.querySelector('.plan-item-info').addEventListener('click', () => openPlanSchedule(plan.id));
     item.querySelector('.plan-item-dots').addEventListener('click', e => {
       e.stopPropagation();
       const isAct = db.activePlan && db.activePlan.planId === plan.id;
@@ -4179,6 +4180,101 @@ function renderPlanDetail() {
     scroll.appendChild(card);
   });
 }
+
+// ── Plan Schedule Screen (days/week + optional fixed weekday assignment) ──
+// Tapping a plan card in "Mijn plannen" opens this instead of the day/exercise
+// screen above — that screen (and Plan Day Edit, and the Presets/AI-generate
+// flows that used to feed it) is unreachable from the UI now but left intact.
+function openPlanSchedule(planId) {
+  currentPlanId = planId;
+  currentPlanData = db.plans[planId];
+  if (!currentPlanData) return;
+  document.getElementById('plan-schedule-title').textContent = currentPlanData.name;
+  renderPlanSchedule();
+  showScreen('screen-plan-schedule');
+}
+
+async function savePlanSchedule() {
+  db.plans[currentPlanId] = currentPlanData;
+  await persistPlan(currentPlanId, currentPlanData);
+}
+
+function renderPlanSchedule() {
+  if (!currentPlanData) return;
+  const daysPerWeek = currentPlanData.daysPerWeek || 0;
+  const fixedDays = !!currentPlanData.fixedDays;
+  const weekdaysA = currentPlanData.weekdaysA || [];
+  const weekdaysB = currentPlanData.weekdaysB || [];
+  const splitWeeks = daysPerWeek > 7;
+
+  document.querySelectorAll('#ps-day-count-grid .ps-num-box').forEach(btn => {
+    btn.classList.toggle('selected', parseInt(btn.dataset.days) === daysPerWeek);
+  });
+
+  document.querySelectorAll('#ps-fixed-toggle .ps-toggle-option').forEach(btn => {
+    btn.classList.toggle('selected', (btn.dataset.fixed === '1') === fixedDays);
+  });
+
+  document.getElementById('ps-weekdays-section').style.display = fixedDays ? '' : 'none';
+  if (!fixedDays) return;
+
+  document.getElementById('ps-week-a-label').style.display = splitWeeks ? '' : 'none';
+  document.getElementById('ps-week-b-block').style.display = splitWeeks ? '' : 'none';
+
+  const totalSelected = weekdaysA.length + (splitWeeks ? weekdaysB.length : 0);
+  document.getElementById('ps-weekdays-counter').textContent = `${totalSelected} / ${daysPerWeek} dagen geselecteerd`;
+  const atLimit = totalSelected >= daysPerWeek;
+
+  function renderWeekRow(weekKey, selectedArr) {
+    document.querySelectorAll(`.ps-weekday-row[data-week="${weekKey}"] .ps-day-circle`).forEach(btn => {
+      const isSelected = selectedArr.includes(parseInt(btn.dataset.day));
+      btn.classList.toggle('selected', isSelected);
+      btn.disabled = !isSelected && atLimit;
+    });
+  }
+  renderWeekRow('a', weekdaysA);
+  if (splitWeeks) renderWeekRow('b', weekdaysB);
+}
+
+document.getElementById('plan-schedule-scroll').addEventListener('click', async e => {
+  if (!currentPlanData) return;
+
+  const dayBtn = e.target.closest('.ps-num-box');
+  if (dayBtn) {
+    const days = parseInt(dayBtn.dataset.days);
+    if (currentPlanData.daysPerWeek === days) return;
+    currentPlanData.daysPerWeek = days;
+    currentPlanData.weekdaysA = [];
+    currentPlanData.weekdaysB = [];
+    renderPlanSchedule();
+    await savePlanSchedule();
+    return;
+  }
+
+  const toggleBtn = e.target.closest('.ps-toggle-option');
+  if (toggleBtn) {
+    const fixed = toggleBtn.dataset.fixed === '1';
+    if (!!currentPlanData.fixedDays === fixed) return;
+    currentPlanData.fixedDays = fixed;
+    renderPlanSchedule();
+    await savePlanSchedule();
+    return;
+  }
+
+  const circleBtn = e.target.closest('.ps-day-circle');
+  if (circleBtn && !circleBtn.disabled) {
+    const week = circleBtn.closest('.ps-weekday-row').dataset.week;
+    const dayIdx = parseInt(circleBtn.dataset.day);
+    const key = week === 'a' ? 'weekdaysA' : 'weekdaysB';
+    const arr = currentPlanData[key] || (currentPlanData[key] = []);
+    const pos = arr.indexOf(dayIdx);
+    if (pos >= 0) arr.splice(pos, 1); else arr.push(dayIdx);
+    renderPlanSchedule();
+    await savePlanSchedule();
+  }
+});
+
+document.getElementById('btn-back-plan-schedule').addEventListener('click', () => goBack('screen-workout-plan'));
 
 // ── Plan Day Edit Screen ──────────────────────────────
 function openPlanDayEdit(dayIdx) {

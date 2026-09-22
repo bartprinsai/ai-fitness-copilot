@@ -590,6 +590,31 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .plan-day-ex-name { flex: 1; font-size: 14px; color: #ccc; }
 .plan-day-ex-sets { font-size: 12px; color: #555; flex-shrink: 0; }
 
+/* ── PLAN SCHEDULE SCREEN (light, like #screen-workout-plan) ──────────── */
+#screen-plan-schedule.plan-screen { background: var(--bg); color: var(--text-primary); }
+.plan-schedule-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px 16px calc(var(--ai-bar-space) + 16px); display: flex; flex-direction: column; gap: 20px; }
+.ps-section { display: flex; flex-direction: column; gap: 10px; }
+
+/* "Aantal dagen": 14 equal-width boxes, 2 rows of 7. Unselected = white/bordered/grey,
+   selected = solid blue/white, same convention reused by the weekday circles below. */
+.ps-num-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+.ps-num-box { padding: 10px 0; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text-secondary); font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; transition: background .1s, border-color .1s, color .1s; }
+.ps-num-box.selected { background: var(--blue); border-color: var(--blue); color: #fff; }
+
+/* "Dagindeling": two-up toggle, same layout idea as .plate-bar-options but with a
+   solid-fill selected state (per spec) rather than the Calculator's tinted one. */
+.ps-toggle-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.ps-toggle-option { padding: 12px 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text-secondary); font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; text-align: center; transition: background .1s, border-color .1s, color .1s; }
+.ps-toggle-option.selected { background: var(--blue); border-color: var(--blue); color: #fff; }
+
+.ps-weekdays-counter { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.ps-week-block { display: flex; flex-direction: column; gap: 8px; }
+.ps-week-label { font-size: 11px; font-weight: 700; color: var(--text-secondary); letter-spacing: .08em; text-transform: uppercase; }
+.ps-weekday-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.ps-day-circle { aspect-ratio: 1; border-radius: 50%; border: 1px solid var(--border); background: var(--surface); color: var(--text-secondary); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .1s, border-color .1s, color .1s; }
+.ps-day-circle.selected { background: var(--blue); border-color: var(--blue); color: #fff; }
+.ps-day-circle:disabled { opacity: .4; cursor: not-allowed; }
+
 /* ── AI GENERATE FORM ─────────────────────────────────── */
 .ai-gen-form { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px 16px calc(var(--ai-bar-space) + 16px); display: flex; flex-direction: column; gap: 20px; }
 .ai-gen-section { display: flex; flex-direction: column; gap: 10px; }
