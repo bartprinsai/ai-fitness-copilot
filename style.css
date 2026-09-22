@@ -583,18 +583,47 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 
 .plan-active-ribbon { padding: 6px 16px; font-size: 11px; font-weight: 700; color: #7C4DFF; background: rgba(124,77,255,.1); letter-spacing: .06em; flex-shrink: 0; display: none; }
 .plan-active-ribbon.show { display: block; }
+/* Small pencil next to the plan name in the header, shown only in the editable
+   state (planDetailEditMode) — opens the shared #plan-rename-overlay. */
+.plan-title-edit-btn { width: 34px; height: 34px; margin-right: 2px; }
+.plan-title-edit-btn svg { width: 17px; height: 17px; }
 .plan-detail-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 8px 12px calc(var(--ai-bar-space) + 24px); }
 .plan-day-card { display: flex; align-items: center; gap: 12px; background: var(--surface); box-shadow: 0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.06); border-radius: 14px; margin-bottom: 10px; padding: 14px; }
 .plan-day-num { width: 28px; height: 28px; border-radius: 50%; background: #7C4DFF; color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .plan-day-info { flex: 1; min-width: 0; }
+.plan-day-name-row { display: flex; align-items: center; gap: 6px; }
 .plan-day-name { font-size: 15px; font-weight: 600; color: var(--text-primary); }
 .plan-day-sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
-.plan-day-edit-btn { width: 34px; height: 34px; border: none; border-radius: 10px; background: var(--cyan-light); color: var(--cyan); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: background .1s; }
+.plan-day-edit-btn, .plan-day-delete-btn { width: 34px; height: 34px; border: none; border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: background .1s; }
+.plan-day-edit-btn { background: var(--cyan-light); color: var(--cyan); }
 .plan-day-edit-btn:active { background: rgba(41,182,246,.25); }
 .plan-day-edit-btn svg { width: 17px; height: 17px; fill: var(--cyan); }
+.plan-day-delete-btn { background: rgba(211,47,47,.1); color: #d32f2f; }
+.plan-day-delete-btn:active { background: rgba(211,47,47,.2); }
+.plan-day-delete-btn svg { width: 17px; height: 17px; fill: #d32f2f; }
+/* Small rename pencil next to a day-card's own name, editable state only. */
+.plan-day-rename-btn { width: 20px; height: 20px; border: none; background: none; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+.plan-day-rename-btn svg { width: 13px; height: 13px; fill: var(--cyan); }
 /* "WEEK A" / "WEEK B" group header above a block of generated day-cards — same small-kop
    convention as elsewhere (e.g. "MIJN PLANNEN"). */
 .plan-day-group-label { padding: 6px 4px 4px; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .08em; }
+
+/* "Dag toevoegen" / "Week toevoegen" dashed blocks, editable state only —
+   one per week section (day) and one overall while there's still just 1 week (week). */
+.plan-add-day-block, .plan-add-week-block { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; box-sizing: border-box; padding: 14px; margin-bottom: 10px; border-radius: 14px; border: 2px dashed; background: none; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.plan-add-day-block { border-color: var(--cyan); color: var(--cyan); }
+.plan-add-day-block:active { background: var(--cyan-light); }
+.plan-add-week-block { border-color: var(--green); color: var(--green); }
+.plan-add-week-block:active { background: rgba(76,175,80,.1); }
+.plan-add-block-icon { font-size: 18px; font-weight: 700; line-height: 1; }
+
+/* Weekday picker inside #day-picker-overlay ("Dag toevoegen" on a "Vaste dagen" plan) —
+   same circle geometry as .ps-day-circle, but the two states this needs (available vs.
+   already taken) are simpler: no persistent "selected" state, tapping one commits it. */
+.day-picker-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+.day-picker-circle { aspect-ratio: 1; border-radius: 50%; border: 1px solid var(--cyan); background: var(--surface); color: var(--cyan); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .1s; }
+.day-picker-circle:active { background: var(--cyan-light); }
+.day-picker-circle:disabled { border-color: var(--border); background: var(--border); color: var(--text-hint); cursor: not-allowed; }
 
 /* ── PLAN SCHEDULE SCREEN (light, like #screen-workout-plan) ──────────── */
 #screen-plan-schedule.plan-screen { background: var(--bg); color: var(--text-primary); }

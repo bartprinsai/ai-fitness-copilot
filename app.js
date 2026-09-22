@@ -249,6 +249,13 @@ let currentBrowseCategory = null;
 let exerciseScreenMode = 'browse';
 let exerciseLoadSelection = new Set();
 let exerciseLoadDayName = '';
+// Plan Detail's editable state (toggled via ⋮ → Bewerken/Klaar): adds rename pencils,
+// swaps the day pencil for a delete button, and shows Dag/Week toevoegen blocks.
+let planDetailEditMode = false;
+let pendingRenameDayIndex = null; // null while renaming the plan itself, else a day index
+let planRenameBaseline = '';
+let pendingDeleteDayIndex = null;
+let pendingAddDayGroup; // undefined | 'A' | 'B' — which week's "Dag toevoegen" was tapped
 let currentEditDayIndex = null;
 let pdeDragItem = null;
 let pdeDragStartY = 0;
@@ -3254,6 +3261,9 @@ const OVERLAY_CANCEL_BUTTON = {
   'delete-exercise-overlay': 'btn-delete-ex-cancel',
   'cat-delete-overlay': 'btn-cat-delete-cancel',
   'delete-plan-overlay': 'btn-delete-plan-cancel',
+  'plan-rename-overlay': 'btn-plan-rename-cancel',
+  'delete-plan-day-overlay': 'btn-delete-plan-day-cancel',
+  'day-picker-overlay': 'btn-day-picker-cancel',
   'reset-overlay': 'btn-reset-cancel',
   'history-goto-overlay': 'history-goto-cancel',
   'discard-changes-overlay': 'btn-discard-changes-cancel',
@@ -4195,6 +4205,7 @@ function openPlanDetail(planId) {
   currentPlanId = planId;
   currentPlanData = db.plans[planId];
   if (!currentPlanData) return;
+  planDetailEditMode = false;
   document.getElementById('plan-detail-title').textContent = currentPlanData.name;
   const isActive = db.activePlan && db.activePlan.planId === planId;
   const ribbon = document.getElementById('plan-active-ribbon');
@@ -4205,40 +4216,162 @@ function openPlanDetail(planId) {
   showScreen('screen-plan-detail');
 }
 
+// True once "Week toevoegen" has started a Week B section — checked via the explicit
+// flag (so a still-EMPTY Week B keeps its own "Dag toevoegen" block and the "Week
+// toevoegen" block stays gone) OR'd with actually having a 'B' day (so a plan that was
+// already split by the Schedule screen, before this flag existed, still counts).
+function planHasWeekB() {
+  return !!(currentPlanData.hasWeekB || (currentPlanData.days || []).some(d => d.group === 'B'));
+}
+
 function renderPlanDetail() {
+  document.getElementById('btn-plan-title-edit').classList.toggle('hidden', !planDetailEditMode);
   const scroll = document.getElementById('plan-detail-scroll');
   if (!currentPlanData || !currentPlanData.days) { scroll.innerHTML = ''; return; }
   scroll.innerHTML = '';
-  let lastGroup = undefined;
+
+  // Group the (already-ordered) days into contiguous same-group runs — 'A', 'B', or
+  // undefined for a plan with no Week A/B split yet. Rendered as segments so each
+  // week's own "Dag toevoegen" block lands right after that week's last card, even
+  // when Week A's block is tapped after Week B already has days of its own.
+  const segments = [];
   currentPlanData.days.forEach((day, idx) => {
-    if (day.group && day.group !== lastGroup) {
-      const groupLabel = document.createElement('div');
-      groupLabel.className = 'plan-day-group-label';
-      groupLabel.textContent = day.group === 'A' ? 'WEEK A' : 'WEEK B';
-      scroll.appendChild(groupLabel);
+    let seg = segments[segments.length - 1];
+    if (!seg || seg.group !== day.group) { seg = { group: day.group, dayIndices: [] }; segments.push(seg); }
+    seg.dayIndices.push(idx);
+  });
+  if (segments.length === 0) segments.push({ group: undefined, dayIndices: [] });
+  // A brand-new, still-empty Week B (planHasWeekB() via the flag, no 'B' day yet) has no
+  // segment of its own from the loop above — add one so it still gets its heading + block.
+  if (planHasWeekB() && !segments.some(s => s.group === 'B')) segments.push({ group: 'B', dayIndices: [] });
+
+  segments.forEach(seg => {
+    if (seg.group) {
+      const label = document.createElement('div');
+      label.className = 'plan-day-group-label';
+      label.textContent = seg.group === 'A' ? 'WEEK A' : 'WEEK B';
+      scroll.appendChild(label);
     }
-    lastGroup = day.group;
-    const exCount = (day.exercises || []).length;
-    const subText = exCount === 0 ? 'Geen oefeningen' : `${exCount} ${exCount === 1 ? 'oefening' : 'oefeningen'}`;
-    const card = document.createElement('div');
-    card.className = 'plan-day-card';
-    card.innerHTML = `
-      <div class="plan-day-num">${idx + 1}</div>
-      <div class="plan-day-info">
+    seg.dayIndices.forEach(idx => scroll.appendChild(buildPlanDayCard(currentPlanData.days[idx], idx)));
+    if (planDetailEditMode) scroll.appendChild(buildAddDayBlock(seg.group));
+  });
+
+  if (planDetailEditMode && !planHasWeekB()) scroll.appendChild(buildAddWeekBlock());
+}
+
+function buildPlanDayCard(day, idx) {
+  const exCount = (day.exercises || []).length;
+  const subText = exCount === 0 ? 'Geen oefeningen' : `${exCount} ${exCount === 1 ? 'oefening' : 'oefeningen'}`;
+  const card = document.createElement('div');
+  card.className = 'plan-day-card';
+  card.innerHTML = `
+    <div class="plan-day-num">${idx + 1}</div>
+    <div class="plan-day-info">
+      <div class="plan-day-name-row">
         <div class="plan-day-name">${day.name}</div>
-        <div class="plan-day-sub">${subText}</div>
+        ${planDetailEditMode ? `
+        <button class="plan-day-rename-btn" aria-label="Naam wijzigen">
+          <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+        </button>` : ''}
       </div>
-      <button class="plan-day-edit-btn" data-idx="${idx}" aria-label="Bewerken">
-        <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
-      </button>
-    `;
+      <div class="plan-day-sub">${subText}</div>
+    </div>
+    ${planDetailEditMode ? `
+    <button class="plan-day-delete-btn" aria-label="Dag verwijderen">
+      <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+    </button>` : `
+    <button class="plan-day-edit-btn" aria-label="Bewerken">
+      <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+    </button>`}
+  `;
+  if (planDetailEditMode) {
+    card.querySelector('.plan-day-rename-btn').addEventListener('click', () => openPlanDayRename(idx));
+    card.querySelector('.plan-day-delete-btn').addEventListener('click', () => openDeletePlanDayConfirm(idx));
+  } else {
     card.querySelector('.plan-day-edit-btn').addEventListener('click', () => {
       loadWorkoutReturnScreen = 'screen-plan-detail';
       openLoadWorkout(currentPlanId, idx);
     });
-    scroll.appendChild(card);
-  });
+  }
+  return card;
 }
+
+function buildAddDayBlock(group) {
+  const block = document.createElement('button');
+  block.className = 'plan-add-day-block';
+  block.innerHTML = `<span class="plan-add-block-icon">+</span><span>Dag toevoegen</span>`;
+  block.addEventListener('click', () => addPlanDay(group));
+  return block;
+}
+
+function buildAddWeekBlock() {
+  const block = document.createElement('button');
+  block.className = 'plan-add-week-block';
+  block.innerHTML = `<span class="plan-add-block-icon">+</span><span>Week toevoegen</span>`;
+  block.addEventListener('click', addPlanWeek);
+  return block;
+}
+
+// -- Plan / plan day rename (shared #plan-rename-overlay) ----------------
+function openPlanRename() {
+  pendingRenameDayIndex = null;
+  planRenameBaseline = currentPlanData.name;
+  document.getElementById('plan-rename-input').value = currentPlanData.name;
+  openOverlay('plan-rename-overlay');
+  setTimeout(() => document.getElementById('plan-rename-input').select(), 100);
+}
+
+function openPlanDayRename(idx) {
+  pendingRenameDayIndex = idx;
+  planRenameBaseline = currentPlanData.days[idx].name;
+  document.getElementById('plan-rename-input').value = currentPlanData.days[idx].name;
+  openOverlay('plan-rename-overlay');
+  setTimeout(() => document.getElementById('plan-rename-input').select(), 100);
+}
+
+document.getElementById('btn-plan-title-edit').addEventListener('click', openPlanRename);
+
+document.getElementById('btn-plan-rename-cancel').addEventListener('click', () => {
+  confirmDiscardIfChanged(
+    () => hasChanges(planRenameBaseline, document.getElementById('plan-rename-input').value),
+    () => closeOverlay('plan-rename-overlay')
+  );
+});
+document.getElementById('btn-plan-rename-save').addEventListener('click', async () => {
+  const val = document.getElementById('plan-rename-input').value.trim();
+  if (!val) return;
+  if (pendingRenameDayIndex === null) {
+    currentPlanData.name = val;
+    document.getElementById('plan-detail-title').textContent = val;
+  } else {
+    currentPlanData.days[pendingRenameDayIndex].name = val;
+  }
+  closeOverlay('plan-rename-overlay');
+  renderPlanDetail();
+  await savePlanSchedule();
+});
+
+// -- Plan day delete (mirrors openDeletePlanConfirm / #delete-plan-overlay) --
+function openDeletePlanDayConfirm(idx) {
+  pendingDeleteDayIndex = idx;
+  const day = currentPlanData.days[idx];
+  document.getElementById('delete-plan-day-msg').textContent = `"${day.name}" verwijderen? Dit kan niet ongedaan worden gemaakt.`;
+  openOverlay('delete-plan-day-overlay');
+}
+
+document.getElementById('btn-delete-plan-day-cancel').addEventListener('click', () => {
+  pendingDeleteDayIndex = null;
+  closeOverlay('delete-plan-day-overlay');
+});
+document.getElementById('btn-delete-plan-day-confirm').addEventListener('click', async () => {
+  if (pendingDeleteDayIndex === null) return;
+  currentPlanData.days.splice(pendingDeleteDayIndex, 1);
+  pendingDeleteDayIndex = null;
+  closeOverlay('delete-plan-day-overlay');
+  syncPlanScheduleFieldsAfterDayChange();
+  renderPlanDetail();
+  await savePlanSchedule();
+});
 
 // ── Plan Schedule Screen (days/week + optional fixed weekday assignment) ──
 // Tapping a plan card in "Mijn plannen" opens this instead of the day/exercise
@@ -4329,6 +4462,114 @@ function generatePlanDaysFromSchedule(plan) {
     ...weekdaysA.map(d => ({ name: `${WEEKDAY_FULL_NAMES[d]} A`, exercises: [], group: 'A' })),
     ...weekdaysB.map(d => ({ name: `${WEEKDAY_FULL_NAMES[d]} B`, exercises: [], group: 'B' })),
   ];
+}
+
+// ── Plan Detail editable state: add day / add week ────────────────────
+// Days generated by generatePlanDaysFromSchedule() (or a plan created before this
+// editable state existed) don't carry an explicit weekday index — only their
+// rendered Dutch name. This recovers it by parsing that name (after stripping any
+// "A"/"B" suffix), so weekday bookkeeping still works for a day this feature didn't
+// itself create. Returns undefined if the name was hand-edited into something
+// unparseable (e.g. via the rename pencil) — callers degrade gracefully for that.
+function inferDayWeekday(day) {
+  if (day.weekday !== undefined) return day.weekday;
+  let name = day.name;
+  if (day.group) name = name.replace(new RegExp('\\s*' + day.group + '$'), '');
+  const idx = WEEKDAY_FULL_NAMES.indexOf(name);
+  return idx >= 0 ? idx : undefined;
+}
+
+// Keeps daysPerWeek/weekdaysA/weekdaysB consistent with the actual `days` array after
+// any edit-mode add/delete, so the Plan Schedule screen still shows the right state if
+// the user goes back there, and a later "Doorgaan" there regenerates matching days
+// (generatePlanDaysFromSchedule preserves a day's exercises by matching on name).
+function syncPlanScheduleFieldsAfterDayChange() {
+  const days = currentPlanData.days;
+  currentPlanData.daysPerWeek = days.length;
+  if (!currentPlanData.fixedDays) return;
+  currentPlanData.weekdaysA = days.filter(d => d.group !== 'B').map(inferDayWeekday).filter(w => w !== undefined);
+  currentPlanData.weekdaysB = days.filter(d => d.group === 'B').map(inferDayWeekday).filter(w => w !== undefined);
+}
+
+// Week A's "Dag toevoegen" must insert right after Week A's own last day, not at the
+// very end of the array — Week B's days (if any) come after it and must stay last so
+// renderPlanDetail()'s contiguous-run grouping doesn't split Week A into two sections.
+function insertPlanDay(day, group) {
+  if (group === 'A') {
+    let insertAt = currentPlanData.days.length;
+    for (let i = currentPlanData.days.length - 1; i >= 0; i--) {
+      if (currentPlanData.days[i].group === 'A') { insertAt = i + 1; break; }
+    }
+    currentPlanData.days.splice(insertAt, 0, day);
+  } else {
+    currentPlanData.days.push(day);
+  }
+}
+
+async function addPlanDay(group) {
+  if (!currentPlanData) return;
+  if (!currentPlanData.fixedDays) {
+    const name = `Dag ${currentPlanData.days.length + 1}`;
+    insertPlanDay(group ? { name, exercises: [], group } : { name, exercises: [] }, group);
+    syncPlanScheduleFieldsAfterDayChange();
+    renderPlanDetail();
+    await savePlanSchedule();
+    return;
+  }
+  openPlanWeekdayPicker(group);
+}
+
+function openPlanWeekdayPicker(group) {
+  pendingAddDayGroup = group;
+  const usedWeekdays = new Set(
+    currentPlanData.days
+      .filter(d => (d.group || undefined) === (group || undefined))
+      .map(inferDayWeekday)
+      .filter(w => w !== undefined)
+  );
+  const grid = document.getElementById('day-picker-grid');
+  grid.innerHTML = WEEKDAY_FULL_NAMES.map((fullName, i) => {
+    const taken = usedWeekdays.has(i);
+    const short = fullName.slice(0, 2);
+    return `<button class="day-picker-circle" data-day="${i}" ${taken ? 'disabled' : ''}>${short}</button>`;
+  }).join('');
+  openOverlay('day-picker-overlay');
+}
+
+document.getElementById('day-picker-grid').addEventListener('click', async e => {
+  const btn = e.target.closest('.day-picker-circle');
+  if (!btn || btn.disabled) return;
+  const weekday = parseInt(btn.dataset.day);
+  const group = pendingAddDayGroup;
+  closeOverlay('day-picker-overlay');
+  const name = WEEKDAY_FULL_NAMES[weekday] + (group ? ' ' + group : '');
+  const day = { name, exercises: [], weekday };
+  if (group) day.group = group;
+  insertPlanDay(day, group);
+  syncPlanScheduleFieldsAfterDayChange();
+  renderPlanDetail();
+  await savePlanSchedule();
+});
+
+document.getElementById('btn-day-picker-cancel').addEventListener('click', () => closeOverlay('day-picker-overlay'));
+
+// Converts a single-week plan into Week A + a new, empty Week B: existing days become
+// Week A (fixed-days plans also get their weekday recovered via inferDayWeekday() and
+// an " A" suffix appended, since their name was plain "Maandag" etc. until now).
+async function addPlanWeek() {
+  if (!currentPlanData) return;
+  currentPlanData.days.forEach(day => {
+    const w = currentPlanData.fixedDays ? inferDayWeekday(day) : undefined;
+    day.group = 'A';
+    if (currentPlanData.fixedDays && w !== undefined) {
+      day.weekday = w;
+      day.name = WEEKDAY_FULL_NAMES[w] + ' A';
+    }
+  });
+  currentPlanData.hasWeekB = true;
+  syncPlanScheduleFieldsAfterDayChange();
+  renderPlanDetail();
+  await savePlanSchedule();
 }
 
 document.getElementById('btn-plan-schedule-continue').addEventListener('click', async () => {
@@ -4580,7 +4821,14 @@ document.getElementById('btn-plan-set-active').addEventListener('click', async (
 });
 
 document.getElementById('btn-overflow-plan-detail').addEventListener('click', e => {
+  if (planDetailEditMode) {
+    showOverflowMenu([
+      { label: 'Klaar', action: () => { planDetailEditMode = false; renderPlanDetail(); } },
+    ], e.currentTarget);
+    return;
+  }
   showOverflowMenu([
+    { label: 'Bewerken', action: () => { planDetailEditMode = true; renderPlanDetail(); } },
     { label: 'Dupliceren', action: () => duplicatePlan(currentPlanId) },
     { label: 'Verwijderen', action: () => {
       if (!currentPlanData) return;
