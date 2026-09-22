@@ -519,6 +519,15 @@ window.addEventListener('popstate', e => {
   // history entry the back press just consumed and show the same shared
   // discard confirmation on top of it, exactly like a nested overlay.
   const activeScreen = document.querySelector('.screen.active');
+  // Plan Detail's editable state: hardware back gets the same two-stage behavior as its
+  // in-app back arrow (see btn-back-plan-detail) — first press just closes the editable
+  // state and stays on this screen (consumed history entry restored, no navigation);
+  // only a second press, now out of edit mode, actually leaves the screen.
+  if (activeScreen && activeScreen.id === 'screen-plan-detail' && planDetailEditMode) {
+    restoreConsumedEntry();
+    exitPlanDetailEditMode();
+    return;
+  }
   const guard = activeScreen && SCREEN_HAS_CHANGES[activeScreen.id];
   if (skipScreenGuardOnce) {
     skipScreenGuardOnce = false;
@@ -4186,7 +4195,13 @@ function renderPlanList() {
       </div>
       <button class="plan-item-dots" aria-label="Options"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button>
     `;
-    item.querySelector('.plan-item-info').addEventListener('click', () => openPlanSchedule(plan.id));
+    item.querySelector('.plan-item-info').addEventListener('click', () => {
+      // First tap after creation configures the schedule (Aantal dagen/Dagindeling);
+      // once that's been confirmed once, later taps go straight to the day cards —
+      // "Bewerken" in Plan Detail is the way to change the configuration after that.
+      if (plan.scheduleConfirmed) openPlanDetail(plan.id);
+      else openPlanSchedule(plan.id);
+    });
     item.querySelector('.plan-item-dots').addEventListener('click', e => {
       e.stopPropagation();
       const isAct = db.activePlan && db.activePlan.planId === plan.id;
@@ -4226,6 +4241,8 @@ function planHasWeekB() {
 
 function renderPlanDetail() {
   document.getElementById('btn-plan-title-edit').classList.toggle('hidden', !planDetailEditMode);
+  document.getElementById('btn-plan-set-active').classList.toggle('hidden', planDetailEditMode);
+  document.getElementById('btn-plan-detail-done').classList.toggle('hidden', !planDetailEditMode);
   const scroll = document.getElementById('plan-detail-scroll');
   if (!currentPlanData || !currentPlanData.days) { scroll.innerHTML = ''; return; }
   scroll.innerHTML = '';
@@ -4583,6 +4600,7 @@ document.getElementById('btn-plan-schedule-continue').addEventListener('click', 
     ...d,
     exercises: oldExercisesByName.get(d.name) || [],
   }));
+  currentPlanData.scheduleConfirmed = true;
   db.plans[currentPlanId] = currentPlanData;
   await persistPlan(currentPlanId, currentPlanData);
   openPlanDetail(currentPlanId);
@@ -4820,10 +4838,25 @@ document.getElementById('btn-plan-set-active').addEventListener('click', async (
   document.getElementById('btn-plan-set-active').classList.toggle('is-active', isActive);
 });
 
+// Saves (everything's already persisted per-action, but this re-confirms) and leaves
+// the editable state — shared by the header checkmark, the back arrow's first tap
+// while editing, and the hardware back button's equivalent (see the popstate handler).
+async function exitPlanDetailEditMode() {
+  planDetailEditMode = false;
+  renderPlanDetail();
+  await savePlanSchedule();
+}
+
+document.getElementById('btn-plan-detail-done').addEventListener('click', exitPlanDetailEditMode);
+
 document.getElementById('btn-overflow-plan-detail').addEventListener('click', e => {
   if (planDetailEditMode) {
     showOverflowMenu([
-      { label: 'Klaar', action: () => { planDetailEditMode = false; renderPlanDetail(); } },
+      { label: 'Dupliceren', action: () => duplicatePlan(currentPlanId) },
+      { label: 'Verwijderen', action: () => {
+        if (!currentPlanData) return;
+        openDeletePlanConfirm(currentPlanId, currentPlanData.name, () => showScreen('screen-workout-plan'));
+      }},
     ], e.currentTarget);
     return;
   }
@@ -4837,7 +4870,14 @@ document.getElementById('btn-overflow-plan-detail').addEventListener('click', e 
   ], e.currentTarget);
 });
 
-document.getElementById('btn-back-plan-detail').addEventListener('click', () => goBack('screen-workout-plan'));
+// Two-stage back: while editing, the first tap just closes the editable state (same as
+// the checkmark) and stays on this screen; only a second tap (now out of edit mode)
+// actually navigates away. Hardware back gets the same behavior via the popstate
+// handler's screen-plan-detail special case above.
+document.getElementById('btn-back-plan-detail').addEventListener('click', () => {
+  if (planDetailEditMode) { exitPlanDetailEditMode(); return; }
+  goBack('screen-workout-plan');
+});
 
 // ── AI Generate Screen ────────────────────────────────
 function getAiGenFormSnapshot() {
