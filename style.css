@@ -589,11 +589,20 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .plan-day-ex-row { display: flex; align-items: center; padding: 6px 0; border-top: 1px solid #2a2a2a; gap: 8px; }
 .plan-day-ex-name { flex: 1; font-size: 14px; color: #ccc; }
 .plan-day-ex-sets { font-size: 12px; color: #555; flex-shrink: 0; }
+/* "WEEK A" / "WEEK B" group header above a block of generated day-cards — same small-kop
+   convention as elsewhere (e.g. "MIJN PLANNEN"), tuned for this screen's dark background. */
+.plan-day-group-label { font-size: 11px; font-weight: 700; color: #666; text-transform: uppercase; letter-spacing: .08em; margin: 4px 2px 0; }
 
 /* ── PLAN SCHEDULE SCREEN (light, like #screen-workout-plan) ──────────── */
 #screen-plan-schedule.plan-screen { background: var(--bg); color: var(--text-primary); }
-.plan-schedule-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px 16px calc(var(--ai-bar-space) + 16px); display: flex; flex-direction: column; gap: 20px; }
+.plan-schedule-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px; display: flex; flex-direction: column; gap: 20px; }
 .ps-section { display: flex; flex-direction: column; gap: 10px; }
+/* Non-scrolling footer, same pattern as .lw-footer: its own margin-bottom reserves room
+   above the floating AI Coach pill, so the button never sits permanently behind it. */
+.plan-schedule-footer { padding: 12px 16px calc(var(--safe-bottom) + 12px); background: var(--surface); border-top: 1px solid var(--border); flex-shrink: 0; margin-bottom: var(--ai-bar-space); }
+.ps-continue-btn { width: 100%; padding: 16px; border: none; border-radius: 14px; background: var(--blue); color: #fff; font-family: inherit; font-size: 14px; font-weight: 500; text-transform: uppercase; letter-spacing: .06em; cursor: pointer; transition: filter .1s; }
+.ps-continue-btn:active { filter: brightness(.85); }
+.ps-continue-btn:disabled { background: var(--border); color: var(--text-hint); cursor: not-allowed; }
 
 /* "Aantal dagen": 14 equal-width boxes, 2 rows of 7. Unselected = white/bordered/grey,
    selected = solid blue/white, same convention reused by the weekday circles below. */

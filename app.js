@@ -4155,7 +4155,15 @@ function renderPlanDetail() {
   const scroll = document.getElementById('plan-detail-scroll');
   if (!currentPlanData || !currentPlanData.days) { scroll.innerHTML = ''; return; }
   scroll.innerHTML = '';
+  let lastGroup = undefined;
   currentPlanData.days.forEach((day, idx) => {
+    if (day.group && day.group !== lastGroup) {
+      const groupLabel = document.createElement('div');
+      groupLabel.className = 'plan-day-group-label';
+      groupLabel.textContent = day.group === 'A' ? 'WEEK A' : 'WEEK B';
+      scroll.appendChild(groupLabel);
+    }
+    lastGroup = day.group;
     const card = document.createElement('div');
     card.className = 'plan-day-card';
     const exRows = (day.exercises || []).map(ex =>
@@ -4215,6 +4223,8 @@ function renderPlanSchedule() {
     btn.classList.toggle('selected', (btn.dataset.fixed === '1') === fixedDays);
   });
 
+  document.getElementById('btn-plan-schedule-continue').disabled = !isPlanScheduleValid(currentPlanData);
+
   document.getElementById('ps-weekdays-section').style.display = fixedDays ? '' : 'none';
   if (!fixedDays) return;
 
@@ -4235,6 +4245,56 @@ function renderPlanSchedule() {
   renderWeekRow('a', weekdaysA);
   if (splitWeeks) renderWeekRow('b', weekdaysB);
 }
+
+// A schedule is only ready for "Doorgaan" once a day count is chosen, and — for fixed
+// weekdays — exactly that many weekdays are checked (across both weeks when > 7).
+function isPlanScheduleValid(plan) {
+  const daysPerWeek = plan.daysPerWeek || 0;
+  if (daysPerWeek <= 0) return false;
+  if (!plan.fixedDays) return true;
+  const splitWeeks = daysPerWeek > 7;
+  const total = (plan.weekdaysA || []).length + (splitWeeks ? (plan.weekdaysB || []).length : 0);
+  return total === daysPerWeek;
+}
+
+const WEEKDAY_FULL_NAMES = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag'];
+
+// Turns the schedule config into the flat "days" list screen-plan-detail renders.
+// No fixed days: "Dag 1".."Dag N". Fixed, <=7: one day per checked weekday, full Dutch
+// name, Mon->Sun order. Fixed, >7: Week A's checked days then Week B's, each named
+// "{Dagnaam} A"/"{Dagnaam} B" and flagged with `group` so renderPlanDetail() can show
+// the "WEEK A"/"WEEK B" headers.
+function generatePlanDaysFromSchedule(plan) {
+  const daysPerWeek = plan.daysPerWeek || 0;
+  if (!plan.fixedDays) {
+    return Array.from({ length: daysPerWeek }, (_, i) => ({ name: `Dag ${i + 1}`, exercises: [] }));
+  }
+  const weekdaysA = [...(plan.weekdaysA || [])].sort((a, b) => a - b);
+  if (daysPerWeek <= 7) {
+    return weekdaysA.map(d => ({ name: WEEKDAY_FULL_NAMES[d], exercises: [] }));
+  }
+  const weekdaysB = [...(plan.weekdaysB || [])].sort((a, b) => a - b);
+  return [
+    ...weekdaysA.map(d => ({ name: `${WEEKDAY_FULL_NAMES[d]} A`, exercises: [], group: 'A' })),
+    ...weekdaysB.map(d => ({ name: `${WEEKDAY_FULL_NAMES[d]} B`, exercises: [], group: 'B' })),
+  ];
+}
+
+document.getElementById('btn-plan-schedule-continue').addEventListener('click', async () => {
+  if (!currentPlanData || !isPlanScheduleValid(currentPlanData)) return;
+  // Best-effort preserve: a regenerated day keeps its old exercises only if a day with
+  // that exact name already existed. Any day whose name isn't reproduced by the new
+  // config (count/weekdays changed since exercises were added) loses its exercises —
+  // there's no reliable way to match it to a "new" day otherwise.
+  const oldExercisesByName = new Map((currentPlanData.days || []).map(d => [d.name, d.exercises || []]));
+  currentPlanData.days = generatePlanDaysFromSchedule(currentPlanData).map(d => ({
+    ...d,
+    exercises: oldExercisesByName.get(d.name) || [],
+  }));
+  db.plans[currentPlanId] = currentPlanData;
+  await persistPlan(currentPlanId, currentPlanData);
+  openPlanDetail(currentPlanId);
+});
 
 document.getElementById('plan-schedule-scroll').addEventListener('click', async e => {
   if (!currentPlanData) return;
