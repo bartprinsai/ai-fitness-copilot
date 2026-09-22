@@ -233,7 +233,6 @@ let currentLoadDayIndex = null;
 let loadWorkoutReturnScreen = 'screen-plan-detail';
 let bannerDismissed = false;
 let bannerSuggestedDayIndex = null;
-let loadWorkoutItems = [];
 let selectedSetIndex = null;
 let currentTimeRange = 'all';
 let calLoadedMonths = []; // ascending {year, month} entries currently rendered in the calendar scroller
@@ -243,6 +242,13 @@ let calDetailDate = null;
 let calScrollLock = false;
 let exerciseBrowserMode = 'categories';
 let currentBrowseCategory = null;
+// The exercise browser (screen-exercises) doubles as the Load Workout flow for a
+// plan day's pencil icon: 'browse' is its normal Fitness Tracker behavior (tapping
+// a row opens Training), 'select' is the Load flow (tapping a row toggles it into
+// exerciseLoadSelection instead, and the sticky footer below the list confirms).
+let exerciseScreenMode = 'browse';
+let exerciseLoadSelection = new Set();
+let exerciseLoadDayName = '';
 let currentEditDayIndex = null;
 let pdeDragItem = null;
 let pdeDragStartY = 0;
@@ -1180,6 +1186,12 @@ function setExercisesTitle(text) {
   document.getElementById('exercises-title').textContent = text;
 }
 
+// The top-level (unfiltered) title: "Laden: [Dag]" while this screen is doubling
+// as the Load Workout flow, "All Exercises" for its normal Fitness Tracker use.
+function defaultExercisesTitle() {
+  return exerciseScreenMode === 'select' ? ('Laden: ' + exerciseLoadDayName) : 'All Exercises';
+}
+
 // -- New Workout intermediate screen --------------------
 function openNewWorkoutScreen() {
   renderNewWorkoutScreen();
@@ -1206,6 +1218,8 @@ function renderNewWorkoutScreen() {
 }
 
 function openExerciseList() {
+  exerciseScreenMode = 'browse';
+  document.getElementById('ex-select-footer').classList.add('hidden');
   exerciseBrowserMode = 'categories';
   currentBrowseCategory = null;
   document.getElementById('exercise-search').value = '';
@@ -1250,7 +1264,7 @@ function syncExerciseBrowseToHistory(browse) {
 }
 
 function renderCategoryBrowser() {
-  setExercisesTitle('All Exercises');
+  setExercisesTitle(defaultExercisesTitle());
   const list = document.getElementById('exercise-list');
   list.innerHTML = '';
   const hasFavorites = Object.keys(db.favoriteExercises || {}).length > 0;
@@ -1346,9 +1360,10 @@ document.getElementById('btn-cat-delete-confirm').addEventListener('click', () =
 function renderExercisesInCategory(cat) {
   const list = document.getElementById('exercise-list');
   list.innerHTML = '';
+  renderLoadSelectAllRow(list);
   const exercises = allExercises().filter(e => e.category === cat);
   if (exercises.length === 0) {
-    list.innerHTML = `<div class="exercise-empty">No exercises found</div>`;
+    list.insertAdjacentHTML('beforeend', `<div class="exercise-empty">No exercises found</div>`);
     return;
   }
   exercises.forEach(ex => renderExerciseItem(list, ex));
@@ -1357,9 +1372,10 @@ function renderExercisesInCategory(cat) {
 function renderFavoriteExercises() {
   const list = document.getElementById('exercise-list');
   list.innerHTML = '';
+  renderLoadSelectAllRow(list);
   const favs = allExercises().filter(e => isFavoriteExercise(e.name));
   if (favs.length === 0) {
-    list.innerHTML = `<div class="exercise-empty">No favorites yet</div>`;
+    list.insertAdjacentHTML('beforeend', `<div class="exercise-empty">No favorites yet</div>`);
     return;
   }
   favs.forEach(ex => renderExerciseItem(list, ex));
@@ -1368,12 +1384,45 @@ function renderFavoriteExercises() {
 function renderExerciseSearchResults(q) {
   const list = document.getElementById('exercise-list');
   list.innerHTML = '';
+  renderLoadSelectAllRow(list);
   const filtered = allExercises().filter(e => e.name.toLowerCase().includes(q));
   if (filtered.length === 0) {
-    list.innerHTML = `<div class="exercise-empty">No exercises found</div>`;
+    list.insertAdjacentHTML('beforeend', `<div class="exercise-empty">No exercises found</div>`);
     return;
   }
   filtered.forEach(ex => renderExerciseItem(list, ex));
+}
+
+// Only shown in the Load Workout flow (exerciseScreenMode === 'select'). Operates over
+// the FULL exercise database regardless of which category is currently displayed —
+// selections made in other categories are preserved when switching between them, since
+// they all live in the one exerciseLoadSelection set.
+function renderLoadSelectAllRow(list) {
+  if (exerciseScreenMode !== 'select') return;
+  const all = allExercises();
+  const allSelected = all.length > 0 && all.every(e => exerciseLoadSelection.has(e.name));
+  const row = document.createElement('div');
+  row.className = 'lw-select-all-row';
+  row.innerHTML = `<div class="lw-checkbox ${allSelected ? 'checked' : ''}"></div><span>Alles selecteren</span>`;
+  row.addEventListener('click', () => {
+    const next = !all.every(e => exerciseLoadSelection.has(e.name));
+    if (next) all.forEach(e => exerciseLoadSelection.add(e.name));
+    else exerciseLoadSelection.clear();
+    refreshExerciseList();
+    updateLoadFooter();
+  });
+  list.appendChild(row);
+}
+
+function toggleLoadSelection(name) {
+  if (exerciseLoadSelection.has(name)) exerciseLoadSelection.delete(name);
+  else exerciseLoadSelection.add(name);
+  refreshExerciseList();
+  updateLoadFooter();
+}
+
+function updateLoadFooter() {
+  document.getElementById('btn-confirm-load-workout').textContent = `Workout laden (${exerciseLoadSelection.size})`;
 }
 
 function refreshExerciseList() {
@@ -1390,15 +1439,18 @@ function refreshExerciseList() {
 
 function renderExerciseItem(list, ex) {
   const item = document.createElement('div');
-  item.className = 'exercise-item list-row' + (ex.custom ? ' exercise-item-custom' : '');
+  const isSelectMode = exerciseScreenMode === 'select';
+  const isSelected = isSelectMode && exerciseLoadSelection.has(ex.name);
+  item.className = 'exercise-item list-row' + (ex.custom ? ' exercise-item-custom' : '') + (isSelected ? ' exercise-item-selected' : '');
   const isFav = isFavoriteExercise(ex.name);
   item.innerHTML = `
     <span class="exercise-item-name">${ex.name}</span>
-    ${isFav ? `<svg class="exercise-item-fav-star" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>` : ''}
+    ${isSelected ? `<svg class="exercise-item-check" viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>` : (isFav ? `<svg class="exercise-item-fav-star" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>` : '')}
     <svg class="exercise-item-dots" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
   `;
   item.querySelector('.exercise-item-name').addEventListener('click', () => {
-    openTraining(ex.name);
+    if (isSelectMode) toggleLoadSelection(ex.name);
+    else openTraining(ex.name);
   });
   item.querySelector('.exercise-item-dots').addEventListener('click', e => {
     e.stopPropagation();
@@ -3095,11 +3147,12 @@ function saveNewExerciseFromScreen() {
     updateExistingExercise(pendingEditExerciseOriginalName, { category: cat, name, type });
     // After the rename above has moved any existing info over to the new name.
     setExerciseInfoFor(name, readExerciseInfoForm(EXERCISE_INFO_FORMS.newEx));
+    if (exerciseLoadSelection.delete(pendingEditExerciseOriginalName)) exerciseLoadSelection.add(name);
     pendingEditExerciseOriginalName = null;
     exerciseBrowserMode = 'categories';
     currentBrowseCategory = null;
-    setExercisesTitle('All Exercises');
     renderCategoryBrowser();
+    updateLoadFooter();
     showScreen('screen-exercises');
     return;
   }
@@ -3112,7 +3165,6 @@ function saveNewExerciseFromScreen() {
   toast('Exercise created');
   exerciseBrowserMode = 'categories';
   currentBrowseCategory = null;
-  setExercisesTitle('All Exercises');
   renderCategoryBrowser();
   showScreen('screen-exercises');
 }
@@ -3156,9 +3208,11 @@ document.getElementById('btn-delete-ex-confirm').addEventListener('click', () =>
   if (db.records && db.records[name]) { delete db.records[name]; persistRecords(); }
   if (db.favoriteExercises && db.favoriteExercises[name]) { delete db.favoriteExercises[name]; persistFavorites(); }
   if (db.exerciseInfo && db.exerciseInfo[name]) { delete db.exerciseInfo[name]; persistExerciseInfo(); }
+  exerciseLoadSelection.delete(name);
   pendingDeleteExercise = null;
   closeOverlay('delete-exercise-overlay');
   refreshExerciseList();
+  updateLoadFooter();
   renderHome();
   toast('Exercise deleted');
 });
@@ -3247,7 +3301,7 @@ document.getElementById('btn-back-exercises').addEventListener('click', () => {
     if (history.state && history.state.browse) history.back();
     else resetExerciseBrowseToCategories();
   } else {
-    goBack('screen-fitness-tracker');
+    goBack(exerciseScreenMode === 'select' ? loadWorkoutReturnScreen : 'screen-fitness-tracker');
   }
 });
 
@@ -3345,7 +3399,7 @@ document.getElementById('exercise-search').addEventListener('input', e => {
   const q = e.target.value.toLowerCase().trim();
   if (q) {
     renderExerciseSearchResults(q);
-    setExercisesTitle('All Exercises');
+    setExercisesTitle(defaultExercisesTitle());
   } else if (exerciseBrowserMode === 'exercises' && currentBrowseCategory === FAVORITES_CATEGORY) {
     renderFavoriteExercises();
     setExercisesTitle('Favorites');
@@ -4698,7 +4752,11 @@ document.getElementById('btn-new-plan-save').addEventListener('click', async () 
   renderPlanList();
 });
 
-// ── Load Workout Screen ───────────────────────────────
+// ── Load Workout Flow (Plan Detail's pencil icon / the Smart Day Banner) ──
+// Reuses the exercise browser screen (screen-exercises) wholesale, in 'select' mode:
+// same categories, same exercise lists, same +/⋮ menus and New Exercise form as the
+// Fitness Tracker's own "All Exercises" — only row-tap and the sticky footer below
+// the list differ. See exerciseScreenMode / renderExerciseItem / renderLoadSelectAllRow.
 async function openLoadWorkout(planId, dayIndex) {
   currentLoadPlanId = planId;
   currentLoadDayIndex = dayIndex;
@@ -4706,55 +4764,25 @@ async function openLoadWorkout(planId, dayIndex) {
   if (!plan || !plan.days[dayIndex]) { toast('Kon dag niet laden'); return; }
   const day = plan.days[dayIndex];
 
-  document.getElementById('load-workout-title').textContent = 'Laden: ' + day.name;
-  document.getElementById('lw-scroll').innerHTML = '<div style="padding:32px;text-align:center;color:#555">Laden...</div>';
-  showScreen('screen-load-workout');
-
-  loadWorkoutItems = (day.exercises || []).map(ex => ({ name: ex.name, sets: ex.sets, reps: ex.reps, selected: true }));
-
-  renderLoadWorkoutList();
-}
-
-function renderLoadWorkoutList() {
-  const scroll = document.getElementById('lw-scroll');
-  scroll.innerHTML = '';
-
-  const allChecked = loadWorkoutItems.every(i => i.selected);
-  const saRow = document.createElement('div');
-  saRow.className = 'lw-select-all-row';
-  saRow.innerHTML = `<div class="lw-checkbox ${allChecked ? 'checked' : ''}" id="lw-cb-all"></div><span>Alles selecteren</span>`;
-  saRow.addEventListener('click', () => {
-    const next = !loadWorkoutItems.every(i => i.selected);
-    loadWorkoutItems.forEach(i => i.selected = next);
-    renderLoadWorkoutList();
-  });
-  scroll.appendChild(saRow);
-
-  loadWorkoutItems.forEach((item, idx) => {
-    const card = document.createElement('div');
-    card.className = 'lw-ex-card';
-    card.innerHTML = `
-      <div class="lw-ex-header">
-        <div class="lw-checkbox ${item.selected ? 'checked' : ''}" data-idx="${idx}"></div>
-        <div class="lw-ex-name">${item.name}</div>
-        <div class="lw-ex-sets">${item.sets}×${item.reps}</div>
-      </div>
-    `;
-    card.querySelector('[data-idx]').addEventListener('click', e => {
-      e.stopPropagation();
-      loadWorkoutItems[idx].selected = !loadWorkoutItems[idx].selected;
-      renderLoadWorkoutList();
-    });
-    scroll.appendChild(card);
-  });
+  exerciseScreenMode = 'select';
+  // Pre-check the day's own exercises (old behavior: they used to be the only
+  // choices, all pre-selected) — browsing can now also add any other exercise on top.
+  exerciseLoadSelection = new Set((day.exercises || []).map(ex => ex.name));
+  exerciseLoadDayName = day.name;
+  exerciseBrowserMode = 'categories';
+  currentBrowseCategory = null;
+  document.getElementById('exercise-search').value = '';
+  document.getElementById('ex-select-footer').classList.remove('hidden');
+  updateLoadFooter();
+  renderCategoryBrowser();
+  showScreen('screen-exercises');
 }
 
 document.getElementById('btn-confirm-load-workout').addEventListener('click', async () => {
-  const selected = loadWorkoutItems.filter(i => i.selected);
-  if (selected.length === 0) { toast('Selecteer minstens één oefening'); return; }
+  if (exerciseLoadSelection.size === 0) { toast('Selecteer minstens één oefening'); return; }
   const workout = getWorkout(currentDate);
-  selected.forEach(item => {
-    if (!workout.find(e => e.name === item.name)) workout.push({ name: item.name, sets: [] });
+  exerciseLoadSelection.forEach(name => {
+    if (!workout.find(e => e.name === name)) workout.push({ name, sets: [] });
   });
   setWorkout(currentDate, workout);
   // Advance active plan day index
@@ -4767,8 +4795,6 @@ document.getElementById('btn-confirm-load-workout').addEventListener('click', as
   toast('Workout geladen!');
   showScreen('screen-fitness-tracker');
 });
-
-document.getElementById('btn-back-load-workout').addEventListener('click', () => goBack(loadWorkoutReturnScreen));
 
 // ── Smart Day Banner ──────────────────────────────────
 function renderSmartBanner() {

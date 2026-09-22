@@ -217,6 +217,11 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .exercise-item-fav-star { width: 18px; height: 18px; fill: var(--blue-btn); flex-shrink: 0; margin-right: 10px; }
 .exercise-item-dots { width: 20px; height: 20px; fill: var(--text-hint); flex-shrink: 0; }
 .exercise-empty { padding: 32px; text-align: center; color: var(--text-hint); font-size: 14px; }
+/* Row selection state, Load Workout flow only (exerciseScreenMode === 'select') —
+   same accent-background convention as .exercise-card-selected in Home's multi-select. */
+.exercise-item-selected { background: var(--cyan-light); }
+.exercise-item-selected .exercise-item-name { font-weight: 700; color: var(--cyan); }
+.exercise-item-check { width: 18px; height: 18px; fill: var(--cyan); flex-shrink: 0; margin-right: 10px; }
 
 /* ── TRAINING TABS ────────────────────────────────────── */
 .training-tabs { display: flex; background: #212121; flex-shrink: 0; }
@@ -644,20 +649,18 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .ai-gen-loading-text { font-size: 15px; color: #666; }
 .hidden { display: none !important; }
 
-/* ── LOAD WORKOUT SCREEN ──────────────────────────────── */
-.lw-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 10px 12px; }
+/* ── LOAD WORKOUT FLOW (screen-exercises in 'select' mode) ───────────────
+   The sticky confirm footer below the exercise list, and the "select all"
+   row at the top of it — see exerciseScreenMode / renderLoadSelectAllRow
+   in app.js. Exercise selection itself reuses .exercise-item (below). */
 .lw-footer { padding: 12px 16px calc(var(--safe-bottom) + 12px); background: var(--surface); border-top: 1px solid var(--border); flex-shrink: 0; margin-bottom: var(--ai-bar-space); }
 .lw-load-btn { width: 100%; padding: 16px; border: none; border-radius: 14px; background: var(--cyan); color: #fff; font-family: inherit; font-size: 14px; font-weight: 500; text-transform: uppercase; letter-spacing: .06em; cursor: pointer; transition: filter .1s; }
 .lw-load-btn:active { filter: brightness(.85); }
 
-.lw-select-all-row { display: flex; align-items: center; gap: 10px; padding: 8px 4px 12px; cursor: pointer; color: var(--cyan); font-size: 13px; font-weight: 600; }
-.lw-ex-card { background: var(--surface); border-radius: 8px; padding: 14px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
-.lw-ex-header { display: flex; align-items: center; gap: 10px; }
+.lw-select-all-row { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--border); background: var(--surface); cursor: pointer; color: var(--cyan); font-size: 14px; font-weight: 600; }
 .lw-checkbox { width: 22px; height: 22px; border: 2px solid var(--border); border-radius: 6px; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all .12s; }
 .lw-checkbox.checked { background: var(--cyan); border-color: var(--cyan); }
 .lw-checkbox.checked::after { content: ''; display: block; width: 5px; height: 9px; border: 2px solid #fff; border-top: none; border-left: none; transform: rotate(45deg) translate(-1px, -2px); }
-.lw-ex-name { flex: 1; font-size: 15px; font-weight: 600; color: var(--text-primary); }
-.lw-ex-sets { font-size: 12px; color: var(--text-secondary); flex-shrink: 0; }
 
 /* ── SMART DAY BANNER ─────────────────────────────────── */
 .smart-banner { display: flex; align-items: center; gap: 12px; background: var(--surface); border-left: 3px solid var(--cyan); padding: 11px 14px; flex-shrink: 0; }
