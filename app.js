@@ -4164,26 +4164,23 @@ function renderPlanDetail() {
       scroll.appendChild(groupLabel);
     }
     lastGroup = day.group;
+    const exCount = (day.exercises || []).length;
+    const subText = exCount === 0 ? 'Geen oefeningen' : `${exCount} ${exCount === 1 ? 'oefening' : 'oefeningen'}`;
     const card = document.createElement('div');
     card.className = 'plan-day-card';
-    const exRows = (day.exercises || []).map(ex =>
-      `<div class="plan-day-ex-row"><span class="plan-day-ex-name">${ex.name}</span><span class="plan-day-ex-sets">${ex.sets}×${ex.reps}</span></div>`
-    ).join('');
     card.innerHTML = `
-      <div class="plan-day-header">
-        <div class="plan-day-num">${idx + 1}</div>
+      <div class="plan-day-num">${idx + 1}</div>
+      <div class="plan-day-info">
         <div class="plan-day-name">${day.name}</div>
-        <button class="plan-day-load-btn" data-idx="${idx}">Laden ▶</button>
+        <div class="plan-day-sub">${subText}</div>
       </div>
-      <div class="plan-day-exercises">${exRows || '<div style="color:#444;font-size:14px;padding:0 0 4px">Geen oefeningen</div>'}</div>
+      <button class="plan-day-edit-btn" data-idx="${idx}" aria-label="Bewerken">
+        <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+      </button>
     `;
-    card.querySelector('.plan-day-load-btn').addEventListener('click', () => {
+    card.querySelector('.plan-day-edit-btn').addEventListener('click', () => {
       loadWorkoutReturnScreen = 'screen-plan-detail';
       openLoadWorkout(currentPlanId, idx);
-    });
-    card.querySelector('.plan-day-header').addEventListener('click', e => {
-      if (e.target.closest('.plan-day-load-btn')) return;
-      openPlanDayEdit(idx);
     });
     scroll.appendChild(card);
   });

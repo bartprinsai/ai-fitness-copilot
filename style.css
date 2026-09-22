@@ -545,11 +545,12 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .plan-active-star svg { fill: #555; transition: fill .15s; }
 .plan-active-star.is-active svg { fill: #7C4DFF; filter: drop-shadow(0 0 4px rgba(124,77,255,.6)); }
 
-/* Workout Plans (the plan list screen, #screen-workout-plan) is the one plan-builder
-   screen that's been brought over to the app's light theme — the toolbar stays the
-   shared dark one above, only the body (and its own cards below) turns light. Plan
-   detail / day edit / AI generate keep the original dark styling untouched. */
-#screen-workout-plan.plan-screen { background: var(--bg); color: var(--text-primary); }
+/* Workout Plans (the plan list screen, #screen-workout-plan) and Plan Detail
+   (#screen-plan-detail) have been brought over to the app's light theme — the
+   toolbar stays the shared dark one above, only the body (and its own cards
+   below) turns light. Plan day edit / AI generate keep the original dark
+   styling untouched. */
+#screen-workout-plan.plan-screen, #screen-plan-detail.plan-screen { background: var(--bg); color: var(--text-primary); }
 
 .plan-create-row { display: flex; gap: 8px; padding: 12px; flex-shrink: 0; }
 .plan-create-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 14px 6px; border: none; border-radius: 14px; background: var(--surface); box-shadow: 0 1px 3px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.08); color: var(--text-secondary); font-family: inherit; font-size: 11px; font-weight: 600; cursor: pointer; transition: background .12s; line-height: 1.3; text-align: center; }
@@ -578,20 +579,17 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .plan-active-ribbon { padding: 6px 16px; font-size: 11px; font-weight: 700; color: #7C4DFF; background: rgba(124,77,255,.1); letter-spacing: .06em; flex-shrink: 0; display: none; }
 .plan-active-ribbon.show { display: block; }
 .plan-detail-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 8px 12px calc(var(--ai-bar-space) + 24px); }
-.plan-day-card { background: #1E1E1E; border-radius: 14px; margin-bottom: 12px; overflow: hidden; }
-.plan-day-header { display: flex; align-items: center; padding: 14px 14px 10px; gap: 10px; cursor: pointer; }
-.plan-day-header:active { opacity: .85; }
+.plan-day-card { display: flex; align-items: center; gap: 12px; background: var(--surface); box-shadow: 0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.06); border-radius: 14px; margin-bottom: 10px; padding: 14px; }
 .plan-day-num { width: 28px; height: 28px; border-radius: 50%; background: #7C4DFF; color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.plan-day-name { flex: 1; font-size: 16px; font-weight: 600; color: #fff; }
-.plan-day-load-btn { padding: 8px 14px; border: none; border-radius: 20px; background: var(--cyan-light); color: var(--cyan); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; flex-shrink: 0; transition: background .1s; }
-.plan-day-load-btn:active { background: rgba(41,182,246,.25); }
-.plan-day-exercises { padding: 0 14px 12px; }
-.plan-day-ex-row { display: flex; align-items: center; padding: 6px 0; border-top: 1px solid #2a2a2a; gap: 8px; }
-.plan-day-ex-name { flex: 1; font-size: 14px; color: #ccc; }
-.plan-day-ex-sets { font-size: 12px; color: #555; flex-shrink: 0; }
+.plan-day-info { flex: 1; min-width: 0; }
+.plan-day-name { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+.plan-day-sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+.plan-day-edit-btn { width: 34px; height: 34px; border: none; border-radius: 10px; background: var(--cyan-light); color: var(--cyan); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: background .1s; }
+.plan-day-edit-btn:active { background: rgba(41,182,246,.25); }
+.plan-day-edit-btn svg { width: 17px; height: 17px; fill: var(--cyan); }
 /* "WEEK A" / "WEEK B" group header above a block of generated day-cards — same small-kop
-   convention as elsewhere (e.g. "MIJN PLANNEN"), tuned for this screen's dark background. */
-.plan-day-group-label { font-size: 11px; font-weight: 700; color: #666; text-transform: uppercase; letter-spacing: .08em; margin: 4px 2px 0; }
+   convention as elsewhere (e.g. "MIJN PLANNEN"). */
+.plan-day-group-label { padding: 6px 4px 4px; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .08em; }
 
 /* ── PLAN SCHEDULE SCREEN (light, like #screen-workout-plan) ──────────── */
 #screen-plan-schedule.plan-screen { background: var(--bg); color: var(--text-primary); }
