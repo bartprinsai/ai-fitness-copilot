@@ -4034,11 +4034,11 @@ async function duplicatePlan(planId) {
   const src = db.plans[planId];
   if (!src) return;
   const newId = genPlanId();
-  const copy = { id: newId, name: 'Copy of ' + src.name, days: JSON.parse(JSON.stringify(src.days || [])), createdAt: Date.now() };
+  const copy = { id: newId, name: 'Kopie van ' + src.name, days: JSON.parse(JSON.stringify(src.days || [])), createdAt: Date.now() };
   db.plans[newId] = copy;
   await persistPlan(newId, copy);
   renderPlanList();
-  toast('Plan duplicated');
+  toast('Plan gedupliceerd');
 }
 
 async function deletePlan(planId) {
@@ -4049,7 +4049,7 @@ async function deletePlan(planId) {
     await persistActivePlan(null);
   }
   renderPlanList();
-  toast('Plan deleted');
+  toast('Plan verwijderd');
 }
 
 // -- Delete plan confirmation ----------------------------
@@ -4059,7 +4059,7 @@ let pendingDeletePlanOnDeleted = null;
 function openDeletePlanConfirm(planId, planName, onDeleted) {
   pendingDeletePlanId = planId;
   pendingDeletePlanOnDeleted = onDeleted || null;
-  document.getElementById('delete-plan-msg').textContent = `Delete "${planName}"? This can't be undone.`;
+  document.getElementById('delete-plan-msg').textContent = `"${planName}" verwijderen? Dit kan niet ongedaan worden gemaakt.`;
   openOverlay('delete-plan-overlay');
 }
 
@@ -4086,12 +4086,12 @@ async function setActivePlan(planId) {
   if (wasActive) {
     db.activePlan = null;
     await persistActivePlan(null);
-    toast('Active plan removed');
+    toast('Actief plan verwijderd');
   } else {
     db.activePlan = { planId, planName: plan.name, lastDayIndex: -1 };
     await persistActivePlan(db.activePlan);
     bannerDismissed = false;
-    toast('Set as active plan');
+    toast('Ingesteld als actief plan');
   }
 }
 
@@ -4105,7 +4105,7 @@ function renderPlanList() {
   const scroll = document.getElementById('plan-list-scroll');
   const plans = Object.values(db.plans).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   if (plans.length === 0) {
-    scroll.innerHTML = '<div class="plan-list-empty">No plans yet. Create one above!</div>';
+    scroll.innerHTML = '<div class="plan-list-empty">Nog geen plannen. Maak er hierboven een aan!</div>';
     return;
   }
   scroll.innerHTML = '';
@@ -4116,8 +4116,8 @@ function renderPlanList() {
     item.innerHTML = `
       <div class="plan-item-info">
         <div class="plan-item-name">${plan.name}</div>
-        <div class="plan-item-meta">${(plan.days || []).length} day${(plan.days || []).length !== 1 ? 's' : ''}</div>
-        ${isActive ? '<div class="plan-item-active-pill">★ ACTIVE</div>' : ''}
+        <div class="plan-item-meta">${(plan.days || []).length} dag${(plan.days || []).length !== 1 ? 'en' : ''}</div>
+        ${isActive ? '<div class="plan-item-active-pill">★ ACTIEF</div>' : ''}
       </div>
       <button class="plan-item-dots" aria-label="Options"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button>
     `;
@@ -4126,9 +4126,9 @@ function renderPlanList() {
       e.stopPropagation();
       const isAct = db.activePlan && db.activePlan.planId === plan.id;
       showOverflowMenu([
-        { label: isAct ? '★ Remove active' : 'Set as Active', action: async () => { await setActivePlan(plan.id); renderPlanList(); } },
-        { label: 'Duplicate', action: () => duplicatePlan(plan.id) },
-        { label: 'Delete', action: () => openDeletePlanConfirm(plan.id, plan.name) },
+        { label: isAct ? '★ Actief verwijderen' : 'Actief maken', action: async () => { await setActivePlan(plan.id); renderPlanList(); } },
+        { label: 'Dupliceren', action: () => duplicatePlan(plan.id) },
+        { label: 'Verwijderen', action: () => openDeletePlanConfirm(plan.id, plan.name) },
       ], e.currentTarget);
     });
     scroll.appendChild(item);
@@ -4164,9 +4164,9 @@ function renderPlanDetail() {
       <div class="plan-day-header">
         <div class="plan-day-num">${idx + 1}</div>
         <div class="plan-day-name">${day.name}</div>
-        <button class="plan-day-load-btn" data-idx="${idx}">Load ▶</button>
+        <button class="plan-day-load-btn" data-idx="${idx}">Laden ▶</button>
       </div>
-      <div class="plan-day-exercises">${exRows || '<div style="color:#444;font-size:14px;padding:0 0 4px">No exercises</div>'}</div>
+      <div class="plan-day-exercises">${exRows || '<div style="color:#444;font-size:14px;padding:0 0 4px">Geen oefeningen</div>'}</div>
     `;
     card.querySelector('.plan-day-load-btn').addEventListener('click', () => {
       loadWorkoutReturnScreen = 'screen-plan-detail';
@@ -4196,7 +4196,7 @@ function renderPlanDayEdit() {
   list.innerHTML = '';
 
   if (exercises.length === 0) {
-    list.innerHTML = '<div class="pde-empty">No exercises. Load a workout to add exercises to this day.</div>';
+    list.innerHTML = '<div class="pde-empty">Geen oefeningen. Laad een workout om oefeningen aan deze dag toe te voegen.</div>';
     return;
   }
 
@@ -4205,7 +4205,7 @@ function renderPlanDayEdit() {
     item.className = 'pde-item';
     item.dataset.exIdx = idx;
     item.innerHTML = `
-      <div class="pde-delete-reveal"><button class="pde-delete-btn">DELETE</button></div>
+      <div class="pde-delete-reveal"><button class="pde-delete-btn">VERWIJDEREN</button></div>
       <div class="pde-item-inner">
         <div class="pde-ex-info">
           <span class="pde-ex-name">${ex.name}</span>
@@ -4268,7 +4268,7 @@ function setupPdeDragReorder(list) {
     if (JSON.stringify(newExercises.map(e => e.name)) !== JSON.stringify(oldExercises.map(e => e.name))) {
       await savePlanDayExercises(newExercises);
       newItems.forEach((el, i) => { el.dataset.exIdx = i; });
-      toast('Order saved');
+      toast('Volgorde opgeslagen');
     }
     pdeDragItem = null;
   };
@@ -4357,7 +4357,7 @@ function setupPdeSwipeDelete(item) {
     if (currentPos >= 0 && currentPos < exercises.length) exercises.splice(currentPos, 1);
     await savePlanDayExercises(exercises);
     renderPlanDayEdit();
-    toast('Removed from plan');
+    toast('Verwijderd uit plan');
   });
 }
 
@@ -4374,8 +4374,8 @@ document.getElementById('btn-plan-set-active').addEventListener('click', async (
 
 document.getElementById('btn-overflow-plan-detail').addEventListener('click', e => {
   showOverflowMenu([
-    { label: 'Duplicate', action: () => duplicatePlan(currentPlanId) },
-    { label: 'Delete', action: () => {
+    { label: 'Dupliceren', action: () => duplicatePlan(currentPlanId) },
+    { label: 'Verwijderen', action: () => {
       if (!currentPlanData) return;
       openDeletePlanConfirm(currentPlanId, currentPlanData.name, () => showScreen('screen-workout-plan'));
     }},
@@ -4550,11 +4550,11 @@ async function openLoadWorkout(planId, dayIndex) {
   currentLoadPlanId = planId;
   currentLoadDayIndex = dayIndex;
   const plan = db.plans[planId];
-  if (!plan || !plan.days[dayIndex]) { toast('Could not load day'); return; }
+  if (!plan || !plan.days[dayIndex]) { toast('Kon dag niet laden'); return; }
   const day = plan.days[dayIndex];
 
-  document.getElementById('load-workout-title').textContent = 'Load: ' + day.name;
-  document.getElementById('lw-scroll').innerHTML = '<div style="padding:32px;text-align:center;color:#555">Loading...</div>';
+  document.getElementById('load-workout-title').textContent = 'Laden: ' + day.name;
+  document.getElementById('lw-scroll').innerHTML = '<div style="padding:32px;text-align:center;color:#555">Laden...</div>';
   showScreen('screen-load-workout');
 
   loadWorkoutItems = (day.exercises || []).map(ex => ({ name: ex.name, sets: ex.sets, reps: ex.reps, selected: true }));
@@ -4569,7 +4569,7 @@ function renderLoadWorkoutList() {
   const allChecked = loadWorkoutItems.every(i => i.selected);
   const saRow = document.createElement('div');
   saRow.className = 'lw-select-all-row';
-  saRow.innerHTML = `<div class="lw-checkbox ${allChecked ? 'checked' : ''}" id="lw-cb-all"></div><span>Select All</span>`;
+  saRow.innerHTML = `<div class="lw-checkbox ${allChecked ? 'checked' : ''}" id="lw-cb-all"></div><span>Alles selecteren</span>`;
   saRow.addEventListener('click', () => {
     const next = !loadWorkoutItems.every(i => i.selected);
     loadWorkoutItems.forEach(i => i.selected = next);
@@ -4598,7 +4598,7 @@ function renderLoadWorkoutList() {
 
 document.getElementById('btn-confirm-load-workout').addEventListener('click', async () => {
   const selected = loadWorkoutItems.filter(i => i.selected);
-  if (selected.length === 0) { toast('Select at least one exercise'); return; }
+  if (selected.length === 0) { toast('Selecteer minstens één oefening'); return; }
   const workout = getWorkout(currentDate);
   selected.forEach(item => {
     if (!workout.find(e => e.name === item.name)) workout.push({ name: item.name, sets: [] });
@@ -4611,7 +4611,7 @@ document.getElementById('btn-confirm-load-workout').addEventListener('click', as
   }
   bannerDismissed = true;
   renderHome();
-  toast('Workout loaded!');
+  toast('Workout geladen!');
   showScreen('screen-fitness-tracker');
 });
 
