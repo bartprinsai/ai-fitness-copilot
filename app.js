@@ -4517,17 +4517,12 @@ function openPresetsOverlay() {
 
 // ── Make your own ─────────────────────────────────────
 function getNewPlanFormSnapshot() {
-  return {
-    name: document.getElementById('new-plan-name').value,
-    days: document.querySelector('#chips-new-plan-days .chip.active')?.dataset.val || '',
-  };
+  return { name: document.getElementById('new-plan-name').value };
 }
-const NEW_PLAN_DEFAULT_SNAPSHOT = { name: '', days: '3' };
+const NEW_PLAN_DEFAULT_SNAPSHOT = { name: '' };
 
 function openMakeYourOwn() {
   document.getElementById('new-plan-name').value = '';
-  document.querySelectorAll('#chips-new-plan-days .chip').forEach(c => c.classList.remove('active'));
-  document.querySelector('#chips-new-plan-days [data-val="3"]').classList.add('active');
   openOverlay('new-plan-overlay');
 }
 
@@ -4545,11 +4540,9 @@ document.getElementById('btn-presets-close').addEventListener('click', () => clo
 document.getElementById('btn-new-plan-save').addEventListener('click', async () => {
   const name = document.getElementById('new-plan-name').value.trim();
   if (!name) { toast('Enter a plan name'); return; }
-  const daysCount = parseInt(document.querySelector('#chips-new-plan-days .chip.active')?.dataset.val || '3');
-  const planDays = Array.from({ length: daysCount }, (_, i) => ({ name: 'Day ' + (i + 1), exercises: [] }));
   closeOverlay('new-plan-overlay');
-  const planId = await createPlan(name, planDays);
-  openPlanDetail(planId);
+  await createPlan(name, []);
+  renderPlanList();
 });
 
 // ── Load Workout Screen ───────────────────────────────
