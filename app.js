@@ -1479,8 +1479,8 @@ function resetEffortFields() { setRpeField(0); setExtraField(0, ''); setDropsetF
 const DROP_ARROW_SVG = '<svg class="drop-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10"/><path d="M17 8v9H8"/></svg>';
 function isDropChild(sets, i) { return i > 0 && !!sets[i].isDropsetContinuation; }
 // Weight cell of EVERY row, in every list (chain or not): wrapped so the column layout is
-// always the same — the arrow of a dropset row lives in the weight column's indent, and adding
-// a dropset never moves any other row (see style.css).
+// always the same — a dropset row's arrow+weight group is shifted right by a fixed amount
+// (a transform, purely visual), and adding a dropset never moves any other row (see style.css).
 function dropWeightHtml(sets, i, weightHtml) {
   return `<span class="drop-wcell">${isDropChild(sets, i) ? DROP_ARROW_SVG : ''}${weightHtml}</span>`;
 }
