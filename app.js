@@ -4532,8 +4532,8 @@ function openMakeYourOwn() {
 }
 
 document.getElementById('btn-plan-make-own').addEventListener('click', openMakeYourOwn);
-document.getElementById('btn-plan-presets').addEventListener('click', openPresetsOverlay);
-document.getElementById('btn-plan-ai').addEventListener('click', openAIGenerate);
+// Presets and Generate with AI are temporarily disabled (single-user app, on hold for now):
+// no click handler attached, so a tap is a no-op. Looks unchanged; wire back up when needed.
 document.getElementById('btn-new-plan-cancel').addEventListener('click', () => {
   confirmDiscardIfChanged(
     () => hasChanges(NEW_PLAN_DEFAULT_SNAPSHOT, getNewPlanFormSnapshot()),
