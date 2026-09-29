@@ -260,6 +260,7 @@ let pdeDragStartY = 0;
 let pdeDragDy = 0;
 let pdeActiveSwipeInner = null;
 let pdeActiveSwipeReveal = null;
+let pendingPdeSetsRepsIndex = null;
 
 // -- Screen Navigation ------------------------------------
 // Central place that both switches the visible .screen AND keeps the
@@ -3241,6 +3242,7 @@ const OVERLAY_CANCEL_BUTTON = {
   'plan-rename-overlay': 'btn-plan-rename-cancel',
   'delete-plan-day-overlay': 'btn-delete-plan-day-cancel',
   'day-picker-overlay': 'btn-day-picker-cancel',
+  'pde-sets-reps-overlay': 'btn-pde-sr-cancel',
   'reset-overlay': 'btn-reset-cancel',
   'history-goto-overlay': 'history-goto-cancel',
   'discard-changes-overlay': 'btn-discard-changes-cancel',
@@ -4269,11 +4271,16 @@ function buildPlanDayCard(day, idx) {
       <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
     </button>`}
   `;
+  // The card itself (number, name, exercise count) opens the day's reorder/delete
+  // screen; the pencil/trash/rename buttons stop propagation so they keep their
+  // own actions instead of also triggering this.
+  card.addEventListener('click', () => openPlanDayEdit(idx));
   if (planDetailEditMode) {
-    card.querySelector('.plan-day-rename-btn').addEventListener('click', () => openPlanDayRename(idx));
-    card.querySelector('.plan-day-delete-btn').addEventListener('click', () => openDeletePlanDayConfirm(idx));
+    card.querySelector('.plan-day-rename-btn').addEventListener('click', e => { e.stopPropagation(); openPlanDayRename(idx); });
+    card.querySelector('.plan-day-delete-btn').addEventListener('click', e => { e.stopPropagation(); openDeletePlanDayConfirm(idx); });
   } else {
-    card.querySelector('.plan-day-edit-btn').addEventListener('click', () => {
+    card.querySelector('.plan-day-edit-btn').addEventListener('click', e => {
+      e.stopPropagation();
       openPlanDayAddExercises(idx);
     });
   }
@@ -4629,7 +4636,7 @@ function renderPlanDayEdit() {
   list.innerHTML = '';
 
   if (exercises.length === 0) {
-    list.innerHTML = '<div class="pde-empty">Geen oefeningen. Laad een workout om oefeningen aan deze dag toe te voegen.</div>';
+    list.innerHTML = '<div class="pde-empty">Geen oefeningen. Tik op het potlood-icoon om oefeningen aan deze dag toe te voegen.</div>';
     return;
   }
 
@@ -4644,6 +4651,7 @@ function renderPlanDayEdit() {
           <span class="pde-ex-name">${ex.name}</span>
           <span class="pde-ex-meta">${ex.sets} sets × ${ex.reps} reps</span>
         </div>
+        <svg class="pde-chevron" viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
         <div class="pde-drag-handle" aria-label="Drag to reorder">
           <svg viewBox="0 0 24 24"><path d="M3 15h18v-2H3v2zm0 4h18v-2H3v2zm0-8h18V9H3v2zm0-6v2h18V5H3z"/></svg>
         </div>
@@ -4661,6 +4669,39 @@ async function savePlanDayExercises(newExercises) {
   db.plans[currentPlanId] = currentPlanData;
   await persistPlan(currentPlanId, currentPlanData);
 }
+
+// -- Plan Day Edit: sets/reps popup (shared #pde-sets-reps-overlay) ------
+function openPdeSetsRepsEdit(exIdx) {
+  const ex = currentPlanData.days[currentEditDayIndex].exercises[exIdx];
+  if (!ex) return;
+  pendingPdeSetsRepsIndex = exIdx;
+  document.getElementById('pde-sr-sets').value = ex.sets;
+  document.getElementById('pde-sr-reps').value = ex.reps;
+  openOverlay('pde-sets-reps-overlay');
+}
+
+document.getElementById('btn-pde-sr-cancel').addEventListener('click', () => {
+  pendingPdeSetsRepsIndex = null;
+  closeOverlay('pde-sets-reps-overlay');
+});
+document.getElementById('btn-pde-sr-save').addEventListener('click', async () => {
+  if (pendingPdeSetsRepsIndex === null) return;
+  const day = currentPlanData.days[currentEditDayIndex];
+  const ex = day.exercises[pendingPdeSetsRepsIndex];
+  if (!ex) { closeOverlay('pde-sets-reps-overlay'); return; }
+  const sets = parseInt(document.getElementById('pde-sr-sets').value, 10);
+  const reps = parseInt(document.getElementById('pde-sr-reps').value, 10);
+  let changed = false;
+  if (sets > 0 && sets !== ex.sets) { ex.sets = sets; changed = true; }
+  if (reps > 0 && reps !== ex.reps) { ex.reps = reps; changed = true; }
+  pendingPdeSetsRepsIndex = null;
+  closeOverlay('pde-sets-reps-overlay');
+  if (changed) {
+    await persistPlan(currentPlanId, currentPlanData);
+    renderPlanDayEdit();
+    toast('Sets & reps opgeslagen');
+  }
+});
 
 function setupPdeDragReorder(list) {
   list.addEventListener('touchstart', e => {
@@ -4774,6 +4815,26 @@ function setupPdeSwipeDelete(item) {
     setTimeout(() => { inner.style.transition = ''; reveal.style.transition = ''; }, 160);
     mode = null;
   }, { passive: true });
+
+  // Plain tap (not the drag handle, not a swipe — a real swipe calls
+  // preventDefault() on touchmove above, which suppresses the browser's
+  // synthetic click that would otherwise follow): opens the sets/reps editor,
+  // or just closes an already-revealed delete button instead of opening it.
+  inner.addEventListener('click', e => {
+    if (e.target.closest('.pde-drag-handle')) return;
+    if (isOpen) {
+      inner.style.transition = 'transform 0.15s';
+      reveal.style.transition = 'width 0.15s';
+      inner.style.transform = '';
+      reveal.style.width = '0';
+      isOpen = false;
+      pdeActiveSwipeInner = null;
+      pdeActiveSwipeReveal = null;
+      setTimeout(() => { inner.style.transition = ''; reveal.style.transition = ''; }, 160);
+      return;
+    }
+    openPdeSetsRepsEdit(parseInt(item.dataset.exIdx));
+  });
 
   deleteBtn.addEventListener('click', async () => {
     pdeActiveSwipeInner = null;

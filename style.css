@@ -381,9 +381,12 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .overlay-panel h3 { font-size: 18px; font-weight: 500; color: var(--blue); }
 .comment-panel #comment-view-mode, .comment-panel #comment-edit-mode { display: flex; flex-direction: column; gap: 14px; }
 .comment-text { font-size: 15px; color: var(--text-primary); line-height: 1.5; white-space: pre-wrap; }
-.overlay-panel input[type="text"], .overlay-panel select, .overlay-panel textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 16px; color: var(--text-primary); outline: none; background: var(--surface); transition: border-color 0.15s; }
+.overlay-panel input[type="text"], .overlay-panel input[type="number"], .overlay-panel select, .overlay-panel textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 16px; color: var(--text-primary); outline: none; background: var(--surface); transition: border-color 0.15s; }
 .overlay-panel textarea { resize: vertical; min-height: 72px; }
 .overlay-panel input:focus, .overlay-panel select:focus, .overlay-panel textarea:focus { border-color: var(--blue); }
+.pde-sr-row { display: flex; gap: 14px; }
+.pde-sr-field { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.pde-sr-field label { font-size: 12px; color: var(--text-secondary); font-weight: 500; text-transform: uppercase; letter-spacing: .04em; }
 .modal-input-underline { border: none !important; border-bottom: 1px solid var(--border) !important; border-radius: 0 !important; padding: 8px 2px !important; background: transparent !important; }
 .modal-input-underline:focus { border-bottom-color: var(--blue) !important; }
 .overlay-btns { display: flex; gap: 10px; }
@@ -596,7 +599,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .plan-title-edit-btn { width: 34px; height: 34px; flex-shrink: 0; }
 .plan-title-edit-btn svg { width: 17px; height: 17px; }
 .plan-detail-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 8px 12px calc(var(--ai-bar-space) + 24px); }
-.plan-day-card { display: flex; align-items: center; gap: 12px; background: var(--surface); box-shadow: 0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.06); border-radius: 14px; margin-bottom: 10px; padding: 14px; }
+.plan-day-card { display: flex; align-items: center; gap: 12px; background: var(--surface); box-shadow: 0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.06); border-radius: 14px; margin-bottom: 10px; padding: 14px; cursor: pointer; }
 .plan-day-num { width: 28px; height: 28px; border-radius: 50%; background: #7C4DFF; color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .plan-day-info { flex: 1; min-width: 0; }
 .plan-day-name-row { display: flex; align-items: center; gap: 6px; }
@@ -702,11 +705,12 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .pde-hint-txt { padding: 8px 16px; font-size: 12px; color: #444; flex-shrink: 0; }
 .pde-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 4px 12px calc(var(--ai-bar-space) + 24px); display: flex; flex-direction: column; gap: 2px; }
 .pde-item { position: relative; border-radius: 10px; overflow: hidden; flex-shrink: 0; }
-.pde-item-inner { display: flex; align-items: center; background: #1E1E1E; border-radius: 10px; padding: 12px 4px 12px 14px; position: relative; z-index: 1; will-change: transform; }
+.pde-item-inner { display: flex; align-items: center; gap: 4px; background: #1E1E1E; border-radius: 10px; padding: 12px 4px 12px 14px; position: relative; z-index: 1; will-change: transform; cursor: pointer; }
 .pde-item.pde-dragging .pde-item-inner { box-shadow: 0 8px 28px rgba(0,0,0,.65); background: #272727; transform: scale(1.015); }
 .pde-ex-info { flex: 1; min-width: 0; }
 .pde-ex-name { font-size: 15px; color: #fff; display: block; }
 .pde-ex-meta { font-size: 12px; color: #555; display: block; margin-top: 2px; }
+.pde-chevron { width: 20px; height: 20px; fill: #444; flex-shrink: 0; }
 .pde-drag-handle { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; cursor: grab; flex-shrink: 0; touch-action: none; }
 .pde-drag-handle:active { cursor: grabbing; }
 .pde-drag-handle svg { width: 20px; height: 20px; fill: #3a3a3a; }
