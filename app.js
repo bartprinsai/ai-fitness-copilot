@@ -250,6 +250,9 @@ let exerciseLoadDayName = '';
 // Plan Detail's editable state (toggled via ⋮ → Bewerken/Klaar): adds rename pencils,
 // swaps the day pencil for a delete button, and shows Dag/Week toevoegen blocks.
 let planDetailEditMode = false;
+// Accordion state for the day cards on screen-plan-detail: the day index whose
+// inline preview is expanded, or null if none is. Only one at a time.
+let expandedPlanDayIndex = null;
 let pendingRenameDayIndex = null; // null while renaming the plan itself, else a day index
 let planRenameBaseline = '';
 let pendingDeleteDayIndex = null;
@@ -284,6 +287,7 @@ const SCREEN_ON_ENTER = {
   'screen-workout-plan': () => renderPlanList(),
   'screen-plan-detail': () => renderPlanDetail(),
   'screen-plan-schedule': () => renderPlanSchedule(),
+  'screen-plan-day-edit': () => renderPlanDayEdit(),
 };
 
 // Per-screen "does the CURRENTLY ACTIVE screen have unsaved input?" checks,
@@ -3290,7 +3294,7 @@ document.getElementById('btn-back-exercises').addEventListener('click', () => {
     if (history.state && history.state.browse) history.back();
     else resetExerciseBrowseToCategories();
   } else {
-    goBack(exerciseScreenMode === 'plan-add' ? 'screen-plan-detail' : 'screen-fitness-tracker');
+    goBack(exerciseScreenMode === 'plan-add' ? 'screen-plan-day-edit' : 'screen-fitness-tracker');
   }
 });
 
@@ -4191,6 +4195,7 @@ function openPlanDetail(planId) {
   currentPlanData = db.plans[planId];
   if (!currentPlanData) return;
   planDetailEditMode = false;
+  expandedPlanDayIndex = null;
   document.getElementById('plan-detail-title').textContent = currentPlanData.name;
   const isActive = db.activePlan && db.activePlan.planId === planId;
   const ribbon = document.getElementById('plan-active-ribbon');
@@ -4247,41 +4252,55 @@ function renderPlanDetail() {
 }
 
 function buildPlanDayCard(day, idx) {
-  const exCount = (day.exercises || []).length;
+  const exercises = day.exercises || [];
+  const exCount = exercises.length;
   const subText = exCount === 0 ? 'Geen oefeningen' : `${exCount} ${exCount === 1 ? 'oefening' : 'oefeningen'}`;
+  const expanded = expandedPlanDayIndex === idx;
   const card = document.createElement('div');
   card.className = 'plan-day-card';
   card.innerHTML = `
-    <div class="plan-day-num">${idx + 1}</div>
-    <div class="plan-day-info">
-      <div class="plan-day-name-row">
-        <div class="plan-day-name">${day.name}</div>
-        ${planDetailEditMode ? `
-        <button class="plan-day-rename-btn" aria-label="Naam wijzigen">
-          <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
-        </button>` : ''}
+    <div class="plan-day-head">
+      <div class="plan-day-num">${idx + 1}</div>
+      <div class="plan-day-info">
+        <div class="plan-day-name-row">
+          <div class="plan-day-name">${day.name}</div>
+          ${planDetailEditMode ? `
+          <button class="plan-day-rename-btn" aria-label="Naam wijzigen">
+            <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+          </button>` : ''}
+        </div>
+        <div class="plan-day-sub">${subText}</div>
       </div>
-      <div class="plan-day-sub">${subText}</div>
+      <svg class="plan-day-chevron${expanded ? ' expanded' : ''}" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+      ${planDetailEditMode ? `
+      <button class="plan-day-delete-btn" aria-label="Dag verwijderen">
+        <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+      </button>` : `
+      <button class="plan-day-edit-btn" aria-label="Bewerken">
+        <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+      </button>`}
     </div>
-    ${planDetailEditMode ? `
-    <button class="plan-day-delete-btn" aria-label="Dag verwijderen">
-      <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-    </button>` : `
-    <button class="plan-day-edit-btn" aria-label="Bewerken">
-      <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
-    </button>`}
+    ${expanded ? `
+    <div class="plan-day-preview">
+      ${exCount === 0 ? `<div class="plan-day-preview-empty">Geen oefeningen</div>` : exercises.map(ex => `
+      <div class="plan-day-preview-row"><span class="plan-day-preview-name">${ex.name}</span><span class="plan-day-preview-meta">${ex.sets}×${ex.reps}</span></div>`).join('')}
+    </div>` : ''}
   `;
-  // The card itself (number, name, exercise count) opens the day's reorder/delete
-  // screen; the pencil/trash/rename buttons stop propagation so they keep their
-  // own actions instead of also triggering this.
-  card.addEventListener('click', () => openPlanDayEdit(idx));
+  // Tapping the head (number, name, exercise count) toggles this card's inline
+  // preview — accordion behaviour: only one day at a time, enforced by
+  // expandedPlanDayIndex being a single value. The pencil/trash/rename buttons
+  // stop propagation so they keep their own actions instead of also toggling it.
+  card.querySelector('.plan-day-head').addEventListener('click', () => {
+    expandedPlanDayIndex = expanded ? null : idx;
+    renderPlanDetail();
+  });
   if (planDetailEditMode) {
     card.querySelector('.plan-day-rename-btn').addEventListener('click', e => { e.stopPropagation(); openPlanDayRename(idx); });
     card.querySelector('.plan-day-delete-btn').addEventListener('click', e => { e.stopPropagation(); openDeletePlanDayConfirm(idx); });
   } else {
     card.querySelector('.plan-day-edit-btn').addEventListener('click', e => {
       e.stopPropagation();
-      openPlanDayAddExercises(idx);
+      openPlanDayEdit(idx);
     });
   }
   return card;
@@ -4856,6 +4875,7 @@ function setupPdeSwipeDelete(item) {
 }
 
 document.getElementById('btn-back-plan-day-edit').addEventListener('click', () => goBack('screen-plan-detail'));
+document.getElementById('btn-pde-add-exercise').addEventListener('click', () => openPlanDayAddExercises(currentEditDayIndex));
 
 // ── Plan Set Active / Overflow ────────────────────────
 document.getElementById('btn-plan-set-active').addEventListener('click', async () => {
@@ -5068,12 +5088,14 @@ document.getElementById('btn-new-plan-save').addEventListener('click', async () 
   renderPlanList();
 });
 
-// ── Plan Day Add Exercise Flow (Plan Detail's pencil icon) ──────────────
+// ── Plan Day Add Exercise Flow (screen-plan-day-edit's "+" button) ──────
 // Reuses the exercise browser screen (screen-exercises) wholesale, in 'plan-add'
 // mode: same categories, same exercise lists, same ⋮ menu and New Exercise form as
 // the Fitness Tracker's own "All Exercises" — only each row's own Voeg toe/Toegevoegd
 // button differs, and it writes straight into currentPlanData.days[currentEditDayIndex]
 // (never into a Fitness Tracker workout). See exerciseScreenMode / renderExerciseItem.
+// Always entered from screen-plan-day-edit (currentEditDayIndex is already set by
+// openPlanDayEdit) and always returns there — see btn-back-exercises.
 function openPlanDayAddExercises(dayIndex) {
   if (!currentPlanData || !currentPlanData.days[dayIndex]) { toast('Kon dag niet laden'); return; }
   currentEditDayIndex = dayIndex;
