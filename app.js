@@ -261,9 +261,14 @@ let currentEditDayIndex = null;
 let pdeDragItem = null;
 let pdeDragStartY = 0;
 let pdeDragDy = 0;
-let pdeActiveSwipeInner = null;
-let pdeActiveSwipeReveal = null;
 let pendingPdeSetsRepsIndex = null;
+let pendingPdeDeleteIndex = null;
+// 'uniform' ({sets, reps}) or 'persets' ({repsPerSet: [...]}) — which half of
+// #pde-sets-reps-overlay is showing. pdeSrPerSetReps is the working array for
+// the 'persets' side while the popup is open (add/remove set rows mutate it
+// directly; only committed to the exercise on Opslaan).
+let pdeSrMode = 'uniform';
+let pdeSrPerSetReps = [];
 
 // -- Screen Navigation ------------------------------------
 // Central place that both switches the visible .screen AND keeps the
@@ -3247,6 +3252,7 @@ const OVERLAY_CANCEL_BUTTON = {
   'delete-plan-day-overlay': 'btn-delete-plan-day-cancel',
   'day-picker-overlay': 'btn-day-picker-cancel',
   'pde-sets-reps-overlay': 'btn-pde-sr-cancel',
+  'delete-pde-exercise-overlay': 'btn-delete-pde-exercise-cancel',
   'reset-overlay': 'btn-reset-cancel',
   'history-goto-overlay': 'history-goto-cancel',
   'discard-changes-overlay': 'btn-discard-changes-cancel',
@@ -4251,6 +4257,17 @@ function renderPlanDetail() {
   if (planDetailEditMode && !planHasWeekB()) scroll.appendChild(buildAddWeekBlock());
 }
 
+// A plan day's exercise carries EITHER a uniform {sets, reps} pair OR a
+// per-set {repsPerSet: [...]} list (never both — see the save handler on
+// #pde-sets-reps-overlay) — every other place that displays sets/reps reads
+// through this instead of the raw fields. `style: 'short'` drops " sets"/
+// " reps" for tighter spots (the day-card preview); per-set reps has no
+// shorter form of its own either way.
+function formatExerciseSetsReps(ex, style) {
+  if (Array.isArray(ex.repsPerSet) && ex.repsPerSet.length > 0) return `${ex.repsPerSet.join('-')} reps`;
+  return style === 'short' ? `${ex.sets}×${ex.reps}` : `${ex.sets} sets × ${ex.reps} reps`;
+}
+
 function buildPlanDayCard(day, idx) {
   const exercises = day.exercises || [];
   const exCount = exercises.length;
@@ -4283,7 +4300,7 @@ function buildPlanDayCard(day, idx) {
     ${expanded ? `
     <div class="plan-day-preview">
       ${exCount === 0 ? `<div class="plan-day-preview-empty">Geen oefeningen</div>` : exercises.map(ex => `
-      <div class="plan-day-preview-row"><span class="plan-day-preview-name">${ex.name}</span><span class="plan-day-preview-meta">${ex.sets}×${ex.reps}</span></div>`).join('')}
+      <div class="plan-day-preview-row"><span class="plan-day-preview-name">${ex.name}</span><span class="plan-day-preview-meta">${formatExerciseSetsReps(ex, 'short')}</span></div>`).join('')}
     </div>` : ''}
   `;
   // Tapping the head (number, name, exercise count) toggles this card's inline
@@ -4664,11 +4681,10 @@ function renderPlanDayEdit() {
     item.className = 'pde-item';
     item.dataset.exIdx = idx;
     item.innerHTML = `
-      <div class="pde-delete-reveal"><button class="pde-delete-btn">VERWIJDEREN</button></div>
       <div class="pde-item-inner">
         <div class="pde-ex-info">
           <span class="pde-ex-name">${ex.name}</span>
-          <span class="pde-ex-meta">${ex.sets} sets × ${ex.reps} reps</span>
+          <span class="pde-ex-meta">${formatExerciseSetsReps(ex)}</span>
         </div>
         <svg class="pde-chevron" viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
         <div class="pde-drag-handle" aria-label="Drag to reorder">
@@ -4676,7 +4692,7 @@ function renderPlanDayEdit() {
         </div>
       </div>
     `;
-    setupPdeSwipeDelete(item);
+    setupPdeItemInteractions(item);
     list.appendChild(item);
   });
 
@@ -4690,14 +4706,79 @@ async function savePlanDayExercises(newExercises) {
 }
 
 // -- Plan Day Edit: sets/reps popup (shared #pde-sets-reps-overlay) ------
+// Two modes, toggled at the top of the popup: 'uniform' is the plain Sets/Reps
+// pair every exercise starts with; 'persets' lets each set have its own reps
+// (e.g. a descending pyramid) — see formatExerciseSetsReps for how both are
+// displayed afterwards, and pdeSrMode/pdeSrPerSetReps above for the working state.
 function openPdeSetsRepsEdit(exIdx) {
   const ex = currentPlanData.days[currentEditDayIndex].exercises[exIdx];
   if (!ex) return;
   pendingPdeSetsRepsIndex = exIdx;
-  document.getElementById('pde-sr-sets').value = ex.sets;
-  document.getElementById('pde-sr-reps').value = ex.reps;
+  if (Array.isArray(ex.repsPerSet) && ex.repsPerSet.length > 0) {
+    pdeSrMode = 'persets';
+    pdeSrPerSetReps = [...ex.repsPerSet];
+    document.getElementById('pde-sr-sets').value = ex.repsPerSet.length;
+    document.getElementById('pde-sr-reps').value = ex.repsPerSet[0];
+  } else {
+    pdeSrMode = 'uniform';
+    pdeSrPerSetReps = Array.from({ length: ex.sets || 1 }, () => ex.reps || 1);
+    document.getElementById('pde-sr-sets').value = ex.sets;
+    document.getElementById('pde-sr-reps').value = ex.reps;
+  }
+  renderPdeSrMode();
   openOverlay('pde-sets-reps-overlay');
 }
+
+function renderPdeSrMode() {
+  document.getElementById('pde-sr-mode-uniform').classList.toggle('active', pdeSrMode === 'uniform');
+  document.getElementById('pde-sr-mode-persets').classList.toggle('active', pdeSrMode === 'persets');
+  document.getElementById('pde-sr-uniform-fields').classList.toggle('hidden', pdeSrMode !== 'uniform');
+  document.getElementById('pde-sr-persets-fields').classList.toggle('hidden', pdeSrMode !== 'persets');
+  if (pdeSrMode === 'persets') renderPdeSrSetList();
+}
+
+function renderPdeSrSetList() {
+  const list = document.getElementById('pde-sr-set-list');
+  list.innerHTML = '';
+  pdeSrPerSetReps.forEach((reps, i) => {
+    const row = document.createElement('div');
+    row.className = 'pde-sr-set-row';
+    row.innerHTML = `
+      <span class="pde-sr-set-label">Set ${i + 1}</span>
+      <input type="number" class="pde-sr-set-reps-input" inputmode="numeric" min="1" value="${reps}"/>
+      <button type="button" class="pde-sr-set-remove" aria-label="Set verwijderen">&times;</button>
+    `;
+    row.querySelector('.pde-sr-set-reps-input').addEventListener('input', e => {
+      pdeSrPerSetReps[i] = parseInt(e.target.value, 10) || 0;
+    });
+    row.querySelector('.pde-sr-set-remove').addEventListener('click', () => {
+      pdeSrPerSetReps.splice(i, 1);
+      renderPdeSrSetList();
+    });
+    list.appendChild(row);
+  });
+}
+
+document.getElementById('pde-sr-mode-uniform').addEventListener('click', () => {
+  if (pdeSrMode === 'uniform') return;
+  pdeSrMode = 'uniform';
+  renderPdeSrMode();
+});
+document.getElementById('pde-sr-mode-persets').addEventListener('click', () => {
+  if (pdeSrMode === 'persets') return;
+  if (pdeSrPerSetReps.length === 0) {
+    const sets = parseInt(document.getElementById('pde-sr-sets').value, 10) || 1;
+    const reps = parseInt(document.getElementById('pde-sr-reps').value, 10) || 1;
+    pdeSrPerSetReps = Array.from({ length: sets }, () => reps);
+  }
+  pdeSrMode = 'persets';
+  renderPdeSrMode();
+});
+document.getElementById('pde-sr-add-set').addEventListener('click', () => {
+  const last = pdeSrPerSetReps[pdeSrPerSetReps.length - 1];
+  pdeSrPerSetReps.push(last !== undefined ? last : 1);
+  renderPdeSrSetList();
+});
 
 document.getElementById('btn-pde-sr-cancel').addEventListener('click', () => {
   pendingPdeSetsRepsIndex = null;
@@ -4708,11 +4789,16 @@ document.getElementById('btn-pde-sr-save').addEventListener('click', async () =>
   const day = currentPlanData.days[currentEditDayIndex];
   const ex = day.exercises[pendingPdeSetsRepsIndex];
   if (!ex) { closeOverlay('pde-sets-reps-overlay'); return; }
-  const sets = parseInt(document.getElementById('pde-sr-sets').value, 10);
-  const reps = parseInt(document.getElementById('pde-sr-reps').value, 10);
-  let changed = false;
-  if (sets > 0 && sets !== ex.sets) { ex.sets = sets; changed = true; }
-  if (reps > 0 && reps !== ex.reps) { ex.reps = reps; changed = true; }
+  const before = JSON.stringify({ sets: ex.sets, reps: ex.reps, repsPerSet: ex.repsPerSet });
+  if (pdeSrMode === 'persets') {
+    const reps = pdeSrPerSetReps.filter(r => r > 0);
+    if (reps.length > 0) { ex.repsPerSet = reps; delete ex.sets; delete ex.reps; }
+  } else {
+    const sets = parseInt(document.getElementById('pde-sr-sets').value, 10);
+    const reps = parseInt(document.getElementById('pde-sr-reps').value, 10);
+    if (sets > 0 && reps > 0) { ex.sets = sets; ex.reps = reps; delete ex.repsPerSet; }
+  }
+  const changed = JSON.stringify({ sets: ex.sets, reps: ex.reps, repsPerSet: ex.repsPerSet }) !== before;
   pendingPdeSetsRepsIndex = null;
   closeOverlay('pde-sets-reps-overlay');
   if (changed) {
@@ -4722,15 +4808,33 @@ document.getElementById('btn-pde-sr-save').addEventListener('click', async () =>
   }
 });
 
+// -- Plan Day Edit: delete-exercise confirm (shared #delete-pde-exercise-overlay) --
+function openPdeDeleteConfirm(exIdx) {
+  const ex = currentPlanData.days[currentEditDayIndex].exercises[exIdx];
+  if (!ex) return;
+  pendingPdeDeleteIndex = exIdx;
+  document.getElementById('delete-pde-exercise-msg').textContent = `Weet je zeker dat je "${ex.name}" wilt verwijderen uit deze dag?`;
+  openOverlay('delete-pde-exercise-overlay');
+}
+document.getElementById('btn-delete-pde-exercise-cancel').addEventListener('click', () => {
+  pendingPdeDeleteIndex = null;
+  closeOverlay('delete-pde-exercise-overlay');
+});
+document.getElementById('btn-delete-pde-exercise-confirm').addEventListener('click', async () => {
+  if (pendingPdeDeleteIndex === null) return;
+  const day = currentPlanData.days[currentEditDayIndex];
+  const exercises = [...(day.exercises || [])];
+  exercises.splice(pendingPdeDeleteIndex, 1);
+  await savePlanDayExercises(exercises);
+  pendingPdeDeleteIndex = null;
+  closeOverlay('delete-pde-exercise-overlay');
+  renderPlanDayEdit();
+  toast('Verwijderd uit plan');
+});
+
 function setupPdeDragReorder(list) {
   list.addEventListener('touchstart', e => {
     if (!e.target.closest('.pde-drag-handle')) return;
-    if (pdeActiveSwipeInner) {
-      pdeActiveSwipeInner.style.transform = '';
-      if (pdeActiveSwipeReveal) pdeActiveSwipeReveal.style.width = '0';
-      pdeActiveSwipeInner = null;
-      pdeActiveSwipeReveal = null;
-    }
     pdeDragItem = e.target.closest('.pde-item');
     if (!pdeDragItem) return;
     pdeDragStartY = e.touches[0].clientY;
@@ -4770,107 +4874,47 @@ function setupPdeDragReorder(list) {
   list.addEventListener('touchcancel', endDrag, { passive: true });
 }
 
-function setupPdeSwipeDelete(item) {
+// Long-press (not the drag handle — that's still drag-to-reorder) to delete,
+// same 500ms/vibrate convention as Home's exercise-card long-press. A plain
+// short tap still opens the sets/reps editor; longPressFired guards the click
+// that follows every touch sequence so it can't ALSO open the editor right
+// after a long-press already opened the delete confirm.
+function setupPdeItemInteractions(item) {
   const inner = item.querySelector('.pde-item-inner');
-  const reveal = item.querySelector('.pde-delete-reveal');
-  const deleteBtn = item.querySelector('.pde-delete-btn');
   let touchStartX = 0;
   let touchStartY = 0;
-  let mode = null;
-  let baseX = 0;
-  let isOpen = false;
+  let longPressTimer = null;
+  let longPressFired = false;
+
+  const cancelLongPress = () => { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } };
 
   inner.addEventListener('touchstart', e => {
     if (e.target.closest('.pde-drag-handle') || pdeDragItem) return;
     touchStartX = e.touches[0].clientX;
     touchStartY = e.touches[0].clientY;
-    baseX = isOpen ? -80 : 0;
-    mode = null;
-    if (pdeActiveSwipeInner && pdeActiveSwipeInner !== inner) {
-      pdeActiveSwipeInner.style.transition = 'transform 0.15s';
-      pdeActiveSwipeInner.style.transform = '';
-      if (pdeActiveSwipeReveal) { pdeActiveSwipeReveal.style.transition = 'width 0.15s'; pdeActiveSwipeReveal.style.width = '0'; }
-      setTimeout(() => { if (pdeActiveSwipeInner) { pdeActiveSwipeInner.style.transition = ''; } if (pdeActiveSwipeReveal) pdeActiveSwipeReveal.style.transition = ''; }, 160);
-      pdeActiveSwipeInner = null;
-      pdeActiveSwipeReveal = null;
-    }
+    longPressFired = false;
+    longPressTimer = setTimeout(() => {
+      longPressTimer = null;
+      longPressFired = true;
+      if (navigator.vibrate) navigator.vibrate(30);
+      openPdeDeleteConfirm(parseInt(item.dataset.exIdx));
+    }, 500);
   }, { passive: true });
 
   inner.addEventListener('touchmove', e => {
     if (e.target.closest('.pde-drag-handle') || pdeDragItem) return;
-    if (mode === 'scroll') return;
     const dx = e.touches[0].clientX - touchStartX;
     const dy = e.touches[0].clientY - touchStartY;
-    if (mode === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
-      mode = Math.abs(dx) > Math.abs(dy) ? 'swipe' : 'scroll';
-    }
-    if (mode === 'swipe') {
-      e.preventDefault();
-      const target = Math.max(-80, Math.min(0, baseX + dx));
-      inner.style.transform = `translateX(${target}px)`;
-      reveal.style.width = `${Math.abs(target)}px`;
-      pdeActiveSwipeInner = inner;
-      pdeActiveSwipeReveal = reveal;
-    }
-  }, { passive: false });
-
-  inner.addEventListener('touchend', e => {
-    if (mode !== 'swipe') return;
-    const dx = e.changedTouches[0].clientX - touchStartX;
-    const finalX = baseX + dx;
-    inner.style.transition = 'transform 0.15s';
-    reveal.style.transition = 'width 0.15s';
-    if (finalX < -40) {
-      inner.style.transform = 'translateX(-80px)';
-      reveal.style.width = '80px';
-      isOpen = true;
-    } else {
-      inner.style.transform = '';
-      reveal.style.width = '0';
-      isOpen = false;
-      pdeActiveSwipeInner = null;
-      pdeActiveSwipeReveal = null;
-    }
-    setTimeout(() => { inner.style.transition = ''; reveal.style.transition = ''; }, 160);
-    mode = null;
+    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) cancelLongPress();
   }, { passive: true });
 
-  // Plain tap (not the drag handle, not a swipe — a real swipe calls
-  // preventDefault() on touchmove above, which suppresses the browser's
-  // synthetic click that would otherwise follow): opens the sets/reps editor,
-  // or just closes an already-revealed delete button instead of opening it.
+  inner.addEventListener('touchend', cancelLongPress, { passive: true });
+  inner.addEventListener('touchcancel', cancelLongPress, { passive: true });
+
   inner.addEventListener('click', e => {
     if (e.target.closest('.pde-drag-handle')) return;
-    if (isOpen) {
-      inner.style.transition = 'transform 0.15s';
-      reveal.style.transition = 'width 0.15s';
-      inner.style.transform = '';
-      reveal.style.width = '0';
-      isOpen = false;
-      pdeActiveSwipeInner = null;
-      pdeActiveSwipeReveal = null;
-      setTimeout(() => { inner.style.transition = ''; reveal.style.transition = ''; }, 160);
-      return;
-    }
+    if (longPressFired) { longPressFired = false; return; }
     openPdeSetsRepsEdit(parseInt(item.dataset.exIdx));
-  });
-
-  deleteBtn.addEventListener('click', async () => {
-    pdeActiveSwipeInner = null;
-    pdeActiveSwipeReveal = null;
-    const allItems = [...document.querySelectorAll('#pde-list .pde-item')];
-    const currentPos = allItems.indexOf(item);
-    item.style.transition = 'height 0.2s ease, opacity 0.2s ease, margin-bottom 0.2s ease';
-    item.style.overflow = 'hidden';
-    item.style.height = item.offsetHeight + 'px';
-    requestAnimationFrame(() => { item.style.height = '0'; item.style.opacity = '0'; item.style.marginBottom = '0'; });
-    await new Promise(r => setTimeout(r, 220));
-    const day = currentPlanData.days[currentEditDayIndex];
-    const exercises = [...(day.exercises || [])];
-    if (currentPos >= 0 && currentPos < exercises.length) exercises.splice(currentPos, 1);
-    await savePlanDayExercises(exercises);
-    renderPlanDayEdit();
-    toast('Verwijderd uit plan');
   });
 }
 

@@ -625,7 +625,7 @@
       </button>
     </div>
   </div>
-  <div class="pde-hint-txt">Houd ≡ ingedrukt om te herschikken · Swipe naar links om te verwijderen</div>
+  <div class="pde-hint-txt">Houd ≡ ingedrukt om te herschikken · Houd een oefening ingedrukt om te verwijderen</div>
   <div class="pde-list" id="pde-list"></div>
 </div>
 
@@ -633,7 +633,11 @@
 <div class="overlay" id="pde-sets-reps-overlay">
   <div class="overlay-panel">
     <h3>Sets &amp; reps aanpassen</h3>
-    <div class="pde-sr-row">
+    <div class="pde-sr-mode-toggle">
+      <button type="button" class="pde-sr-mode-btn active" id="pde-sr-mode-uniform">Gelijke reps</button>
+      <button type="button" class="pde-sr-mode-btn" id="pde-sr-mode-persets">Andere reps per set</button>
+    </div>
+    <div class="pde-sr-row" id="pde-sr-uniform-fields">
       <div class="pde-sr-field">
         <label for="pde-sr-sets">Sets</label>
         <input type="number" id="pde-sr-sets" inputmode="numeric" min="1"/>
@@ -643,9 +647,25 @@
         <input type="number" id="pde-sr-reps" inputmode="numeric" min="1"/>
       </div>
     </div>
+    <div class="pde-sr-persets-fields hidden" id="pde-sr-persets-fields">
+      <div class="pde-sr-set-list" id="pde-sr-set-list"></div>
+      <button type="button" class="pde-sr-add-set-block" id="pde-sr-add-set">+ Set toevoegen</button>
+    </div>
     <div class="overlay-btns">
       <button class="btn-secondary" id="btn-pde-sr-cancel">Annuleren</button>
       <button class="btn-primary" id="btn-pde-sr-save">Opslaan</button>
+    </div>
+  </div>
+</div>
+
+<!-- PLAN DAY EXERCISE DELETE OVERLAY (screen-plan-day-edit, long-press) -->
+<div class="overlay" id="delete-pde-exercise-overlay">
+  <div class="overlay-panel">
+    <h3>Oefening verwijderen?</h3>
+    <p id="delete-pde-exercise-msg" class="cat-delete-msg"></p>
+    <div class="overlay-btns">
+      <button class="btn-secondary" id="btn-delete-pde-exercise-cancel">Annuleren</button>
+      <button class="btn-danger" id="btn-delete-pde-exercise-confirm">Verwijderen</button>
     </div>
   </div>
 </div>
