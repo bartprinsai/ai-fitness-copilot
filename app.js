@@ -228,9 +228,6 @@ let currentExercise = null;
 // -- Plan Builder state ---------------------------------
 let currentPlanId = null;
 let currentPlanData = null;
-let currentLoadPlanId = null;
-let currentLoadDayIndex = null;
-let loadWorkoutReturnScreen = 'screen-plan-detail';
 let bannerDismissed = false;
 let bannerSuggestedDayIndex = null;
 let selectedSetIndex = null;
@@ -242,12 +239,13 @@ let calDetailDate = null;
 let calScrollLock = false;
 let exerciseBrowserMode = 'categories';
 let currentBrowseCategory = null;
-// The exercise browser (screen-exercises) doubles as the Load Workout flow for a
-// plan day's pencil icon: 'browse' is its normal Fitness Tracker behavior (tapping
-// a row opens Training), 'select' is the Load flow (tapping a row toggles it into
-// exerciseLoadSelection instead, and the sticky footer below the list confirms).
+// The exercise browser (screen-exercises) doubles as the Plan Day "Add Exercise" flow
+// for a plan day's pencil icon: 'browse' is its normal Fitness Tracker behavior
+// (tapping a row opens Training), 'plan-add' is the plan flow (each row gets its own
+// Voeg toe/Toegevoegd button that writes straight into the plan day being edited —
+// see currentEditDayIndex/planDayHasExercise/addExerciseToPlanDay — and NEVER touches
+// a Fitness Tracker workout).
 let exerciseScreenMode = 'browse';
-let exerciseLoadSelection = new Set();
 let exerciseLoadDayName = '';
 // Plan Detail's editable state (toggled via ⋮ → Bewerken/Klaar): adds rename pencils,
 // swaps the day pencil for a delete button, and shows Dag/Week toevoegen blocks.
@@ -1202,10 +1200,10 @@ function setExercisesTitle(text) {
   document.getElementById('exercises-title').textContent = text;
 }
 
-// The top-level (unfiltered) title: "Laden: [Dag]" while this screen is doubling
-// as the Load Workout flow, "All Exercises" for its normal Fitness Tracker use.
+// The top-level (unfiltered) title: "Toevoegen: [Dag]" while this screen is doubling
+// as the Plan Day add-exercise flow, "All Exercises" for its normal Fitness Tracker use.
 function defaultExercisesTitle() {
-  return exerciseScreenMode === 'select' ? ('Laden: ' + exerciseLoadDayName) : 'All Exercises';
+  return exerciseScreenMode === 'plan-add' ? ('Toevoegen: ' + exerciseLoadDayName) : 'All Exercises';
 }
 
 // -- New Workout intermediate screen --------------------
@@ -1235,7 +1233,6 @@ function renderNewWorkoutScreen() {
 
 function openExerciseList() {
   exerciseScreenMode = 'browse';
-  document.getElementById('ex-select-footer').classList.add('hidden');
   exerciseBrowserMode = 'categories';
   currentBrowseCategory = null;
   document.getElementById('exercise-search').value = '';
@@ -1376,7 +1373,6 @@ document.getElementById('btn-cat-delete-confirm').addEventListener('click', () =
 function renderExercisesInCategory(cat) {
   const list = document.getElementById('exercise-list');
   list.innerHTML = '';
-  renderLoadSelectAllRow(list);
   const exercises = allExercises().filter(e => e.category === cat);
   if (exercises.length === 0) {
     list.insertAdjacentHTML('beforeend', `<div class="exercise-empty">No exercises found</div>`);
@@ -1388,7 +1384,6 @@ function renderExercisesInCategory(cat) {
 function renderFavoriteExercises() {
   const list = document.getElementById('exercise-list');
   list.innerHTML = '';
-  renderLoadSelectAllRow(list);
   const favs = allExercises().filter(e => isFavoriteExercise(e.name));
   if (favs.length === 0) {
     list.insertAdjacentHTML('beforeend', `<div class="exercise-empty">No favorites yet</div>`);
@@ -1400,45 +1395,12 @@ function renderFavoriteExercises() {
 function renderExerciseSearchResults(q) {
   const list = document.getElementById('exercise-list');
   list.innerHTML = '';
-  renderLoadSelectAllRow(list);
   const filtered = allExercises().filter(e => e.name.toLowerCase().includes(q));
   if (filtered.length === 0) {
     list.insertAdjacentHTML('beforeend', `<div class="exercise-empty">No exercises found</div>`);
     return;
   }
   filtered.forEach(ex => renderExerciseItem(list, ex));
-}
-
-// Only shown in the Load Workout flow (exerciseScreenMode === 'select'). Operates over
-// the FULL exercise database regardless of which category is currently displayed —
-// selections made in other categories are preserved when switching between them, since
-// they all live in the one exerciseLoadSelection set.
-function renderLoadSelectAllRow(list) {
-  if (exerciseScreenMode !== 'select') return;
-  const all = allExercises();
-  const allSelected = all.length > 0 && all.every(e => exerciseLoadSelection.has(e.name));
-  const row = document.createElement('div');
-  row.className = 'lw-select-all-row';
-  row.innerHTML = `<div class="lw-checkbox ${allSelected ? 'checked' : ''}"></div><span>Alles selecteren</span>`;
-  row.addEventListener('click', () => {
-    const next = !all.every(e => exerciseLoadSelection.has(e.name));
-    if (next) all.forEach(e => exerciseLoadSelection.add(e.name));
-    else exerciseLoadSelection.clear();
-    refreshExerciseList();
-    updateLoadFooter();
-  });
-  list.appendChild(row);
-}
-
-function toggleLoadSelection(name) {
-  if (exerciseLoadSelection.has(name)) exerciseLoadSelection.delete(name);
-  else exerciseLoadSelection.add(name);
-  refreshExerciseList();
-  updateLoadFooter();
-}
-
-function updateLoadFooter() {
-  document.getElementById('btn-confirm-load-workout').textContent = `Workout laden (${exerciseLoadSelection.size})`;
 }
 
 function refreshExerciseList() {
@@ -1455,19 +1417,29 @@ function refreshExerciseList() {
 
 function renderExerciseItem(list, ex) {
   const item = document.createElement('div');
-  const isSelectMode = exerciseScreenMode === 'select';
-  const isSelected = isSelectMode && exerciseLoadSelection.has(ex.name);
-  item.className = 'exercise-item list-row' + (ex.custom ? ' exercise-item-custom' : '') + (isSelected ? ' exercise-item-selected' : '');
+  const isPlanAddMode = exerciseScreenMode === 'plan-add';
+  const inPlanDay = isPlanAddMode && planDayHasExercise(ex.name);
+  item.className = 'exercise-item list-row' + (ex.custom ? ' exercise-item-custom' : '');
   const isFav = isFavoriteExercise(ex.name);
   item.innerHTML = `
     <span class="exercise-item-name">${ex.name}</span>
-    ${isSelected ? `<svg class="exercise-item-check" viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>` : (isFav ? `<svg class="exercise-item-fav-star" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>` : '')}
+    ${isPlanAddMode ? `
+    <button class="ex-add-btn${inPlanDay ? ' ex-add-btn-done' : ''}"${inPlanDay ? ' disabled' : ''}>${
+      inPlanDay
+        ? `<svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>Toegevoegd`
+        : `Voeg toe`
+    }</button>` : (isFav ? `<svg class="exercise-item-fav-star" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>` : '')}
     <svg class="exercise-item-dots" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
   `;
   item.querySelector('.exercise-item-name').addEventListener('click', () => {
-    if (isSelectMode) toggleLoadSelection(ex.name);
-    else openTraining(ex.name);
+    if (!isPlanAddMode) openTraining(ex.name);
   });
+  if (isPlanAddMode && !inPlanDay) {
+    item.querySelector('.ex-add-btn').addEventListener('click', e => {
+      e.stopPropagation();
+      addExerciseToPlanDay(ex.name);
+    });
+  }
   item.querySelector('.exercise-item-dots').addEventListener('click', e => {
     e.stopPropagation();
     showOverflowMenu([
@@ -3163,12 +3135,10 @@ function saveNewExerciseFromScreen() {
     updateExistingExercise(pendingEditExerciseOriginalName, { category: cat, name, type });
     // After the rename above has moved any existing info over to the new name.
     setExerciseInfoFor(name, readExerciseInfoForm(EXERCISE_INFO_FORMS.newEx));
-    if (exerciseLoadSelection.delete(pendingEditExerciseOriginalName)) exerciseLoadSelection.add(name);
     pendingEditExerciseOriginalName = null;
     exerciseBrowserMode = 'categories';
     currentBrowseCategory = null;
     renderCategoryBrowser();
-    updateLoadFooter();
     showScreen('screen-exercises');
     return;
   }
@@ -3224,11 +3194,9 @@ document.getElementById('btn-delete-ex-confirm').addEventListener('click', () =>
   if (db.records && db.records[name]) { delete db.records[name]; persistRecords(); }
   if (db.favoriteExercises && db.favoriteExercises[name]) { delete db.favoriteExercises[name]; persistFavorites(); }
   if (db.exerciseInfo && db.exerciseInfo[name]) { delete db.exerciseInfo[name]; persistExerciseInfo(); }
-  exerciseLoadSelection.delete(name);
   pendingDeleteExercise = null;
   closeOverlay('delete-exercise-overlay');
   refreshExerciseList();
-  updateLoadFooter();
   renderHome();
   toast('Exercise deleted');
 });
@@ -3320,7 +3288,7 @@ document.getElementById('btn-back-exercises').addEventListener('click', () => {
     if (history.state && history.state.browse) history.back();
     else resetExerciseBrowseToCategories();
   } else {
-    goBack(exerciseScreenMode === 'select' ? loadWorkoutReturnScreen : 'screen-fitness-tracker');
+    goBack(exerciseScreenMode === 'plan-add' ? 'screen-plan-detail' : 'screen-fitness-tracker');
   }
 });
 
@@ -4306,8 +4274,7 @@ function buildPlanDayCard(day, idx) {
     card.querySelector('.plan-day-delete-btn').addEventListener('click', () => openDeletePlanDayConfirm(idx));
   } else {
     card.querySelector('.plan-day-edit-btn').addEventListener('click', () => {
-      loadWorkoutReturnScreen = 'screen-plan-detail';
-      openLoadWorkout(currentPlanId, idx);
+      openPlanDayAddExercises(idx);
     });
   }
   return card;
@@ -5040,49 +5007,40 @@ document.getElementById('btn-new-plan-save').addEventListener('click', async () 
   renderPlanList();
 });
 
-// ── Load Workout Flow (Plan Detail's pencil icon / the Smart Day Banner) ──
-// Reuses the exercise browser screen (screen-exercises) wholesale, in 'select' mode:
-// same categories, same exercise lists, same +/⋮ menus and New Exercise form as the
-// Fitness Tracker's own "All Exercises" — only row-tap and the sticky footer below
-// the list differ. See exerciseScreenMode / renderExerciseItem / renderLoadSelectAllRow.
-async function openLoadWorkout(planId, dayIndex) {
-  currentLoadPlanId = planId;
-  currentLoadDayIndex = dayIndex;
-  const plan = db.plans[planId];
-  if (!plan || !plan.days[dayIndex]) { toast('Kon dag niet laden'); return; }
-  const day = plan.days[dayIndex];
-
-  exerciseScreenMode = 'select';
-  // Pre-check the day's own exercises (old behavior: they used to be the only
-  // choices, all pre-selected) — browsing can now also add any other exercise on top.
-  exerciseLoadSelection = new Set((day.exercises || []).map(ex => ex.name));
-  exerciseLoadDayName = day.name;
+// ── Plan Day Add Exercise Flow (Plan Detail's pencil icon) ──────────────
+// Reuses the exercise browser screen (screen-exercises) wholesale, in 'plan-add'
+// mode: same categories, same exercise lists, same ⋮ menu and New Exercise form as
+// the Fitness Tracker's own "All Exercises" — only each row's own Voeg toe/Toegevoegd
+// button differs, and it writes straight into currentPlanData.days[currentEditDayIndex]
+// (never into a Fitness Tracker workout). See exerciseScreenMode / renderExerciseItem.
+function openPlanDayAddExercises(dayIndex) {
+  if (!currentPlanData || !currentPlanData.days[dayIndex]) { toast('Kon dag niet laden'); return; }
+  currentEditDayIndex = dayIndex;
+  exerciseScreenMode = 'plan-add';
+  exerciseLoadDayName = currentPlanData.days[dayIndex].name;
   exerciseBrowserMode = 'categories';
   currentBrowseCategory = null;
   document.getElementById('exercise-search').value = '';
-  document.getElementById('ex-select-footer').classList.remove('hidden');
-  updateLoadFooter();
   renderCategoryBrowser();
   showScreen('screen-exercises');
 }
 
-document.getElementById('btn-confirm-load-workout').addEventListener('click', async () => {
-  if (exerciseLoadSelection.size === 0) { toast('Selecteer minstens één oefening'); return; }
-  const workout = getWorkout(currentDate);
-  exerciseLoadSelection.forEach(name => {
-    if (!workout.find(e => e.name === name)) workout.push({ name, sets: [] });
-  });
-  setWorkout(currentDate, workout);
-  // Advance active plan day index
-  if (db.activePlan && currentLoadPlanId === db.activePlan.planId && currentLoadDayIndex !== null) {
-    db.activePlan.lastDayIndex = currentLoadDayIndex;
-    await persistActivePlan(db.activePlan);
-  }
-  bannerDismissed = true;
-  renderHome();
-  toast('Workout geladen!');
-  showScreen('screen-fitness-tracker');
-});
+// Whether `name` is already part of the plan day currently being edited via the
+// pencil icon — drives the Voeg toe / Toegevoegd button state per row.
+function planDayHasExercise(name) {
+  const day = currentPlanData && currentPlanData.days[currentEditDayIndex];
+  return !!(day && (day.exercises || []).some(e => e.name === name));
+}
+
+async function addExerciseToPlanDay(name) {
+  const day = currentPlanData && currentPlanData.days[currentEditDayIndex];
+  if (!day) return;
+  if (!day.exercises) day.exercises = [];
+  if (day.exercises.some(e => e.name === name)) return;
+  day.exercises.push({ name, sets: 3, reps: 10 });
+  await persistPlan(currentPlanId, currentPlanData);
+  refreshExerciseList();
+}
 
 // ── Smart Day Banner ──────────────────────────────────
 function renderSmartBanner() {
@@ -5104,12 +5062,25 @@ document.getElementById('btn-banner-skip').addEventListener('click', () => {
   document.getElementById('smart-day-banner').classList.add('hidden');
 });
 
-document.getElementById('btn-banner-load').addEventListener('click', () => {
+// Unlike the Plan Builder's pencil icon (openPlanDayAddExercises), this DOES write
+// into the Fitness Tracker on purpose — it's the Fitness Tracker itself loading
+// today's suggested plan day into today's workout log, in one tap.
+document.getElementById('btn-banner-load').addEventListener('click', async () => {
   document.getElementById('smart-day-banner').classList.add('hidden');
-  if (db.activePlan && bannerSuggestedDayIndex !== null) {
-    loadWorkoutReturnScreen = 'screen-fitness-tracker';
-    openLoadWorkout(db.activePlan.planId, bannerSuggestedDayIndex);
-  }
+  if (!db.activePlan || bannerSuggestedDayIndex === null) return;
+  const plan = db.plans[db.activePlan.planId];
+  const day = plan && plan.days[bannerSuggestedDayIndex];
+  if (!day) return;
+  const workout = getWorkout(currentDate);
+  (day.exercises || []).forEach(ex => {
+    if (!workout.find(e => e.name === ex.name)) workout.push({ name: ex.name, sets: [] });
+  });
+  setWorkout(currentDate, workout);
+  db.activePlan.lastDayIndex = bannerSuggestedDayIndex;
+  await persistActivePlan(db.activePlan);
+  bannerDismissed = true;
+  renderHome();
+  toast('Workout geladen!');
 });
 
 // Add new overlays to backdrop-close listener
