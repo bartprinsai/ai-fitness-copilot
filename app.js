@@ -2603,15 +2603,46 @@ document.querySelectorAll('.field-btn').forEach(btn => {
   input.name = id + '-' + Math.random().toString(36).slice(2);
 });
 
-// Typing: extra reps updates toggle + RPE as you type (digits and a decimal separator
-// only, rounded + capped); a typed RPE is checked once you leave the field, so "10"
-// isn't seen as "1" mid-typing. Leaving a field normalizes it to the decimal rules
-// above ("132,54" -> "132.5", "150.0" -> "150", reps "8,6" -> "9", RPE "8,5" -> "8.5").
-document.getElementById('field-extra').addEventListener('input', e => {
-  const clean = e.target.value.replace(/[^\d.,]/g, '');
-  if (clean !== e.target.value) e.target.value = clean;
-  onExtraChanged(getExtraReps());
+// Block invalid characters while typing (also paste, and Android keyboards that
+// show a separator anyway): weight and RPE take digits plus ONE decimal separator
+// (comma or point) with at most 1 digit after it; reps and extra reps take digits
+// only. A rejected keystroke simply doesn't appear; the caret stays where it was.
+const FIELD_DECIMALS = { 'field-weight': 1, 'field-rpe': 1, 'field-reps': 0, 'field-extra': 0 };
+function restrictNumber(str, decimals) {
+  let out = '', sep = false, after = 0;
+  for (const ch of str) {
+    if (ch >= '0' && ch <= '9') {
+      if (!sep) out += ch;
+      else if (after < decimals) { out += ch; after++; }
+    } else if ((ch === ',' || ch === '.') && decimals > 0 && !sep) { out += ch; sep = true; }
+  }
+  return out;
+}
+Object.entries(FIELD_DECIMALS).forEach(([id, decimals]) => {
+  const input = document.getElementById(id);
+  let before = null;
+  input.addEventListener('beforeinput', () => { before = { value: input.value, start: input.selectionStart, end: input.selectionEnd }; });
+  input.addEventListener('input', e => {
+    const clean = restrictNumber(input.value, decimals);
+    if (clean === input.value) return;
+    if (e.inputType === 'insertText' && before && restrictNumber(before.value, decimals) === before.value) {
+      // A typed key that isn't allowed: undo just that keystroke.
+      input.value = before.value;
+      input.setSelectionRange(before.start, before.end);
+    } else {
+      // Paste, autofill, composition: keep what's valid.
+      const caret = restrictNumber(input.value.slice(0, input.selectionStart), decimals).length;
+      input.value = clean;
+      input.setSelectionRange(caret, caret);
+    }
+  });
 });
+
+// Typing: extra reps updates toggle + RPE as you type (capped); a typed RPE is
+// checked once you leave the field, so "10" isn't seen as "1" mid-typing. Leaving
+// a field also normalizes it (safety net for the rules above, e.g. "132,5" ->
+// "132.5", "150.0" -> "150", RPE "8,5" -> "8.5").
+document.getElementById('field-extra').addEventListener('input', () => onExtraChanged(getExtraReps()));
 document.getElementById('field-extra').addEventListener('change', e => { e.target.value = getExtraReps(); });
 document.getElementById('field-rpe').addEventListener('change', e => { setRpeField(parseRpe(e.target.value)); reconcileExtraWithRpe(); });
 document.getElementById('field-weight').addEventListener('change', e => { e.target.value = formatWeight(parseWeight(e.target.value)); });
