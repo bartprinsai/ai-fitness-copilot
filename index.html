@@ -633,17 +633,26 @@
 <!-- PLAN DAY EDIT SCREEN -->
 <div id="screen-plan-day-edit" class="screen plan-screen">
   <div class="toolbar">
-    <button class="toolbar-btn" id="btn-back-plan-day-edit" aria-label="Back">
+    <button class="toolbar-btn norm-only" id="btn-back-plan-day-edit" aria-label="Back">
       <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
     </button>
-    <span class="toolbar-title" id="plan-day-edit-title">Dag bewerken</span>
-    <div class="toolbar-actions">
+    <span class="toolbar-title norm-only" id="plan-day-edit-title">Dag bewerken</span>
+    <div class="toolbar-actions norm-only">
       <button class="toolbar-btn" id="btn-pde-add-exercise" aria-label="Oefening toevoegen">
         <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
       </button>
     </div>
+    <button class="toolbar-btn sel-only" id="btn-pde-sel-done" aria-label="Klaar">
+      <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+    </button>
+    <span class="toolbar-title sel-only" id="pde-sel-count">1 oefening</span>
+    <div class="toolbar-actions sel-only">
+      <button class="toolbar-btn" id="btn-pde-sel-delete" aria-label="Oefeningen verwijderen">
+        <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+      </button>
+    </div>
   </div>
-  <div class="pde-hint-txt">Houd ≡ ingedrukt om te herschikken · Houd een oefening ingedrukt om te verwijderen</div>
+  <div class="pde-hint-txt">Houd ≡ ingedrukt om te herschikken · Houd een oefening ingedrukt om te selecteren</div>
   <div class="pde-list" id="pde-list"></div>
 </div>
 
@@ -679,7 +688,7 @@
 <!-- PLAN DAY EXERCISE DELETE OVERLAY (screen-plan-day-edit, long-press) -->
 <div class="overlay" id="delete-pde-exercise-overlay">
   <div class="overlay-panel">
-    <h3>Oefening verwijderen?</h3>
+    <h3 id="delete-pde-exercise-title">Oefening verwijderen?</h3>
     <p id="delete-pde-exercise-msg" class="cat-delete-msg"></p>
     <div class="overlay-btns">
       <button class="btn-secondary" id="btn-delete-pde-exercise-cancel">Annuleren</button>

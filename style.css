@@ -133,10 +133,10 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .new-workout-card-title { font-size: 16px; font-weight: 700; color: var(--text-primary); margin-bottom: 3px; }
 .new-workout-card-desc { font-size: 13px; color: var(--text-secondary); line-height: 1.4; }
 
-/* ── HOME SELECTION MODE ──────────────────────────────── */
+/* ── LONG-PRESS SELECTION MODE (Fitness Tracker, Plan Day Edit — see createSelectionMode) ── */
 .sel-only { display: none !important; }
-#screen-fitness-tracker.sel-mode .norm-only { display: none !important; }
-#screen-fitness-tracker.sel-mode .sel-only { display: flex !important; }
+.screen.sel-mode .norm-only { display: none !important; }
+.screen.sel-mode .sel-only { display: flex !important; }
 
 /* ── EXERCISE CARDS (HOME) ────────────────────────────── */
 .exercise-card { background: var(--surface); margin: 8px 8px 0; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.18), 0 1px 2px rgba(0,0,0,.12); cursor: pointer; overflow: visible; transition: background 0.08s; position: relative; }
@@ -730,6 +730,10 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .pde-drag-handle { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; cursor: grab; flex-shrink: 0; touch-action: none; }
 .pde-drag-handle:active { cursor: grabbing; }
 .pde-drag-handle svg { width: 20px; height: 20px; fill: var(--text-hint); }
+/* Selection mode: .pde-item clips overflow, so the shared highlight's outline goes inside;
+   reordering is off, so the handle is dimmed. */
+.pde-item-inner.exercise-card-selected { outline-offset: -2px; }
+#screen-plan-day-edit.sel-mode .pde-drag-handle { opacity: .3; cursor: default; }
 .pde-empty { padding: 32px 16px; text-align: center; color: var(--text-hint); font-size: 14px; }
 /* Sets/reps popup: uniform vs per-set mode toggle, same segmented-button
    convention as .extra-type-btn (Training tab's Partial/Forced toggle). */

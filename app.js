@@ -21,8 +21,11 @@ let currentUser = null;
 let db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, favoriteExercises: {}, hiddenBuiltins: {}, exerciseInfo: {}, plateInventory: {}, plateOnBar: {} };
 
 // -- Home selection mode state --------------------------
-let homeSelMode = false;
-let homeSelCards = new Set();
+// Fitness Tracker's long-press selection mode (see createSelectionMode).
+const homeSel = createSelectionMode({
+  screenId: 'screen-fitness-tracker', countId: 'home-sel-count',
+  countLabel: n => (n === 1 ? '1 exercise' : `${n} exercises`),
+});
 let homeExDragItem = null;
 let homeExDragStartY = 0;
 let homeExDragDy = 0;
@@ -279,7 +282,13 @@ let pdeDragItem = null;
 let pdeDragStartY = 0;
 let pdeDragDy = 0;
 let pendingPdeSetsRepsIndex = null;
-let pendingPdeDeleteIndex = null;
+let pendingPdeDeleteIndices = null; // exercise indices #delete-pde-exercise-overlay would delete
+// Plan Day Edit's long-press selection mode — same component as the Fitness Tracker's.
+const pdeSel = createSelectionMode({
+  screenId: 'screen-plan-day-edit', countId: 'pde-sel-count',
+  countLabel: n => (n === 1 ? '1 oefening' : `${n} oefeningen`),
+  markEl: item => item.querySelector('.pde-item-inner'),
+});
 // 'uniform' ({sets, reps}) or 'persets' ({repsPerSet: [...]}) — which half of
 // #pde-sets-reps-overlay is showing. pdeSrPerSetReps is the working array for
 // the 'persets' side while the popup is open (add/remove set rows mutate it
@@ -339,7 +348,9 @@ const SCREEN_TEMP_MODE = {
   // Plan Detail's editable state — same as the header checkmark / first back-arrow tap.
   'screen-plan-detail': { isActive: () => planDetailEditMode, exit: () => exitPlanDetailEditMode() },
   // Fitness Tracker's long-press selection mode — same as the ✓ in its selection header.
-  'screen-fitness-tracker': { isActive: () => homeSelMode, exit: () => exitHomeSelMode() },
+  'screen-fitness-tracker': { isActive: () => homeSel.active, exit: () => exitHomeSelMode() },
+  // Plan Day Edit's long-press selection mode — same as the ✓ in its selection header.
+  'screen-plan-day-edit': { isActive: () => pdeSel.active, exit: () => pdeSel.exit() },
 };
 
 let historyInitialized = false;
@@ -961,35 +972,11 @@ function renderHome() {
     card.appendChild(setsDiv);
 
     // Long-press to enter selection mode
-    let longPressTimer = null;
-    card.addEventListener('touchstart', () => {
-      if (homeSelMode) return;
-      longPressTimer = setTimeout(() => {
-        longPressTimer = null;
-        if (navigator.vibrate) navigator.vibrate(30);
-        enterHomeSelMode(card);
-      }, 500);
-    }, { passive: true });
-    const cancelLongPress = () => { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } };
-    card.addEventListener('touchmove', cancelLongPress, { passive: true });
-    card.addEventListener('touchend', cancelLongPress, { passive: true });
-    card.addEventListener('touchcancel', cancelLongPress, { passive: true });
-
+    const wasLongPress = attachLongPress(card, () => homeSel.enter(card), () => homeSel.active);
     card.addEventListener('click', () => {
-      if (!homeSelMode) {
-        openTraining(ex.name);
-      } else {
-        if (homeSelCards.has(card)) {
-          homeSelCards.delete(card);
-          card.classList.remove('exercise-card-selected');
-          if (homeSelCards.size === 0) exitHomeSelMode();
-          else updateHomeSelCount();
-        } else {
-          homeSelCards.add(card);
-          card.classList.add('exercise-card-selected');
-          updateHomeSelCount();
-        }
-      }
+      if (wasLongPress()) return;
+      if (!homeSel.active) openTraining(ex.name);
+      else homeSel.toggle(card);
     });
     container.appendChild(card);
   });
@@ -1063,32 +1050,83 @@ function openSessionCommentPopup() {
   });
 }
 
-function enterHomeSelMode(card) {
-  homeSelMode = true;
-  homeSelCards.add(card);
-  card.classList.add('exercise-card-selected');
-  document.getElementById('screen-fitness-tracker').classList.add('sel-mode');
-  updateHomeSelCount();
+// -- Long-press multi-select mode (shared) ---------------
+// The pattern used by Fitness Tracker's exercise cards and Plan Day Edit's
+// exercise items: long-press an item -> selection mode with that item selected.
+// The screen gets .sel-mode, which swaps its .norm-only toolbar for the .sel-only
+// one (✓ / "N <items>" / trash, see style.css); taps then toggle items, and
+// deselecting the last one leaves the mode. .sel-single marks exactly one selected
+// (Home shows its drag handle then). `markEl(item)` is the element that gets the
+// .exercise-card-selected highlight (the item itself unless it has an inner card).
+function createSelectionMode({ screenId, countId, countLabel, markEl = item => item }) {
+  const sel = { active: false, items: new Set() };
+  const screen = () => document.getElementById(screenId);
+  const update = () => {
+    document.getElementById(countId).textContent = countLabel(sel.items.size);
+    screen().classList.toggle('sel-single', sel.items.size === 1);
+  };
+  sel.enter = item => {
+    sel.active = true;
+    sel.items.add(item);
+    markEl(item).classList.add('exercise-card-selected');
+    screen().classList.add('sel-mode');
+    update();
+  };
+  sel.toggle = item => {
+    if (sel.items.delete(item)) {
+      markEl(item).classList.remove('exercise-card-selected');
+      if (sel.items.size === 0) { sel.exit(); return; }
+    } else {
+      sel.items.add(item);
+      markEl(item).classList.add('exercise-card-selected');
+    }
+    update();
+  };
+  sel.exit = () => {
+    sel.active = false;
+    sel.items.forEach(item => markEl(item).classList.remove('exercise-card-selected'));
+    sel.items.clear();
+    screen().classList.remove('sel-mode', 'sel-single');
+  };
+  return sel;
 }
 
-function updateHomeSelCount() {
-  const n = homeSelCards.size;
-  document.getElementById('home-sel-count').textContent = n === 1 ? '1 exercise' : `${n} exercises`;
-  document.getElementById('screen-fitness-tracker').classList.toggle('sel-single', n === 1);
+// Long-press (500ms + short vibrate) on `el` calls onLongPress(). Moving the finger
+// more than 10px cancels it; touches for which `ignore(e)` is true (drag handles,
+// an active drag/selection) are left alone. Returns a check for the element's click
+// handler: true (once) when that click is just the end of a long-press, so the tap
+// action must not run as well.
+function attachLongPress(el, onLongPress, ignore = () => false) {
+  let timer = null, fired = false, startX = 0, startY = 0;
+  const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
+  el.addEventListener('touchstart', e => {
+    if (ignore(e)) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    fired = false;
+    timer = setTimeout(() => {
+      timer = null;
+      fired = true;
+      if (navigator.vibrate) navigator.vibrate(30);
+      onLongPress();
+    }, 500);
+  }, { passive: true });
+  el.addEventListener('touchmove', e => {
+    if (!timer) return;
+    if (Math.abs(e.touches[0].clientX - startX) > 10 || Math.abs(e.touches[0].clientY - startY) > 10) cancel();
+  }, { passive: true });
+  el.addEventListener('touchend', cancel, { passive: true });
+  el.addEventListener('touchcancel', cancel, { passive: true });
+  return () => { const was = fired; fired = false; return was; };
 }
 
-function exitHomeSelMode() {
-  homeSelMode = false;
-  homeSelCards.forEach(card => card.classList.remove('exercise-card-selected'));
-  homeSelCards.clear();
-  document.getElementById('screen-fitness-tracker').classList.remove('sel-mode', 'sel-single');
-}
+function exitHomeSelMode() { homeSel.exit(); }
 
 function confirmDeleteHomeSelectedEx() {
-  if (homeSelCards.size === 0) return;
+  if (homeSel.items.size === 0) return;
   const allCards = [...document.getElementById('home-content').querySelectorAll('.exercise-card')];
   const exercises = getWorkout(currentDate);
-  const names = [...homeSelCards].map(c => exercises[allCards.indexOf(c)]).filter(Boolean).map(e => `"${e.name}"`);
+  const names = [...homeSel.items].map(c => exercises[allCards.indexOf(c)]).filter(Boolean).map(e => `"${e.name}"`);
   const n = names.length;
   openConfirmDelete({
     title: n === 1 ? 'Oefening verwijderen?' : 'Oefeningen verwijderen?',
@@ -1098,13 +1136,13 @@ function confirmDeleteHomeSelectedEx() {
 }
 
 function deleteHomeSelectedEx() {
-  if (homeSelCards.size === 0) return;
+  if (homeSel.items.size === 0) return;
   const container = document.getElementById('home-content');
   const allCards = [...container.querySelectorAll('.exercise-card')];
-  const selectedIdxs = new Set([...homeSelCards].map(c => allCards.indexOf(c)).filter(i => i >= 0));
+  const selectedIdxs = new Set([...homeSel.items].map(c => allCards.indexOf(c)).filter(i => i >= 0));
   const exercises = getWorkout(currentDate);
   const newExercises = exercises.filter((_, i) => !selectedIdxs.has(i));
-  const n = homeSelCards.size;
+  const n = homeSel.items.size;
   setWorkout(currentDate, newExercises);
   exitHomeSelMode();
   renderHome();
@@ -1150,7 +1188,7 @@ function setupHomeExDragReorder() {
   const container = document.getElementById('home-content');
 
   container.addEventListener('touchstart', e => {
-    if (!homeSelMode || homeSelCards.size !== 1) return;
+    if (!homeSel.active || homeSel.items.size !== 1) return;
     if (!e.target.closest('.exercise-card-drag-handle')) return;
     homeExDragItem = e.target.closest('.exercise-card');
     if (!homeExDragItem) return;
@@ -3634,7 +3672,7 @@ function navigateDay(delta) {
 }
 
 function setupDaySwipeNav() {
-  setupSwipeNav('home-content', navigateDay, { startGuard: () => homeSelMode });
+  setupSwipeNav('home-content', navigateDay, { startGuard: () => homeSel.active });
 }
 
 // -- Event Listeners ------------------------------------
@@ -5060,6 +5098,7 @@ function openPlanDayEdit(dayIdx) {
 }
 
 function renderPlanDayEdit() {
+  pdeSel.exit(); // the selection holds this render's item elements
   const list = document.getElementById('pde-list');
   const day = currentPlanData.days[currentEditDayIndex];
   const exercises = day.exercises || [];
@@ -5234,33 +5273,42 @@ document.getElementById('btn-pde-sr-save').addEventListener('click', async () =>
   }
 });
 
-// -- Plan Day Edit: delete-exercise confirm (shared #delete-pde-exercise-overlay) --
-function openPdeDeleteConfirm(exIdx) {
-  const ex = currentPlanData.days[currentEditDayIndex].exercises[exIdx];
-  if (!ex) return;
-  pendingPdeDeleteIndex = exIdx;
-  document.getElementById('delete-pde-exercise-msg').textContent = `Weet je zeker dat je "${ex.name}" wilt verwijderen uit deze dag?`;
+// -- Plan Day Edit: delete confirm for the selected exercises (#delete-pde-exercise-overlay) --
+// Opened by the selection header's trash; names every selected exercise, like the
+// Fitness Tracker's trash. Annuleren keeps the selection; Verwijderen deletes them
+// all in one write and leaves selection mode (renderPlanDayEdit).
+function openPdeDeleteSelectedConfirm() {
+  const exercises = currentPlanData.days[currentEditDayIndex].exercises || [];
+  const idxs = [...pdeSel.items].map(item => parseInt(item.dataset.exIdx)).filter(i => exercises[i]).sort((a, b) => a - b);
+  if (idxs.length === 0) return;
+  pendingPdeDeleteIndices = idxs;
+  const names = idxs.map(i => `"${exercises[i].name}"`);
+  document.getElementById('delete-pde-exercise-title').textContent = idxs.length === 1 ? 'Oefening verwijderen?' : 'Oefeningen verwijderen?';
+  document.getElementById('delete-pde-exercise-msg').textContent = idxs.length === 1
+    ? `Weet je zeker dat je ${names[0]} wilt verwijderen uit deze dag?`
+    : `Weet je zeker dat je ${idxs.length} oefeningen (${names.join(', ')}) wilt verwijderen uit deze dag?`;
   openOverlay('delete-pde-exercise-overlay');
 }
 document.getElementById('btn-delete-pde-exercise-cancel').addEventListener('click', () => {
-  pendingPdeDeleteIndex = null;
+  pendingPdeDeleteIndices = null;
   closeOverlay('delete-pde-exercise-overlay');
 });
 document.getElementById('btn-delete-pde-exercise-confirm').addEventListener('click', async () => {
-  if (pendingPdeDeleteIndex === null) return;
-  const day = currentPlanData.days[currentEditDayIndex];
-  const exercises = [...(day.exercises || [])];
-  exercises.splice(pendingPdeDeleteIndex, 1);
+  if (!pendingPdeDeleteIndices) return;
+  const remove = new Set(pendingPdeDeleteIndices);
+  pendingPdeDeleteIndices = null;
+  const exercises = (currentPlanData.days[currentEditDayIndex].exercises || []).filter((_, i) => !remove.has(i));
   await savePlanDayExercises(exercises);
-  pendingPdeDeleteIndex = null;
   closeOverlay('delete-pde-exercise-overlay');
   renderPlanDayEdit();
-  toast('Verwijderd uit plan');
+  toast(remove.size === 1 ? 'Verwijderd uit plan' : `${remove.size} oefeningen verwijderd uit plan`);
 });
+document.getElementById('btn-pde-sel-done').addEventListener('click', () => pdeSel.exit());
+document.getElementById('btn-pde-sel-delete').addEventListener('click', openPdeDeleteSelectedConfirm);
 
 function setupPdeDragReorder(list) {
   list.addEventListener('touchstart', e => {
-    if (!e.target.closest('.pde-drag-handle')) return;
+    if (pdeSel.active || !e.target.closest('.pde-drag-handle')) return; // no reordering while selecting
     pdeDragItem = e.target.closest('.pde-item');
     if (!pdeDragItem) return;
     pdeDragStartY = e.touches[0].clientY;
@@ -5300,47 +5348,17 @@ function setupPdeDragReorder(list) {
   list.addEventListener('touchcancel', endDrag, { passive: true });
 }
 
-// Long-press (not the drag handle — that's still drag-to-reorder) to delete,
-// same 500ms/vibrate convention as Home's exercise-card long-press. A plain
-// short tap still opens the sets/reps editor; longPressFired guards the click
-// that follows every touch sequence so it can't ALSO open the editor right
-// after a long-press already opened the delete confirm.
+// Long-press (not the drag handle — that's drag-to-reorder) starts selection mode
+// with this exercise selected, like the Fitness Tracker's exercise cards. A plain
+// tap opens the sets/reps editor, or — in selection mode — (de)selects the row.
 function setupPdeItemInteractions(item) {
   const inner = item.querySelector('.pde-item-inner');
-  let touchStartX = 0;
-  let touchStartY = 0;
-  let longPressTimer = null;
-  let longPressFired = false;
-
-  const cancelLongPress = () => { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } };
-
-  inner.addEventListener('touchstart', e => {
-    if (e.target.closest('.pde-drag-handle') || pdeDragItem) return;
-    touchStartX = e.touches[0].clientX;
-    touchStartY = e.touches[0].clientY;
-    longPressFired = false;
-    longPressTimer = setTimeout(() => {
-      longPressTimer = null;
-      longPressFired = true;
-      if (navigator.vibrate) navigator.vibrate(30);
-      openPdeDeleteConfirm(parseInt(item.dataset.exIdx));
-    }, 500);
-  }, { passive: true });
-
-  inner.addEventListener('touchmove', e => {
-    if (e.target.closest('.pde-drag-handle') || pdeDragItem) return;
-    const dx = e.touches[0].clientX - touchStartX;
-    const dy = e.touches[0].clientY - touchStartY;
-    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) cancelLongPress();
-  }, { passive: true });
-
-  inner.addEventListener('touchend', cancelLongPress, { passive: true });
-  inner.addEventListener('touchcancel', cancelLongPress, { passive: true });
-
+  const wasLongPress = attachLongPress(inner, () => pdeSel.enter(item),
+    e => !!e.target.closest('.pde-drag-handle') || !!pdeDragItem || pdeSel.active);
   inner.addEventListener('click', e => {
-    if (e.target.closest('.pde-drag-handle')) return;
-    if (longPressFired) { longPressFired = false; return; }
-    openPdeSetsRepsEdit(parseInt(item.dataset.exIdx));
+    if (wasLongPress() || e.target.closest('.pde-drag-handle')) return;
+    if (pdeSel.active) pdeSel.toggle(item);
+    else openPdeSetsRepsEdit(parseInt(item.dataset.exIdx));
   });
 }
 
