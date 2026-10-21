@@ -893,4 +893,10 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .recap-down { color: var(--toast-error); }
 .recap-muted { color: var(--text-hint); }
 .recap-prev { color: #b5b5b5; }
+.recap-prs { background: var(--toast-pr); color: #000; border-radius: 8px; padding: 10px 14px; font-size: 14px; font-weight: 700; }
+/* One block per set: header, weight × reps, RPE, previous time — spaced, no lines between sets. */
+.recap-set { padding-left: 20px; font-size: 13px; color: var(--text-secondary); line-height: 1.45; }
+.recap-set + .recap-set, .recap-line + .recap-set { margin-top: 8px; }
+.recap-set + .recap-line { margin-top: 8px; }
+.recap-set-head { font-weight: 700; color: var(--text-primary); }
 .recap-empty { text-align: center; color: var(--text-hint); font-size: 14px; padding: 16px 0; }

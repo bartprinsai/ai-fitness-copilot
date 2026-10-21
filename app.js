@@ -4145,9 +4145,9 @@ function clampAllOnBarToAvailable() {
 }
 
 // -- Day Recap popup (#recap-overlay, the Fitness Tracker's "Recap" pill) --------
-// Summarizes the VIEWED day (currentDate): per exercise, logged sets vs. the plan
-// target it was loaded with (only when it has one), and each set's weight and reps
-// vs. the same set in the most recent earlier session of that exercise.
+// Summarizes the VIEWED day (currentDate): how many PRs it has, then per exercise,
+// logged sets vs. the plan target it was loaded with (only when it has one), and each
+// set's weight, reps and RPE vs. the same set in the most recent earlier session.
 const recapDayFormat = new Intl.DateTimeFormat('nl-NL', { timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'long' });
 
 function recapDayName(dateStr) {
@@ -4183,34 +4183,78 @@ function recapSetsLine(ex) {
   return recapLine('recap-more', '+', `${done}/${planned} sets (${done - planned} meer dan gepland)`);
 }
 
-// One line per working set of the day, each compared with the set at the SAME
-// position in the most recent earlier session (Set 1 vs Set 1, ...): weight and
-// reps judged separately. Extra sets today have no counterpart; extra sets last
-// time are simply not shown. No earlier session: plain set lines + one note.
-function recapSetLines(ex, date) {
-  const sets = workingSets(ex.sets || []);
-  if (sets.length === 0) return recapLine('recap-muted', '', 'Nog geen sets gelogd');
+// Working sets (dropset continuations folded into the set before them) with the
+// raw `sets` indices they cover — PR keys (getPRSetKeys) use the raw index.
+function workingSetGroups(sets) {
+  const groups = [];
+  sets.forEach((s, i) => {
+    if (s.isDropsetContinuation && groups.length) groups[groups.length - 1].idxs.push(i);
+    else groups.push({ set: s, idxs: [i] });
+  });
+  return groups;
+}
+
+// One block per working set of the day, each compared with the set at the SAME
+// position in the most recent earlier session (Set 1 vs Set 1, ...):
+//   "Set N" (+ 🏆 when it — or one of its dropsets — is a PR)
+//   weight × reps, with weight and reps judged separately
+//   RPE, judged on its own (higher = felt heavier, so red)
+//   what that set was last time
+// Extra sets today have no counterpart; extra sets last time are simply not shown.
+// No earlier session at all: no comparisons, one note under the last set.
+function recapSetLines(ex, date, prKeys) {
+  const groups = workingSetGroups(ex.sets || []);
+  if (groups.length === 0) return recapLine('recap-muted', '', 'Nog geen sets gelogd');
   const prevSessionSets = previousSessionSets(ex.name, date);
   const prev = prevSessionSets ? workingSets(prevSessionSets) : null;
-  const lines = sets.map((s, i) => {
-    const w = Number(s.weight) || 0, r = Number(s.reps) || 0;
-    const label = `<span class="recap-weight">Set ${i + 1}:</span> ${formatKg(w)} kg × ${r}`;
-    if (!prev) return recapLine('', '', label);
-    const p = prev[i];
-    if (!p) return recapLine('', '', `${label} <span class="recap-muted">(geen vorige set)</span>`);
-    const pw = Number(p.weight) || 0, pr = Number(p.reps) || 0;
-    const dw = Math.round((w - pw) * 100) / 100, dr = r - pr;
-    const reps = n => `${n} ${n === 1 ? 'rep' : 'reps'}`;
-    const marks = [];
-    if (dw > 0) marks.push(`<span class="recap-up">↑ +${formatKg(dw)} kg</span>`);
-    if (dw < 0) marks.push(`<span class="recap-down">↓ -${formatKg(-dw)} kg</span>`);
-    if (dr > 0) marks.push(`<span class="recap-up">↑ +${reps(dr)}</span>`);
-    if (dr < 0) marks.push(`<span class="recap-down">↓ -${reps(-dr)}</span>`);
-    if (marks.length === 0) marks.push('<span class="recap-muted">(gelijk)</span>');
-    return recapLine('', '', `${label} ${marks.join(' ')} <span class="recap-prev">(vorige: ${formatKg(pw)}×${pr})</span>`);
+  const reps = n => `${n} ${n === 1 ? 'rep' : 'reps'}`;
+  const blocks = groups.map(({ set: s, idxs }, i) => {
+    const w = Number(s.weight) || 0, r = Number(s.reps) || 0, rpe = parseFloat(s.rpe) || 0;
+    const p = prev && prev[i];
+    const isPR = idxs.some(idx => prKeys.has(date + '#' + idx));
+    let wrMarks = '', rpeMark = '', prevLine = '';
+    if (p) {
+      const pw = Number(p.weight) || 0, pr = Number(p.reps) || 0, prpe = parseFloat(p.rpe) || 0;
+      const dw = Math.round((w - pw) * 100) / 100, dr = r - pr;
+      const marks = [];
+      if (dw > 0) marks.push(`<span class="recap-up">↑ +${formatKg(dw)} kg</span>`);
+      if (dw < 0) marks.push(`<span class="recap-down">↓ -${formatKg(-dw)} kg</span>`);
+      if (dr > 0) marks.push(`<span class="recap-up">↑ +${reps(dr)}</span>`);
+      if (dr < 0) marks.push(`<span class="recap-down">↓ -${reps(-dr)}</span>`);
+      wrMarks = ' ' + (marks.length ? marks.join(' ') : '<span class="recap-muted">(gelijk)</span>');
+      if (rpe > 0 && prpe > 0) {
+        const d = Math.round((rpe - prpe) * 10) / 10;
+        rpeMark = d > 0 ? ` <span class="recap-down">↑ +${formatRpe(d)}</span>`
+          : d < 0 ? ` <span class="recap-up">↓ -${formatRpe(-d)}</span>`
+          : ' <span class="recap-muted">(gelijk)</span>';
+      }
+      prevLine = `Vorige keer: ${formatKg(pw)}×${pr}${prpe > 0 ? `, RPE ${formatRpe(prpe)}` : ''}`;
+    } else if (prev) {
+      prevLine = '(geen vorige set)';
+    }
+    return `
+      <div class="recap-set">
+        <div class="recap-set-head">Set ${i + 1}${isPR ? ' <span class="recap-set-pr" aria-label="Record">🏆</span>' : ''}</div>
+        <div>${formatKg(w)} kg × ${r}${wrMarks}</div>
+        <div>${rpe > 0 ? `RPE ${formatRpe(rpe)}${rpeMark}` : '<span class="recap-muted">Geen RPE gelogd</span>'}</div>
+        ${prevLine ? `<div class="recap-prev">${prevLine}</div>` : ''}
+      </div>`;
   });
-  if (!prev) lines.push(recapLine('recap-muted', '', 'Eerste keer deze oefening — geen vergelijking'));
-  return lines.join('');
+  if (!prev) blocks.push(recapLine('recap-muted', '', 'Eerste keer deze oefening — geen vergelijking'));
+  return blocks.join('');
+}
+
+// PR sets logged on `date`, per exercise name — straight from getPRSetKeys(), the
+// same detection that draws the Track screen's trophies.
+function recapPRKeys(exercises, date) {
+  const byName = {};
+  let count = 0;
+  exercises.forEach(ex => {
+    const keys = getPRSetKeys(ex.name);
+    byName[ex.name] = keys;
+    keys.forEach(k => { if (k.startsWith(date + '#')) count++; });
+  });
+  return { byName, count };
 }
 
 function openDayRecap() {
@@ -4221,6 +4265,10 @@ function openDayRecap() {
   // Exercises with logged sets, plus planned ones still at 0 sets (they count as
   // "minder dan gepland"); nothing logged at all on this day -> empty state.
   const shown = exercises.filter(ex => (ex.sets && ex.sets.length > 0) || ex.target);
+  const prs = recapPRKeys(shown, date);
+  const prsEl = document.getElementById('recap-prs');
+  prsEl.textContent = `🏆 ${prs.count} ${prs.count === 1 ? 'nieuw record' : 'nieuwe records'} ${date === todayStr() ? 'vandaag' : 'op deze dag'}`;
+  prsEl.classList.toggle('hidden', prs.count === 0);
   if (!exercises.some(ex => ex.sets && ex.sets.length > 0)) {
     body.innerHTML = `<div class="recap-empty">${date === todayStr() ? 'Nog niets gelogd vandaag.' : 'Nog niets gelogd op deze dag.'}</div>`;
   } else {
@@ -4228,7 +4276,7 @@ function openDayRecap() {
       <div class="recap-ex">
         <div class="recap-ex-name">${ex.name}</div>
         ${ex.target ? recapSetsLine(ex) : ''}
-        ${recapSetLines(ex, date)}
+        ${recapSetLines(ex, date, prs.byName[ex.name])}
       </div>`).join('');
   }
   openOverlay('recap-overlay');
