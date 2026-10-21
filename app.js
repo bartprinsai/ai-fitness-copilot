@@ -293,6 +293,8 @@ let pendingPdeSrAddName = null;
 const SCREEN_ON_ENTER = {
   'screen-fitness-tracker': () => renderHome(),
   'screen-new-workout': () => renderNewWorkoutScreen(),
+  'screen-schedule-pick-plan': () => renderSchedulePickPlan(),
+  'screen-schedule-pick-day': () => renderSchedulePickDay(),
   'screen-workout-plan': () => renderPlanList(),
   'screen-plan-detail': () => renderPlanDetail(),
   'screen-plan-schedule': () => renderPlanSchedule(),
@@ -914,7 +916,8 @@ function renderHome() {
     const setsDiv = document.createElement('div');
     setsDiv.className = 'exercise-card-sets';
     if (sets.length === 0) {
-      setsDiv.innerHTML = `<div class="exercise-card-empty">No sets</div>`;
+      // Loaded from a plan day: show the plan's sets/reps until the first set is logged.
+      setsDiv.innerHTML = `<div class="exercise-card-empty">${ex.target ? 'Plan: ' + formatExerciseSetsReps(ex.target) : 'No sets'}</div>`;
     } else {
       sets.forEach((s, setIdx) => {
         const isFirstPR = firstPRKeys.has(currentDate + '#' + setIdx);
@@ -1274,24 +1277,184 @@ function openNewWorkoutScreen() {
   showScreen('screen-new-workout');
 }
 
-// Reuses the same active-plan day-rotation logic as the smart day banner
-// (db.activePlan.lastDayIndex -> next index in plan.days) to figure out
-// what today's automatic pick would be.
-function getTodaysScheduledDayName() {
+// The active plan's day that's up today: db.activePlan.lastDayIndex -> next index
+// in plan.days, wrapping around. Shared by the smart day banner, this screen's
+// subtitle and "Load Schedule Automatically". null without an active plan, or
+// when that plan no longer exists or has no days.
+function getTodaysScheduledDay() {
   if (!db.activePlan) return null;
   const plan = db.plans[db.activePlan.planId];
   if (!plan || !plan.days || plan.days.length === 0) return null;
   const lastIdx = db.activePlan.lastDayIndex ?? -1;
-  const nextIdx = (lastIdx + 1) % plan.days.length;
-  return plan.days[nextIdx].name || ('Day ' + (nextIdx + 1));
+  const dayIndex = (lastIdx + 1) % plan.days.length;
+  const day = plan.days[dayIndex];
+  return { plan, dayIndex, day, dayName: day.name || ('Day ' + (dayIndex + 1)) };
 }
 
 function renderNewWorkoutScreen() {
-  const dayName = getTodaysScheduledDayName();
-  document.getElementById('nw-schema-auto-desc').textContent = dayName
-    ? `Today you have ${dayName}.`
+  const pick = getTodaysScheduledDay();
+  document.getElementById('nw-schema-auto-desc').textContent = pick
+    ? `Today you have ${pick.dayName}.`
     : 'Automatic planning not set up yet';
 }
+
+// A plan exercise's sets/reps as a workout exercise's `target`: {sets, reps} or
+// {repsPerSet: [...]} (same shapes as the plan, see formatExerciseSetsReps), or
+// null when the plan has none.
+function planExerciseTarget(ex) {
+  if (Array.isArray(ex.repsPerSet) && ex.repsPerSet.length > 0) return { repsPerSet: [...ex.repsPerSet] };
+  if (ex.sets && ex.reps) return { sets: ex.sets, reps: ex.reps };
+  return null;
+}
+
+// The one place a plan day is loaded into a Fitness Tracker workout (smart day
+// banner, Load Schedule Manually/Automatically). Only READS the plan and only
+// WRITES the workout of `date`. Exercises already in that workout are kept as-is
+// (no duplicates); new ones start without logged sets and carry the plan's
+// sets/reps as `target` — shown on the exercise card and used to prefill reps.
+function loadPlanDayIntoWorkout(day, date) {
+  const workout = getWorkout(date);
+  let added = 0;
+  (day.exercises || []).forEach(ex => {
+    if (workout.find(e => e.name === ex.name)) return;
+    const target = planExerciseTarget(ex);
+    workout.push({ name: ex.name, sets: [], ...(target && { target }) });
+    added++;
+  });
+  if (added > 0) setWorkout(date, workout);
+  return added;
+}
+
+function planDayHasExercises(day) {
+  return !!(day && day.exercises && day.exercises.length > 0);
+}
+
+// After a schedule load from New Workout: back to TODAY's Fitness Tracker by
+// walking back through history (`steps` = entries above it: New Workout, the
+// pickers, an open popup), so the back button doesn't land on the pickers again.
+// The popstate handler's showScreen() re-renders the tracker for currentDate.
+function showTodayTrackerAfterLoad(steps) {
+  currentDate = todayStr();
+  history.go(-steps);
+  toast('Workout geladen!');
+}
+
+// -- Load Schedule Manually: Kies een plan -> [Plan] — kies een dag ----------
+// Read-only views of the Plan Builder's plans; the only write is the chosen
+// day into today's workout.
+let schedulePickPlanId = null;
+
+function openSchedulePickPlan() {
+  renderSchedulePickPlan();
+  showScreen('screen-schedule-pick-plan');
+}
+
+function renderSchedulePickPlan() {
+  const scroll = document.getElementById('schedule-pick-plan-scroll');
+  const plans = sortedPlans();
+  if (plans.length === 0) {
+    scroll.innerHTML = '<div class="plan-list-empty">Nog geen plannen. Maak er eerst een aan via Workout Plan Builder.</div>';
+    return;
+  }
+  scroll.innerHTML = '';
+  plans.forEach(plan => {
+    const item = buildPlanItem(plan, { withMenu: false });
+    item.addEventListener('click', () => openSchedulePickDay(plan.id));
+    scroll.appendChild(item);
+  });
+}
+
+function openSchedulePickDay(planId) {
+  schedulePickPlanId = planId;
+  renderSchedulePickDay();
+  showScreen('screen-schedule-pick-day');
+}
+
+function renderSchedulePickDay() {
+  const plan = db.plans[schedulePickPlanId];
+  const scroll = document.getElementById('schedule-pick-day-scroll');
+  scroll.innerHTML = '';
+  if (!plan) return;
+  document.getElementById('schedule-pick-day-title').textContent = `${plan.name} — kies een dag`;
+  const days = plan.days || [];
+  if (days.length === 0) {
+    scroll.innerHTML = '<div class="plan-list-empty">Dit plan heeft nog geen dagen.</div>';
+    return;
+  }
+  planDaySegments(days).forEach(seg => {
+    if (seg.group) scroll.appendChild(buildPlanDayGroupLabel(seg.group));
+    seg.dayIndices.forEach(idx => scroll.appendChild(buildSchedulePickDayCard(days[idx], idx)));
+  });
+}
+
+// Same look as Plan Detail's day card head, but no preview/edit controls: the
+// whole card is one tap target that loads the day.
+function buildSchedulePickDayCard(day, idx) {
+  const card = document.createElement('div');
+  card.className = 'plan-day-card';
+  card.innerHTML = `
+    <div class="plan-day-head">
+      <div class="plan-day-num">${idx + 1}</div>
+      <div class="plan-day-info">
+        <div class="plan-day-name">${day.name}</div>
+        <div class="plan-day-sub">${planDaySubText(day)}</div>
+      </div>
+      <svg class="plan-day-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+    </div>
+  `;
+  card.addEventListener('click', () => loadPickedScheduleDay(idx));
+  return card;
+}
+
+function loadPickedScheduleDay(idx) {
+  const plan = db.plans[schedulePickPlanId];
+  const day = plan && plan.days[idx];
+  if (!planDayHasExercises(day)) { toast('Deze dag heeft geen oefeningen', { type: 'error' }); return; }
+  loadPlanDayIntoWorkout(day, todayStr());
+  showTodayTrackerAfterLoad(3); // day picker, plan picker, New Workout
+}
+
+// -- Load Schedule Automatically ------------------------------------------
+// The banner's pick (getTodaysScheduledDay) behind a confirm popup — or, without
+// one, a notice with only OK. pendingScheduleLoad is the pick the open popup
+// would load; null for the notice.
+let pendingScheduleLoad = null;
+
+function openScheduleLoadAuto() {
+  const pick = getTodaysScheduledDay();
+  pendingScheduleLoad = pick;
+  document.getElementById('schedule-load-title').textContent = pick ? `Vandaag is ${pick.dayName}` : 'Geen actief plan';
+  document.getElementById('schedule-load-msg').textContent = pick
+    ? 'Oefeningen van dit plan laden voor vandaag?'
+    : 'Geen actief plan gevonden. Stel een plan in als actief via Workout Plan Builder.';
+  document.getElementById('btn-schedule-load-cancel').classList.toggle('hidden', !pick);
+  document.getElementById('btn-schedule-load-confirm').textContent = pick ? 'Laden' : 'OK';
+  openOverlay('schedule-load-overlay');
+}
+
+document.getElementById('btn-schedule-load-cancel').addEventListener('click', () => {
+  pendingScheduleLoad = null;
+  closeOverlay('schedule-load-overlay');
+});
+document.getElementById('btn-schedule-load-confirm').addEventListener('click', async () => {
+  const pick = pendingScheduleLoad;
+  pendingScheduleLoad = null;
+  if (!pick || !planDayHasExercises(pick.day)) {
+    closeOverlay('schedule-load-overlay');
+    if (pick) toast('Deze dag heeft geen oefeningen', { type: 'error' });
+    return;
+  }
+  loadPlanDayIntoWorkout(pick.day, todayStr());
+  // Advance the rotation exactly like the banner's "Yes, load it" does.
+  db.activePlan.lastDayIndex = pick.dayIndex;
+  bannerDismissed = true;
+  persistActivePlan(db.activePlan);
+  // Popup + New Workout in ONE history traversal (two back() calls in a row leave a
+  // dead back press behind — see the calendar detail's "go to day").
+  overlayStack.pop();
+  document.getElementById('schedule-load-overlay').classList.remove('open');
+  showTodayTrackerAfterLoad(2);
+});
 
 function openExerciseList() {
   exerciseScreenMode = 'browse';
@@ -1626,12 +1789,23 @@ function openTraining(name) {
   selectedSetIndex = null;
   document.getElementById('training-title').textContent = name;
   document.getElementById('field-weight').value = 0;
-  document.getElementById('field-reps').value = 0;
+  document.getElementById('field-reps').value = plannedRepsForNextSet() || 0;
   resetEffortFields();
   trackFieldsBaseline = getTrackFieldsSnapshot();
   switchTab('track');
   showScreen('screen-training');
   renderSetList();
+}
+
+// Reps the loaded plan day (the exercise's `target`, see loadPlanDayIntoWorkout)
+// sets for the next set to log, or 0 without a target / once its sets are done.
+function plannedRepsForNextSet() {
+  const ex = getCurrentExerciseData();
+  const target = ex && ex.target;
+  if (!target) return 0;
+  const next = (ex.sets || []).length;
+  if (target.repsPerSet) return target.repsPerSet[next] || 0;
+  return next < target.sets ? target.reps : 0;
 }
 
 function updateActionButtonsUI() {
@@ -3311,6 +3485,7 @@ const OVERLAY_CANCEL_BUTTON = {
   'history-goto-overlay': 'history-goto-cancel',
   'discard-changes-overlay': 'btn-discard-changes-cancel',
   'confirm-delete-overlay': 'btn-confirm-delete-cancel',
+  'schedule-load-overlay': 'btn-schedule-load-cancel',
 };
 
 function openOverlay(id) {
@@ -3363,12 +3538,10 @@ document.getElementById('btn-new-exercise').addEventListener('click', openNewExe
 document.getElementById('btn-back-training').addEventListener('click', () => goBack('screen-fitness-tracker', () => hasChanges(trackFieldsBaseline, getTrackFieldsSnapshot())));
 document.getElementById('btn-back-new-workout').addEventListener('click', () => goBack('screen-fitness-tracker'));
 document.getElementById('btn-nw-manual').addEventListener('click', openExerciseList);
-document.getElementById('btn-nw-schema-manual').addEventListener('click', () => {
-  // TODO: navigeert later naar een lijst met opgeslagen schema's uit de Workout Plan Builder om handmatig te kiezen — nog niet gebouwd
-});
-document.getElementById('btn-nw-schema-auto').addEventListener('click', () => {
-  // TODO: automatisch schema laden — nog niet gebouwd
-});
+document.getElementById('btn-nw-schema-manual').addEventListener('click', openSchedulePickPlan);
+document.getElementById('btn-nw-schema-auto').addEventListener('click', openScheduleLoadAuto);
+document.getElementById('btn-back-schedule-pick-plan').addEventListener('click', () => goBack('screen-new-workout'));
+document.getElementById('btn-back-schedule-pick-day').addEventListener('click', () => goBack('screen-schedule-pick-plan'));
 document.getElementById('btn-save-set').addEventListener('click', saveSet);
 document.getElementById('btn-clear').addEventListener('click', () => {
   if (selectedSetIndex === null) { clearFields(); return; }
@@ -4226,26 +4399,39 @@ function openWorkoutPlan() {
   showScreen('screen-workout-plan');
 }
 
+// Newest first — the order of "Mijn plannen" and the Fitness Tracker's "Kies een plan".
+function sortedPlans() {
+  return Object.values(db.plans).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+}
+
+// One plan card (name, day count, ★ ACTIEF pill). `withMenu` adds the ⋮ button;
+// callers attach their own click handlers.
+function buildPlanItem(plan, { withMenu }) {
+  const isActive = db.activePlan && db.activePlan.planId === plan.id;
+  const dayCount = (plan.days || []).length;
+  const item = document.createElement('div');
+  item.className = 'plan-item';
+  item.innerHTML = `
+    <div class="plan-item-info">
+      <div class="plan-item-name">${plan.name}</div>
+      <div class="plan-item-meta">${dayCount} dag${dayCount !== 1 ? 'en' : ''}</div>
+      ${isActive ? '<div class="plan-item-active-pill">★ ACTIEF</div>' : ''}
+    </div>
+    ${withMenu ? '<button class="plan-item-dots" aria-label="Options"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button>' : ''}
+  `;
+  return item;
+}
+
 function renderPlanList() {
   const scroll = document.getElementById('plan-list-scroll');
-  const plans = Object.values(db.plans).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  const plans = sortedPlans();
   if (plans.length === 0) {
     scroll.innerHTML = '<div class="plan-list-empty">Nog geen plannen. Maak er hierboven een aan!</div>';
     return;
   }
   scroll.innerHTML = '';
   plans.forEach(plan => {
-    const isActive = db.activePlan && db.activePlan.planId === plan.id;
-    const item = document.createElement('div');
-    item.className = 'plan-item';
-    item.innerHTML = `
-      <div class="plan-item-info">
-        <div class="plan-item-name">${plan.name}</div>
-        <div class="plan-item-meta">${(plan.days || []).length} dag${(plan.days || []).length !== 1 ? 'en' : ''}</div>
-        ${isActive ? '<div class="plan-item-active-pill">★ ACTIEF</div>' : ''}
-      </div>
-      <button class="plan-item-dots" aria-label="Options"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button>
-    `;
+    const item = buildPlanItem(plan, { withMenu: true });
     item.querySelector('.plan-item-info').addEventListener('click', () => {
       // First tap after creation configures the schedule (Aantal dagen/Dagindeling);
       // once that's been confirmed once, later taps go straight to the day cards —
@@ -4299,33 +4485,46 @@ function renderPlanDetail() {
   if (!currentPlanData || !currentPlanData.days) { scroll.innerHTML = ''; return; }
   scroll.innerHTML = '';
 
-  // Group the (already-ordered) days into contiguous same-group runs — 'A', 'B', or
-  // undefined for a plan with no Week A/B split yet. Rendered as segments so each
-  // week's own "Dag toevoegen" block lands right after that week's last card, even
-  // when Week A's block is tapped after Week B already has days of its own.
-  const segments = [];
-  currentPlanData.days.forEach((day, idx) => {
-    let seg = segments[segments.length - 1];
-    if (!seg || seg.group !== day.group) { seg = { group: day.group, dayIndices: [] }; segments.push(seg); }
-    seg.dayIndices.push(idx);
-  });
+  // Rendered as segments so each week's own "Dag toevoegen" block lands right after
+  // that week's last card, even when Week A's block is tapped after Week B already
+  // has days of its own.
+  const segments = planDaySegments(currentPlanData.days);
   if (segments.length === 0) segments.push({ group: undefined, dayIndices: [] });
   // A brand-new, still-empty Week B (planHasWeekB() via the flag, no 'B' day yet) has no
   // segment of its own from the loop above — add one so it still gets its heading + block.
   if (planHasWeekB() && !segments.some(s => s.group === 'B')) segments.push({ group: 'B', dayIndices: [] });
 
   segments.forEach(seg => {
-    if (seg.group) {
-      const label = document.createElement('div');
-      label.className = 'info-section-label plan-day-group-label';
-      label.textContent = seg.group === 'A' ? 'WEEK A' : 'WEEK B';
-      scroll.appendChild(label);
-    }
+    if (seg.group) scroll.appendChild(buildPlanDayGroupLabel(seg.group));
     seg.dayIndices.forEach(idx => scroll.appendChild(buildPlanDayCard(currentPlanData.days[idx], idx)));
     if (planDetailEditMode) scroll.appendChild(buildAddDayBlock(seg.group));
   });
 
   if (planDetailEditMode && !planHasWeekB()) scroll.appendChild(buildAddWeekBlock());
+}
+
+// Groups the (already-ordered) days into contiguous same-group runs — 'A', 'B', or
+// undefined for a plan with no Week A/B split yet: [{ group, dayIndices: [...] }].
+function planDaySegments(days) {
+  const segments = [];
+  days.forEach((day, idx) => {
+    let seg = segments[segments.length - 1];
+    if (!seg || seg.group !== day.group) { seg = { group: day.group, dayIndices: [] }; segments.push(seg); }
+    seg.dayIndices.push(idx);
+  });
+  return segments;
+}
+
+function buildPlanDayGroupLabel(group) {
+  const label = document.createElement('div');
+  label.className = 'info-section-label plan-day-group-label';
+  label.textContent = group === 'A' ? 'WEEK A' : 'WEEK B';
+  return label;
+}
+
+function planDaySubText(day) {
+  const exCount = (day.exercises || []).length;
+  return exCount === 0 ? 'Geen oefeningen' : `${exCount} ${exCount === 1 ? 'oefening' : 'oefeningen'}`;
 }
 
 // A plan day's exercise carries EITHER a uniform {sets, reps} pair OR a
@@ -4342,7 +4541,7 @@ function formatExerciseSetsReps(ex, style) {
 function buildPlanDayCard(day, idx) {
   const exercises = day.exercises || [];
   const exCount = exercises.length;
-  const subText = exCount === 0 ? 'Geen oefeningen' : `${exCount} ${exCount === 1 ? 'oefening' : 'oefeningen'}`;
+  const subText = planDaySubText(day);
   const expanded = expandedPlanDayIndex === idx;
   const card = document.createElement('div');
   card.className = 'plan-day-card';
@@ -5278,14 +5477,10 @@ async function addExerciseToPlanDay(name, setsReps) {
 function renderSmartBanner() {
   const banner = document.getElementById('smart-day-banner');
   if (!banner) return;
-  if (bannerDismissed || !db.activePlan) { banner.classList.add('hidden'); return; }
-  const plan = db.plans[db.activePlan.planId];
-  if (!plan || !plan.days || plan.days.length === 0) { banner.classList.add('hidden'); return; }
-  const lastIdx = db.activePlan.lastDayIndex ?? -1;
-  const nextIdx = (lastIdx + 1) % plan.days.length;
-  bannerSuggestedDayIndex = nextIdx;
-  const dayName = plan.days[nextIdx].name || ('Day ' + (nextIdx + 1));
-  document.getElementById('smart-banner-msg').textContent = `Based on your plan, today is ${dayName}. Load it?`;
+  const pick = getTodaysScheduledDay();
+  if (bannerDismissed || !pick) { banner.classList.add('hidden'); return; }
+  bannerSuggestedDayIndex = pick.dayIndex;
+  document.getElementById('smart-banner-msg').textContent = `Based on your plan, today is ${pick.dayName}. Load it?`;
   banner.classList.remove('hidden');
 }
 
@@ -5303,11 +5498,7 @@ document.getElementById('btn-banner-load').addEventListener('click', async () =>
   const plan = db.plans[db.activePlan.planId];
   const day = plan && plan.days[bannerSuggestedDayIndex];
   if (!day) return;
-  const workout = getWorkout(currentDate);
-  (day.exercises || []).forEach(ex => {
-    if (!workout.find(e => e.name === ex.name)) workout.push({ name: ex.name, sets: [] });
-  });
-  setWorkout(currentDate, workout);
+  loadPlanDayIntoWorkout(day, currentDate);
   db.activePlan.lastDayIndex = bannerSuggestedDayIndex;
   await persistActivePlan(db.activePlan);
   bannerDismissed = true;

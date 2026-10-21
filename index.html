@@ -199,6 +199,28 @@
   </div>
 </div>
 
+<!-- LOAD SCHEDULE MANUALLY: PICK A PLAN (read-only view of the Plan Builder's plans) -->
+<div id="screen-schedule-pick-plan" class="screen plan-screen">
+  <div class="toolbar">
+    <button class="toolbar-btn" id="btn-back-schedule-pick-plan" aria-label="Terug">
+      <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </button>
+    <span class="toolbar-title">Kies een plan</span>
+  </div>
+  <div class="plan-list-scroll" id="schedule-pick-plan-scroll"></div>
+</div>
+
+<!-- LOAD SCHEDULE MANUALLY: PICK A DAY -->
+<div id="screen-schedule-pick-day" class="screen plan-screen">
+  <div class="toolbar">
+    <button class="toolbar-btn" id="btn-back-schedule-pick-day" aria-label="Terug">
+      <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </button>
+    <span class="toolbar-title" id="schedule-pick-day-title">Kies een dag</span>
+  </div>
+  <div class="plan-detail-scroll" id="schedule-pick-day-scroll"></div>
+</div>
+
 <!-- CALENDAR SCREEN -->
 <div id="screen-calendar" class="screen">
   <div class="toolbar">
@@ -1160,6 +1182,19 @@
     <div class="overlay-btns">
       <button class="btn-secondary" id="btn-confirm-delete-cancel">Annuleren</button>
       <button class="btn-danger" id="btn-confirm-delete-confirm">Verwijderen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Load Schedule Automatically: confirm (Annuleren/Laden) or, without a usable
+     active plan, a plain notice (OK only — the cancel button is hidden then). -->
+<div class="overlay" id="schedule-load-overlay">
+  <div class="overlay-panel">
+    <h3 id="schedule-load-title"></h3>
+    <p id="schedule-load-msg" class="cat-delete-msg"></p>
+    <div class="overlay-btns">
+      <button class="btn-secondary" id="btn-schedule-load-cancel">Annuleren</button>
+      <button class="btn-primary" id="btn-schedule-load-confirm">Laden</button>
     </div>
   </div>
 </div>
