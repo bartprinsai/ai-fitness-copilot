@@ -1964,14 +1964,14 @@ function updateDropsetToggle() {
 }
 
 // Effort marker for a logged set — ONE component used by the TRACK list, the day
-// overview and History: RPE badge, plus a small "+N partial/forced" line under it
-// when there are extra reps; a muted dash when there is neither.
+// overview and History: RPE as plain text (never a badge), plus a small "+N partial/forced"
+// line under it when there are extra reps; a muted dash when there is neither.
 function effortCellHtml(s) {
   const rpe = parseFloat(s.rpe) || 0;
   const extra = parseInt(s.extra) || 0;
-  const badge = rpe > 0 ? `<span class="badge set-rpe-badge">RPE ${formatRpe(rpe)}</span>` : '';
+  const rpeText = rpe > 0 ? `<span class="set-rpe">RPE ${formatRpe(rpe)}</span>` : '';
   const extraLine = extra > 0 ? `<span class="set-effort-extra">+${extra} ${s.extraType === 'forced' ? 'forced' : 'partial'}</span>` : '';
-  return `<span class="set-effort">${badge || extraLine ? badge + extraLine : '<span class="set-effort-none">—</span>'}</span>`;
+  return `<span class="set-effort">${rpeText || extraLine ? rpeText + extraLine : '<span class="set-effort-none">—</span>'}</span>`;
 }
 
 function openTraining(name) {

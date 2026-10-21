@@ -189,7 +189,7 @@ button.pill:active { filter: brightness(.92); transform: scale(0.97); }
 .pill svg { width: var(--icon-list); height: var(--icon-list); fill: currentColor; flex-shrink: 0; }
 .pill-ai { background: var(--ai); border-color: var(--ai); color: var(--on-primary); }
 .pill-pr { background: var(--pr-gold); border-color: var(--pr-gold); color: var(--on-gold); }
-/* Small inline badge (RPE, "★ ACTIEF") — same pill shape, compact. */
+/* Small inline badge ("★ ACTIEF") — same pill shape, compact. Never used for RPE in set rows (plain text there). */
 .badge { display: inline-flex; align-items: center; border-radius: var(--radius-pill); padding: 2px var(--space-2); font-size: var(--fs-small); font-weight: var(--fw-medium); background: var(--bg); color: var(--text-secondary); white-space: nowrap; }
 .badge-primary { background: var(--primary-light); color: var(--primary); }
 
@@ -371,9 +371,12 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    parent set's weight, and nothing else in the row moves. Same type level as every set value. */
 .set-pr .drop-arrow { width: var(--icon-list); height: var(--icon-list); flex-shrink: 0; fill: none; stroke: var(--primary); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
-/* Effort cell (RPE badge + optional "+N partial/forced" line, or "—"), last column of every set row.
-   Selectors are nested under .set-effort so they also beat the generic ".set-row span" rule. */
+/* Effort cell (RPE text + optional "+N partial/forced" line, or "—"), last column of every set row.
+   Selectors are nested under .set-effort so they also beat the generic ".set-row span" rule.
+   RPE is plain text, never a .badge: same type and box as the former badge (so nothing moves),
+   but no background, so it looks the same on --bg (TRACK) and --surface (cards, popups). */
 .set-effort { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 2px; text-align: right; }
+.set-effort .set-rpe { display: inline-flex; align-items: center; padding: 2px var(--space-2); font-size: var(--fs-small); font-weight: var(--fw-medium); color: var(--text-secondary); white-space: nowrap; }
 .set-effort .set-effort-extra { font-size: var(--fs-small); font-weight: var(--fw-regular); color: var(--text-muted); white-space: nowrap; }
 .set-effort .set-effort-none { font-size: var(--fs-small); font-weight: var(--fw-regular); color: var(--text-muted); }
 
