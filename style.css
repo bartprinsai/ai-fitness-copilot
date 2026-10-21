@@ -337,17 +337,17 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    Rows inside a card (day overview, History) or a bottom sheet (popups) already sit one
    gutter in, so they pad by --space-2; the TRACK list runs edge to edge and pads by the
    sum. That puts every column on the same x on every screen. */
-.set-row { display: grid; grid-template-columns: 28px var(--icon-list) 24px minmax(0, 1fr) 56px 72px; align-items: center; padding: var(--space-3) var(--space-2); border-bottom: 1px solid transparent; }
+.set-row { display: grid; grid-template-columns: 28px var(--icon-list) 24px minmax(0, 1fr) 56px 72px; align-items: center; padding: var(--space-3) var(--space-2); border-bottom: 1px solid var(--border); }
 #set-list .set-row { padding-left: calc(var(--screen-gutter) + var(--space-2)); padding-right: calc(var(--screen-gutter) + var(--space-2)); cursor: pointer; transition: background 0.08s; }
-/* Zebra striping: every second set of a list is tinted — the transparent 1px bottom border keeps
-   the row height. Listed BEFORE the pressed/selected/marked states so those win. */
-.row-alt, .set-row.row-alt { background: var(--bg); }
+/* No zebra: a row takes the colour of whatever it sits on (--bg in TRACK, --surface in cards and
+   popups), with a 1px --border line between rows. The last row of a list keeps its 1px border, but
+   transparent, so every row has the same height and there's no line under the list. */
+.set-row:last-child { border-bottom-color: transparent; }
 #set-list .set-row:active, .set-row.selected { background: var(--primary-light); }
 .set-row.clickable { cursor: pointer; transition: background 0.08s; }
 .set-row.clickable:active { background: var(--primary-light); }
 .set-row.graph-goto-set-point { background: var(--primary-light); }
-.set-row-dragging { position: relative; z-index: 10; will-change: transform; box-shadow: var(--card-shadow-elevated); background: var(--surface); }
-.set-row-dragging.row-alt { background: var(--bg); }
+.set-row-dragging { position: relative; z-index: 10; will-change: transform; box-shadow: var(--card-shadow-elevated); background: var(--bg); }
 .set-row span { text-align: center; }
 /* Comment: TRACK shows the icon on every row (tap = add/edit a note, grey until there is one);
    elsewhere it's only drawn on a set that has a note. The column is always there. */
@@ -415,7 +415,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .tab-content { display: none; flex: 1; overflow-y: auto; flex-direction: column; }
 .tab-content.active { display: flex; }
 
-.set-fields { background: var(--surface); display: flex; flex-direction: column; flex-shrink: 0; border-bottom: 1px solid var(--border); }
+.set-fields { display: flex; flex-direction: column; flex-shrink: 0; border-bottom: 1px solid var(--border); }
 .field-group { padding: var(--space-3) var(--screen-gutter); }
 .field-group .section-label { margin-bottom: var(--space-2); }
 .field-controls { display: flex; align-items: center; gap: var(--space-1); width: 100%; }
@@ -457,7 +457,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .action-buttons { display: flex; flex-shrink: 0; gap: var(--space-3); padding: var(--space-3) var(--screen-gutter); }
 
 /* ── Set list ── */
-.set-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; background: var(--surface); padding-bottom: var(--ai-bar-space); }
+.set-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: var(--ai-bar-space); }
 .set-list-empty { padding: var(--space-5); }
 
 /* ══ TRAINING: HISTORY TAB ══════════════════════════════ */
@@ -871,7 +871,8 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .orm-result-value { font-size: var(--fs-hero); font-weight: var(--fw-bold); color: var(--primary); line-height: 1.1; }
 .orm-table-card { background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--card-shadow); overflow: hidden; }
 .orm-table-row { display: grid; grid-template-columns: 1fr 1.4fr 1.2fr; text-align: center; padding: var(--space-3) var(--space-2); font-size: var(--fs-body); color: var(--text); }
-.orm-table-row:nth-child(even) { background: var(--bg); }
+/* No zebra: rows on the card's --surface, 1px --border line between them (none under the head). */
+.orm-table-row + .orm-table-row { border-top: 1px solid var(--border); }
 .orm-table-head { background: var(--toolbar); color: var(--on-toolbar); font-size: var(--fs-label); font-weight: var(--fw-medium); text-transform: uppercase; letter-spacing: var(--ls-label); }
 
 /* Warm-up Calculator */

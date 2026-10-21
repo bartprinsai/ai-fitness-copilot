@@ -1942,7 +1942,7 @@ function setRowInnerHtml(sets, i, { comment = 'note', commentLabel = 'Set commen
 }
 // Row classes shared by every list: zebra striping + dropset chain markers.
 function setRowClass(sets, i) {
-  return 'set-row' + (i % 2 ? ' row-alt' : '') + dropsetRowClass(sets, i);
+  return 'set-row' + dropsetRowClass(sets, i);
 }
 function dropsetRowClass(sets, i) {
   const child = isDropChild(sets, i);
