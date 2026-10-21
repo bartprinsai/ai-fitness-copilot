@@ -40,7 +40,26 @@ function checkAndReveal() {
 setTimeout(() => { splashDone = true; checkAndReveal(); }, 1200);
 
 // -- Helpers --------------------------------------------
-function todayStr() { return new Date().toISOString().split('T')[0]; }
+// Dates are plain 'YYYY-MM-DD' strings. "Today" is always the date in Amsterdam
+// (Europe/Amsterdam: winter/summer time handled by the browser's tz data), whatever
+// the device's own clock zone — never UTC, which is still "yesterday" until 01:00/
+// 02:00 local. Day arithmetic on the strings goes through UTC midnight, which has
+// no DST jumps, so adding days never skips or repeats one.
+const amsterdamDateFormat = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Amsterdam', year: 'numeric', month: '2-digit', day: '2-digit' });
+function todayStr() {
+  const p = {};
+  amsterdamDateFormat.formatToParts(new Date()).forEach(x => { p[x.type] = x.value; });
+  return `${p.year}-${p.month}-${p.day}`;
+}
+function addDaysToDateStr(dateStr, days) {
+  const d = new Date(dateStr + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().split('T')[0];
+}
+// 0 = Maandag .. 6 = Zondag (like WEEKDAY_FULL_NAMES).
+function weekdayOfDateStr(dateStr) {
+  return (new Date(dateStr + 'T00:00:00Z').getUTCDay() + 6) % 7;
+}
 
 // Shared PR-trophy icon markup, reused everywhere a personal record is shown
 // (home cards, set list, records overlay, history tab, calendar detail) —
@@ -61,7 +80,7 @@ function formatDateStr(str, format) {
   const d = new Date(str + 'T12:00:00');
   if (format === 'long') {
     const today = todayStr();
-    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    const yesterday = addDaysToDateStr(today, -1);
     if (str === today) return 'TODAY';
     if (str === yesterday) return 'YESTERDAY';
     return d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase();
@@ -76,9 +95,7 @@ function formatDateStr(str, format) {
   }
 }
 function changeDate(delta) {
-  const d = new Date(currentDate + 'T12:00:00');
-  d.setDate(d.getDate() + delta);
-  currentDate = d.toISOString().split('T')[0];
+  currentDate = addDaysToDateStr(currentDate, delta);
 }
 function getWorkout(date) { return db.workouts[date] || []; }
 function setWorkout(date, exercises) {
@@ -1300,7 +1317,7 @@ function getTodaysScheduledDay() {
     const lastIdx = db.activePlan.lastDayIndex ?? -1;
     dayIndex = (lastIdx + 1) % plan.days.length;
   } else {
-    const weekday = (new Date().getDay() + 6) % 7; // 0 = Maandag, like WEEKDAY_FULL_NAMES
+    const weekday = weekdayOfDateStr(todayStr());
     if (!planHasWeekSplit(plan)) {
       dayIndex = plan.days.findIndex(d => inferDayWeekday(d) === weekday);
     } else if (db.activePlan.lastDate === todayStr() && plan.days[db.activePlan.lastDayIndex]) {
@@ -1329,9 +1346,7 @@ function planWeekWeekdays(plan, week) {
 // 'YYYY-MM-DD' of the Monday that starts dateStr's calendar week (Monday first,
 // like the calendar screen). `weeksLater` shifts it by whole weeks.
 function mondayOf(dateStr, weeksLater = 0) {
-  const d = new Date(dateStr + 'T00:00:00Z');
-  d.setUTCDate(d.getUTCDate() - (d.getUTCDay() + 6) % 7 + 7 * weeksLater);
-  return d.toISOString().split('T')[0];
+  return addDaysToDateStr(dateStr, 7 * weeksLater - weekdayOfDateStr(dateStr));
 }
 
 // A split fixed-days plan's current cycle: { week: 'A' | 'B', done: [weekdays], since }
@@ -3254,8 +3269,7 @@ document.getElementById('cal-scroll').addEventListener('scroll', calOnScroll);
 document.getElementById('btn-cal-back').addEventListener('click', () => goBack('screen-fitness-tracker'));
 document.getElementById('btn-cal-today').addEventListener('click', () => {
   const t = todayStr();
-  const d = new Date(t + 'T12:00:00');
-  calJumpTo(d.getFullYear(), d.getMonth(), t);
+  calJumpTo(+t.slice(0, 4), +t.slice(5, 7) - 1, t);
 });
 document.getElementById('cal-prev-workout').addEventListener('click', () => calJumpToWorkoutDate(-1));
 document.getElementById('cal-next-workout').addEventListener('click', () => calJumpToWorkoutDate(1));
@@ -5587,8 +5601,7 @@ async function addExerciseToPlanDay(name, setsReps) {
 function renderSmartBanner() {
   const banner = document.getElementById('smart-day-banner');
   if (!banner) return;
-  // Only on today's log: the suggestion is for today (fixed-days plans: today's weekday).
-  const pick = currentDate === todayStr() ? getTodaysScheduledDay() : null;
+  const pick = getTodaysScheduledDay();
   bannerSuggestedPick = pick;
   if (bannerDismissed || !pick) { banner.classList.add('hidden'); return; }
   document.getElementById('smart-banner-msg').textContent = `Based on your plan, today is ${pick.dayName}. Load it?`;
@@ -5602,11 +5615,15 @@ document.getElementById('btn-banner-skip').addEventListener('click', () => {
 
 // Unlike the Plan Builder's pencil icon (openPlanDayAddExercises), this DOES write
 // into the Fitness Tracker on purpose — it's the Fitness Tracker itself loading
-// today's suggested plan day into today's workout log, in one tap.
+// today's suggested plan day into today's workout log, in one tap. Always TODAY
+// (todayStr()), even when the tracker has been swiped to another day meanwhile —
+// it then jumps back to today.
 document.getElementById('btn-banner-load').addEventListener('click', async () => {
   document.getElementById('smart-day-banner').classList.add('hidden');
   const pick = bannerSuggestedPick;
   if (!db.activePlan || !pick) return;
+  exitHomeSelMode();
+  currentDate = todayStr();
   loadPlanDayIntoWorkout(pick.day, currentDate);
   await markScheduledDayLoaded(pick);
   renderHome();

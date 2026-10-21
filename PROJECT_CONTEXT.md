@@ -89,6 +89,7 @@ let db = { ... };                  // In-memory state: workouts, records, plans
 
 ## Belangrijke functies in app.js
 ```javascript
+todayStr()                         // "Vandaag" als 'YYYY-MM-DD' in Europe/Amsterdam (nooit UTC); rekenen met addDaysToDateStr()/weekdayOfDateStr()
 getWorkout(date)                   // Haal workout op voor datum
 setWorkout(date, workout)          // Sla workout op in Firestore
 renderSetList()                    // Herrender de set lijst
