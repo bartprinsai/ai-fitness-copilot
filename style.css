@@ -148,9 +148,14 @@ html, body { height: 100%; background: var(--bg); font-family: var(--font); font
 ::-webkit-scrollbar { width: 0; }
 
 /* ══ SHARED TYPOGRAPHY ══════════════════════════════════ */
-/* The one section label (formerly .field-label, .info-section-label, .new-ex-label,
-   .plate-section-label, .plate-result-title, .cal-month-header, .history-day-date). */
+/* The one section label (formerly .info-section-label, .new-ex-label, .plate-section-label,
+   .plate-result-title, .cal-month-header, .history-day-date): Label level (11px), for every label
+   that is NOT directly above an input — section headers, dates, month headers, result titles. */
 .section-label { display: block; font-size: var(--fs-label); line-height: 16px; font-weight: var(--fw-medium); color: var(--text-secondary); text-transform: uppercase; letter-spacing: var(--ls-label); }
+/* Field label: every label directly above an input, stepper, select button or textarea, app-wide
+   (formerly .section-label/.info-field-label there). The Body size (15px), otherwise identical to
+   .section-label: 500, uppercase, same letter-spacing, colour and line-height. */
+.field-label { display: block; font-size: var(--fs-body); line-height: 16px; font-weight: var(--fw-medium); color: var(--text-secondary); text-transform: uppercase; letter-spacing: var(--ls-label); }
 .t-small { font-size: var(--fs-small); font-weight: var(--fw-regular); }
 .t-body { font-size: var(--fs-body); font-weight: var(--fw-regular); }
 .t-heading { font-size: var(--fs-heading); font-weight: var(--fw-medium); }
@@ -421,7 +426,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 
 .set-fields { display: flex; flex-direction: column; flex-shrink: 0; }
 .field-group { padding: var(--space-3) var(--screen-gutter); }
-.field-group .section-label { margin-bottom: var(--space-2); }
+.field-group .field-label { margin-bottom: var(--space-2); }
 .field-controls { display: flex; align-items: center; gap: var(--space-1); width: 100%; }
 .field-btn { width: var(--control-height); height: var(--control-height); border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; font-size: var(--fs-number); font-weight: var(--fw-regular); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.1s; flex-shrink: 0; user-select: none; line-height: 1; }
 .field-btn:active { background: var(--pressed); }
@@ -451,10 +456,6 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 /* DROPSET checkbox on the REPS label line: same label type in the accent colour */
 .dropset-box { width: 16px; height: 16px; border-radius: var(--radius-pill); border: 2px solid var(--primary); display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-sizing: border-box; transition: background .1s; }
 .dropset-box svg { width: 10px; height: 10px; fill: var(--on-primary); opacity: 0; }
-/* TEMPORARY label-size test (TRACK only, not in DESIGN_SYSTEM.md yet): GEWICHT/REPS at 15px,
-   RPE/EXTRA REPS at 16px; weight 500, uppercase, colour and line-height stay those of .section-label. */
-#tab-track .field-row-pair:first-child .section-label { font-size: var(--fs-body); }
-#tab-track .field-row-pair + .field-row-pair .section-label { font-size: var(--fs-heading); }
 /* Unit inside a label ("WEIGHT (kgs)"): keeps its own lowercase casing. */
 .label-unit { text-transform: none; }
 
@@ -586,7 +587,6 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 /* Wrapper for the generated equipment fields (rendered into both the info overlay and the New/Edit Exercise screen). */
 .info-fields-group { display: flex; flex-direction: column; gap: var(--space-3); }
 .info-field { display: flex; flex-direction: column; gap: var(--space-1); }
-.info-field-label { font-size: var(--fs-small); color: var(--text-secondary); }
 .info-checkbox { width: 24px; height: 24px; accent-color: var(--primary); cursor: pointer; margin-top: var(--space-2); }
 .info-view-stat { display: flex; flex-direction: column; gap: 2px; }
 .info-view-stat-label { font-size: var(--fs-small); color: var(--text-secondary); }
@@ -814,7 +814,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .new-ex-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: var(--ai-bar-space); }
 .new-ex-section { padding: var(--space-4) var(--screen-gutter); border-bottom: 1px solid var(--border); background: var(--surface); }
 .new-ex-section:last-child { border-bottom: none; }
-.new-ex-section > .section-label { margin-bottom: var(--space-2); }
+.new-ex-section > .section-label, .new-ex-section > .field-label { margin-bottom: var(--space-2); }
 .new-ex-field-row { display: flex; align-items: center; gap: var(--space-3); }
 .new-ex-add-cat-btn { width: var(--control-height); height: var(--control-height); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text-secondary); font-family: inherit; font-size: var(--fs-number); line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .1s; }
 .new-ex-add-cat-btn:active { background: var(--pressed); }

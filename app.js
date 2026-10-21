@@ -2345,7 +2345,7 @@ const EXERCISE_INFO_FORMS = {
 function renderExerciseInfoFormFields(form) {
   const p = form.prefix;
   const pickerBtn = id => `<button type="button" class="new-ex-select new-ex-select-btn" id="${id}"></button>`;
-  const field = (id, label, control) => `<div class="info-field"><label class="info-field-label" for="${id}">${label}</label>${control}</div>`;
+  const field = (id, label, control) => `<div class="info-field"><label class="field-label" for="${id}">${label}</label>${control}</div>`;
   const equipmentField = key => {
     const f = EXERCISE_INFO_FIELDS_BY_KEY[key];
     const id = `${p}-${f.idSuffix}`;
