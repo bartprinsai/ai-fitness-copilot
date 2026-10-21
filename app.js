@@ -2674,12 +2674,14 @@ function renderHistoryTab() {
   const container = document.getElementById('history-content');
   container.innerHTML = '';
 
+  // Only days with at least one logged set: an exercise can sit in a workout with
+  // no sets yet (just added, or loaded from a plan day), which isn't history.
   const relevantDates = Object.keys(db.workouts).sort().reverse()
-    .filter(d => db.workouts[d] && db.workouts[d].find(e => e.name === currentExercise))
+    .filter(d => db.workouts[d] && db.workouts[d].some(e => e.name === currentExercise && e.sets && e.sets.length > 0))
     .slice(0, 20);
 
   if (relevantDates.length === 0) {
-    container.innerHTML = `<div style="padding:32px;text-align:center;color:#9e9e9e;font-size:14px">No previous sessions for ${currentExercise}</div>`;
+    container.innerHTML = '<div class="plan-list-empty">No history yet</div>';
     return;
   }
 
