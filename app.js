@@ -1866,11 +1866,20 @@ function getTrackFieldsSnapshot() {
 }
 let trackFieldsBaseline = { weight: '0', reps: '0', rpe: '0', extra: '0', extraType: '', dropset: false };
 
+// Number entry for sets (the TRACK tab is the only place sets are entered or edited):
+// a decimal comma (Dutch keyboard) counts as a point; weight and RPE keep at most
+// 1 decimal (more is rounded), reps and extra reps are whole numbers (a typed
+// decimal is rounded). Shown without a superfluous ".0" (150, not 150.0).
+function parseDecimal(str) { return parseFloat(String(str).replace(',', '.')) || 0; }
+function round1(v) { return Math.round(v * 10) / 10; }
+function parseWeight(str) { return Math.max(0, round1(parseDecimal(str))); }
+function formatWeight(v) { return String(round1(v)); }
+function parseWholeNumber(str) { return Math.max(0, Math.round(parseDecimal(str))); }
+
 // RPE: 0 = not filled in; otherwise 6..10 in steps of 0.5. Whole numbers show
 // without a decimal ("8"), halves with one ("8.5").
 const RPE_MIN = 6, RPE_MAX = 10, RPE_STEP = 0.5;
-// Decimal comma (Dutch keyboard) counts as a point.
-function parseRpe(str) { return parseFloat(String(str).replace(',', '.')) || 0; }
+function parseRpe(str) { return round1(parseDecimal(str)); }
 function isValidRpe(v) { return v === 0 || (v >= RPE_MIN && v <= RPE_MAX && (v / RPE_STEP) % 1 === 0); }
 function formatRpe(v) { return Number.isInteger(v) ? String(v) : v.toFixed(1); }
 // Stepper: 0 -> 6 on +, 6 -> 0 on -, +/-0.5 in between (max 10).
@@ -1884,7 +1893,7 @@ function setRpeField(v) { document.getElementById('field-rpe').value = v ? forma
 // possible at RPE 10: extra reps > 0 sets RPE to 10 (a real, editable value),
 // and lowering RPE below 10 again clears the extra reps.
 const EXTRA_MAX = 20;
-function getExtraReps() { return Math.max(0, Math.min(EXTRA_MAX, parseInt(document.getElementById('field-extra').value) || 0)); }
+function getExtraReps() { return Math.min(EXTRA_MAX, parseWholeNumber(document.getElementById('field-extra').value)); }
 function getExtraType() { const b = document.querySelector('.extra-type-btn.active'); return b ? b.dataset.type : ''; }
 // Type toggle follows the amount: disabled + nothing selected at 0, otherwise one
 // of Partial/Forced is selected (Partial unless the user already picked Forced).
@@ -2474,8 +2483,8 @@ function saveExerciseInfo() {
 }
 
 function saveSet() {
-  const weight = parseFloat(document.getElementById('field-weight').value) || 0;
-  const reps = parseInt(document.getElementById('field-reps').value) || 0;
+  const weight = parseWeight(document.getElementById('field-weight').value);
+  const reps = parseWholeNumber(document.getElementById('field-reps').value);
   if (reps < 1) { toast('Enter reps', { type: 'error' }); return; }
   reconcileExtraWithRpe(); // a typed RPE below 10 whose change event hasn't fired yet
   const rpe = parseRpe(document.getElementById('field-rpe').value);
@@ -2520,10 +2529,10 @@ function selectSet(i) {
   } else {
     selectedSetIndex = i;
     const ex = getCurrentExerciseData();
-    document.getElementById('field-weight').value = ex.sets[i].weight;
-    document.getElementById('field-reps').value = ex.sets[i].reps;
-    setRpeField(parseFloat(ex.sets[i].rpe) || 0);
-    setExtraField(parseInt(ex.sets[i].extra) || 0, ex.sets[i].extraType);
+    document.getElementById('field-weight').value = formatWeight(parseDecimal(ex.sets[i].weight));
+    document.getElementById('field-reps').value = parseWholeNumber(ex.sets[i].reps);
+    setRpeField(parseRpe(ex.sets[i].rpe));
+    setExtraField(parseWholeNumber(ex.sets[i].extra), ex.sets[i].extraType);
     setDropsetField(isDropChild(ex.sets, i));
   }
   // Whatever the fields show right after selecting/deselecting a set becomes
@@ -2568,10 +2577,11 @@ document.querySelectorAll('.field-btn').forEach(btn => {
       onExtraChanged(n);
       return;
     }
-    let val = parseFloat(input.value) || 0;
-    const step = field === 'weight' ? 2.5 : 1;
+    const isWeight = field === 'weight';
+    let val = isWeight ? parseWeight(input.value) : parseWholeNumber(input.value);
+    const step = isWeight ? 2.5 : 1;
     val = dir === '+' ? val + step : Math.max(0, val - step);
-    input.value = field === 'weight' ? val.toFixed(1).replace('.0', '') : val;
+    input.value = isWeight ? formatWeight(val) : val;
   });
 });
 
@@ -2593,15 +2603,19 @@ document.querySelectorAll('.field-btn').forEach(btn => {
   input.name = id + '-' + Math.random().toString(36).slice(2);
 });
 
-// Typing: extra reps updates toggle + RPE as you type (digits only, capped);
-// a typed RPE is checked once you leave the field, so "10" isn't seen as "1" mid-typing.
+// Typing: extra reps updates toggle + RPE as you type (digits and a decimal separator
+// only, rounded + capped); a typed RPE is checked once you leave the field, so "10"
+// isn't seen as "1" mid-typing. Leaving a field normalizes it to the decimal rules
+// above ("132,54" -> "132.5", "150.0" -> "150", reps "8,6" -> "9", RPE "8,5" -> "8.5").
 document.getElementById('field-extra').addEventListener('input', e => {
-  const digits = e.target.value.replace(/\D/g, '');
-  if (digits !== e.target.value) e.target.value = digits;
+  const clean = e.target.value.replace(/[^\d.,]/g, '');
+  if (clean !== e.target.value) e.target.value = clean;
   onExtraChanged(getExtraReps());
 });
 document.getElementById('field-extra').addEventListener('change', e => { e.target.value = getExtraReps(); });
-document.getElementById('field-rpe').addEventListener('change', reconcileExtraWithRpe);
+document.getElementById('field-rpe').addEventListener('change', e => { setRpeField(parseRpe(e.target.value)); reconcileExtraWithRpe(); });
+document.getElementById('field-weight').addEventListener('change', e => { e.target.value = formatWeight(parseWeight(e.target.value)); });
+document.getElementById('field-reps').addEventListener('change', e => { e.target.value = parseWholeNumber(e.target.value); });
 document.querySelectorAll('.extra-type-btn').forEach(b => b.addEventListener('click', () => {
   if (getExtraReps() > 0) syncExtraType(getExtraReps(), b.dataset.type);
 }));

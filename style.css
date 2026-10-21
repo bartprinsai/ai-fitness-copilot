@@ -427,6 +427,14 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .field-btn:active { background: var(--pressed); }
 /* Weight/reps/RPE/extra: the shared input box, value at "Groot getal". */
 .field-group input { flex: 1; min-width: 0; padding: 0 var(--space-1); text-align: center; font-size: var(--fs-number); font-weight: var(--fw-bold); }
+/* Compact stepper — TRACK tab only, a deliberate exception (see DESIGN_SYSTEM.md): 36px −/+ buttons
+   (below the 48px minimum tap width; their tap area stays the button itself, so it never covers the
+   field) and an underline-only number field that gets the freed-up width, so long weights fit
+   without making the input block taller. Every other stepper keeps the standard look. */
+#tab-track .field-btn { width: 36px; }
+#tab-track .field-btn::after { width: 100%; }
+#tab-track .field-group input { border: none; border-bottom: 2px solid var(--text-muted); border-radius: 0; background: transparent; }
+#tab-track .field-group input:focus { border-bottom-color: var(--primary); }
 /* Fields side by side, each half the width */
 .field-row-pair { display: flex; }
 .field-row-pair + .field-row-pair { border-top: 1px solid var(--border); }
