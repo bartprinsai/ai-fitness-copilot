@@ -309,7 +309,8 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .exercise-card:active { background: var(--bg); }
 .exercise-card-selected { background: var(--primary-light) !important; outline: 2px solid var(--primary); outline-offset: 0; }
 .exercise-card-dragging { z-index: 10; will-change: transform; box-shadow: var(--card-shadow-elevated); }
-.exercise-card-header, .history-card-header { display: flex; align-items: center; min-height: 48px; padding: var(--space-2) var(--space-1) var(--space-1) var(--card-padding); }
+/* Header starts at the same x as the rows' comment column (rows pad by --space-2, see SET ROW). */
+.exercise-card-header, .history-card-header { display: flex; align-items: center; min-height: 48px; padding: var(--space-2) var(--space-1) var(--space-1) var(--space-2); }
 .exercise-card-name { flex: 1; font-size: var(--fs-heading); font-weight: var(--fw-medium); color: var(--text); }
 .exercise-card-drag-handle { display: none; width: var(--control-height); height: var(--control-height); align-items: center; justify-content: center; cursor: grab; flex-shrink: 0; touch-action: none; }
 .exercise-card-drag-handle:active { cursor: grabbing; }
@@ -317,7 +318,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 #screen-fitness-tracker.sel-single .exercise-card-selected .exercise-card-drag-handle { display: flex; }
 .exercise-card-divider, .history-card-divider { height: 2px; background: var(--primary); }
 .exercise-card-sets, .history-card-sets { padding: var(--space-2) 0; }
-.exercise-card-empty { padding: var(--space-2) var(--card-padding) var(--space-3); text-align: left; }
+.exercise-card-empty { padding: var(--space-2) var(--space-2) var(--space-3); text-align: left; }
 /* History: the date header is tappable ("Go to"); its press tint follows the card's top corners. */
 .history-card-header.clickable { cursor: pointer; border-radius: var(--radius-lg) var(--radius-lg) 0 0; transition: background 0.08s; }
 .history-card-header.clickable:active { background: var(--primary-light); }
@@ -326,16 +327,17 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    ONE row component for every list of logged sets — TRACK list, day overview, History,
    Calendar day popup and Graph "Go to" popup — built by setRowInnerHtml() in app.js.
    One fixed grid, every cell always rendered (empty when unused), left to right:
-     comment · PR trophy · set number · weight · reps · RPE/partial/"—"
-   Columns: 28px · 20px · 24px · flexible · 56px · 72px. The weight is a fixed 104px block
-   (room for a dropset arrow + "132.5 kgs") placed --space-2 after the set number, at the
-   start of the flexible column — so any extra width ends up between weight and reps.
-   Inside the block, reps and the effort cell, everything is right-aligned.
+     comment · PR trophy · set number · dropset arrow · weight · reps · RPE/partial/"—"
+   Columns: 28px · 20px · 24px · 16px · flexible · 56px · 72px. The dropset arrow has its own
+   column (always reserved). The weight is a fixed 76px block (just fits "132.5 kgs") placed
+   --space-1 after the arrow column, at the start of the flexible column — so any extra width
+   ends up between weight and reps. Inside the block, reps and the effort cell, everything is
+   right-aligned, so "kgs" ends on the same x in every row.
    Content edge: 24px from the screen edge in every list (--screen-gutter + --space-2).
    Rows inside a card (day overview, History) or a bottom sheet (popups) already sit one
    gutter in, so they pad by --space-2; the TRACK list runs edge to edge and pads by the
    sum. That puts every column on the same x on every screen. */
-.set-row { display: grid; grid-template-columns: 28px var(--icon-list) 24px minmax(0, 1fr) 56px 72px; align-items: center; padding: var(--space-3) var(--space-2); border-bottom: 1px solid transparent; }
+.set-row { display: grid; grid-template-columns: 28px var(--icon-list) 24px 16px minmax(0, 1fr) 56px 72px; align-items: center; padding: var(--space-3) var(--space-2); border-bottom: 1px solid transparent; }
 #set-list .set-row { padding-left: calc(var(--screen-gutter) + var(--space-2)); padding-right: calc(var(--screen-gutter) + var(--space-2)); cursor: pointer; transition: background 0.08s; }
 /* Zebra striping: every second set of a list is tinted — the transparent 1px bottom border keeps
    the row height. Listed BEFORE the pressed/selected/marked states so those win. */
@@ -361,13 +363,14 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .set-pr-icon { width: var(--icon-list); height: var(--icon-list); fill: var(--pr-gold); flex-shrink: 0; }
 .set-num { font-size: var(--fs-body); font-weight: var(--fw-bold); color: var(--text); }
 .set-weight, .set-reps { display: flex; align-items: baseline; justify-content: flex-end; gap: var(--space-1); min-width: 0; }
-.set-weight { justify-self: start; width: 104px; margin-left: var(--space-2); }
+.set-weight { justify-self: start; width: 76px; margin-left: var(--space-1); }
 .set-val { font-size: var(--fs-number); font-weight: var(--fw-bold); color: var(--text); }
 .set-unit { font-size: var(--fs-small); font-weight: var(--fw-regular); color: var(--text-secondary); }
-/* Dropset (a set flagged isDropsetContinuation hangs under the previous set): the arrow sits inside
-   the weight column, left of the number — the number keeps its right-aligned x, straight under
+/* Dropset (a set flagged isDropsetContinuation hangs under the previous set): the arrow sits in its
+   own column right after the set number, so the weight keeps its right-aligned x, straight under
    the parent set's weight, and nothing else in the row moves. Same type level as every set value. */
-.set-weight .drop-arrow { align-self: center; width: 16px; height: 16px; flex-shrink: 0; fill: none; stroke: var(--primary); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.set-drop { display: flex; align-items: center; justify-content: center; }
+.set-drop .drop-arrow { align-self: center; width: 16px; height: 16px; flex-shrink: 0; fill: none; stroke: var(--primary); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 /* Effort cell (RPE badge + optional "+N partial/forced" line, or "—"), last column of every set row.
    Selectors are nested under .set-effort so they also beat the generic ".set-row span" rule. */
@@ -604,7 +607,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .cal-detail-body { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; }
 .cal-detail-ex { padding-top: var(--space-3); }
 .cal-detail-ex:first-child { padding-top: 0; }
-.cal-detail-ex-name { font-size: var(--fs-heading); font-weight: var(--fw-medium); color: var(--text); margin-bottom: var(--space-1); }
+.cal-detail-ex-name { font-size: var(--fs-heading); font-weight: var(--fw-medium); color: var(--text); margin-bottom: var(--space-1); padding: 0 var(--space-2); }
 
 /* ══ TOAST ══════════════════════════════════════════════
    FitNotes-style full-width banner right under the header, covering the tab bar while it is up.

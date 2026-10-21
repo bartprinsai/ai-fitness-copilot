@@ -1915,10 +1915,10 @@ function isDropChild(sets, i) { return i > 0 && !!sets[i].isDropsetContinuation;
 // -- Shared set row ----------------------------------------
 // ONE row for every list of logged sets — TRACK list, day overview, History, Calendar
 // day popup, Graph "Go to" popup — with fixed columns (style.css .set-row):
-//   comment · PR trophy · set number · weight · reps · RPE/partial
+//   comment · PR trophy · set number · dropset arrow · weight · reps · RPE/partial
 // Every cell is always rendered (empty when there's nothing to show), so the columns
-// land on the same x positions in every list. A dropset row's arrow sits inside the
-// weight cell, left of the number, so the number itself stays right-aligned.
+// land on the same x positions in every list. The dropset arrow has its own column,
+// so it never moves the weight.
 //   comment: 'always' = icon on every row (TRACK: tap to add a note),
 //            'note'   = icon only on a set that has a note, 'none' = never (popups)
 function setRowInnerHtml(sets, i, { comment = 'note', commentLabel = 'Set comment', isPR = false } = {}) {
@@ -1929,7 +1929,8 @@ function setRowInnerHtml(sets, i, { comment = 'note', commentLabel = 'Set commen
       <span class="set-comment${hasNote ? ' has-note' : ''}"${comment === 'none' ? '' : ` aria-label="${commentLabel}"`}>${showIcon ? COMMENT_ICON_SVG : ''}</span>
       <span class="set-pr">${isPR ? prTrophySvg('set-pr-icon') : ''}</span>
       <span class="set-num">${i + 1}</span>
-      <span class="set-weight">${isDropChild(sets, i) ? DROP_ARROW_SVG : ''}<span class="set-val">${s.weight}</span><span class="set-unit">kgs</span></span>
+      <span class="set-drop">${isDropChild(sets, i) ? DROP_ARROW_SVG : ''}</span>
+      <span class="set-weight"><span class="set-val">${s.weight}</span><span class="set-unit">kgs</span></span>
       <span class="set-reps"><span class="set-val">${s.reps}</span><span class="set-unit">reps</span></span>
       ${effortCellHtml(s)}`;
 }
