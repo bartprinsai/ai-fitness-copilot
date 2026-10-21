@@ -4196,7 +4196,7 @@ function workingSetGroups(sets) {
 
 // One block per working set of the day, each compared with the set at the SAME
 // position in the most recent earlier session (Set 1 vs Set 1, ...):
-//   "Set N" (+ 🏆 when it — or one of its dropsets — is a PR)
+//   "Set N" (+ the trophy when it — or one of its dropsets — is a PR)
 //   weight × reps, with weight and reps judged separately
 //   RPE, judged on its own (higher = felt heavier, so red)
 //   what that set was last time
@@ -4234,7 +4234,7 @@ function recapSetLines(ex, date, prKeys) {
     }
     return `
       <div class="recap-set">
-        <div class="recap-set-head">Set ${i + 1}${isPR ? ' <span class="recap-set-pr" aria-label="Record">🏆</span>' : ''}</div>
+        <div class="recap-set-head">Set ${i + 1}${isPR ? ' ' + prTrophySvg('recap-set-pr') : ''}</div>
         <div>${formatKg(w)} kg × ${r}${wrMarks}</div>
         <div>${rpe > 0 ? `RPE ${formatRpe(rpe)}${rpeMark}` : '<span class="recap-muted">Geen RPE gelogd</span>'}</div>
         ${prevLine ? `<div class="recap-prev">${prevLine}</div>` : ''}

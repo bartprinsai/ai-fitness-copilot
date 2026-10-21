@@ -45,7 +45,9 @@ input, textarea, .comment-text { user-select: text; -webkit-user-select: text; -
   --toolbar-height: 56px;
   --toast-success: #16a394;
   --toast-error: #c62828;
-  --toast-pr: #d4a017;
+  /* The one PR/record gold: trophy icons, PR toast, Records block, Recap PR summary. */
+  --pr-gold: #d4a017;
+  --toast-pr: var(--pr-gold);
   --ai-bar-height: 64px;
   --ai-bar-space: calc(var(--ai-bar-height) + var(--safe-bottom));
   --day-actions-height: 56px;
@@ -155,7 +157,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .exercise-set-comment, .history-set-comment { display: flex; align-items: center; justify-content: center; cursor: default; }
 .exercise-set-comment.has-note, .history-set-comment.has-note { cursor: pointer; }
 .exercise-set-comment svg, .history-set-comment svg { width: 15px; height: 15px; fill: var(--cyan); }
-.exercise-set-pr { width: 14px; height: 14px; fill: var(--cyan); flex-shrink: 0; }
+.exercise-set-pr { width: 14px; height: 14px; fill: var(--pr-gold); flex-shrink: 0; }
 .exercise-set-spacer { width: 14px; flex-shrink: 0; }
 .exercise-set-weight, .exercise-set-reps { display: flex; align-items: baseline; justify-content: flex-end; gap: 4px; }
 /* RPE badge (day overview + History): grey chip with the value, or a muted dash when the set has no RPE / extra reps */
@@ -304,7 +306,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .set-weight, .set-reps { display: flex; align-items: baseline; justify-content: flex-end; gap: 3px; }
 .set-weight-val, .set-reps-val { font-size: 15px; font-weight: 700; color: var(--text-primary); }
 .set-weight-unit, .set-reps-unit { font-size: 12px; font-weight: 400; color: var(--text-secondary); }
-.set-pr-icon { width: 14px; height: 14px; fill: var(--cyan); flex-shrink: 0; }
+.set-pr-icon { width: 14px; height: 14px; fill: var(--pr-gold); flex-shrink: 0; }
 .set-row-dragging { position: relative; z-index: 10; will-change: transform; box-shadow: var(--card-shadow-elevated); }
 
 /* ── HISTORY TAB ──────────────────────────────────────── */
@@ -320,7 +322,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
    this modifier instead of the base class. */
 .history-day-header.clickable, .history-set-row.clickable { cursor: pointer; transition: background 0.08s; }
 .history-day-header.clickable:active, .history-set-row.clickable:active { background: var(--cyan-light); }
-.history-set-pr { width: 14px; height: 14px; fill: var(--cyan); flex-shrink: 0; }
+.history-set-pr { width: 14px; height: 14px; fill: var(--pr-gold); flex-shrink: 0; }
 .history-set-spacer { width: 14px; flex-shrink: 0; }
 .history-set-comment { width: 20px; flex-shrink: 0; }
 .history-set-weight { font-size: 15px; font-weight: 700; color: var(--text-primary); }
@@ -415,7 +417,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .records-history-body .records-row:last-child { border-bottom: none; }
 .records-row-reps { font-size: 14px; font-weight: 700; color: var(--text-secondary); }
 .records-row-weight { display: flex; align-items: center; gap: 6px; font-size: 16px; font-weight: 700; color: var(--text-primary); }
-.records-row-weight svg { width: 14px; height: 14px; fill: var(--cyan); }
+.records-row-weight svg { width: 14px; height: 14px; fill: var(--pr-gold); }
 .records-row-value { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
 .records-row-date { font-size: 12px; color: var(--text-secondary); }
 .records-row-via { font-size: 12px; font-style: italic; color: var(--text-secondary); }
@@ -899,4 +901,5 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .recap-set + .recap-set, .recap-line + .recap-set { margin-top: 8px; }
 .recap-set + .recap-line { margin-top: 8px; }
 .recap-set-head { font-weight: 700; color: var(--text-primary); }
+.recap-set-pr { width: 13px; height: 13px; fill: var(--pr-gold); vertical-align: -2px; margin-left: 2px; }
 .recap-empty { text-align: center; color: var(--text-hint); font-size: 14px; padding: 16px 0; }
