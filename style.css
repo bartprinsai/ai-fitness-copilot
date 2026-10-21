@@ -327,13 +327,16 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    Calendar day popup and Graph "Go to" popup — built by setRowInnerHtml() in app.js.
    One fixed grid, every cell always rendered (empty when unused), left to right:
      comment · PR trophy · set number · weight · reps · RPE/partial/"—"
-   Weight, reps and the effort cell are right-aligned in their column.
-   Content edge: 32px from the screen edge in every list (--screen-gutter + --card-padding).
+   Columns: 28px · 20px · 24px · flexible · 56px · 72px. The weight is a fixed 104px block
+   (room for a dropset arrow + "132.5 kgs") placed --space-2 after the set number, at the
+   start of the flexible column — so any extra width ends up between weight and reps.
+   Inside the block, reps and the effort cell, everything is right-aligned.
+   Content edge: 24px from the screen edge in every list (--screen-gutter + --space-2).
    Rows inside a card (day overview, History) or a bottom sheet (popups) already sit one
-   gutter in, so they pad by --card-padding; the TRACK list runs edge to edge and pads by
-   the sum. That puts every column on the same x on every screen. */
-.set-row { display: grid; grid-template-columns: 28px var(--icon-list) 24px minmax(0, 1fr) 60px 64px; align-items: center; padding: var(--space-3) var(--card-padding); border-bottom: 1px solid transparent; }
-#set-list .set-row { padding-left: calc(var(--screen-gutter) + var(--card-padding)); padding-right: calc(var(--screen-gutter) + var(--card-padding)); cursor: pointer; transition: background 0.08s; }
+   gutter in, so they pad by --space-2; the TRACK list runs edge to edge and pads by the
+   sum. That puts every column on the same x on every screen. */
+.set-row { display: grid; grid-template-columns: 28px var(--icon-list) 24px minmax(0, 1fr) 56px 72px; align-items: center; padding: var(--space-3) var(--space-2); border-bottom: 1px solid transparent; }
+#set-list .set-row { padding-left: calc(var(--screen-gutter) + var(--space-2)); padding-right: calc(var(--screen-gutter) + var(--space-2)); cursor: pointer; transition: background 0.08s; }
 /* Zebra striping: every second set of a list is tinted — the transparent 1px bottom border keeps
    the row height. Listed BEFORE the pressed/selected/marked states so those win. */
 .row-alt, .set-row.row-alt { background: var(--bg); }
@@ -350,10 +353,15 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .set-comment svg { width: 16px; height: 16px; fill: var(--border); transition: fill 0.12s; }
 .set-comment.has-note svg { fill: var(--primary); }
 #set-list .set-comment, .set-comment.has-note { cursor: pointer; }
+/* TRACK: the note icon's tap target is 48×48 without widening its column — the invisible
+   ::after extends left into the row's own side padding (never right, over the trophy). */
+#set-list .set-comment { position: relative; }
+#set-list .set-comment::after { content: ''; position: absolute; right: 0; top: 50%; width: var(--control-height); height: var(--control-height); transform: translateY(-50%); }
 .set-pr { display: flex; align-items: center; justify-content: center; }
 .set-pr-icon { width: var(--icon-list); height: var(--icon-list); fill: var(--pr-gold); flex-shrink: 0; }
 .set-num { font-size: var(--fs-body); font-weight: var(--fw-bold); color: var(--text); }
 .set-weight, .set-reps { display: flex; align-items: baseline; justify-content: flex-end; gap: var(--space-1); min-width: 0; }
+.set-weight { justify-self: start; width: 104px; margin-left: var(--space-2); }
 .set-val { font-size: var(--fs-number); font-weight: var(--fw-bold); color: var(--text); }
 .set-unit { font-size: var(--fs-small); font-weight: var(--fw-regular); color: var(--text-secondary); }
 /* Dropset (a set flagged isDropsetContinuation hangs under the previous set): the arrow sits inside
