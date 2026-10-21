@@ -952,16 +952,10 @@ function renderHome() {
         const isFirstPR = firstPRKeys.has(currentDate + '#' + setIdx);
         const hasNote = !!(s.note && s.note.trim());
         const row = document.createElement('div');
-        row.className = 'exercise-set-row' + (setIdx % 2 ? ' row-alt' : '') + dropsetRowClass(sets, setIdx);
-        row.innerHTML = `
-          <span class="exercise-set-comment${hasNote ? ' has-note' : ''}" aria-label="Set comment">${hasNote ? COMMENT_ICON_SVG : ''}</span>
-          ${isFirstPR ? prTrophySvg('exercise-set-pr') : `<span class="exercise-set-spacer"></span>`}
-          ${dropWeightHtml(sets, setIdx, `<span class="exercise-set-weight"><span class="exercise-set-val">${s.weight}</span><span class="exercise-set-unit">kgs</span></span>`)}
-          <span class="exercise-set-reps"><span class="exercise-set-val">${s.reps}</span><span class="exercise-set-unit">reps</span></span>
-          ${effortCellHtml(s)}
-        `;
+        row.className = setRowClass(sets, setIdx);
+        row.innerHTML = setRowInnerHtml(sets, setIdx, { isPR: isFirstPR });
         if (hasNote) {
-          row.querySelector('.exercise-set-comment').addEventListener('click', e => {
+          row.querySelector('.set-comment').addEventListener('click', e => {
             e.stopPropagation();
             openSetCommentPopup(idx, setIdx);
           });
@@ -1918,11 +1912,30 @@ function resetEffortFields() { setRpeField(0); setExtraField(0, ''); setDropsetF
 // be a continuation. Shared by the TRACK list, the day overview and History.
 const DROP_ARROW_SVG = '<svg class="drop-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10"/><path d="M17 8v9H8"/></svg>';
 function isDropChild(sets, i) { return i > 0 && !!sets[i].isDropsetContinuation; }
-// Weight cell of EVERY row, in every list (chain or not): wrapped so the column layout is
-// always the same — a dropset row's arrow+weight group is shifted right by a fixed amount
-// (a transform, purely visual), and adding a dropset never moves any other row (see style.css).
-function dropWeightHtml(sets, i, weightHtml) {
-  return `<span class="drop-wcell">${isDropChild(sets, i) ? DROP_ARROW_SVG : ''}${weightHtml}</span>`;
+// -- Shared set row ----------------------------------------
+// ONE row for every list of logged sets — TRACK list, day overview, History, Calendar
+// day popup, Graph "Go to" popup — with fixed columns (style.css .set-row):
+//   comment · PR trophy · set number · weight · reps · RPE/partial
+// Every cell is always rendered (empty when there's nothing to show), so the columns
+// land on the same x positions in every list. A dropset row's arrow sits inside the
+// weight cell, left of the number, so the number itself stays right-aligned.
+//   comment: 'always' = icon on every row (TRACK: tap to add a note),
+//            'note'   = icon only on a set that has a note, 'none' = never (popups)
+function setRowInnerHtml(sets, i, { comment = 'note', commentLabel = 'Set comment', isPR = false } = {}) {
+  const s = sets[i];
+  const hasNote = comment !== 'none' && !!(s.note && s.note.trim());
+  const showIcon = comment === 'always' || hasNote;
+  return `
+      <span class="set-comment${hasNote ? ' has-note' : ''}"${comment === 'none' ? '' : ` aria-label="${commentLabel}"`}>${showIcon ? COMMENT_ICON_SVG : ''}</span>
+      <span class="set-pr">${isPR ? prTrophySvg('set-pr-icon') : ''}</span>
+      <span class="set-num">${i + 1}</span>
+      <span class="set-weight">${isDropChild(sets, i) ? DROP_ARROW_SVG : ''}<span class="set-val">${s.weight}</span><span class="set-unit">kgs</span></span>
+      <span class="set-reps"><span class="set-val">${s.reps}</span><span class="set-unit">reps</span></span>
+      ${effortCellHtml(s)}`;
+}
+// Row classes shared by every list: zebra striping + dropset chain markers.
+function setRowClass(sets, i) {
+  return 'set-row' + (i % 2 ? ' row-alt' : '') + dropsetRowClass(sets, i);
 }
 function dropsetRowClass(sets, i) {
   const child = isDropChild(sets, i);
@@ -2006,19 +2019,11 @@ function renderSetList() {
 
   sets.forEach((s, i) => {
     const isPR = firstPRKeys.has(currentDate + '#' + i);
-    const hasNote = !!(s.note && s.note.trim());
     const isSelected = selectedSetIndex === i;
     const row = document.createElement('div');
-    row.className = 'set-row' + (isSelected ? ' selected' : '') + (i % 2 ? ' row-alt' : '') + dropsetRowClass(sets, i);
+    row.className = setRowClass(sets, i) + (isSelected ? ' selected' : '');
     row.dataset.setIdx = i;
-    row.innerHTML = `
-      <span class="set-comment${hasNote ? ' has-note' : ''}" aria-label="Set note">${COMMENT_ICON_SVG}</span>
-      <span class="set-row-pr">${isPR ? prTrophySvg('set-pr-icon') : ''}</span>
-      <span class="set-num">${i + 1}</span>
-      ${dropWeightHtml(sets, i, `<span class="set-weight"><span class="set-weight-val">${s.weight}</span><span class="set-weight-unit">kgs</span></span>`)}
-      <span class="set-reps"><span class="set-reps-val">${s.reps}</span><span class="set-reps-unit">reps</span></span>
-      ${effortCellHtml(s)}
-    `;
+    row.innerHTML = setRowInnerHtml(sets, i, { comment: 'always', commentLabel: 'Set note', isPR });
     row.querySelector('.set-comment').addEventListener('click', e => { e.stopPropagation(); openSetNote(i); });
     row.addEventListener('click', () => selectSet(i));
     list.appendChild(row);
@@ -2692,36 +2697,39 @@ function renderHistoryTab() {
     const ex = db.workouts[date][exIdx];
     if (!ex || !ex.sets.length) return;
 
-    const headerDiv = document.createElement('div');
-    headerDiv.className = 'history-day-header clickable';
-    headerDiv.innerHTML = `<div class="section-label">${formatDateStr(date, 'short')}</div><div class="history-day-divider"></div>`;
-    headerDiv.addEventListener('click', () => openHistoryGotoDate(date));
-    container.appendChild(headerDiv);
+    // One card per date, built like the day overview's exercise card: the date
+    // sits where the exercise name sits there, above the same accent line.
+    const card = document.createElement('div');
+    card.className = 'history-card';
+    const header = document.createElement('div');
+    header.className = 'history-card-header clickable';
+    header.innerHTML = `<div class="section-label">${formatDateStr(date, 'short')}</div>`;
+    header.addEventListener('click', () => openHistoryGotoDate(date));
+    card.appendChild(header);
+    card.appendChild(Object.assign(document.createElement('div'), { className: 'history-card-divider' }));
+    const setsDiv = document.createElement('div');
+    setsDiv.className = 'history-card-sets';
 
     ex.sets.forEach((s, i) => {
       const isPR = firstPRKeys.has(date + '#' + i);
       const hasNote = !!(s.note && s.note.trim());
       const row = document.createElement('div');
-      row.className = 'history-set-row clickable' + (i % 2 ? ' row-alt' : '') + dropsetRowClass(ex.sets, i);
+      row.className = setRowClass(ex.sets, i) + ' clickable';
       // Same comment indicator as the Fitness Tracker day overview: only drawn
       // when the set has a note (the slot is always reserved so rows stay
       // aligned), and tapping it opens the same comment popup.
-      row.innerHTML = `
-        <span class="history-set-comment${hasNote ? ' has-note' : ''}" aria-label="Set comment">${hasNote ? COMMENT_ICON_SVG : ''}</span>
-        ${isPR ? prTrophySvg('history-set-pr') : `<span class="history-set-spacer"></span>`}
-        ${dropWeightHtml(ex.sets, i, `<span class="history-set-weight"><span class="history-set-val">${s.weight}</span><span class="history-set-unit">kgs</span></span>`)}
-        <span class="history-set-reps"><span class="history-set-val">${s.reps}</span><span class="history-set-unit">reps</span></span>
-        <span class="history-set-effort">${effortCellHtml(s)}</span>
-      `;
+      row.innerHTML = setRowInnerHtml(ex.sets, i, { isPR });
       if (hasNote) {
-        row.querySelector('.history-set-comment').addEventListener('click', e => {
+        row.querySelector('.set-comment').addEventListener('click', e => {
           e.stopPropagation();
           openSetCommentPopup(exIdx, i, date);
         });
       }
       row.addEventListener('click', () => openHistoryGotoDate(date));
-      container.appendChild(row);
+      setsDiv.appendChild(row);
     });
+    card.appendChild(setsDiv);
+    container.appendChild(card);
   });
 }
 
@@ -2760,15 +2768,12 @@ function openHistoryGotoDaySets(dateStr, markReps, markVal, underOverlayId) {
   nameEl.className = 'cal-detail-ex-name';
   nameEl.textContent = currentExercise;
   body.appendChild(nameEl);
-  ((ex && ex.sets) || []).forEach(s => {
+  const sets = (ex && ex.sets) || [];
+  sets.forEach((s, i) => {
     const isMarked = parseInt(s.reps) === markReps && (parseFloat(s.weight) || 0) === markVal;
     const row = document.createElement('div');
-    row.className = 'history-set-row' + (isMarked ? ' graph-goto-set-point' : '');
-    row.innerHTML = `
-      <span class="history-set-spacer"></span>
-      <span class="history-set-weight"><span class="history-set-val">${s.weight}</span><span class="history-set-unit">kgs</span></span>
-      <span class="history-set-reps"><span class="history-set-val">${s.reps}</span><span class="history-set-unit">reps</span></span>
-    `;
+    row.className = setRowClass(sets, i) + (isMarked ? ' graph-goto-set-point' : '');
+    row.innerHTML = setRowInnerHtml(sets, i, { comment: 'none' });
     body.appendChild(row);
   });
   openHistoryGoto('Go to ' + formatDateStr(dateStr, 'short'), () => {
@@ -3355,12 +3360,8 @@ function openWorkoutDetail(dateStr) {
     ex.sets.forEach((s, i) => {
       const isPR = firstPRKeys.has(dateStr + '#' + i);
       const row = document.createElement('div');
-      row.className = 'history-set-row';
-      row.innerHTML = `
-        ${isPR ? prTrophySvg('history-set-pr') : `<span class="history-set-spacer"></span>`}
-        <span class="history-set-weight"><span class="history-set-val">${s.weight}</span><span class="history-set-unit">kgs</span></span>
-        <span class="history-set-reps"><span class="history-set-val">${s.reps}</span><span class="history-set-unit">reps</span></span>
-      `;
+      row.className = setRowClass(ex.sets, i);
+      row.innerHTML = setRowInnerHtml(ex.sets, i, { comment: 'none', isPR });
       exEl.appendChild(row);
     });
 

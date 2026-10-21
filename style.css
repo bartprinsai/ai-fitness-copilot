@@ -304,58 +304,68 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .screen.sel-mode .norm-only { display: none !important; }
 .screen.sel-mode .sel-only { display: flex !important; }
 
-/* Exercise cards (day overview) */
-.exercise-card { background: var(--surface); margin: var(--card-gap) var(--screen-gutter) 0; border-radius: var(--radius-lg); box-shadow: var(--card-shadow); cursor: pointer; overflow: visible; transition: background 0.08s; position: relative; }
+/* Cards holding a list of set rows: one per exercise (day overview), one per date (History). */
+.exercise-card, .history-card { background: var(--surface); margin: var(--card-gap) var(--screen-gutter) 0; border-radius: var(--radius-lg); box-shadow: var(--card-shadow); cursor: pointer; overflow: visible; transition: background 0.08s; position: relative; }
 .exercise-card:active { background: var(--bg); }
 .exercise-card-selected { background: var(--primary-light) !important; outline: 2px solid var(--primary); outline-offset: 0; }
 .exercise-card-dragging { z-index: 10; will-change: transform; box-shadow: var(--card-shadow-elevated); }
-.exercise-card-header { display: flex; align-items: center; min-height: 48px; padding: var(--space-2) var(--space-1) var(--space-1) var(--card-padding); }
+.exercise-card-header, .history-card-header { display: flex; align-items: center; min-height: 48px; padding: var(--space-2) var(--space-1) var(--space-1) var(--card-padding); }
 .exercise-card-name { flex: 1; font-size: var(--fs-heading); font-weight: var(--fw-medium); color: var(--text); }
 .exercise-card-drag-handle { display: none; width: var(--control-height); height: var(--control-height); align-items: center; justify-content: center; cursor: grab; flex-shrink: 0; touch-action: none; }
 .exercise-card-drag-handle:active { cursor: grabbing; }
 .exercise-card-drag-handle svg { width: var(--icon-list); height: var(--icon-list); fill: var(--text-muted); }
 #screen-fitness-tracker.sel-single .exercise-card-selected .exercise-card-drag-handle { display: flex; }
-.exercise-card-divider { height: 2px; background: var(--primary); }
-.exercise-card-sets { padding: var(--space-2) var(--card-padding) var(--space-3); }
-.exercise-set-row { display: grid; grid-template-columns: 20px 20px 1fr 1fr 64px; align-items: center; padding: var(--space-2) var(--card-padding); margin: 0 calc(-1 * var(--card-padding)); gap: var(--space-2); }
-.exercise-set-comment, .history-set-comment { display: flex; align-items: center; justify-content: center; cursor: default; }
-.exercise-set-comment.has-note, .history-set-comment.has-note { cursor: pointer; }
-.exercise-set-comment svg, .history-set-comment svg { width: 16px; height: 16px; fill: var(--primary); }
-.exercise-set-pr { width: var(--icon-list); height: var(--icon-list); fill: var(--pr-gold); flex-shrink: 0; }
-.exercise-set-spacer { width: var(--icon-list); flex-shrink: 0; }
-.exercise-set-weight, .exercise-set-reps { display: flex; align-items: baseline; justify-content: flex-end; gap: var(--space-1); }
-.exercise-set-val { font-size: var(--fs-number); font-weight: var(--fw-bold); color: var(--text); }
-.exercise-set-unit { font-size: var(--fs-small); font-weight: var(--fw-regular); color: var(--text-secondary); }
+.exercise-card-divider, .history-card-divider { height: 2px; background: var(--primary); }
+.exercise-card-sets, .history-card-sets { padding: var(--space-2) 0; }
 .exercise-card-empty { padding: var(--space-2) var(--card-padding) var(--space-3); text-align: left; }
+/* History: the date header is tappable ("Go to"); its press tint follows the card's top corners. */
+.history-card-header.clickable { cursor: pointer; border-radius: var(--radius-lg) var(--radius-lg) 0 0; transition: background 0.08s; }
+.history-card-header.clickable:active { background: var(--primary-light); }
 
-/* Effort marker (RPE badge + optional "+N partial/forced" line), one component for TRACK list, day overview and History.
-   Selectors are nested under .set-effort so they also beat the generic ".set-row span" rule of the TRACK list. */
+/* ══ SET ROW (shared) ═══════════════════════════════════
+   ONE row component for every list of logged sets — TRACK list, day overview, History,
+   Calendar day popup and Graph "Go to" popup — built by setRowInnerHtml() in app.js.
+   One fixed grid, every cell always rendered (empty when unused), left to right:
+     comment · PR trophy · set number · weight · reps · RPE/partial/"—"
+   Weight, reps and the effort cell are right-aligned in their column.
+   Content edge: 32px from the screen edge in every list (--screen-gutter + --card-padding).
+   Rows inside a card (day overview, History) or a bottom sheet (popups) already sit one
+   gutter in, so they pad by --card-padding; the TRACK list runs edge to edge and pads by
+   the sum. That puts every column on the same x on every screen. */
+.set-row { display: grid; grid-template-columns: 28px var(--icon-list) 24px minmax(0, 1fr) 60px 64px; align-items: center; padding: var(--space-3) var(--card-padding); border-bottom: 1px solid transparent; }
+#set-list .set-row { padding-left: calc(var(--screen-gutter) + var(--card-padding)); padding-right: calc(var(--screen-gutter) + var(--card-padding)); cursor: pointer; transition: background 0.08s; }
+/* Zebra striping: every second set of a list is tinted — the transparent 1px bottom border keeps
+   the row height. Listed BEFORE the pressed/selected/marked states so those win. */
+.row-alt, .set-row.row-alt { background: var(--bg); }
+#set-list .set-row:active, .set-row.selected { background: var(--primary-light); }
+.set-row.clickable { cursor: pointer; transition: background 0.08s; }
+.set-row.clickable:active { background: var(--primary-light); }
+.set-row.graph-goto-set-point { background: var(--primary-light); }
+.set-row-dragging { position: relative; z-index: 10; will-change: transform; box-shadow: var(--card-shadow-elevated); background: var(--surface); }
+.set-row-dragging.row-alt { background: var(--bg); }
+.set-row span { text-align: center; }
+/* Comment: TRACK shows the icon on every row (tap = add/edit a note, grey until there is one);
+   elsewhere it's only drawn on a set that has a note. The column is always there. */
+.set-comment { display: flex; align-items: center; justify-content: center; padding: var(--space-1); border-radius: var(--radius-pill); box-sizing: border-box; min-height: 24px; }
+.set-comment svg { width: 16px; height: 16px; fill: var(--border); transition: fill 0.12s; }
+.set-comment.has-note svg { fill: var(--primary); }
+#set-list .set-comment, .set-comment.has-note { cursor: pointer; }
+.set-pr { display: flex; align-items: center; justify-content: center; }
+.set-pr-icon { width: var(--icon-list); height: var(--icon-list); fill: var(--pr-gold); flex-shrink: 0; }
+.set-num { font-size: var(--fs-body); font-weight: var(--fw-bold); color: var(--text); }
+.set-weight, .set-reps { display: flex; align-items: baseline; justify-content: flex-end; gap: var(--space-1); min-width: 0; }
+.set-val { font-size: var(--fs-number); font-weight: var(--fw-bold); color: var(--text); }
+.set-unit { font-size: var(--fs-small); font-weight: var(--fw-regular); color: var(--text-secondary); }
+/* Dropset (a set flagged isDropsetContinuation hangs under the previous set): the arrow sits inside
+   the weight column, left of the number — the number keeps its right-aligned x, straight under
+   the parent set's weight, and nothing else in the row moves. Same type level as every set value. */
+.set-weight .drop-arrow { align-self: center; width: 16px; height: 16px; flex-shrink: 0; fill: none; stroke: var(--primary); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Effort cell (RPE badge + optional "+N partial/forced" line, or "—"), last column of every set row.
+   Selectors are nested under .set-effort so they also beat the generic ".set-row span" rule. */
 .set-effort { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 2px; text-align: right; }
 .set-effort .set-effort-extra { font-size: var(--fs-small); font-weight: var(--fw-regular); color: var(--text-muted); white-space: nowrap; }
 .set-effort .set-effort-none { font-size: var(--fs-small); font-weight: var(--fw-regular); color: var(--text-muted); }
-.history-set-effort { width: 64px; flex-shrink: 0; }
-
-/* Dropset chain: a set flagged isDropsetContinuation hangs under the previous set.
-   EVERY row of EVERY list uses the same fixed columns (comment, trophy, [number], weight, reps, RPE
-   badge), whether or not the list has a dropset — so nothing ever shifts when one is added, and Reps
-   and the badge never move between normal and dropset rows.
-   Only the weight column reacts: its content is right-aligned within the column, so every normal
-   row's weight ends at the same x regardless of digit count. A dropset row's whole weight+arrow
-   group is then shifted a fixed amount further right with a transform — visual-only, so it doesn't
-   grow the grid track or push any other column — landing every dropset weight of a list at its own,
-   further-right, fixed x, diagonally under the parent set's weight.
-   .drop-wcell wraps the weight cell; it is an ordinary, vertically centred cell like every other one.
-   Dropset values use the same type level (Groot getal) as every other set value; only the arrow marks them. */
-#history-content .history-set-row { display: grid; grid-template-columns: 20px 20px 1fr 84px 64px; border-bottom: 1px solid transparent; }
-/* Weight/reps cells of every .history-set-row (History tab, Calendar day popup, Graph "Go to" popup):
-   value on Groot getal + a separate unit on Klein, exactly like the TRACK list and the day overview. */
-.history-set-weight, .history-set-reps { display: flex; align-items: baseline; justify-content: flex-end; gap: var(--space-1); }
-.history-set-val { font-size: var(--fs-number); font-weight: var(--fw-bold); color: var(--text); }
-.history-set-unit { font-size: var(--fs-small); font-weight: var(--fw-regular); color: var(--text-secondary); }
-#history-content .history-set-reps { margin-left: 0; }
-.drop-wcell { display: flex; align-items: center; justify-content: flex-end; min-width: 0; gap: var(--space-1); }
-.drop-child .drop-wcell { transform: translateX(20px); }
-.drop-wcell .drop-arrow { width: 16px; height: 16px; flex-shrink: 0; fill: none; stroke: var(--primary); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 /* ══ NEW WORKOUT SCREEN ═════════════════════════════════ */
 /* Uses .nav-card-list / .nav-card (shared with the main menu and Calculator menu). */
@@ -439,41 +449,9 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 /* ── Set list ── */
 .set-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; background: var(--surface); padding-bottom: var(--ai-bar-space); }
 .set-list-empty { padding: var(--space-5); }
-.set-row { display: grid; grid-template-columns: 28px 20px 32px 1fr 1fr 64px; padding: var(--space-3) var(--space-2); border-bottom: 1px solid transparent; background: var(--surface); cursor: pointer; transition: background 0.08s; align-items: center; }
-/* Zebra striping (TRACK list, day overview, History): every second set of a list is tinted — the
-   transparent 1px bottom border keeps the row height. Listed BEFORE :active/.selected so those win. */
-.row-alt, .set-row.row-alt { background: var(--bg); }
-.set-row:active, .set-row.selected { background: var(--primary-light); }
-.set-row span { text-align: center; }
-.set-comment { display: flex; align-items: center; justify-content: center; cursor: pointer; padding: var(--space-1); border-radius: var(--radius-pill); box-sizing: border-box; min-height: 24px; }
-.set-comment svg { width: 16px; height: 16px; fill: var(--border); transition: fill 0.12s; }
-.set-comment.has-note svg { fill: var(--primary); }
-.set-row-pr { display: flex; align-items: center; justify-content: center; }
-.set-num { font-size: var(--fs-body); font-weight: var(--fw-bold); color: var(--text); }
-.set-weight, .set-reps { display: flex; align-items: baseline; justify-content: flex-end; gap: var(--space-1); }
-.set-weight-val, .set-reps-val { font-size: var(--fs-number); font-weight: var(--fw-bold); color: var(--text); }
-.set-weight-unit, .set-reps-unit { font-size: var(--fs-small); font-weight: var(--fw-regular); color: var(--text-secondary); }
-.set-pr-icon { width: var(--icon-list); height: var(--icon-list); fill: var(--pr-gold); flex-shrink: 0; }
-.set-row-dragging { position: relative; z-index: 10; will-change: transform; box-shadow: var(--card-shadow-elevated); }
 
 /* ══ TRAINING: HISTORY TAB ══════════════════════════════ */
-.history-content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: var(--ai-bar-space); }
-.history-day-header { padding: var(--space-3) var(--screen-gutter) var(--space-2); }
-.history-day-header .section-label { margin-bottom: var(--space-1); }
-.history-day-divider { height: 2px; background: var(--primary); }
-.history-set-row { display: flex; align-items: center; padding: var(--space-3) var(--screen-gutter); border-bottom: 1px solid var(--border); background: var(--surface); gap: var(--space-2); }
-.history-set-row.row-alt { background: var(--bg); }
-/* Only the History-tab rows are tappable ("go to" popups) — the same
-   .history-day-header/.history-set-row classes are reused, un-clickable, in
-   the Calendar day-detail popup, so the pointer/active feedback is scoped to
-   this modifier instead of the base class. */
-.history-day-header.clickable, .history-set-row.clickable { cursor: pointer; transition: background 0.08s; }
-.history-day-header.clickable:active, .history-set-row.clickable:active { background: var(--primary-light); }
-.history-set-pr { width: var(--icon-list); height: var(--icon-list); fill: var(--pr-gold); flex-shrink: 0; }
-.history-set-spacer { width: var(--icon-list); flex-shrink: 0; }
-.history-set-comment { width: 20px; flex-shrink: 0; }
-/* Popup rows are a plain flex row: reps sit at the right edge. */
-.history-set-reps { margin-left: auto; }
+.history-content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: calc(var(--ai-bar-space) + var(--space-4)); }
 
 /* ══ TRAINING: GRAPH TAB ════════════════════════════════ */
 .graph-time-filters { display: flex; gap: var(--space-2); padding: var(--space-3) var(--screen-gutter); background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0; }
@@ -512,7 +490,6 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .graph-sel-date { font-size: var(--fs-small); color: var(--text-secondary); }
 /* Set overview inside the shared "Go to…" overlay (opened from the Graph tab). */
 .history-goto-body { max-height: 45vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-.graph-goto-set-point { background: var(--primary-light); }
 
 /* ══ MODALS (shared base for every .overlay bottom sheet) ═
    One shared visual contract, applied automatically to every current and
