@@ -38,6 +38,8 @@ input, textarea, .comment-text { user-select: text; -webkit-user-select: text; -
   /* White content cards on --bg (New Workout cards, every Plan Builder card). */
   --card-radius: 12px;
   --card-shadow: 0 1px 3px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.08);
+  /* Lifted card/row while it's being dragged to reorder. */
+  --card-shadow-elevated: 0 8px 28px rgba(0,0,0,.22);
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --toolbar-height: 56px;
@@ -140,7 +142,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .exercise-card { background: var(--surface); margin: 8px 8px 0; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.18), 0 1px 2px rgba(0,0,0,.12); cursor: pointer; overflow: visible; transition: background 0.08s; position: relative; }
 .exercise-card:active { background: #f9f9f9; }
 .exercise-card-selected { background: rgba(41,182,246,0.10) !important; outline: 2px solid var(--cyan); outline-offset: 0; }
-.exercise-card-dragging { z-index: 10; will-change: transform; box-shadow: 0 8px 28px rgba(0,0,0,.22); }
+.exercise-card-dragging { z-index: 10; will-change: transform; box-shadow: var(--card-shadow-elevated); }
 .exercise-card-header { display: flex; align-items: center; padding: 12px 4px 6px 12px; }
 .exercise-card-name { flex: 1; font-size: 16px; font-weight: 600; color: var(--text-primary); }
 .exercise-card-drag-handle { display: none; width: 44px; height: 44px; align-items: center; justify-content: center; cursor: grab; flex-shrink: 0; touch-action: none; }
@@ -303,7 +305,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .set-weight-val, .set-reps-val { font-size: 15px; font-weight: 700; color: var(--text-primary); }
 .set-weight-unit, .set-reps-unit { font-size: 12px; font-weight: 400; color: var(--text-secondary); }
 .set-pr-icon { width: 14px; height: 14px; fill: var(--cyan); flex-shrink: 0; }
-.set-row-dragging { position: relative; z-index: 10; will-change: transform; box-shadow: 0 8px 28px rgba(0,0,0,.22); }
+.set-row-dragging { position: relative; z-index: 10; will-change: transform; box-shadow: var(--card-shadow-elevated); }
 
 /* ── HISTORY TAB ──────────────────────────────────────── */
 .history-content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: var(--ai-bar-space); }
@@ -712,7 +714,12 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .pde-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 4px 12px calc(var(--ai-bar-space) + 24px); display: flex; flex-direction: column; gap: 10px; }
 .pde-item { position: relative; border-radius: var(--card-radius); overflow: hidden; flex-shrink: 0; }
 .pde-item-inner { display: flex; align-items: center; gap: 4px; background: var(--surface); box-shadow: var(--card-shadow); border-radius: var(--card-radius); padding: 12px 4px 12px 14px; position: relative; z-index: 1; will-change: transform; cursor: pointer; }
-.pde-item.pde-dragging .pde-item-inner { box-shadow: 0 8px 28px rgba(0,0,0,.22); transform: scale(1.015); }
+/* While dragged: the inner card is translateY'd out of its own .pde-item slot, so the
+   wrapper must stop clipping it (overflow) and stack above every sibling (z-index) —
+   otherwise later items paint over it. `scale` (not transform) so it composes with
+   dragReorderStep's inline translateY instead of being overwritten by it. */
+.pde-item.pde-dragging { z-index: 10; overflow: visible; }
+.pde-item.pde-dragging .pde-item-inner { box-shadow: var(--card-shadow-elevated); scale: 1.015; }
 .pde-ex-info { flex: 1; min-width: 0; }
 .pde-ex-name { font-size: 15px; font-weight: 600; color: var(--text-primary); display: block; }
 .pde-ex-meta { font-size: 12px; color: var(--text-secondary); display: block; margin-top: 2px; }
