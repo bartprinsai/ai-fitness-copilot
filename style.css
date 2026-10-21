@@ -34,6 +34,10 @@ input, textarea, .comment-text { user-select: text; -webkit-user-select: text; -
   --color-ai-coach-glow: rgba(34,197,94,0.35);
   --color-manual-accent: var(--blue);
   --color-schema-manual-accent: #a855f7;
+  --color-plan-ai-accent: #7C4DFF;
+  /* White content cards on --bg (New Workout cards, every Plan Builder card). */
+  --card-radius: 12px;
+  --card-shadow: 0 1px 3px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.08);
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --toolbar-height: 56px;
@@ -119,7 +123,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 
 /* ── NEW WORKOUT SCREEN ───────────────────────────────── */
 .new-workout-content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px 16px calc(var(--ai-bar-space) + 16px); display: flex; flex-direction: column; justify-content: center; gap: 12px; }
-.new-workout-card { width: 100%; background: var(--surface); border: none; border-left: 4px solid var(--card-accent); border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.08); display: flex; align-items: center; gap: 14px; padding: 18px 16px; cursor: pointer; font-family: inherit; text-align: left; transition: opacity 0.12s, transform 0.1s; }
+.new-workout-card { width: 100%; background: var(--surface); border: none; border-left: 4px solid var(--card-accent); border-radius: var(--card-radius); box-shadow: var(--card-shadow); display: flex; align-items: center; gap: 14px; padding: 18px 16px; cursor: pointer; font-family: inherit; text-align: left; transition: opacity 0.12s, transform 0.1s; }
 .new-workout-card:active { opacity: 0.75; transform: scale(0.98); }
 .new-workout-card-icon { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .new-workout-card-icon svg { width: 26px; height: 26px; fill: var(--card-accent); }
@@ -220,7 +224,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .exercise-empty { padding: 32px; text-align: center; color: var(--text-hint); font-size: 14px; }
 /* Plan Day add-exercise flow only (exerciseScreenMode === 'plan-add') — per-row
    button that writes straight into the plan day, next to the ⋮ menu. */
-.ex-add-btn { display: flex; align-items: center; gap: 4px; padding: 7px 12px; margin-right: 10px; border: none; border-radius: 8px; background: var(--blue-btn); color: #fff; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; transition: filter .1s; flex-shrink: 0; }
+.ex-add-btn { display: flex; align-items: center; gap: 4px; padding: 7px 12px; margin-right: 10px; border: none; border-radius: 8px; background: var(--blue); color: #fff; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; transition: filter .1s; flex-shrink: 0; }
 .ex-add-btn:active { filter: brightness(.85); }
 .ex-add-btn svg { width: 14px; height: 14px; fill: currentColor; flex-shrink: 0; }
 .ex-add-btn-done { background: var(--green-light); color: var(--green); cursor: default; }
@@ -386,7 +390,6 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .overlay-panel input:focus, .overlay-panel select:focus, .overlay-panel textarea:focus { border-color: var(--blue); }
 .pde-sr-row { display: flex; gap: 14px; }
 .pde-sr-field { flex: 1; display: flex; flex-direction: column; gap: 6px; }
-.pde-sr-field label { font-size: 12px; color: var(--text-secondary); font-weight: 500; text-transform: uppercase; letter-spacing: .04em; }
 .modal-input-underline { border: none !important; border-bottom: 1px solid var(--border) !important; border-radius: 0 !important; padding: 8px 2px !important; background: transparent !important; }
 .modal-input-underline:focus { border-bottom-color: var(--blue) !important; }
 .overlay-btns { display: flex; gap: 10px; }
@@ -551,43 +554,37 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .placeholder-desc { font-size: 15px; color: #9e9e9e; text-align: center; line-height: 1.5; max-width: 260px; }
 
 /* ── PLAN BUILDER SCREENS ─────────────────────────────── */
-.plan-screen { background: #121212; color: #fff; }
-.plan-toolbar { background: #1a1a1a !important; box-shadow: 0 1px 0 #2a2a2a; }
-.plan-active-star svg { fill: #555; transition: fill .15s; }
-.plan-active-star.is-active svg { fill: #7C4DFF; filter: drop-shadow(0 0 4px rgba(124,77,255,.6)); }
-
-/* Workout Plans (the plan list screen, #screen-workout-plan), Plan Detail
-   (#screen-plan-detail) and Plan Day Edit (#screen-plan-day-edit) have been
-   brought over to the app's light theme — the toolbar stays the shared dark
-   one above, only the body (and its own cards below) turns light. AI generate
-   keeps the original dark styling untouched. */
-#screen-workout-plan.plan-screen, #screen-plan-detail.plan-screen, #screen-plan-day-edit.plan-screen { background: var(--bg); color: var(--text-primary); }
+/* Every Plan Builder screen (incl. AI generate) uses the app's light theme: the
+   shared dark .toolbar on top, --bg body, white --card-radius/--card-shadow cards.
+   .plan-screen itself only marks the screens; it adds no colors of its own. */
+.plan-active-star svg { fill: rgba(255,255,255,.45); transition: fill .15s; }
+.plan-active-star.is-active svg { fill: var(--blue); }
 
 .plan-create-row { display: flex; gap: 8px; padding: 12px; flex-shrink: 0; }
-.plan-create-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 14px 6px; border: none; border-radius: 14px; background: var(--surface); box-shadow: 0 1px 3px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.08); color: var(--text-secondary); font-family: inherit; font-size: 11px; font-weight: 600; cursor: pointer; transition: background .12s; line-height: 1.3; text-align: center; }
+.plan-create-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 14px 6px; border: none; border-radius: var(--card-radius); background: var(--surface); box-shadow: var(--card-shadow); color: var(--text-secondary); font-family: inherit; font-size: 11px; font-weight: 600; cursor: pointer; transition: background .12s; line-height: 1.3; text-align: center; }
 .plan-create-btn:active { background: #f5f5f5; }
 .plan-create-btn svg { width: 22px; height: 22px; fill: var(--text-secondary); }
-#btn-plan-make-own svg { fill: var(--blue-btn); }
+#btn-plan-make-own svg { fill: var(--blue); }
 #btn-plan-presets svg { fill: var(--green); }
-.plan-create-ai-btn { background: rgba(124,77,255,.08); border: 1px solid rgba(124,77,255,.35); color: #7C4DFF; }
-.plan-create-ai-btn:active { background: rgba(124,77,255,.16); }
-.plan-create-ai-btn svg { fill: #7C4DFF; }
+.plan-create-ai-btn { color: var(--color-plan-ai-accent); }
+.plan-create-ai-btn svg { fill: var(--color-plan-ai-accent); }
 
-.plan-list-label { padding: 6px 16px 4px; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .08em; flex-shrink: 0; }
+/* Typography comes from the shared .info-section-label; this only positions it. */
+.plan-list-label { padding: 6px 16px 4px; flex-shrink: 0; }
 .plan-list-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 4px 12px calc(var(--ai-bar-space) + 16px); }
 .plan-list-empty { text-align: center; color: var(--text-hint); padding: 32px 16px; font-size: 14px; }
 
-.plan-item { display: flex; align-items: center; background: var(--surface); box-shadow: 0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.06); border-radius: 14px; padding: 14px; margin-bottom: 10px; gap: 10px; cursor: pointer; transition: background .1s; }
+.plan-item { display: flex; align-items: center; background: var(--surface); box-shadow: var(--card-shadow); border-radius: var(--card-radius); padding: 14px; margin-bottom: 10px; gap: 10px; cursor: pointer; transition: background .1s; }
 .plan-item:active { background: #f5f5f5; }
 .plan-item-info { flex: 1; min-width: 0; }
 .plan-item-name { font-size: 15px; font-weight: 600; color: var(--text-primary); }
 .plan-item-meta { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
-.plan-item-active-pill { display: inline-block; font-size: 10px; font-weight: 700; color: #7C4DFF; background: rgba(124,77,255,.14); border-radius: 4px; padding: 2px 7px; margin-top: 5px; letter-spacing: .04em; }
+.plan-item-active-pill { display: inline-block; font-size: 10px; font-weight: 700; color: var(--blue); background: rgba(74,158,255,.14); border-radius: 4px; padding: 2px 7px; margin-top: 5px; letter-spacing: .04em; }
 .plan-item-dots { width: 36px; height: 36px; border: none; background: none; color: var(--text-hint); cursor: pointer; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .1s; }
 .plan-item-dots:active { background: rgba(0,0,0,.06); }
 .plan-item-dots svg { width: 18px; height: 18px; fill: var(--text-hint); }
 
-.plan-active-ribbon { padding: 6px 16px; font-size: 11px; font-weight: 700; color: #7C4DFF; background: rgba(124,77,255,.1); letter-spacing: .06em; flex-shrink: 0; display: none; }
+.plan-active-ribbon { padding: 6px 16px; font-size: 11px; font-weight: 700; color: var(--blue); background: rgba(74,158,255,.1); letter-spacing: .06em; flex-shrink: 0; display: none; }
 .plan-active-ribbon.show { display: block; }
 /* Title + rename pencil sit in their own flex:1 wrapper (taking the slot .toolbar-title
    alone used to fill) so the pencil hugs the last letter of the name instead of being
@@ -599,9 +596,9 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .plan-title-edit-btn { width: 34px; height: 34px; flex-shrink: 0; }
 .plan-title-edit-btn svg { width: 17px; height: 17px; }
 .plan-detail-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 8px 12px calc(var(--ai-bar-space) + 24px); }
-.plan-day-card { background: var(--surface); box-shadow: 0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.06); border-radius: 14px; margin-bottom: 10px; overflow: hidden; }
+.plan-day-card { background: var(--surface); box-shadow: var(--card-shadow); border-radius: var(--card-radius); margin-bottom: 10px; overflow: hidden; }
 .plan-day-head { display: flex; align-items: center; gap: 12px; padding: 14px; cursor: pointer; }
-.plan-day-num { width: 28px; height: 28px; border-radius: 50%; background: #7C4DFF; color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.plan-day-num { width: 28px; height: 28px; border-radius: 50%; background: var(--blue); color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .plan-day-info { flex: 1; min-width: 0; }
 .plan-day-name-row { display: flex; align-items: center; gap: 6px; }
 .plan-day-name { font-size: 15px; font-weight: 600; color: var(--text-primary); }
@@ -625,13 +622,13 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 /* Small rename pencil next to a day-card's own name, editable state only. */
 .plan-day-rename-btn { width: 20px; height: 20px; border: none; background: none; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
 .plan-day-rename-btn svg { width: 13px; height: 13px; fill: var(--cyan); }
-/* "WEEK A" / "WEEK B" group header above a block of generated day-cards — same small-kop
-   convention as elsewhere (e.g. "MIJN PLANNEN"). */
-.plan-day-group-label { padding: 6px 4px 4px; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .08em; }
+/* "WEEK A" / "WEEK B" group header above a block of generated day-cards — typography
+   from the shared .info-section-label (same as "MIJN PLANNEN"); this only positions it. */
+.plan-day-group-label { padding: 6px 4px 4px; }
 
 /* "Dag toevoegen" / "Week toevoegen" dashed blocks, editable state only —
    one per week section (day) and one overall while there's still just 1 week (week). */
-.plan-add-day-block, .plan-add-week-block { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; box-sizing: border-box; padding: 14px; margin-bottom: 10px; border-radius: 14px; border: 2px dashed; background: none; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.plan-add-day-block, .plan-add-week-block { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; box-sizing: border-box; padding: 14px; margin-bottom: 10px; border-radius: var(--card-radius); border: 2px dashed; background: none; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
 .plan-add-day-block { border-color: var(--cyan); color: var(--cyan); }
 .plan-add-day-block:active { background: var(--cyan-light); }
 .plan-add-week-block { border-color: var(--green); color: var(--green); }
@@ -647,14 +644,13 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .day-picker-circle:disabled { border-color: var(--border); background: var(--border); color: var(--text-hint); cursor: not-allowed; }
 
 /* ── PLAN SCHEDULE SCREEN (light, like #screen-workout-plan) ──────────── */
-#screen-plan-schedule.plan-screen { background: var(--bg); color: var(--text-primary); }
 .plan-schedule-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px; display: flex; flex-direction: column; gap: 20px; }
 .ps-section { display: flex; flex-direction: column; gap: 10px; }
 /* Non-scrolling footer: its own margin-bottom reserves room above the floating
    AI Coach pill, so the button never sits permanently behind it. */
 .plan-schedule-footer { padding: 12px 16px calc(var(--safe-bottom) + 12px); background: var(--surface); border-top: 1px solid var(--border); flex-shrink: 0; margin-bottom: var(--ai-bar-space); }
-.ps-continue-btn { width: 100%; padding: 16px; border: none; border-radius: 14px; background: var(--blue); color: #fff; font-family: inherit; font-size: 14px; font-weight: 500; text-transform: uppercase; letter-spacing: .06em; cursor: pointer; transition: filter .1s; }
-.ps-continue-btn:active { filter: brightness(.85); }
+/* Shared .btn-primary, just full-width and as tall as the Training tab's SAVE/CLEAR. */
+.ps-continue-btn { width: 100%; padding: 15px 8px; }
 .ps-continue-btn:disabled { background: var(--border); color: var(--text-hint); cursor: not-allowed; }
 
 /* "Aantal dagen": 14 equal-width boxes, 2 rows of 7. Unselected = white/bordered/grey,
@@ -666,12 +662,11 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 /* "Dagindeling": two-up toggle, same layout idea as .plate-bar-options but with a
    solid-fill selected state (per spec) rather than the Calculator's tinted one. */
 .ps-toggle-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-.ps-toggle-option { padding: 12px 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text-secondary); font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; text-align: center; transition: background .1s, border-color .1s, color .1s; }
+.ps-toggle-option { padding: 12px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text-secondary); font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; text-align: center; transition: background .1s, border-color .1s, color .1s; }
 .ps-toggle-option.selected { background: var(--blue); border-color: var(--blue); color: #fff; }
 
 .ps-weekdays-counter { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
 .ps-week-block { display: flex; flex-direction: column; gap: 8px; }
-.ps-week-label { font-size: 11px; font-weight: 700; color: var(--text-secondary); letter-spacing: .08em; text-transform: uppercase; }
 .ps-weekday-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
 .ps-day-circle { aspect-ratio: 1; border-radius: 50%; border: 1px solid var(--border); background: var(--surface); color: var(--text-secondary); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .1s, border-color .1s, color .1s; }
 .ps-day-circle.selected { background: var(--blue); border-color: var(--blue); color: #fff; }
@@ -680,23 +675,24 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 /* ── AI GENERATE FORM ─────────────────────────────────── */
 .ai-gen-form { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px 16px calc(var(--ai-bar-space) + 16px); display: flex; flex-direction: column; gap: 20px; }
 .ai-gen-section { display: flex; flex-direction: column; gap: 10px; }
-.ai-gen-label { font-size: 11px; font-weight: 700; color: #666; text-transform: uppercase; letter-spacing: .08em; }
+/* Chips: same unselected/selected convention as .ps-num-box / .ps-toggle-option. */
 .chip-group { display: flex; flex-wrap: wrap; gap: 8px; }
-.chip { padding: 8px 14px; border: 1px solid #2e2e2e; border-radius: 20px; background: #1E1E1E; color: #888; font-family: inherit; font-size: 13px; font-weight: 500; cursor: pointer; transition: all .12s; }
-.chip.active { border-color: #7C4DFF; background: rgba(124,77,255,.18); color: #9d7dff; }
-.chip:active { opacity: .7; }
-.ai-gen-textarea { width: 100%; padding: 12px; border: 1px solid #2e2e2e; border-radius: 10px; background: #1E1E1E; color: #fff; font-family: inherit; font-size: 14px; resize: none; height: 80px; outline: none; transition: border-color .15s; }
-.ai-gen-textarea:focus { border-color: #7C4DFF; }
-.ai-gen-textarea::placeholder { color: #444; }
-.ai-gen-submit-btn { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 16px; border: none; border-radius: 14px; background: #7C4DFF; color: #fff; font-family: inherit; font-size: 14px; font-weight: 500; text-transform: uppercase; letter-spacing: .06em; cursor: pointer; transition: filter .1s; flex-shrink: 0; }
-.ai-gen-submit-btn:active { filter: brightness(.85); }
-.ai-gen-submit-btn svg { width: 18px; height: 18px; }
+.chip { padding: 8px 14px; border: 1px solid var(--border); border-radius: 20px; background: var(--surface); color: var(--text-secondary); font-family: inherit; font-size: 13px; font-weight: 500; cursor: pointer; transition: background .1s, border-color .1s, color .1s; }
+.chip.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+/* Same box as the modal inputs (.overlay-panel textarea). */
+.ai-gen-textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text-primary); font-family: inherit; font-size: 16px; resize: none; height: 80px; outline: none; transition: border-color .15s; }
+.ai-gen-textarea:focus { border-color: var(--blue); }
+.ai-gen-textarea::placeholder { color: var(--text-hint); }
+/* Shared .btn-primary (full-width, SAVE-height), recolored with the AI-plan accent. */
+.ai-gen-submit-btn { flex: none; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 15px 8px; background: var(--color-plan-ai-accent); }
+.ai-gen-submit-btn:active { background: var(--color-plan-ai-accent); filter: brightness(.85); }
+.ai-gen-submit-btn svg { width: 18px; height: 18px; fill: currentColor; }
 .ai-gen-loading { flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
 .ai-gen-loading.hidden { display: none; }
 .ai-gen-loading:not(.hidden) { display: flex; }
-.ai-gen-spinner { width: 52px; height: 52px; border: 4px solid #2e2e2e; border-top-color: #7C4DFF; border-radius: 50%; animation: spin .8s linear infinite; }
+.ai-gen-spinner { width: 52px; height: 52px; border: 4px solid var(--border); border-top-color: var(--color-plan-ai-accent); border-radius: 50%; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.ai-gen-loading-text { font-size: 15px; color: #666; }
+.ai-gen-loading-text { font-size: 15px; color: var(--text-secondary); }
 .hidden { display: none !important; }
 
 /* ── SMART DAY BANNER ─────────────────────────────────── */
@@ -714,8 +710,8 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 /* ── PLAN DAY EDIT SCREEN (light, like #screen-plan-detail) ──────────── */
 .pde-hint-txt { padding: 8px 16px; font-size: 12px; color: var(--text-secondary); flex-shrink: 0; }
 .pde-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 4px 12px calc(var(--ai-bar-space) + 24px); display: flex; flex-direction: column; gap: 10px; }
-.pde-item { position: relative; border-radius: 14px; overflow: hidden; flex-shrink: 0; }
-.pde-item-inner { display: flex; align-items: center; gap: 4px; background: var(--surface); box-shadow: 0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.06); border-radius: 14px; padding: 12px 4px 12px 14px; position: relative; z-index: 1; will-change: transform; cursor: pointer; }
+.pde-item { position: relative; border-radius: var(--card-radius); overflow: hidden; flex-shrink: 0; }
+.pde-item-inner { display: flex; align-items: center; gap: 4px; background: var(--surface); box-shadow: var(--card-shadow); border-radius: var(--card-radius); padding: 12px 4px 12px 14px; position: relative; z-index: 1; will-change: transform; cursor: pointer; }
 .pde-item.pde-dragging .pde-item-inner { box-shadow: 0 8px 28px rgba(0,0,0,.22); transform: scale(1.015); }
 .pde-ex-info { flex: 1; min-width: 0; }
 .pde-ex-name { font-size: 15px; font-weight: 600; color: var(--text-primary); display: block; }
@@ -737,16 +733,16 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .pde-sr-set-remove { width: 30px; height: 30px; flex-shrink: 0; border: none; border-radius: 8px; background: rgba(211,47,47,.1); color: #d32f2f; font-size: 16px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .pde-sr-set-remove:active { background: rgba(211,47,47,.2); }
 /* "+ Set toevoegen" — same dashed-block convention as "Dag toevoegen" on Plan Detail. */
-.pde-sr-add-set-block { display: flex; align-items: center; justify-content: center; width: 100%; box-sizing: border-box; padding: 12px; margin-top: 8px; border-radius: 10px; border: 2px dashed var(--blue); background: none; color: var(--blue); font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.pde-sr-add-set-block { display: flex; align-items: center; justify-content: center; width: 100%; box-sizing: border-box; padding: 12px; margin-top: 8px; border-radius: 8px; border: 2px dashed var(--blue); background: none; color: var(--blue); font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 .pde-sr-add-set-block:active { background: rgba(74,158,255,.1); }
 
 /* ── PRESET OVERLAY ITEMS ─────────────────────────────── */
-.preset-item { padding: 13px; border: 1px solid #2e2e2e; border-radius: 10px; cursor: pointer; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; transition: background .1s; }
-.preset-item:active { background: rgba(124,77,255,.08); }
+.preset-item { padding: 13px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; transition: background .1s; }
+.preset-item:active { background: #f5f5f5; }
 .preset-item-body { flex: 1; }
 .preset-item-name { font-size: 15px; font-weight: 600; color: var(--text-primary); }
 .preset-item-meta { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
-.preset-item-arrow { color: #aaa; font-size: 16px; }
+.preset-item-arrow { color: var(--text-hint); font-size: 16px; }
 
 /* ── DANGER BUTTON ────────────────────────────────────── */
 .btn-danger { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 8px; border: none; border-radius: 8px; background: #C62828; color: white; font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.12s; text-transform: uppercase; letter-spacing: .06em; }

@@ -4250,7 +4250,7 @@ function renderPlanDetail() {
   segments.forEach(seg => {
     if (seg.group) {
       const label = document.createElement('div');
-      label.className = 'plan-day-group-label';
+      label.className = 'info-section-label plan-day-group-label';
       label.textContent = seg.group === 'A' ? 'WEEK A' : 'WEEK B';
       scroll.appendChild(label);
     }

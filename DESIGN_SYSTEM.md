@@ -30,6 +30,9 @@ Stijl-inspiratie: **FitNotes** (Android app) — lichtgrijze achtergrond, cyaan 
 | `--color-ai-coach-glow` | `rgba(34,197,94,0.35)` | Zachte groene gloed-schaduw rond de AI Coach-pil (`box-shadow`). |
 | `--color-manual-accent` | `var(--blue)` | Accentkleur voor "Manual Workout" op het New Workout-scherm — nu een alias van `--blue` (zelfde kleur, zie hierboven). |
 | `--color-schema-manual-accent` | `#a855f7` | Accentkleur voor "Load Schedule Manually" op het New Workout-scherm — paars, nieuw. |
+| `--color-plan-ai-accent` | `#7C4DFF` | Paars van de Workout Plan Builder (ook de accentkleur van zijn kaart op het hoofdmenu). Binnen de Plan Builder alleen nog voor "Genereren met AI": de tegel op Trainingsplannen, de Generate Plan-knop en de laadspinner. |
+| `--card-radius` | `12px` | Hoekradius van witte content-kaarten op `--bg` (New Workout-kaarten en elke Plan Builder-kaart). |
+| `--card-shadow` | `0 1px 3px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.08)` | Schaduw van diezelfde kaarten. |
 
 ## Typografie
 
@@ -163,6 +166,16 @@ Zowel "New Exercise" (via de "+" op het All Exercises-scherm) als "Update Exerci
 - **"New Category" is nu een echte modal** (`#new-category-overlay`, hergebruikt het gedeelde modal-contract hierboven) i.p.v. de vroegere inline uitklap-rij met een apart rond bevestig-knopje. Titel "New Category" (blauw, automatisch via de modal-basisregel), simpel `.modal-input-underline`-tekstveld, twee losse knoppen Cancel/Save. Bij Save: categorie toegevoegd aan de `<select>`-opties én meteen geselecteerd, modal sluit.
 - **TYPE-opties**: Weight and Reps / Reps Only / Duration / **Distance** (nieuw). Onderzocht hoe "Distance" verwerkt moet worden bij het loggen, net als "Duration" — bevinding: `type` is in de hele app een **puur informatief/opgeslagen veld**, het exercise-logging scherm (`#screen-training`) toont altijd dezelfde WEIGHT+REPS-velden ongeacht de gekozen `type`, ook voor bestaande "Duration"-oefeningen. Er is dus geen bestaand type-afhankelijk logging-gedrag om "Distance" consistent mee te maken — toegevoegd als vierde optie op exact dezelfde (niet-functionele) manier als Duration, in plaats van in deze wijziging óók meteen een ongevraagde losse duur/afstand-invoer op het logging-scherm te bouwen.
 - **WEIGHT UNIT-opties**: alleen **Kilogram** (`value="kg"`) en **Pounds** (`value="lbs"`) — de tussenlaag-optie "Default (kgs)" (`value="default"`) is weg. Nieuwe/bewerkte oefeningen krijgen altijd expliciet `kg` of `lbs`; het Edit-scherm toont bestaande custom-oefeningen met de oude `weightUnit: 'default'`-waarde (of zonder waarde) als "Kilogram", zodat er geen kapotte/lege dropdown-status ontstaat voor reeds opgeslagen data.
+
+## Workout Plan Builder (alle schermen onder het hoofdmenu-item)
+
+Trainingsplannen, Plan schedule, Plan detail, Dag bewerken, AI genereren en de Laden-flow (hergebruikt `#screen-exercises`) volgen allemaal het lichte thema: de gedeelde donkere `.toolbar` (geen eigen toolbar-override meer), `--bg`-body en witte kaarten met `--card-radius`/`--card-shadow`. `.plan-screen` markeert de schermen alleen en zet zelf geen kleuren.
+
+- Kleine kopjes ("MIJN PLANNEN", "WEEK A/B", "AANTAL DAGEN", AI-formulierlabels, Sets/Reps-labels in de pop-up) gebruiken de gedeelde `.info-section-label`.
+- Volle-breedte acties (Doorgaan, Generate Plan) zijn `.btn-primary` met een SAVE-hoogte-modifier; pop-ups gebruiken `.btn-primary`/`.btn-secondary`/`.btn-danger`.
+- Selectiestaat (dagenaantal, dagindeling, weekdagen, AI-chips, Gelijke/Andere reps): wit met `--border` → geselecteerd vol `--blue` met witte tekst.
+- "Actief plan" (ster in de toolbar, ACTIEF-pil, ACTIEF PLAN-strook) en de dagnummer-rondjes zijn `--blue`; de inactieve ster is half-transparant wit.
+- Bewerk-acties op Plan detail (potloodjes, "Dag toevoegen") zijn `--cyan`, "Week toevoegen" is `--green`, verwijderen is rood.
 
 ## Toast-melding (banner)
 

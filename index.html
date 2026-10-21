@@ -439,7 +439,7 @@
 
 <!-- WORKOUT PLAN BUILDER SCREEN -->
 <div id="screen-workout-plan" class="screen plan-screen">
-  <div class="toolbar plan-toolbar">
+  <div class="toolbar">
     <button class="toolbar-btn" id="btn-back-workout-plan" aria-label="Back">
       <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
     </button>
@@ -459,7 +459,7 @@
       <span>Genereren met AI</span>
     </button>
   </div>
-  <div class="plan-list-label">Mijn plannen</div>
+  <div class="info-section-label plan-list-label">Mijn plannen</div>
   <div class="plan-list-scroll" id="plan-list-scroll">
     <div class="plan-list-empty" id="plan-list-empty">Nog geen plannen. Maak er hierboven een aan!</div>
   </div>
@@ -467,7 +467,7 @@
 
 <!-- PLAN DETAIL SCREEN -->
 <div id="screen-plan-detail" class="screen plan-screen">
-  <div class="toolbar plan-toolbar">
+  <div class="toolbar">
     <button class="toolbar-btn" id="btn-back-plan-detail" aria-label="Back">
       <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
     </button>
@@ -495,7 +495,7 @@
 
 <!-- PLAN SCHEDULE SCREEN (tapping a plan card in "Mijn plannen" opens this) -->
 <div id="screen-plan-schedule" class="screen plan-screen">
-  <div class="toolbar plan-toolbar">
+  <div class="toolbar">
     <button class="toolbar-btn" id="btn-back-plan-schedule" aria-label="Back">
       <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
     </button>
@@ -531,7 +531,7 @@
     <div class="ps-section" id="ps-weekdays-section" style="display:none">
       <div class="ps-weekdays-counter" id="ps-weekdays-counter"></div>
       <div class="ps-week-block">
-        <div class="ps-week-label" id="ps-week-a-label">Week A</div>
+        <div class="info-section-label" id="ps-week-a-label">Week A</div>
         <div class="ps-weekday-row" data-week="a">
           <button class="ps-day-circle" data-day="0">Ma</button>
           <button class="ps-day-circle" data-day="1">Di</button>
@@ -543,7 +543,7 @@
         </div>
       </div>
       <div class="ps-week-block" id="ps-week-b-block" style="display:none">
-        <div class="ps-week-label">Week B</div>
+        <div class="info-section-label">Week B</div>
         <div class="ps-weekday-row" data-week="b">
           <button class="ps-day-circle" data-day="0">Ma</button>
           <button class="ps-day-circle" data-day="1">Di</button>
@@ -557,13 +557,13 @@
     </div>
   </div>
   <div class="plan-schedule-footer">
-    <button class="ps-continue-btn" id="btn-plan-schedule-continue" disabled>Doorgaan</button>
+    <button class="btn-primary ps-continue-btn" id="btn-plan-schedule-continue" disabled>Doorgaan</button>
   </div>
 </div>
 
 <!-- AI GENERATE SCREEN -->
 <div id="screen-ai-generate" class="screen plan-screen">
-  <div class="toolbar plan-toolbar">
+  <div class="toolbar">
     <button class="toolbar-btn" id="btn-back-ai-generate" aria-label="Back">
       <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
     </button>
@@ -571,7 +571,7 @@
   </div>
   <div class="ai-gen-form" id="ai-gen-form">
     <div class="ai-gen-section">
-      <div class="ai-gen-label">Goal</div>
+      <div class="info-section-label">Goal</div>
       <div class="chip-group" id="chips-goal">
         <button class="chip active" data-val="Muscle Growth">Muscle Growth</button>
         <button class="chip" data-val="Strength">Strength</button>
@@ -580,7 +580,7 @@
       </div>
     </div>
     <div class="ai-gen-section">
-      <div class="ai-gen-label">Level</div>
+      <div class="info-section-label">Level</div>
       <div class="chip-group" id="chips-level">
         <button class="chip" data-val="Beginner">Beginner</button>
         <button class="chip active" data-val="Intermediate">Intermediate</button>
@@ -588,7 +588,7 @@
       </div>
     </div>
     <div class="ai-gen-section">
-      <div class="ai-gen-label">Days per week</div>
+      <div class="info-section-label">Days per week</div>
       <div class="chip-group" id="chips-days">
         <button class="chip" data-val="2">2</button>
         <button class="chip" data-val="3">3</button>
@@ -598,10 +598,10 @@
       </div>
     </div>
     <div class="ai-gen-section">
-      <div class="ai-gen-label">Preference (optional)</div>
+      <div class="info-section-label">Preference (optional)</div>
       <textarea id="ai-gen-pref" class="ai-gen-textarea" placeholder="E.g. Focus on chest and back, no leg press..."></textarea>
     </div>
-    <button class="ai-gen-submit-btn" id="btn-ai-generate-submit">
+    <button class="btn-primary ai-gen-submit-btn" id="btn-ai-generate-submit">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
       Generate Plan
     </button>
@@ -614,7 +614,7 @@
 
 <!-- PLAN DAY EDIT SCREEN -->
 <div id="screen-plan-day-edit" class="screen plan-screen">
-  <div class="toolbar plan-toolbar">
+  <div class="toolbar">
     <button class="toolbar-btn" id="btn-back-plan-day-edit" aria-label="Back">
       <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
     </button>
@@ -639,11 +639,11 @@
     </div>
     <div class="pde-sr-row" id="pde-sr-uniform-fields">
       <div class="pde-sr-field">
-        <label for="pde-sr-sets">Sets</label>
+        <label class="info-section-label" for="pde-sr-sets">Sets</label>
         <input type="number" id="pde-sr-sets" inputmode="numeric" min="1"/>
       </div>
       <div class="pde-sr-field">
-        <label for="pde-sr-reps">Reps</label>
+        <label class="info-section-label" for="pde-sr-reps">Reps</label>
         <input type="number" id="pde-sr-reps" inputmode="numeric" min="1"/>
       </div>
     </div>
