@@ -427,11 +427,20 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .field-btn:active { background: var(--pressed); }
 /* Weight/reps/RPE/extra: the shared input box, value at "Groot getal". */
 .field-group input { flex: 1; min-width: 0; padding: 0 var(--space-1); text-align: center; font-size: var(--fs-number); font-weight: var(--fw-bold); }
-/* Underline field — TRACK tab only (see DESIGN_SYSTEM.md): the −/+ buttons are the standard 48×48
-   steppers; only the number field between them drops its box for a 2px underline. Without a box it
-   needs no side padding either, which is what lets "232.5" fit at 360px (the 4px gap to the buttons
-   is already the smallest spacing step). Every other stepper keeps the standard look. */
-#tab-track .field-group input { padding: 0; border: none; border-bottom: 2px solid var(--text-muted); border-radius: 0; background: transparent; }
+/* TRACK stepper (see DESIGN_SYSTEM.md): the −/+ buttons have the Plate-stepper size — 36×36 visible,
+   48×48 tap area via the shared ::after — but that tap area only grows outward (− to the left, + to
+   the right) and in height, never over the number field. Between the two half columns there's 16px,
+   so there each button grows 8px instead of 12px (44×48) and the two tap areas never meet.
+   The number field is an underline only (TRACK only), as tall as the buttons; the transparent 2px top
+   border mirrors the 2px underline so the number sits exactly on the buttons' centre line. */
+#tab-track .field-btn { width: 36px; height: 36px; }
+#tab-track .field-btn::after { width: var(--control-height); height: var(--control-height); transform: translateY(-50%); }
+/* -1px: ::after is positioned from inside the button's 1px border; this pins it to the outer edge. */
+#tab-track .field-btn[data-dir="-"]::after { left: auto; right: -1px; }
+#tab-track .field-btn[data-dir="+"]::after { left: -1px; }
+#tab-track .field-row-pair .field-group:first-child .field-btn[data-dir="+"]::after,
+#tab-track .field-row-pair .field-group:last-child .field-btn[data-dir="-"]::after { width: calc(36px + var(--space-2)); }
+#tab-track .field-group input { height: 36px; padding: 0; border: none; border-top: 2px solid transparent; border-bottom: 2px solid var(--text-muted); border-radius: 0; background: transparent; }
 #tab-track .field-group input:focus { border-bottom-color: var(--primary); }
 /* Fields side by side, each half the width; no divider lines in the input block, the 12px
    padding of each field group keeps the blocks apart. */
