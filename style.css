@@ -795,6 +795,8 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
    base .overlay stack instead of relying on DOM order to win.
    See the overlay stacking tiers documented in :root (style.css). */
 #field-picker-overlay { z-index: var(--z-overlay-nested); }
+/* Generic delete confirm: can be opened from within the (base-tier) comment-overlay. */
+#confirm-delete-overlay { z-index: var(--z-overlay-nested); }
 .field-picker-list { display: flex; flex-direction: column; max-height: 60vh; overflow-y: auto; }
 .field-picker-row { display: flex; align-items: center; gap: 14px; padding: 14px 2px; border-bottom: 1px solid var(--border); cursor: pointer; background: var(--surface); transition: background .08s; }
 .field-picker-row:last-child { border-bottom: none; }

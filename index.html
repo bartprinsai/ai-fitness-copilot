@@ -1155,6 +1155,19 @@
   </div>
 </div>
 
+<!-- GENERIC DELETE CONFIRMATION OVERLAY (openConfirmDelete — every delete action without a
+     dedicated confirm overlay of its own; nested tier so it can sit on top of comment-overlay) -->
+<div class="overlay" id="confirm-delete-overlay">
+  <div class="overlay-panel">
+    <h3 id="confirm-delete-title">Verwijderen?</h3>
+    <p id="confirm-delete-msg" class="cat-delete-msg"></p>
+    <div class="overlay-btns">
+      <button class="btn-secondary" id="btn-confirm-delete-cancel">Annuleren</button>
+      <button class="btn-danger" id="btn-confirm-delete-confirm">Verwijderen</button>
+    </div>
+  </div>
+</div>
+
 <!-- GLOBAL AI COACH BAR -->
 <div class="global-ai-bar">
   <button class="global-ai-bar-pill" id="btn-global-ai-coach">

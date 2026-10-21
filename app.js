@@ -494,6 +494,28 @@ document.getElementById('btn-discard-changes-confirm').addEventListener('click',
   if (action) action();
 });
 
+// -- Generic delete confirmation (#confirm-delete-overlay) ----------------
+// For every delete action that has no dedicated confirm overlay of its own
+// (those — plan, plan day, plan-day exercise, category, exercise, reset — keep
+// theirs). `onConfirm` runs only on Verwijderen; Annuleren (or back) deletes nothing.
+let pendingConfirmDelete = null;
+function openConfirmDelete({ title, message, onConfirm }) {
+  pendingConfirmDelete = onConfirm;
+  document.getElementById('confirm-delete-title').textContent = title;
+  document.getElementById('confirm-delete-msg').textContent = message;
+  openOverlay('confirm-delete-overlay');
+}
+document.getElementById('btn-confirm-delete-cancel').addEventListener('click', () => {
+  pendingConfirmDelete = null;
+  closeOverlay('confirm-delete-overlay');
+});
+document.getElementById('btn-confirm-delete-confirm').addEventListener('click', () => {
+  const action = pendingConfirmDelete;
+  pendingConfirmDelete = null;
+  closeOverlay('confirm-delete-overlay');
+  if (action) action();
+});
+
 window.addEventListener('popstate', e => {
   if (suppressNextPopstate) {
     suppressNextPopstate = false;
@@ -974,7 +996,9 @@ function openSetCommentPopup(exIdx, setIdx, date = currentDate) {
     renderHome();
     if (document.getElementById('tab-history').classList.contains('active')) renderHistoryTab();
   };
+  const exName = (getWorkout(date)[exIdx] || {}).name;
   openCommentPopup({
+    label: `Comment bij set ${setIdx + 1} van "${exName}"`,
     getText: () => {
       const ex = getWorkout(date)[exIdx];
       return (ex && ex.sets[setIdx] && ex.sets[setIdx].note) || '';
@@ -1001,6 +1025,7 @@ function openSetCommentPopup(exIdx, setIdx, date = currentDate) {
 function openSessionCommentPopup() {
   const date = currentDate;
   openCommentPopup({
+    label: 'Comment bij deze workout',
     getText: () => getSessionNote(date),
     onSave: val => saveSessionNote(date, val),
     onDelete: () => saveSessionNote(date, '')
@@ -1026,6 +1051,19 @@ function exitHomeSelMode() {
   homeSelCards.forEach(card => card.classList.remove('exercise-card-selected'));
   homeSelCards.clear();
   document.getElementById('screen-fitness-tracker').classList.remove('sel-mode', 'sel-single');
+}
+
+function confirmDeleteHomeSelectedEx() {
+  if (homeSelCards.size === 0) return;
+  const allCards = [...document.getElementById('home-content').querySelectorAll('.exercise-card')];
+  const exercises = getWorkout(currentDate);
+  const names = [...homeSelCards].map(c => exercises[allCards.indexOf(c)]).filter(Boolean).map(e => `"${e.name}"`);
+  const n = names.length;
+  openConfirmDelete({
+    title: n === 1 ? 'Oefening verwijderen?' : 'Oefeningen verwijderen?',
+    message: `${n === 1 ? names[0] : `${n} oefeningen (${names.join(', ')})`} verwijderen uit deze workout? Alle sets gaan verloren. Dit kan niet ongedaan worden gemaakt.`,
+    onConfirm: deleteHomeSelectedEx,
+  });
 }
 
 function deleteHomeSelectedEx() {
@@ -3260,6 +3298,7 @@ const OVERLAY_CANCEL_BUTTON = {
   'reset-overlay': 'btn-reset-cancel',
   'history-goto-overlay': 'history-goto-cancel',
   'discard-changes-overlay': 'btn-discard-changes-cancel',
+  'confirm-delete-overlay': 'btn-confirm-delete-cancel',
 };
 
 function openOverlay(id) {
@@ -3292,7 +3331,7 @@ document.getElementById('btn-next-day').addEventListener('click', () => navigate
 document.getElementById('btn-calendar').addEventListener('click', openCalendar);
 document.getElementById('btn-add-exercise').addEventListener('click', openExerciseList);
 document.getElementById('btn-home-sel-done').addEventListener('click', exitHomeSelMode);
-document.getElementById('btn-home-sel-delete').addEventListener('click', deleteHomeSelectedEx);
+document.getElementById('btn-home-sel-delete').addEventListener('click', confirmDeleteHomeSelectedEx);
 setupHomeExDragReorder();
 setupDaySwipeNav();
 setupSetListDragReorder();
@@ -3320,8 +3359,13 @@ document.getElementById('btn-nw-schema-auto').addEventListener('click', () => {
 });
 document.getElementById('btn-save-set').addEventListener('click', saveSet);
 document.getElementById('btn-clear').addEventListener('click', () => {
-  if (selectedSetIndex !== null) deleteSet(selectedSetIndex);
-  else clearFields();
+  if (selectedSetIndex === null) { clearFields(); return; }
+  const i = selectedSetIndex;
+  openConfirmDelete({
+    title: 'Set verwijderen?',
+    message: `Set ${i + 1} van "${currentExercise}" verwijderen? Dit kan niet ongedaan worden gemaakt.`,
+    onConfirm: () => deleteSet(i),
+  });
 });
 document.getElementById('btn-training-pr').addEventListener('click', openExerciseRecords);
 document.getElementById('btn-back-records').addEventListener('click', () => goBack('screen-training'));
@@ -3386,9 +3430,20 @@ document.getElementById('btn-comment-cancel').addEventListener('click', () => {
   );
 });
 document.getElementById('btn-comment-delete').addEventListener('click', () => {
-  if (commentPopupCtx) commentPopupCtx.onDelete();
-  closeOverlay('comment-overlay');
-  toast('Comment deleted');
+  const ctx = commentPopupCtx;
+  const doDelete = () => {
+    if (ctx) ctx.onDelete();
+    closeOverlay('comment-overlay');
+    toast('Comment deleted');
+  };
+  // Nothing saved yet (popup opened straight into edit mode): nothing to lose, just close.
+  const saved = ctx && ctx.getText();
+  if (!saved || !saved.trim()) { doDelete(); return; }
+  openConfirmDelete({
+    title: 'Comment verwijderen?',
+    message: `${ctx.label} verwijderen? Dit kan niet ongedaan worden gemaakt.`,
+    onConfirm: doDelete,
+  });
 });
 document.getElementById('btn-comment-save').addEventListener('click', () => {
   const val = document.getElementById('comment-edit-input').value.trim();
