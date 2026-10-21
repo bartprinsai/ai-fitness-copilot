@@ -892,4 +892,5 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .recap-more { color: var(--blue); }
 .recap-down { color: var(--toast-error); }
 .recap-muted { color: var(--text-hint); }
+.recap-prev { color: #b5b5b5; }
 .recap-empty { text-align: center; color: var(--text-hint); font-size: 14px; padding: 16px 0; }

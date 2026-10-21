@@ -4146,8 +4146,8 @@ function clampAllOnBarToAvailable() {
 
 // -- Day Recap popup (#recap-overlay, the Fitness Tracker's "Recap" pill) --------
 // Summarizes the VIEWED day (currentDate): per exercise, logged sets vs. the plan
-// target it was loaded with (only when it has one), and its heaviest weight vs. the
-// most recent earlier session of that exercise.
+// target it was loaded with (only when it has one), and each set's weight and reps
+// vs. the same set in the most recent earlier session of that exercise.
 const recapDayFormat = new Intl.DateTimeFormat('nl-NL', { timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'long' });
 
 function recapDayName(dateStr) {
@@ -4156,12 +4156,11 @@ function recapDayName(dateStr) {
 }
 
 // Sets as the user counts them: a dropset continuation belongs to the set before it.
-function countWorkingSets(sets) {
-  return sets.filter(s => !s.isDropsetContinuation).length;
+function workingSets(sets) {
+  return sets.filter(s => !s.isDropsetContinuation);
 }
-
-function heaviestWeight(sets) {
-  return Math.max(...sets.map(s => Number(s.weight) || 0));
+function countWorkingSets(sets) {
+  return workingSets(sets).length;
 }
 
 // The most recent session BEFORE `date` with logged sets of `name`, or null.
@@ -4184,17 +4183,34 @@ function recapSetsLine(ex) {
   return recapLine('recap-more', '+', `${done}/${planned} sets (${done - planned} meer dan gepland)`);
 }
 
-function recapWeightLine(ex, date) {
-  const sets = ex.sets || [];
+// One line per working set of the day, each compared with the set at the SAME
+// position in the most recent earlier session (Set 1 vs Set 1, ...): weight and
+// reps judged separately. Extra sets today have no counterpart; extra sets last
+// time are simply not shown. No earlier session: plain set lines + one note.
+function recapSetLines(ex, date) {
+  const sets = workingSets(ex.sets || []);
   if (sets.length === 0) return recapLine('recap-muted', '', 'Nog geen sets gelogd');
-  const prevSets = previousSessionSets(ex.name, date);
-  if (!prevSets) return recapLine('recap-muted', '', 'Eerste keer deze oefening — geen vergelijking');
-  const now = heaviestWeight(sets), before = heaviestWeight(prevSets);
-  const nowHtml = `<span class="recap-weight">${formatKg(now)} kg</span>`;
-  const diff = Math.round((now - before) * 100) / 100;
-  if (diff > 0) return recapLine('', '', `${nowHtml} <span class="recap-up">↑ +${formatKg(diff)} kg t.o.v. vorige keer (${formatKg(before)} kg)</span>`);
-  if (diff < 0) return recapLine('', '', `${nowHtml} <span class="recap-down">↓ -${formatKg(-diff)} kg t.o.v. vorige keer (${formatKg(before)} kg)</span>`);
-  return recapLine('', '', `${nowHtml} <span class="recap-muted">(gelijk aan vorige keer)</span>`);
+  const prevSessionSets = previousSessionSets(ex.name, date);
+  const prev = prevSessionSets ? workingSets(prevSessionSets) : null;
+  const lines = sets.map((s, i) => {
+    const w = Number(s.weight) || 0, r = Number(s.reps) || 0;
+    const label = `<span class="recap-weight">Set ${i + 1}:</span> ${formatKg(w)} kg × ${r}`;
+    if (!prev) return recapLine('', '', label);
+    const p = prev[i];
+    if (!p) return recapLine('', '', `${label} <span class="recap-muted">(geen vorige set)</span>`);
+    const pw = Number(p.weight) || 0, pr = Number(p.reps) || 0;
+    const dw = Math.round((w - pw) * 100) / 100, dr = r - pr;
+    const reps = n => `${n} ${n === 1 ? 'rep' : 'reps'}`;
+    const marks = [];
+    if (dw > 0) marks.push(`<span class="recap-up">↑ +${formatKg(dw)} kg</span>`);
+    if (dw < 0) marks.push(`<span class="recap-down">↓ -${formatKg(-dw)} kg</span>`);
+    if (dr > 0) marks.push(`<span class="recap-up">↑ +${reps(dr)}</span>`);
+    if (dr < 0) marks.push(`<span class="recap-down">↓ -${reps(-dr)}</span>`);
+    if (marks.length === 0) marks.push('<span class="recap-muted">(gelijk)</span>');
+    return recapLine('', '', `${label} ${marks.join(' ')} <span class="recap-prev">(vorige: ${formatKg(pw)}×${pr})</span>`);
+  });
+  if (!prev) lines.push(recapLine('recap-muted', '', 'Eerste keer deze oefening — geen vergelijking'));
+  return lines.join('');
 }
 
 function openDayRecap() {
@@ -4212,7 +4228,7 @@ function openDayRecap() {
       <div class="recap-ex">
         <div class="recap-ex-name">${ex.name}</div>
         ${ex.target ? recapSetsLine(ex) : ''}
-        ${recapWeightLine(ex, date)}
+        ${recapSetLines(ex, date)}
       </div>`).join('');
   }
   openOverlay('recap-overlay');
