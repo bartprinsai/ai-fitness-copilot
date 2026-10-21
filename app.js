@@ -889,6 +889,7 @@ function getPRSetKeys(exerciseName) {
 }
 
 function renderHome() {
+  renderSmartBanner();
   document.getElementById('day-nav-label').textContent = formatDateStr(currentDate, 'long');
   const exercises = getWorkout(currentDate);
   const container = document.getElementById('home-content');
@@ -3799,8 +3800,7 @@ function renderMenuUserBar() {
 function openFitnessTracker() {
   currentDate = todayStr();
   bannerDismissed = false;
-  renderSmartBanner();
-  renderHome();
+  renderHome(); // also (re)renders the smart day banner
   showScreen('screen-fitness-tracker');
 }
 
@@ -5598,12 +5598,15 @@ async function addExerciseToPlanDay(name, setsReps) {
 }
 
 // ── Smart Day Banner ──────────────────────────────────
+// Re-checked on every renderHome(), so it follows today's workout however it got
+// filled (manual add, Load Schedule Manually/Automatically, the banner itself):
+// shown only while TODAY's workout (todayStr(), not the viewed day) is still empty.
 function renderSmartBanner() {
   const banner = document.getElementById('smart-day-banner');
   if (!banner) return;
   const pick = getTodaysScheduledDay();
   bannerSuggestedPick = pick;
-  if (bannerDismissed || !pick) { banner.classList.add('hidden'); return; }
+  if (bannerDismissed || !pick || getWorkout(todayStr()).length > 0) { banner.classList.add('hidden'); return; }
   document.getElementById('smart-banner-msg').textContent = `Based on your plan, today is ${pick.dayName}. Load it?`;
   banner.classList.remove('hidden');
 }
