@@ -30,7 +30,7 @@ Stijl-inspiratie: **FitNotes** (Android app) — lichtgrijze achtergrond, cyaan 
 | `--color-ai-coach-glow` | `rgba(34,197,94,0.35)` | Zachte groene gloed-schaduw rond de AI Coach-pil (`box-shadow`). |
 | `--color-manual-accent` | `var(--blue)` | Accentkleur voor "Manual Workout" op het New Workout-scherm — nu een alias van `--blue` (zelfde kleur, zie hierboven). |
 | `--color-schema-manual-accent` | `#a855f7` | Accentkleur voor "Load Schedule Manually" op het New Workout-scherm — paars, nieuw. |
-| `--color-plan-ai-accent` | `#7C4DFF` | Paars van de Workout Plan Builder (ook de accentkleur van zijn kaart op het hoofdmenu). Binnen de Plan Builder alleen nog voor "Genereren met AI": de tegel op Trainingsplannen, de Generate Plan-knop en de laadspinner. |
+| `--color-plan-ai-accent` | `#7C4DFF` | Paars van de Workout Plan Builder (ook de accentkleur van zijn kaart op het hoofdmenu). Binnen de Plan Builder alleen nog op het (momenteel onbereikbare) AI genereren-scherm: de Generate Plan-knop en de laadspinner. De "Genereren met AI"-tegel op Trainingsplannen is verwijderd; het scherm en `openAIGenerate()` staan nog in de code om later terug te kunnen koppelen. |
 | `--card-radius` | `12px` | Hoekradius van witte content-kaarten op `--bg` (New Workout-kaarten en elke Plan Builder-kaart). |
 | `--card-shadow` | `0 1px 3px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.08)` | Schaduw van diezelfde kaarten. |
 

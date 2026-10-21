@@ -573,8 +573,6 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 .plan-create-btn svg { width: 22px; height: 22px; fill: var(--text-secondary); }
 #btn-plan-make-own svg { fill: var(--blue); }
 #btn-plan-presets svg { fill: var(--green); }
-.plan-create-ai-btn { color: var(--color-plan-ai-accent); }
-.plan-create-ai-btn svg { fill: var(--color-plan-ai-accent); }
 
 /* Typography comes from the shared .info-section-label; this only positions it. */
 .plan-list-label { padding: 6px 16px 4px; flex-shrink: 0; }
