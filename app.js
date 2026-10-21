@@ -1861,7 +1861,7 @@ function getTrackFieldsSnapshot() {
     rpe: document.getElementById('field-rpe').value,
     extra: document.getElementById('field-extra').value,
     extraType: getExtraType(),
-    dropset: document.getElementById('field-dropset').checked,
+    dropset: getDropsetField(),
   };
 }
 let trackFieldsBaseline = { weight: '0', reps: '0', rpe: '0', extra: '0', extraType: '', dropset: false };
@@ -1894,12 +1894,12 @@ function setRpeField(v) { document.getElementById('field-rpe').value = v ? forma
 // and lowering RPE below 10 again clears the extra reps.
 const EXTRA_MAX = 20;
 function getExtraReps() { return Math.min(EXTRA_MAX, parseWholeNumber(document.getElementById('field-extra').value)); }
-function getExtraType() { const b = document.querySelector('.extra-type-btn.active'); return b ? b.dataset.type : ''; }
+function getExtraType() { const b = document.querySelector('#extra-type .extra-type-btn.active'); return b ? b.dataset.type : ''; }
 // Type toggle follows the amount: disabled + nothing selected at 0, otherwise one
 // of Partial/Forced is selected (Partial unless the user already picked Forced).
 function syncExtraType(n, type) {
   const on = n > 0, sel = on ? (type || 'partial') : '';
-  document.querySelectorAll('.extra-type-btn').forEach(b => {
+  document.querySelectorAll('#extra-type .extra-type-btn').forEach(b => {
     b.disabled = !on;
     b.classList.toggle('active', on && b.dataset.type === sel);
   });
@@ -1965,7 +1965,14 @@ function dropsetEligible() {
   const n = ex ? ex.sets.length : 0;
   return selectedSetIndex !== null ? selectedSetIndex > 0 : n > 0;
 }
-function setDropsetField(on) { document.getElementById('field-dropset').checked = !!on; }
+// Dropset is a toggle button under RPE (same .extra-type-btn look as Partial/Forced: on = .active);
+// it's never disabled, only hidden when there's no previous set to hang on to.
+function getDropsetField() { return document.getElementById('dropset-toggle').classList.contains('active'); }
+function setDropsetField(on) {
+  const b = document.getElementById('dropset-toggle');
+  b.classList.toggle('active', !!on);
+  b.setAttribute('aria-pressed', on ? 'true' : 'false');
+}
 function updateDropsetToggle() {
   const ok = dropsetEligible();
   document.getElementById('dropset-toggle').classList.toggle('hidden', !ok);
@@ -2497,7 +2504,7 @@ function saveSet() {
   if (!ex) { ex = { name: currentExercise, sets: [] }; workout.push(ex); }
 
   // Link to the previous set only when there is one (new set: any saved set today; edited set: not the first).
-  const dropset = document.getElementById('field-dropset').checked && (selectedSetIndex !== null ? selectedSetIndex > 0 : ex.sets.length > 0);
+  const dropset = getDropsetField() && (selectedSetIndex !== null ? selectedSetIndex > 0 : ex.sets.length > 0);
   let savedMsg, savedIdx;
   if (selectedSetIndex !== null) {
     const existingNote = ex.sets[selectedSetIndex] && ex.sets[selectedSetIndex].note;
@@ -2623,6 +2630,16 @@ Object.entries(FIELD_DECIMALS).forEach(([id, decimals]) => {
   let before = null;
   input.addEventListener('beforeinput', () => { before = { value: input.value, start: input.selectionStart, end: input.selectionEnd }; });
   input.addEventListener('input', e => {
+    // Pasting into a whole-number field: everything from the first comma/point on is
+    // dropped, so "8,5" becomes "8" (not "85").
+    if (decimals === 0 && before && /^insertFrom/.test(e.inputType || '')) {
+      const head = before.value.slice(0, before.start), tail = before.value.slice(before.end);
+      const pasted = input.value.slice(head.length, input.value.length - tail.length).split(/[.,]/)[0];
+      input.value = restrictNumber(head + pasted + tail, 0);
+      const caret = restrictNumber(head + pasted, 0).length;
+      input.setSelectionRange(caret, caret);
+      return;
+    }
     const clean = restrictNumber(input.value, decimals);
     if (clean === input.value) return;
     if (e.inputType === 'insertText' && before && restrictNumber(before.value, decimals) === before.value) {
@@ -2647,9 +2664,10 @@ document.getElementById('field-extra').addEventListener('change', e => { e.targe
 document.getElementById('field-rpe').addEventListener('change', e => { setRpeField(parseRpe(e.target.value)); reconcileExtraWithRpe(); });
 document.getElementById('field-weight').addEventListener('change', e => { e.target.value = formatWeight(parseWeight(e.target.value)); });
 document.getElementById('field-reps').addEventListener('change', e => { e.target.value = parseWholeNumber(e.target.value); });
-document.querySelectorAll('.extra-type-btn').forEach(b => b.addEventListener('click', () => {
+document.querySelectorAll('#extra-type .extra-type-btn').forEach(b => b.addEventListener('click', () => {
   if (getExtraReps() > 0) syncExtraType(getExtraReps(), b.dataset.type);
 }));
+document.getElementById('dropset-toggle').addEventListener('click', () => setDropsetField(!getDropsetField()));
 
 // -- Tabs -----------------------------------------------
 function switchTab(tab) {
