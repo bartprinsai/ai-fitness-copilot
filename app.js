@@ -313,6 +313,16 @@ const SCREEN_HAS_CHANGES = {
   'screen-training': () => hasChanges(trackFieldsBaseline, getTrackFieldsSnapshot()),
 };
 
+// Screens with a temporary mode that the hardware back button closes first, before it
+// navigates away (two-stage back, see the popstate handler). `exit` is the same action
+// as the mode's own on-screen exit control.
+const SCREEN_TEMP_MODE = {
+  // Plan Detail's editable state — same as the header checkmark / first back-arrow tap.
+  'screen-plan-detail': { isActive: () => planDetailEditMode, exit: () => exitPlanDetailEditMode() },
+  // Fitness Tracker's long-press selection mode — same as the ✓ in its selection header.
+  'screen-fitness-tracker': { isActive: () => homeSelMode, exit: () => exitHomeSelMode() },
+};
+
 let historyInitialized = false;
 let inPopstateNavigation = false;
 
@@ -553,13 +563,13 @@ window.addEventListener('popstate', e => {
   // history entry the back press just consumed and show the same shared
   // discard confirmation on top of it, exactly like a nested overlay.
   const activeScreen = document.querySelector('.screen.active');
-  // Plan Detail's editable state: hardware back gets the same two-stage behavior as its
-  // in-app back arrow (see btn-back-plan-detail) — first press just closes the editable
-  // state and stays on this screen (consumed history entry restored, no navigation);
-  // only a second press, now out of edit mode, actually leaves the screen.
-  if (activeScreen && activeScreen.id === 'screen-plan-detail' && planDetailEditMode) {
+  // Two-stage back for screens with a temporary mode (see SCREEN_TEMP_MODE): the first
+  // press just leaves that mode and stays on this screen (consumed history entry
+  // restored, no navigation); only a second press, now out of it, leaves the screen.
+  const tempMode = activeScreen && SCREEN_TEMP_MODE[activeScreen.id];
+  if (tempMode && tempMode.isActive()) {
     restoreConsumedEntry();
-    exitPlanDetailEditMode();
+    tempMode.exit();
     return;
   }
   const guard = activeScreen && SCREEN_HAS_CHANGES[activeScreen.id];
