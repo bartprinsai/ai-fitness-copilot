@@ -2766,8 +2766,8 @@ function openHistoryGotoDaySets(dateStr, markReps, markVal, underOverlayId) {
     row.className = 'history-set-row' + (isMarked ? ' graph-goto-set-point' : '');
     row.innerHTML = `
       <span class="history-set-spacer"></span>
-      <span class="history-set-weight">${s.weight} kg</span>
-      <span class="history-set-reps">${s.reps} reps</span>
+      <span class="history-set-weight"><span class="history-set-val">${s.weight}</span><span class="history-set-unit">kgs</span></span>
+      <span class="history-set-reps"><span class="history-set-val">${s.reps}</span><span class="history-set-unit">reps</span></span>
     `;
     body.appendChild(row);
   });
@@ -3358,8 +3358,8 @@ function openWorkoutDetail(dateStr) {
       row.className = 'history-set-row';
       row.innerHTML = `
         ${isPR ? prTrophySvg('history-set-pr') : `<span class="history-set-spacer"></span>`}
-        <span class="history-set-weight">${s.weight} kg</span>
-        <span class="history-set-reps">${s.reps} reps</span>
+        <span class="history-set-weight"><span class="history-set-val">${s.weight}</span><span class="history-set-unit">kgs</span></span>
+        <span class="history-set-reps"><span class="history-set-val">${s.reps}</span><span class="history-set-unit">reps</span></span>
       `;
       exEl.appendChild(row);
     });
