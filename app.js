@@ -1823,7 +1823,7 @@ function renderExerciseItem(list, ex) {
   item.innerHTML = `
     <span class="exercise-item-name">${ex.name}</span>
     ${isPlanAddMode ? `
-    <button class="ex-add-btn${inPlanDay ? ' ex-add-btn-done' : ''}"${inPlanDay ? ' disabled' : ''}>${
+    <button class="btn btn-primary ex-add-btn${inPlanDay ? ' ex-add-btn-done' : ''}"${inPlanDay ? ' disabled' : ''}>${
       inPlanDay
         ? `<svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>Toegevoegd`
         : `Voeg toe`
@@ -1949,7 +1949,7 @@ function updateDropsetToggle() {
 function effortCellHtml(s) {
   const rpe = parseFloat(s.rpe) || 0;
   const extra = parseInt(s.extra) || 0;
-  const badge = rpe > 0 ? `<span class="set-rpe-badge">RPE ${formatRpe(rpe)}</span>` : '';
+  const badge = rpe > 0 ? `<span class="badge set-rpe-badge">RPE ${formatRpe(rpe)}</span>` : '';
   const extraLine = extra > 0 ? `<span class="set-effort-extra">+${extra} ${s.extraType === 'forced' ? 'forced' : 'partial'}</span>` : '';
   return `<span class="set-effort">${badge || extraLine ? badge + extraLine : '<span class="set-effort-none">—</span>'}</span>`;
 }
@@ -1997,7 +1997,7 @@ function renderSetList() {
   updateDropsetToggle();
 
   if (sets.length === 0) {
-    list.innerHTML = `<div style="padding:24px;text-align:center;color:#9e9e9e;font-size:14px">No sets yet. Enter weight and reps, then tap SAVE.</div>`;
+    list.innerHTML = `<div class="set-list-empty">No sets yet. Enter weight and reps, then tap SAVE.</div>`;
     return;
   }
 
@@ -2144,9 +2144,9 @@ function openRecordsHistory(reps) {
   const previous = steps.slice(0, -1).reverse(); // everything BEFORE the current record, newest first
   document.getElementById('records-history-title').textContent = recordsRepLabel(reps) + ' history';
   document.getElementById('records-history-body').innerHTML = `
-    <div class="info-section-label">Current record</div>
+    <div class="section-label">Current record</div>
     ${recordsStepRowHtml(cur.weight, cur.date, cur.sourceReps, cur.direct)}
-    <div class="info-section-label">${recordsRepLabel(reps)} previous records</div>
+    <div class="section-label">${recordsRepLabel(reps)} previous records</div>
     ${previous.length ? previous.map(st => recordsStepRowHtml(st.weight, st.date, st.sourceReps, st.direct)).join('') : '<div class="records-empty">No previous records</div>'}`;
   openOverlay('records-history-overlay');
 }
@@ -2270,7 +2270,7 @@ function renderExerciseInfoView() {
   document.getElementById('exercise-info-view-title').textContent = currentExercise + ' info';
   const sections = [];
   if (info.primaryMuscle || info.secondaryMuscle) {
-    sections.push(`<div class="info-section-label">Muscle group</div><div class="info-two-col">
+    sections.push(`<div class="section-label">Muscle group</div><div class="info-two-col">
       ${info.primaryMuscle ? `<div class="info-view-stat"><span class="info-view-stat-label">Primary</span><span class="info-view-stat-value">${info.primaryMuscle}</span></div>` : ''}
       ${info.secondaryMuscle ? `<div class="info-view-stat"><span class="info-view-stat-label">Secondary</span><span class="info-view-stat-value">${info.secondaryMuscle}</span></div>` : ''}
     </div>`);
@@ -2288,7 +2288,7 @@ function renderExerciseInfoView() {
     if (!equipmentFieldIsFilled(f, info)) return;
     equipHtml += `<div class="info-view-stat"><span class="info-view-stat-label">${f.label}</span><span class="info-view-stat-value">${equipmentFieldViewValue(f, info)}</span></div>`;
   });
-  if (equipHtml) sections.push('<div class="info-section-label">Equipment setup</div>' + equipHtml);
+  if (equipHtml) sections.push('<div class="section-label">Equipment setup</div>' + equipHtml);
   const content = document.getElementById('exercise-info-view-content');
   content.innerHTML = sections.length === 0
     ? `<div class="exercise-info-empty">No info added yet</div>`
@@ -2694,7 +2694,7 @@ function renderHistoryTab() {
 
     const headerDiv = document.createElement('div');
     headerDiv.className = 'history-day-header clickable';
-    headerDiv.innerHTML = `<div class="history-day-date">${formatDateStr(date, 'short')}</div><div class="history-day-divider"></div>`;
+    headerDiv.innerHTML = `<div class="section-label">${formatDateStr(date, 'short')}</div><div class="history-day-divider"></div>`;
     headerDiv.addEventListener('click', () => openHistoryGotoDate(date));
     container.appendChild(headerDiv);
 
@@ -3001,12 +3001,16 @@ function drawGraphChart() {
 
   ctx.clearRect(0, 0, W, H);
 
-  ctx.strokeStyle = '#e0e0e0'; ctx.lineWidth = 1;
+  const tok = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  // Token hex (#rrggbb) → rgba() with the given alpha, for the area fill under the line.
+  const hexAlpha = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; };
+  const primary = tok('--primary');
+  ctx.strokeStyle = tok('--border'); ctx.lineWidth = 1;
   for (let i = 0; i <= 4; i++) {
     const y = pad.top + (gH / 4) * i;
     ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + gW, y); ctx.stroke();
     const label = (maxV - (range / 4) * i).toFixed(1);
-    ctx.fillStyle = '#9e9e9e'; ctx.font = '11px Roboto'; ctx.textAlign = 'right';
+    ctx.fillStyle = tok('--text-muted'); ctx.font = '11px Roboto'; ctx.textAlign = 'right';
     ctx.fillText(label, pad.left - 4, y + 4);
   }
 
@@ -3017,8 +3021,8 @@ function drawGraphChart() {
   graphPlot = { pts };
 
   const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + gH);
-  grad.addColorStop(0, 'rgba(41,182,246,0.35)');
-  grad.addColorStop(1, 'rgba(41,182,246,0.02)');
+  grad.addColorStop(0, hexAlpha(primary, 0.35));
+  grad.addColorStop(1, hexAlpha(primary, 0.02));
   ctx.beginPath();
   pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
   ctx.lineTo(pts[pts.length - 1].x, pad.top + gH);
@@ -3027,20 +3031,20 @@ function drawGraphChart() {
   ctx.fillStyle = grad;
   ctx.fill();
 
-  ctx.strokeStyle = '#29b6f6'; ctx.lineWidth = 2.5;
+  ctx.strokeStyle = primary; ctx.lineWidth = 2.5;
   ctx.lineJoin = 'round'; ctx.lineCap = 'round';
   ctx.beginPath();
   pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
   ctx.stroke();
 
   // Direct points: blue dot. Derived ("via") points: the PR gold with a white edge.
-  const gold = getComputedStyle(document.documentElement).getPropertyValue('--toast-pr').trim() || '#d4a017';
+  const gold = tok('--pr-gold');
   pts.forEach((p, i) => {
     if (data[i].derived) {
-      ctx.fillStyle = gold; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+      ctx.fillStyle = gold; ctx.strokeStyle = tok('--surface'); ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     } else {
-      ctx.fillStyle = '#29b6f6';
+      ctx.fillStyle = primary;
       ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill();
     }
   });
@@ -3048,12 +3052,12 @@ function drawGraphChart() {
   // Selected point: green ring around its (still blue / gold) dot.
   const sel = pts[graphSelected];
   if (sel) {
-    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--green').trim() || '#4CAF50';
+    ctx.strokeStyle = tok('--success');
     ctx.lineWidth = 3;
     ctx.beginPath(); ctx.arc(sel.x, sel.y, 9, 0, Math.PI * 2); ctx.stroke();
   }
 
-  ctx.fillStyle = '#9e9e9e'; ctx.font = '11px Roboto';
+  ctx.fillStyle = tok('--text-muted'); ctx.font = '11px Roboto';
   const dateLabel = d => new Date(d.date + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short' });
   if (data.length === 1) {
     ctx.textAlign = 'center';
@@ -3144,7 +3148,7 @@ function calBuildMonthEl(year, month) {
 
   const label = new Date(year, month, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
   const hdr = document.createElement('div');
-  hdr.className = 'cal-month-header';
+  hdr.className = 'section-label';
   hdr.textContent = label;
   wrap.appendChild(hdr);
 
@@ -4725,7 +4729,7 @@ function buildPlanItem(plan, { withMenu }) {
     <div class="plan-item-info">
       <div class="plan-item-name">${plan.name}</div>
       <div class="plan-item-meta">${dayCount} dag${dayCount !== 1 ? 'en' : ''}</div>
-      ${isActive ? '<div class="plan-item-active-pill">★ ACTIEF</div>' : ''}
+      ${isActive ? '<div class="badge badge-primary plan-item-active-pill">★ ACTIEF</div>' : ''}
     </div>
     ${withMenu ? '<button class="plan-item-dots" aria-label="Options"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button>' : ''}
   `;
@@ -4827,7 +4831,7 @@ function planDaySegments(days) {
 
 function buildPlanDayGroupLabel(group) {
   const label = document.createElement('div');
-  label.className = 'info-section-label plan-day-group-label';
+  label.className = 'section-label plan-day-group-label';
   label.textContent = group === 'A' ? 'WEEK A' : 'WEEK B';
   return label;
 }
