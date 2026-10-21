@@ -493,8 +493,13 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
    from behind the header and back up. The top offset is the toolbar's own height (toolbar-height + safe-top),
    so the banner sits below the status bar/notch inset instead of behind it. */
 .toast { position: fixed; top: calc(var(--toolbar-height) + var(--safe-top)); left: 0; right: 0; overflow: hidden; pointer-events: none; z-index: var(--z-toast); }
-.toast-msg { padding: 3px 16px; display: flex; align-items: center; justify-content: center; text-align: center; background: var(--toast-success); color: #fff; font-size: 15px; font-weight: 700; line-height: 1.3; transform: translateY(-100%); transition: transform .22s ease; }
-.toast.show .toast-msg { transform: translateY(0); }
+.toast-msg { padding: 3px 16px; display: flex; align-items: center; justify-content: center; text-align: center; background: var(--toast-success); color: #fff; font-size: 15px; font-weight: 700; line-height: 1.3; transform: translateY(-100%); visibility: hidden; transition: transform .22s ease, visibility 0s linear .22s; }
+/* The bar's height is fractional (15px × 1.3 line-height + padding), so on a phone's
+   non-integer devicePixelRatio translateY(-100%) rounds to a position that leaves the
+   bottom 1–2 device pixels inside .toast's clip: a thin colored line under the toolbar
+   after every toast (i.e. after most popup Save/Delete actions). Hiding the bar once
+   its slide-out has finished removes it regardless of rounding. */
+.toast.show .toast-msg { transform: translateY(0); visibility: visible; transition: transform .22s ease, visibility 0s; }
 .toast.toast-error .toast-msg { background: var(--toast-error); }
 .toast.toast-pr .toast-msg { background: var(--toast-pr); }
 #screen-login { background: var(--toolbar); justify-content: center; }
