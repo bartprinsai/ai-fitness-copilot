@@ -1069,15 +1069,15 @@
 <!-- DELETE EXERCISE OVERLAY -->
 <div class="overlay" id="delete-exercise-overlay">
   <div class="overlay-panel">
-    <h3 class="delete-ex-title">Delete Exercise</h3>
+    <h3 class="delete-ex-title">Oefening verwijderen?</h3>
     <p id="delete-ex-msg" class="cat-delete-msg"></p>
     <label class="delete-ex-check-row">
       <input type="checkbox" id="delete-ex-confirm-check"/>
-      <span>I understand that this action cannot be undone.</span>
+      <span>Ik begrijp dat dit niet ongedaan kan worden gemaakt.</span>
     </label>
     <div class="overlay-btns">
-      <button class="btn-secondary" id="btn-delete-ex-cancel">Cancel</button>
-      <button class="btn-danger" id="btn-delete-ex-confirm" disabled>Delete</button>
+      <button class="btn-secondary" id="btn-delete-ex-cancel">Annuleren</button>
+      <button class="btn-danger" id="btn-delete-ex-confirm" disabled>Verwijderen</button>
     </div>
   </div>
 </div>
@@ -1085,11 +1085,11 @@
 <!-- CATEGORY DELETE OVERLAY -->
 <div class="overlay" id="cat-delete-overlay">
   <div class="overlay-panel">
-    <h3>Delete Category</h3>
+    <h3>Categorie verwijderen?</h3>
     <p id="cat-delete-msg" class="cat-delete-msg"></p>
     <div class="overlay-btns">
-      <button class="btn-secondary" id="btn-cat-delete-cancel">Cancel</button>
-      <button class="btn-danger" id="btn-cat-delete-confirm">Delete</button>
+      <button class="btn-secondary" id="btn-cat-delete-cancel">Annuleren</button>
+      <button class="btn-danger" id="btn-cat-delete-confirm">Verwijderen</button>
     </div>
   </div>
 </div>
@@ -1097,16 +1097,16 @@
 <!-- RESET TO DEFAULT OVERLAY -->
 <div class="overlay" id="reset-overlay">
   <div class="overlay-panel">
-    <h3>Reset to default?</h3>
-    <p class="cat-delete-msg">This permanently deletes <strong>all data</strong> for this account — workout history, exercises you added or removed, workout plans, and settings — and resets the app to its original state. This cannot be undone.</p>
-    <p class="cat-delete-msg">Type <strong>RESET</strong> below to confirm.</p>
-    <input type="text" id="reset-confirm-input" placeholder="Type RESET" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"/>
+    <h3>Terugzetten naar standaard?</h3>
+    <p class="cat-delete-msg">Dit verwijdert permanent <strong>alle gegevens</strong> van dit account — trainingsgeschiedenis, oefeningen die je hebt toegevoegd of verwijderd, trainingsplannen en instellingen — en zet de app terug naar de oorspronkelijke staat. Dit kan niet ongedaan worden gemaakt.</p>
+    <p class="cat-delete-msg">Typ hieronder <strong>RESET</strong> om te bevestigen.</p>
+    <input type="text" id="reset-confirm-input" placeholder="Typ RESET" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"/>
     <p class="reset-error hidden" id="reset-error"></p>
     <div class="overlay-btns">
-      <button class="btn-secondary" id="btn-reset-cancel">Cancel</button>
+      <button class="btn-secondary" id="btn-reset-cancel">Annuleren</button>
       <button class="btn-danger" id="btn-reset-confirm" disabled>
         <span class="reset-btn-spinner hidden" id="reset-btn-spinner"></span>
-        <span id="reset-confirm-label">Reset</span>
+        <span id="reset-confirm-label">Resetten</span>
       </button>
     </div>
   </div>

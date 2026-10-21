@@ -748,7 +748,7 @@ function setResetBusy(busy) {
   document.getElementById('btn-reset-cancel').disabled = busy;
   document.getElementById('btn-reset-confirm').disabled = busy || document.getElementById('reset-confirm-input').value !== 'RESET';
   document.getElementById('reset-btn-spinner').classList.toggle('hidden', !busy);
-  document.getElementById('reset-confirm-label').textContent = busy ? 'Resetting...' : 'Reset';
+  document.getElementById('reset-confirm-label').textContent = busy ? 'Bezig met resetten...' : 'Resetten';
 }
 
 function showResetError(msg) {
@@ -766,7 +766,7 @@ document.getElementById('btn-reset-cancel').addEventListener('click', () => {
 document.getElementById('btn-reset-confirm').addEventListener('click', async () => {
   if (resetInProgress) return;
   if (document.getElementById('reset-confirm-input').value !== 'RESET') return;
-  if (!currentUser) { showResetError('You are not signed in.'); return; }
+  if (!currentUser) { showResetError('Je bent niet ingelogd.'); return; }
 
   const uid = currentUser.uid;
   const userPrefix = `users/${uid}/`;
@@ -817,7 +817,7 @@ document.getElementById('btn-reset-confirm').addEventListener('click', async () 
     openFitnessTracker();
   } catch (err) {
     console.error('[Reset] failed:', err);
-    showResetError((err && err.message) ? err.message : 'Reset failed. Please check your connection and try again.');
+    showResetError((err && err.message) ? err.message : 'Resetten mislukt. Controleer je verbinding en probeer het opnieuw.');
   } finally {
     setResetBusy(false);
   }
@@ -1382,10 +1382,12 @@ function deleteCategory(cat) {
   pendingDeleteCategory = cat;
   const total = allExercises().filter(e => e.category === cat).length;
   const custom = (db.custom_exercises || []).filter(e => e.category === cat).length;
-  let msg = `Delete "${cat}"`;
+  let msg = `"${cat}"`;
   if (total > 0) {
-    msg += ` and its ${total} exercise${total !== 1 ? 's' : ''}?`;
-    if (total > custom) msg += ` (${total - custom} built-in exercise${total - custom !== 1 ? 's' : ''} cannot be deleted)`;
+    msg += ` en de ${total} oefening${total !== 1 ? 'en' : ''} erin verwijderen?`;
+    if (total > custom) msg += ` (${total - custom} ingebouwde oefening${total - custom !== 1 ? 'en kunnen' : ' kan'} niet worden verwijderd)`;
+  } else {
+    msg += ' verwijderen?';
   }
   document.getElementById('cat-delete-msg').textContent = msg;
   openOverlay('cat-delete-overlay');
@@ -3214,7 +3216,7 @@ function openDeleteExerciseConfirm(ex) {
   pendingDeleteExercise = ex;
   const workoutCount = Object.values(db.workouts).filter(exercises => exercises.some(e => e.name === ex.name)).length;
   document.getElementById('delete-ex-msg').innerHTML =
-    `Are you sure you want to delete <strong>${ex.name}</strong>? <strong>${workoutCount} workout${workoutCount !== 1 ? 's' : ''}</strong> recorded for this exercise will also be permanently deleted.`;
+    `Weet je zeker dat je <strong>${ex.name}</strong> wilt verwijderen? De <strong>${workoutCount} workout${workoutCount !== 1 ? 's' : ''}</strong> die voor deze oefening zijn vastgelegd, worden ook permanent verwijderd.`;
   document.getElementById('delete-ex-confirm-check').checked = false;
   document.getElementById('btn-delete-ex-confirm').disabled = true;
   openOverlay('delete-exercise-overlay');
