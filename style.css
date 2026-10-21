@@ -373,10 +373,11 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 
 /* Effort cell (RPE text + optional "+N partial/forced" line, or "—"), last column of every set row.
    Selectors are nested under .set-effort so they also beat the generic ".set-row span" rule.
-   RPE is plain text, never a .badge: same type and box as the former badge (so nothing moves),
-   but no background, so it looks the same on --bg (TRACK) and --surface (cards, popups). */
+   RPE is plain text, never a .badge: no background, so it looks the same on --bg (TRACK) and
+   --surface (cards, popups). No horizontal padding, so RPE, the "+N partial/forced" line and "—"
+   all end on exactly the same x; the 2px vertical padding of the former badge stays (row height). */
 .set-effort { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 2px; text-align: right; }
-.set-effort .set-rpe { display: inline-flex; align-items: center; padding: 2px var(--space-2); font-size: var(--fs-small); font-weight: var(--fw-medium); color: var(--text-secondary); white-space: nowrap; }
+.set-effort .set-rpe { display: inline-flex; align-items: center; padding: 2px 0; font-size: var(--fs-small); font-weight: var(--fw-medium); color: var(--text-secondary); white-space: nowrap; }
 .set-effort .set-effort-extra { font-size: var(--fs-small); font-weight: var(--fw-regular); color: var(--text-muted); white-space: nowrap; }
 .set-effort .set-effort-none { font-size: var(--fs-small); font-weight: var(--fw-regular); color: var(--text-muted); }
 
