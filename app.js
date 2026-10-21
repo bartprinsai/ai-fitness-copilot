@@ -1284,10 +1284,12 @@ function openNewWorkoutScreen() {
 //   - "Geen vaste dagen": sequential — the day after the last loaded one
 //     (db.activePlan.lastDayIndex), wrapping around.
 //   - "Vaste dagen in de week": the day for today's weekday, whatever was loaded
-//     before (so a break never builds up a backlog). With a Week A/B split, the
-//     week alternates from the last loaded day's week (db.activePlan.lastGroup):
-//     A -> B, B -> A, never loaded -> A. A day loaded earlier TODAY keeps its own
-//     week, so the suggestion doesn't flip to the other week right after loading.
+//     before (so a break never builds up a backlog).
+//   - "Vaste dagen" with a Week A/B split: today's weekday within the ACTIVE week
+//     (planWeekCycle), unless that day was already done this cycle. The active
+//     week only switches once all of its days are done (markScheduledDayLoaded).
+// A split plan's day loaded earlier TODAY stays the suggestion for the rest of the
+// day, so finishing a week doesn't make it suggest the other week's day right away.
 function getTodaysScheduledDay() {
   if (!db.activePlan) return null;
   const plan = db.plans[db.activePlan.planId];
@@ -1298,8 +1300,15 @@ function getTodaysScheduledDay() {
     dayIndex = (lastIdx + 1) % plan.days.length;
   } else {
     const weekday = (new Date().getDay() + 6) % 7; // 0 = Maandag, like WEEKDAY_FULL_NAMES
-    const week = planHasWeekSplit(plan) ? todaysPlanWeek(plan) : null;
-    dayIndex = plan.days.findIndex(d => inferDayWeekday(d) === weekday && (!week || d.group === week));
+    if (!planHasWeekSplit(plan)) {
+      dayIndex = plan.days.findIndex(d => inferDayWeekday(d) === weekday);
+    } else if (db.activePlan.lastDate === todayStr() && plan.days[db.activePlan.lastDayIndex]) {
+      dayIndex = db.activePlan.lastDayIndex;
+    } else {
+      const { week, done } = planWeekCycle(plan);
+      dayIndex = done.includes(weekday) ? -1
+        : plan.days.findIndex(d => d.group === week && inferDayWeekday(d) === weekday);
+    }
     if (dayIndex < 0) return null;
   }
   const day = plan.days[dayIndex];
@@ -1311,27 +1320,53 @@ function planHasWeekSplit(plan) {
   return !!(plan.hasWeekB || (plan.days || []).some(d => d.group === 'B'));
 }
 
-// 'A' or 'B' for a split fixed-days plan, from the last day loaded via the
-// automatic suggestion. Older active-plan records only have lastDayIndex, so the
-// week is read from that day as a fallback.
-function todaysPlanWeek(plan) {
+// The weekdays (0 = Maandag) that `week` ('A'/'B') of a split plan trains on.
+function planWeekWeekdays(plan, week) {
+  return plan.days.filter(d => d.group === week).map(inferDayWeekday).filter(w => w !== undefined);
+}
+
+// A split fixed-days plan's current cycle: { week: 'A' | 'B', done: [weekdays] } —
+// the active week and which of its days were already loaded this cycle. Stored on
+// db.activePlan as activeWeek/doneWeekdays (by weekday, not day index, so editing
+// the plan's days doesn't shift it). Never loaded: Week A, nothing done. Records
+// from before this existed only know the last loaded day (lastDayIndex, maybe
+// lastGroup): its week becomes active with that day done, and if that already
+// completes the week, the next one starts. A week without days is skipped.
+function planWeekCycle(plan) {
   const a = db.activePlan;
-  const lastDay = a.lastDayIndex >= 0 ? plan.days[a.lastDayIndex] : null;
-  const lastWeek = a.lastGroup || (lastDay && lastDay.group);
-  if (!lastWeek) return 'A';
-  if (a.lastDate === todayStr()) return lastWeek;
-  return lastWeek === 'A' ? 'B' : 'A';
+  let week = a.activeWeek;
+  let done = Array.isArray(a.doneWeekdays) ? a.doneWeekdays : [];
+  if (week !== 'A' && week !== 'B') {
+    const lastDay = a.lastDayIndex >= 0 ? plan.days[a.lastDayIndex] : null;
+    week = a.lastGroup || (lastDay && lastDay.group) || 'A';
+    const w = lastDay && lastDay.group === week ? inferDayWeekday(lastDay) : undefined;
+    done = w !== undefined ? [w] : [];
+    if (planWeekWeekdays(plan, week).every(d => done.includes(d))) { week = week === 'A' ? 'B' : 'A'; done = []; }
+  }
+  if (planWeekWeekdays(plan, week).length === 0) { week = week === 'A' ? 'B' : 'A'; done = []; }
+  return { week, done };
 }
 
 // Records a suggested day as loaded (banner "Yes, load it" / Automatically "Laden"):
-// what getTodaysScheduledDay() bases the next suggestion on.
+// what getTodaysScheduledDay() bases the next suggestion on. For a split fixed-days
+// plan it's also marked done in the active week; once every day of that week is
+// done, the other week becomes active with a fresh (empty) done list.
 function markScheduledDayLoaded(pick) {
-  db.activePlan.lastDayIndex = pick.dayIndex;
-  db.activePlan.lastDate = todayStr();
-  if (pick.day.group) db.activePlan.lastGroup = pick.day.group;
-  else delete db.activePlan.lastGroup;
+  const a = db.activePlan;
+  const plan = pick.plan;
+  if (plan.fixedDays && planHasWeekSplit(plan) && a.lastDate !== todayStr()) {
+    let { week, done } = planWeekCycle(plan);
+    const w = inferDayWeekday(pick.day);
+    if (pick.day.group === week && w !== undefined && !done.includes(w)) done = [...done, w];
+    if (planWeekWeekdays(plan, week).every(d => done.includes(d))) { week = week === 'A' ? 'B' : 'A'; done = []; }
+    a.activeWeek = week;
+    a.doneWeekdays = done;
+  }
+  a.lastDayIndex = pick.dayIndex;
+  a.lastDate = todayStr();
+  delete a.lastGroup; // superseded by activeWeek/doneWeekdays
   bannerDismissed = true;
-  return persistActivePlan(db.activePlan);
+  return persistActivePlan(a);
 }
 
 function renderNewWorkoutScreen() {
