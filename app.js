@@ -869,7 +869,8 @@ document.getElementById('btn-reset-confirm').addEventListener('click', async () 
 // this exercise (any date — an earlier OR later set can beat it) matches or beats it
 // on BOTH weight and reps. So 100x5 loses its trophy once 100x6 exists, 120x5 loses
 // it to 240x5, while 100x5 and 120x3 keep one each (neither beats the other on both).
-// Dropset sets take part like any other set. Sets need >= 1 rep and > 0 kg.
+// Dropsets never count (countsForRecords): a dropset can't be a PR and doesn't take one
+// away from a normal set. Sets need >= 1 rep and > 0 kg.
 // Identical sets: only the first one logged keeps the trophy (equalling is not a PR).
 //
 // Efficient by construction (no set-vs-set comparison): per exact rep count keep the
@@ -882,7 +883,9 @@ function getPRSetKeys(exerciseName) {
   Object.keys(db.workouts).sort().forEach(date => {
     const ex = (db.workouts[date] || []).find(e => e.name === exerciseName);
     if (!ex) return;
-    (ex.sets || []).forEach((s, i) => {
+    const sets = ex.sets || [];
+    sets.forEach((s, i) => {
+      if (!countsForRecords(sets, i)) return;
       const reps = parseInt(s.reps) || 0;
       const weight = parseFloat(s.weight) || 0;
       if (reps < 1 || weight <= 0) return;
@@ -1912,13 +1915,17 @@ function resetEffortFields() { setRpeField(0); setExtraField(0, ''); setDropsetF
 // be a continuation. Shared by the TRACK list, the day overview and History.
 const DROP_ARROW_SVG = '<svg class="drop-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10"/><path d="M17 8v9H8"/></svg>';
 function isDropChild(sets, i) { return i > 0 && !!sets[i].isDropsetContinuation; }
+// The one rule for PRs, records and progression (trophies, PR toast, Records screen,
+// Recap PR block, Graph): a dropset (the .drop-child row) never counts. The heavy set
+// it follows is a normal set and counts as usual. Dropsets stay visible in every list.
+function countsForRecords(sets, i) { return !isDropChild(sets, i); }
 // -- Shared set row ----------------------------------------
 // ONE row for every list of logged sets — TRACK list, day overview, History, Calendar
 // day popup, Graph "Go to" popup — with fixed columns (style.css .set-row):
-//   comment · PR trophy · set number · dropset arrow · weight · reps · RPE/partial
+//   comment · PR trophy / dropset arrow · set number · weight · reps · RPE/partial
 // Every cell is always rendered (empty when there's nothing to show), so the columns
-// land on the same x positions in every list. The dropset arrow has its own column,
-// so it never moves the weight.
+// land on the same x positions in every list. The dropset arrow uses the trophy
+// column: a dropset can never be a PR (countsForRecords), so they never meet.
 //   comment: 'always' = icon on every row (TRACK: tap to add a note),
 //            'note'   = icon only on a set that has a note, 'none' = never (popups)
 function setRowInnerHtml(sets, i, { comment = 'note', commentLabel = 'Set comment', isPR = false } = {}) {
@@ -1927,9 +1934,8 @@ function setRowInnerHtml(sets, i, { comment = 'note', commentLabel = 'Set commen
   const showIcon = comment === 'always' || hasNote;
   return `
       <span class="set-comment${hasNote ? ' has-note' : ''}"${comment === 'none' ? '' : ` aria-label="${commentLabel}"`}>${showIcon ? COMMENT_ICON_SVG : ''}</span>
-      <span class="set-pr">${isPR ? prTrophySvg('set-pr-icon') : ''}</span>
+      <span class="set-pr">${isPR ? prTrophySvg('set-pr-icon') : isDropChild(sets, i) ? DROP_ARROW_SVG : ''}</span>
       <span class="set-num">${i + 1}</span>
-      <span class="set-drop">${isDropChild(sets, i) ? DROP_ARROW_SVG : ''}</span>
       <span class="set-weight"><span class="set-val">${s.weight}</span><span class="set-unit">kgs</span></span>
       <span class="set-reps"><span class="set-val">${s.reps}</span><span class="set-unit">reps</span></span>
       ${effortCellHtml(s)}`;
@@ -2071,14 +2077,16 @@ function saveSetNote() {
 // always been there.
 function recordsRepLabel(n) { return n === 1 ? 'One Rep Max' : n + 'RM'; }
 
-// Every valid set (>= 1 rep, > 0 kg) of an exercise in workout-date order: by day,
-// then by position within the day.
+// Every valid set (>= 1 rep, > 0 kg, not a dropset) of an exercise in workout-date
+// order: by day, then by position within the day.
 function getExerciseValidSets(name) {
   const out = [];
   Object.keys(db.workouts).sort().forEach(date => {
     const ex = (db.workouts[date] || []).find(e => e.name === name);
     if (!ex) return;
-    (ex.sets || []).forEach((s, i) => {
+    const sets = ex.sets || [];
+    sets.forEach((s, i) => {
+      if (!countsForRecords(sets, i)) return;
       const reps = parseInt(s.reps) || 0;
       const weight = parseFloat(s.weight) || 0;
       if (reps >= 1 && weight > 0) out.push({ date, i, reps, weight });
@@ -2771,7 +2779,7 @@ function openHistoryGotoDaySets(dateStr, markReps, markVal, underOverlayId) {
   body.appendChild(nameEl);
   const sets = (ex && ex.sets) || [];
   sets.forEach((s, i) => {
-    const isMarked = parseInt(s.reps) === markReps && (parseFloat(s.weight) || 0) === markVal;
+    const isMarked = countsForRecords(sets, i) && parseInt(s.reps) === markReps && (parseFloat(s.weight) || 0) === markVal;
     const row = document.createElement('div');
     row.className = setRowClass(sets, i) + (isMarked ? ' graph-goto-set-point' : '');
     row.innerHTML = setRowInnerHtml(sets, i, { comment: 'none' });
@@ -2816,6 +2824,7 @@ const graphRepsByExercise = {}; // last explicit choice per exercise (this sessi
 function graphRepsLabel(n) { return n === 1 ? 'One Rep Max' : String(n); }
 
 // Per rep count: in how many sessions (dates) it was logged; plus the highest rep count ever.
+// Dropsets don't count (countsForRecords), like everywhere records/progression are derived.
 function getExerciseRepStats(name) {
   const sessions = {};
   let highest = 0;
@@ -2823,7 +2832,9 @@ function getExerciseRepStats(name) {
     const ex = (db.workouts[date] || []).find(e => e.name === name);
     if (!ex) return;
     const seen = new Set();
-    (ex.sets || []).forEach(s => {
+    const sets = ex.sets || [];
+    sets.forEach((s, i) => {
+      if (!countsForRecords(sets, i)) return;
       const r = parseInt(s.reps) || 0;
       if (r < 1) return;
       seen.add(r);
@@ -2930,14 +2941,15 @@ let graphPlot = null;
 const GRAPH_TAP_RADIUS = 28; // px around a point that counts as a tap on it (finger-sized)
 
 // Per session (date, ascending), the heaviest weight actually logged for exactly
-// `reps` reps. A session without such a set gets no entry — never an estimate.
+// `reps` reps, dropsets excluded. A session without such a set gets no entry — never an estimate.
 // Shared by the Graph tab and the Personal Records overlay.
 function getExerciseRepSeries(name, reps) {
   if (!(reps >= 1)) return [];
   return Object.keys(db.workouts).sort().reduce((acc, date) => {
     const ex = db.workouts[date] && db.workouts[date].find(e => e.name === name);
     if (!ex) return acc;
-    const weights = (ex.sets || []).filter(s => parseInt(s.reps) === reps).map(s => parseFloat(s.weight) || 0);
+    const sets = ex.sets || [];
+    const weights = sets.filter((s, i) => countsForRecords(sets, i) && parseInt(s.reps) === reps).map(s => parseFloat(s.weight) || 0);
     if (weights.length === 0) return acc;
     acc.push({ date, val: Math.max(...weights) });
     return acc;
@@ -4230,7 +4242,7 @@ function workingSetGroups(sets) {
 
 // One block per working set of the day, each compared with the set at the SAME
 // position in the most recent earlier session (Set 1 vs Set 1, ...):
-//   "Set N" (+ the trophy when it — or one of its dropsets — is a PR)
+//   "Set N" (+ the trophy when it is a PR — its dropsets never are)
 //   weight × reps, with weight and reps judged separately
 //   RPE, judged on its own (higher = felt heavier, so red)
 //   what that set was last time

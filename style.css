@@ -327,17 +327,17 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    ONE row component for every list of logged sets — TRACK list, day overview, History,
    Calendar day popup and Graph "Go to" popup — built by setRowInnerHtml() in app.js.
    One fixed grid, every cell always rendered (empty when unused), left to right:
-     comment · PR trophy · set number · dropset arrow · weight · reps · RPE/partial/"—"
-   Columns: 28px · 20px · 24px · 16px · flexible · 56px · 72px. The dropset arrow has its own
-   column (always reserved). The weight is a fixed 76px block (just fits "132.5 kgs") placed
-   --space-1 after the arrow column, at the start of the flexible column — so any extra width
+     comment · PR trophy or dropset arrow · set number · weight · reps · RPE/partial/"—"
+   Columns: 28px · 20px · 24px · flexible · 56px · 72px. The dropset arrow sits in the trophy
+   column (a dropset is never a PR, so they never share a row). The weight is a fixed 76px block
+   (just fits "132.5 kgs") placed --space-1 after the set number, at the start of the flexible column — so any extra width
    ends up between weight and reps. Inside the block, reps and the effort cell, everything is
    right-aligned, so "kgs" ends on the same x in every row.
    Content edge: 24px from the screen edge in every list (--screen-gutter + --space-2).
    Rows inside a card (day overview, History) or a bottom sheet (popups) already sit one
    gutter in, so they pad by --space-2; the TRACK list runs edge to edge and pads by the
    sum. That puts every column on the same x on every screen. */
-.set-row { display: grid; grid-template-columns: 28px var(--icon-list) 24px 16px minmax(0, 1fr) 56px 72px; align-items: center; padding: var(--space-3) var(--space-2); border-bottom: 1px solid transparent; }
+.set-row { display: grid; grid-template-columns: 28px var(--icon-list) 24px minmax(0, 1fr) 56px 72px; align-items: center; padding: var(--space-3) var(--space-2); border-bottom: 1px solid transparent; }
 #set-list .set-row { padding-left: calc(var(--screen-gutter) + var(--space-2)); padding-right: calc(var(--screen-gutter) + var(--space-2)); cursor: pointer; transition: background 0.08s; }
 /* Zebra striping: every second set of a list is tinted — the transparent 1px bottom border keeps
    the row height. Listed BEFORE the pressed/selected/marked states so those win. */
@@ -366,11 +366,10 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .set-weight { justify-self: start; width: 76px; margin-left: var(--space-1); }
 .set-val { font-size: var(--fs-number); font-weight: var(--fw-bold); color: var(--text); }
 .set-unit { font-size: var(--fs-small); font-weight: var(--fw-regular); color: var(--text-secondary); }
-/* Dropset (a set flagged isDropsetContinuation hangs under the previous set): the arrow sits in its
-   own column right after the set number, so the weight keeps its right-aligned x, straight under
-   the parent set's weight, and nothing else in the row moves. Same type level as every set value. */
-.set-drop { display: flex; align-items: center; justify-content: center; }
-.set-drop .drop-arrow { align-self: center; width: 16px; height: 16px; flex-shrink: 0; fill: none; stroke: var(--primary); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* Dropset (a set flagged isDropsetContinuation hangs under the previous set): the arrow sits in the
+   trophy column, at the trophy's size — the weight keeps its right-aligned x, straight under the
+   parent set's weight, and nothing else in the row moves. Same type level as every set value. */
+.set-pr .drop-arrow { width: var(--icon-list); height: var(--icon-list); flex-shrink: 0; fill: none; stroke: var(--primary); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 /* Effort cell (RPE badge + optional "+N partial/forced" line, or "—"), last column of every set row.
    Selectors are nested under .set-effort so they also beat the generic ".set-row span" rule. */
