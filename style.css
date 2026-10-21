@@ -229,6 +229,8 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .toolbar-btn:active { background: var(--toolbar-pressed); }
 .toolbar-btn svg { width: var(--icon-toolbar); height: var(--icon-toolbar); fill: var(--on-toolbar); }
 .toolbar-btn svg.icon-outline { fill: none; stroke: var(--on-toolbar); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+/* Theme toggle (main menu): moon in light theme (tap → dark), sun in dark theme (tap → light). */
+:root[data-theme="dark"] .theme-icon-moon, :root:not([data-theme="dark"]) .theme-icon-sun { display: none; }
 
 /* Secondary bars attached under the toolbar (day nav, Training tabs, calendar footer) */
 .day-nav { display: flex; align-items: center; background: var(--toolbar); padding: 0 var(--space-1); height: var(--control-height); flex-shrink: 0; border-bottom: 2px solid var(--primary); }

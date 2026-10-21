@@ -7,7 +7,7 @@ Dit bestand documenteert de visuele stijl zoals die daadwerkelijk in `style.css`
 ## Harde regels
 
 1. **Alle waardes komen uit `:root`.** Buiten `:root` en `:root[data-theme="dark"]` staat er in `style.css` geen enkele kleur-literal (geen hex, geen `rgb()`), en in `index.html`/`app.js` staan geen inline kleuren of `style="…"`-opmaak. Afgeleide tinten (bv. `--danger-light`) worden in `:root` met `color-mix()` uit de basiskleuren berekend, zodat het donkere thema ze automatisch volgt.
-   - Bewuste uitzondering: `<meta name="theme-color">` in `index.html` en `manifest.json` (Android-statusbalk/PWA-splash). Die kunnen geen CSS-variabele lezen. De meta-waarde is gelijk aan `--toolbar` (`#212121`).
+   - Bewuste uitzondering: `<meta name="theme-color">`, het kleine thema-script bovenin `<head>` en `manifest.json` (Android-statusbalk/PWA-splash). Die draaien vóór `style.css` of kunnen geen CSS-variabele lezen; ze gebruiken de `--toolbar`-waarde per thema (`#212121` licht, `#1E1E1E` donker). Manifest: `theme_color` `#212121`, `background_color` `#f2f2f2` (= `--bg` licht).
    - De grafiek (`<canvas>` in de Graph-tab) leest zijn kleuren tijdens het tekenen uit de tokens (`getComputedStyle(…).getPropertyValue('--primary')` enz.).
 2. **Nieuwe schermen gebruiken uitsluitend deze tokens en basisklassen** (`.toolbar`, `.btn`, `.pill`, `.badge`, `.card`/`.nav-card`, `.section-label`, de gedeelde input-stijl, de choice-controls). Geen eigen hex-waardes, geen eigen knopklasse met eigen kleuren/hoogte/radius.
 3. **Geen font-weight 600.** Alleen 400 / 500 / 700 (dat zijn ook de enige geladen Roboto-gewichten).
@@ -59,7 +59,11 @@ Overschrijft alleen de basispalet-tokens. Alle overige kleuren (primary, success
 | `--border` | `#333333` |
 | `--primary-light` | `#0B3A52` |
 
-Standaard is licht. De schakelaar zelf bestaat nog niet; `document.documentElement.dataset.theme = 'dark'` zet het hele UI om.
+**Wisselen en onthouden:**
+- Schakelaar: icoonknop `#btn-theme-toggle` rechts in de toolbar van het hoofdmenu (alleen daar). Licht thema toont een maan (tik → donker), donker thema een zon (tik → licht); welke van de twee SVG's zichtbaar is regelt CSS op `data-theme`, het aria-label zet `applyTheme()`.
+- Startwaarde: een inline script bovenin `<head>` (vóór de CSS en de splash) zet `data-theme` op `<html>`: de opgeslagen keuze (`localStorage` sleutel `theme`, `light`/`dark`), anders `prefers-color-scheme` van de telefoon. Zo verschijnt de app (ook splash en login) nooit eerst in het verkeerde thema.
+- Zonder opgeslagen keuze volgt de app ook live een wijziging van de systeeminstelling; na één tik telt alleen nog de opgeslagen keuze.
+- `applyTheme(theme)` (app.js) zet `data-theme`, werkt `<meta name="theme-color">` bij naar `--toolbar` van het actieve thema, en tekent de grafiek opnieuw als die in beeld is (canvas leest zijn kleuren alleen tijdens het tekenen). Al het andere volgt via de CSS-variabelen vanzelf, zonder herladen.
 
 ## Typografie
 

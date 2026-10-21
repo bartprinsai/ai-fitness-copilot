@@ -3862,6 +3862,34 @@ document.getElementById('menu-card-calculator').addEventListener('click', () => 
 document.getElementById('menu-card-nutrition').addEventListener('click', () => showScreen('screen-nutrition'));
 document.getElementById('menu-card-insight').addEventListener('click', () => showScreen('screen-insight'));
 
+// -- Theme (light/dark) ---------------------------------
+// The inline script at the top of <head> already set data-theme before first
+// paint (saved choice, else the phone's setting); this keeps everything in sync
+// when it changes. Once the user has tapped the toggle, only the saved choice counts.
+const THEME_KEY = 'theme';
+const systemDarkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+function savedTheme() {
+  try { const t = localStorage.getItem(THEME_KEY); return t === 'light' || t === 'dark' ? t : null; } catch (e) { return null; }
+}
+function currentTheme() { return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'; }
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  // Android status bar follows the active theme's toolbar color.
+  document.querySelector('meta[name="theme-color"]').content =
+    getComputedStyle(document.documentElement).getPropertyValue('--toolbar').trim();
+  document.getElementById('btn-theme-toggle').setAttribute('aria-label', theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme');
+  // The canvas chart reads its colors from the tokens only while drawing, so redraw it if it's on screen.
+  if (graphPlot && document.getElementById('tab-graph').offsetParent) drawGraphChart();
+}
+document.getElementById('btn-theme-toggle').addEventListener('click', () => {
+  const next = currentTheme() === 'dark' ? 'light' : 'dark';
+  try { localStorage.setItem(THEME_KEY, next); } catch (e) {}
+  applyTheme(next);
+});
+// No saved choice yet: keep following the phone's setting if it changes while the app is open.
+systemDarkQuery.addEventListener('change', e => { if (!savedTheme()) applyTheme(e.matches ? 'dark' : 'light'); });
+applyTheme(currentTheme());
+
 document.getElementById('btn-home-from-tracker').addEventListener('click', () => goBack('screen-home'));
 document.getElementById('btn-back-workout-plan').addEventListener('click', () => goBack('screen-home'));
 document.getElementById('btn-back-nutrition').addEventListener('click', () => goBack('screen-home'));

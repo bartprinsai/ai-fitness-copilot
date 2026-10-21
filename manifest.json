@@ -5,8 +5,8 @@
   "start_url": "/ai-fitness-copilot/",
   "scope": "/ai-fitness-copilot/",
   "display": "standalone",
-  "background_color": "#0a1628",
-  "theme_color": "#0a1628",
+  "background_color": "#f2f2f2",
+  "theme_color": "#212121",
   "orientation": "portrait",
   "icons": [
     {
