@@ -269,6 +269,10 @@ let pendingPdeDeleteIndex = null;
 // directly; only committed to the exercise on Opslaan).
 let pdeSrMode = 'uniform';
 let pdeSrPerSetReps = [];
+// Name of the exercise being added via screen-exercises' Voeg toe (plan-add mode)
+// while #pde-sets-reps-overlay is open in its "<name> toevoegen" variant; null when
+// the popup is instead editing an existing exercise (pendingPdeSetsRepsIndex).
+let pendingPdeSrAddName = null;
 
 // -- Screen Navigation ------------------------------------
 // Central place that both switches the visible .screen AND keeps the
@@ -1447,7 +1451,7 @@ function renderExerciseItem(list, ex) {
   if (isPlanAddMode && !inPlanDay) {
     item.querySelector('.ex-add-btn').addEventListener('click', e => {
       e.stopPropagation();
-      addExerciseToPlanDay(ex.name);
+      openPdeSrAdd(ex.name);
     });
   }
   item.querySelector('.exercise-item-dots').addEventListener('click', e => {
@@ -4714,6 +4718,21 @@ function openPdeSetsRepsEdit(exIdx) {
   const ex = currentPlanData.days[currentEditDayIndex].exercises[exIdx];
   if (!ex) return;
   pendingPdeSetsRepsIndex = exIdx;
+  pendingPdeSrAddName = null;
+  openPdeSrPopup(ex, 'Sets & reps aanpassen', 'Opslaan');
+}
+
+// Same popup, opened from screen-exercises' Voeg toe (plan-add mode): nothing is
+// written to the plan day until Toevoegen — see btn-pde-sr-save.
+function openPdeSrAdd(name) {
+  pendingPdeSetsRepsIndex = null;
+  pendingPdeSrAddName = name;
+  openPdeSrPopup({ sets: 3, reps: 10 }, `${name} toevoegen`, 'Toevoegen');
+}
+
+function openPdeSrPopup(ex, title, saveLabel) {
+  document.getElementById('pde-sr-title').textContent = title;
+  document.getElementById('btn-pde-sr-save').textContent = saveLabel;
   if (Array.isArray(ex.repsPerSet) && ex.repsPerSet.length > 0) {
     pdeSrMode = 'persets';
     pdeSrPerSetReps = [...ex.repsPerSet];
@@ -4780,24 +4799,41 @@ document.getElementById('pde-sr-add-set').addEventListener('click', () => {
   renderPdeSrSetList();
 });
 
+// The popup's current values as {sets, reps} or {repsPerSet: [...]}, or null if
+// they're not valid (no positive numbers).
+function readPdeSrValues() {
+  if (pdeSrMode === 'persets') {
+    const reps = pdeSrPerSetReps.filter(r => r > 0);
+    return reps.length > 0 ? { repsPerSet: reps } : null;
+  }
+  const sets = parseInt(document.getElementById('pde-sr-sets').value, 10);
+  const reps = parseInt(document.getElementById('pde-sr-reps').value, 10);
+  return sets > 0 && reps > 0 ? { sets, reps } : null;
+}
+
 document.getElementById('btn-pde-sr-cancel').addEventListener('click', () => {
   pendingPdeSetsRepsIndex = null;
+  pendingPdeSrAddName = null;
   closeOverlay('pde-sets-reps-overlay');
 });
 document.getElementById('btn-pde-sr-save').addEventListener('click', async () => {
+  if (pendingPdeSrAddName !== null) {
+    const values = readPdeSrValues();
+    if (!values) { toast('Vul geldige sets en reps in'); return; }
+    const name = pendingPdeSrAddName;
+    pendingPdeSrAddName = null;
+    closeOverlay('pde-sets-reps-overlay');
+    await addExerciseToPlanDay(name, values);
+    return;
+  }
   if (pendingPdeSetsRepsIndex === null) return;
   const day = currentPlanData.days[currentEditDayIndex];
   const ex = day.exercises[pendingPdeSetsRepsIndex];
   if (!ex) { closeOverlay('pde-sets-reps-overlay'); return; }
   const before = JSON.stringify({ sets: ex.sets, reps: ex.reps, repsPerSet: ex.repsPerSet });
-  if (pdeSrMode === 'persets') {
-    const reps = pdeSrPerSetReps.filter(r => r > 0);
-    if (reps.length > 0) { ex.repsPerSet = reps; delete ex.sets; delete ex.reps; }
-  } else {
-    const sets = parseInt(document.getElementById('pde-sr-sets').value, 10);
-    const reps = parseInt(document.getElementById('pde-sr-reps').value, 10);
-    if (sets > 0 && reps > 0) { ex.sets = sets; ex.reps = reps; delete ex.repsPerSet; }
-  }
+  const values = readPdeSrValues();
+  if (values && values.repsPerSet) { ex.repsPerSet = values.repsPerSet; delete ex.sets; delete ex.reps; }
+  else if (values) { ex.sets = values.sets; ex.reps = values.reps; delete ex.repsPerSet; }
   const changed = JSON.stringify({ sets: ex.sets, reps: ex.reps, repsPerSet: ex.repsPerSet }) !== before;
   pendingPdeSetsRepsIndex = null;
   closeOverlay('pde-sets-reps-overlay');
@@ -5159,12 +5195,14 @@ function planDayHasExercise(name) {
   return !!(day && (day.exercises || []).some(e => e.name === name));
 }
 
-async function addExerciseToPlanDay(name) {
+// `setsReps` is what the "<name> toevoegen" popup produced (see readPdeSrValues):
+// either {sets, reps} or {repsPerSet: [...]}.
+async function addExerciseToPlanDay(name, setsReps) {
   const day = currentPlanData && currentPlanData.days[currentEditDayIndex];
   if (!day) return;
   if (!day.exercises) day.exercises = [];
   if (day.exercises.some(e => e.name === name)) return;
-  day.exercises.push({ name, sets: 3, reps: 10 });
+  day.exercises.push({ name, ...setsReps });
   await persistPlan(currentPlanId, currentPlanData);
   refreshExerciseList();
 }
