@@ -813,7 +813,7 @@ document.getElementById('btn-reset-confirm').addEventListener('click', async () 
     currentPlanData = null;
 
     closeOverlay('reset-overlay');
-    toast('Reset complete');
+    toast('Reset voltooid');
     openFitnessTracker();
   } catch (err) {
     console.error('[Reset] failed:', err);
@@ -1077,7 +1077,7 @@ function deleteHomeSelectedEx() {
   setWorkout(currentDate, newExercises);
   exitHomeSelMode();
   renderHome();
-  toast(n === 1 ? 'Exercise removed' : `${n} exercises removed`);
+  toast(n === 1 ? 'Oefening verwijderd' : `${n} oefeningen verwijderd`);
 }
 
 // Shared "follow the finger" swap loop for the app's three long-press/handle
@@ -1421,7 +1421,7 @@ document.getElementById('btn-cat-delete-confirm').addEventListener('click', () =
   closeOverlay('cat-delete-overlay');
   pendingDeleteCategory = null;
   renderCategoryBrowser();
-  toast('Category deleted');
+  toast('Categorie verwijderd');
 });
 
 function renderExercisesInCategory(cat) {
@@ -1693,7 +1693,7 @@ function saveSetNote() {
   noteEditIndex = null;
   closeOverlay('set-note-overlay');
   renderSetList();
-  toast(note ? 'Comment saved' : 'Comment deleted');
+  toast(note ? 'Comment saved' : 'Comment verwijderd');
 }
 
 // Personal Records: 1..12 reps, or up to the highest rep count ever logged for
@@ -2182,7 +2182,7 @@ function deleteSet(i) {
   if (selectedSetIndex === i) clearFields();
   renderSetList();
   renderHome();
-  toast('Set deleted');
+  toast('Set verwijderd');
 }
 
 // -- Field +/- Buttons ---------------------------------
@@ -3252,7 +3252,7 @@ document.getElementById('btn-delete-ex-confirm').addEventListener('click', () =>
   closeOverlay('delete-exercise-overlay');
   refreshExerciseList();
   renderHome();
-  toast('Exercise deleted');
+  toast('Oefening verwijderd');
 });
 
 document.getElementById('btn-new-ex-back').addEventListener('click', () => goBack('screen-exercises', () => hasChanges(newExerciseBaseline, getNewExerciseFormSnapshot())));
@@ -3436,7 +3436,7 @@ document.getElementById('btn-comment-delete').addEventListener('click', () => {
   const doDelete = () => {
     if (ctx) ctx.onDelete();
     closeOverlay('comment-overlay');
-    toast('Comment deleted');
+    toast('Comment verwijderd');
   };
   // Nothing saved yet (popup opened straight into edit mode): nothing to lose, just close.
   const saved = ctx && ctx.getText();
@@ -3452,7 +3452,7 @@ document.getElementById('btn-comment-save').addEventListener('click', () => {
   if (commentPopupCtx) commentPopupCtx.onSave(val);
   closeOverlay('comment-overlay');
   // Saving an emptied comment removes it, same as Delete.
-  toast(val ? 'Comment saved' : 'Comment deleted');
+  toast(val ? 'Comment saved' : 'Comment verwijderd');
 });
 
 document.getElementById('exercise-search').addEventListener('input', e => {
