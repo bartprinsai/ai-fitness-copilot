@@ -1328,7 +1328,12 @@ function defaultExercisesTitle() {
 }
 
 // -- New Workout intermediate screen --------------------
+// The Tracker day New Workout was opened from: Load Schedule Manually loads into it
+// (Automatically and the banner always load into today instead).
+let newWorkoutDate = null;
+
 function openNewWorkoutScreen() {
+  newWorkoutDate = currentDate;
   renderNewWorkoutScreen();
   showScreen('screen-new-workout');
 }
@@ -1491,19 +1496,20 @@ function planDayHasExercises(day) {
   return !!(day && day.exercises && day.exercises.length > 0);
 }
 
-// After a schedule load from New Workout: back to TODAY's Fitness Tracker by
-// walking back through history (`steps` = entries above it: New Workout, the
-// pickers, an open popup), so the back button doesn't land on the pickers again.
-// The popstate handler's showScreen() re-renders the tracker for currentDate.
-function showTodayTrackerAfterLoad(steps) {
-  currentDate = todayStr();
+// After a schedule load from New Workout: back to the Fitness Tracker showing `date`
+// (the day it loaded into) by walking back through history (`steps` = entries above
+// it: New Workout, the pickers, an open popup), so the back button doesn't land on
+// the pickers again. The popstate handler's showScreen() re-renders the tracker for
+// currentDate.
+function showTrackerAfterLoad(date, steps) {
+  currentDate = date;
   history.go(-steps);
   toast('Workout geladen!');
 }
 
 // -- Load Schedule Manually: Kies een plan -> [Plan] — kies een dag ----------
 // Read-only views of the Plan Builder's plans; the only write is the chosen
-// day into today's workout.
+// day into the workout of the day New Workout was opened from (newWorkoutDate).
 let schedulePickPlanId = null;
 
 function openSchedulePickPlan() {
@@ -1572,8 +1578,10 @@ function loadPickedScheduleDay(idx) {
   const plan = db.plans[schedulePickPlanId];
   const day = plan && plan.days[idx];
   if (!planDayHasExercises(day)) { toast('Deze dag heeft geen oefeningen', { type: 'error' }); return; }
-  loadPlanDayIntoWorkout(day, todayStr());
-  showTodayTrackerAfterLoad(3); // day picker, plan picker, New Workout
+  // Into the day the Tracker was showing when New Workout opened — not forced to today.
+  const date = newWorkoutDate || currentDate;
+  loadPlanDayIntoWorkout(day, date);
+  showTrackerAfterLoad(date, 3); // day picker, plan picker, New Workout
 }
 
 // -- Load Schedule Automatically ------------------------------------------
@@ -1617,7 +1625,7 @@ document.getElementById('btn-schedule-load-confirm').addEventListener('click', a
   // dead back press behind — see the calendar detail's "go to day").
   overlayStack.pop();
   document.getElementById('schedule-load-overlay').classList.remove('open');
-  showTodayTrackerAfterLoad(2);
+  showTrackerAfterLoad(todayStr(), 2); // always today, whatever day the Tracker was showing
 });
 
 function openExerciseList() {
