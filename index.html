@@ -307,18 +307,18 @@
   </div>
   <div class="new-ex-scroll">
     <div class="new-ex-section">
-      <div class="field-label">NAME</div>
+      <div class="section-label">NAME</div>
       <input type="text" id="new-ex-name" class="new-ex-input" placeholder="Exercise name" autocomplete="off" autocorrect="off"/>
     </div>
     <div class="new-ex-section">
-      <div class="field-label">CATEGORY</div>
+      <div class="section-label">CATEGORY</div>
       <div class="new-ex-field-row">
         <button type="button" class="new-ex-select new-ex-select-btn" id="new-ex-category"></button>
         <button class="new-ex-add-cat-btn" id="btn-new-ex-add-cat" aria-label="New category">+</button>
       </div>
     </div>
     <div class="new-ex-section">
-      <div class="field-label">TYPE</div>
+      <div class="section-label">TYPE</div>
       <button type="button" class="new-ex-select new-ex-select-btn" id="new-ex-type"></button>
     </div>
     <div class="new-ex-section">
@@ -374,7 +374,7 @@
     <div class="set-fields">
       <div class="field-row-pair">
         <div class="field-group">
-          <label class="field-label">GEWICHT <span class="label-unit">(kgs)</span></label>
+          <label class="section-label">GEWICHT <span class="label-unit">(kgs)</span></label>
           <div class="field-controls">
             <button class="field-btn" data-field="weight" data-dir="-">−</button>
             <input type="text" id="field-weight" inputmode="decimal" value="0" autocomplete="off"/>
@@ -382,7 +382,7 @@
           </div>
         </div>
         <div class="field-group">
-          <label class="field-label">REPS</label>
+          <label class="section-label">REPS</label>
           <div class="field-controls">
             <button class="field-btn" data-field="reps" data-dir="-">−</button>
             <input type="text" id="field-reps" inputmode="numeric" value="0" autocomplete="off"/>
@@ -392,7 +392,7 @@
       </div>
       <div class="field-row-pair">
         <div class="field-group field-group-rpe">
-          <label class="field-label">RPE</label>
+          <label class="section-label">RPE</label>
           <div class="field-controls">
             <button class="field-btn" data-field="rpe" data-dir="-">−</button>
             <input type="text" id="field-rpe" inputmode="decimal" value="0" autocomplete="off"/>
@@ -403,7 +403,7 @@
           </div>
         </div>
         <div class="field-group field-group-rpe field-group-extra">
-          <label class="field-label">EXTRA REPS</label>
+          <label class="section-label">EXTRA REPS</label>
           <div class="field-controls">
             <button class="field-btn" data-field="extra" data-dir="-">−</button>
             <input type="text" id="field-extra" inputmode="numeric" value="0" autocomplete="off"/>
@@ -436,7 +436,7 @@
       <button class="time-filter active" data-range="all">all</button>
     </div>
     <div class="graph-reps-field">
-      <label class="field-label" for="graph-reps">Reps</label>
+      <label class="info-field-label" for="graph-reps">Reps</label>
       <div class="graph-reps-row">
         <button type="button" class="new-ex-select new-ex-select-btn" id="graph-reps"></button>
         <label class="graph-derived-check" id="graph-derived-toggle">
@@ -628,7 +628,7 @@
       </div>
     </div>
     <div class="ai-gen-section">
-      <div class="field-label">Preference (optional)</div>
+      <div class="section-label">Preference (optional)</div>
       <textarea id="ai-gen-pref" class="ai-gen-textarea" placeholder="E.g. Focus on chest and back, no leg press..."></textarea>
     </div>
     <button class="btn btn-ai btn-block" id="btn-ai-generate-submit">
@@ -678,11 +678,11 @@
     </div>
     <div class="pde-sr-row" id="pde-sr-uniform-fields">
       <div class="pde-sr-field">
-        <label class="field-label" for="pde-sr-sets">Sets</label>
+        <label class="section-label" for="pde-sr-sets">Sets</label>
         <input type="number" id="pde-sr-sets" inputmode="numeric" min="1"/>
       </div>
       <div class="pde-sr-field">
-        <label class="field-label" for="pde-sr-reps">Reps</label>
+        <label class="section-label" for="pde-sr-reps">Reps</label>
         <input type="number" id="pde-sr-reps" inputmode="numeric" min="1"/>
       </div>
     </div>
@@ -772,7 +772,7 @@
   </div>
   <div class="plate-calc-scroll">
     <div class="plate-section">
-      <div class="field-label">Doelgewicht (kg)</div>
+      <div class="section-label">Doelgewicht (kg)</div>
       <input type="text" inputmode="decimal" id="plate-target-weight" class="plate-target-input" placeholder="bijv. 100" autocomplete="off"/>
     </div>
     <div class="plate-section">
@@ -836,11 +836,11 @@
   </div>
   <div class="plate-calc-scroll">
     <div class="plate-section">
-      <div class="field-label">Gewicht (kg)</div>
+      <div class="section-label">Gewicht (kg)</div>
       <input type="text" inputmode="decimal" id="orm-weight" class="plate-target-input" placeholder="bijv. 100" autocomplete="off"/>
     </div>
     <div class="plate-section">
-      <div class="field-label">Herhalingen</div>
+      <div class="section-label">Herhalingen</div>
       <input type="text" inputmode="numeric" id="orm-reps" class="plate-target-input" placeholder="bijv. 5" autocomplete="off"/>
       <div class="orm-hint">Werkt het meest nauwkeurig bij 1-5 herhalingen.</div>
     </div>
@@ -887,7 +887,7 @@
       </div>
     </div>
     <div class="plate-section">
-      <div class="field-label">Werkgewicht (kg)</div>
+      <div class="section-label">Werkgewicht (kg)</div>
       <input type="text" inputmode="decimal" id="warmup-weight" class="plate-target-input" placeholder="bijv. 100" autocomplete="off"/>
     </div>
     <button type="button" class="btn btn-primary btn-block" id="btn-warmup-calculate">Bereken</button>
