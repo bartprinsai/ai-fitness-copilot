@@ -1287,7 +1287,8 @@ function openNewWorkoutScreen() {
 //     before (so a break never builds up a backlog).
 //   - "Vaste dagen" with a Week A/B split: today's weekday within the ACTIVE week
 //     (planWeekCycle), unless that day was already done this cycle. The active
-//     week only switches once all of its days are done (markScheduledDayLoaded).
+//     week switches once all of its days are done, or when a new calendar week
+//     begins — whichever comes first.
 // A split plan's day loaded earlier TODAY stays the suggestion for the rest of the
 // day, so finishing a week doesn't make it suggest the other week's day right away.
 function getTodaysScheduledDay() {
@@ -1325,42 +1326,71 @@ function planWeekWeekdays(plan, week) {
   return plan.days.filter(d => d.group === week).map(inferDayWeekday).filter(w => w !== undefined);
 }
 
-// A split fixed-days plan's current cycle: { week: 'A' | 'B', done: [weekdays] } —
-// the active week and which of its days were already loaded this cycle. Stored on
-// db.activePlan as activeWeek/doneWeekdays (by weekday, not day index, so editing
-// the plan's days doesn't shift it). Never loaded: Week A, nothing done. Records
-// from before this existed only know the last loaded day (lastDayIndex, maybe
-// lastGroup): its week becomes active with that day done, and if that already
-// completes the week, the next one starts. A week without days is skipped.
+// 'YYYY-MM-DD' of the Monday that starts dateStr's calendar week (Monday first,
+// like the calendar screen). `weeksLater` shifts it by whole weeks.
+function mondayOf(dateStr, weeksLater = 0) {
+  const d = new Date(dateStr + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() - (d.getUTCDay() + 6) % 7 + 7 * weeksLater);
+  return d.toISOString().split('T')[0];
+}
+
+// A split fixed-days plan's current cycle: { week: 'A' | 'B', done: [weekdays], since }
+// — the active week, which of its days were already loaded this cycle, and the
+// Monday of the calendar week it counts as started in. Stored on db.activePlan as
+// activeWeek/doneWeekdays/weekStart (days by weekday, not day index, so editing the
+// plan's days doesn't shift it). The week switches on whichever comes first:
+//   - all its days done (markScheduledDayLoaded) — the new week then counts as
+//     starting NEXT calendar week, so the Monday right after doesn't force it
+//     straight back (its days still get suggested for the rest of this week);
+//   - a later calendar week than `since` (checked here): forced, even with days
+//     still open, and the new week starts this calendar week.
+// Never loaded: Week A, nothing done, no start yet. Older records are derived from
+// the last loaded day (lastDayIndex, lastGroup, lastDate). A week without days is
+// skipped.
 function planWeekCycle(plan) {
   const a = db.activePlan;
+  const other = w => (w === 'A' ? 'B' : 'A');
+  const lastDay = a.lastDayIndex >= 0 ? plan.days[a.lastDayIndex] : null;
   let week = a.activeWeek;
   let done = Array.isArray(a.doneWeekdays) ? a.doneWeekdays : [];
+  let since = a.weekStart;
   if (week !== 'A' && week !== 'B') {
-    const lastDay = a.lastDayIndex >= 0 ? plan.days[a.lastDayIndex] : null;
     week = a.lastGroup || (lastDay && lastDay.group) || 'A';
     const w = lastDay && lastDay.group === week ? inferDayWeekday(lastDay) : undefined;
     done = w !== undefined ? [w] : [];
-    if (planWeekWeekdays(plan, week).every(d => done.includes(d))) { week = week === 'A' ? 'B' : 'A'; done = []; }
+    if (planWeekWeekdays(plan, week).every(d => done.includes(d))) { week = other(week); done = []; }
   }
-  if (planWeekWeekdays(plan, week).length === 0) { week = week === 'A' ? 'B' : 'A'; done = []; }
-  return { week, done };
+  // No weekStart yet: the last loaded day either belongs to the active week (started
+  // that calendar week) or completed the previous one (active week starts the next).
+  if (!since && a.lastDate) since = mondayOf(a.lastDate, lastDay && lastDay.group !== week ? 1 : 0);
+  const thisMonday = mondayOf(todayStr());
+  if (since && thisMonday > since) { week = other(week); done = []; since = thisMonday; }
+  if (planWeekWeekdays(plan, week).length === 0) { week = other(week); done = []; }
+  return { week, done, since };
 }
 
 // Records a suggested day as loaded (banner "Yes, load it" / Automatically "Laden"):
 // what getTodaysScheduledDay() bases the next suggestion on. For a split fixed-days
-// plan it's also marked done in the active week; once every day of that week is
-// done, the other week becomes active with a fresh (empty) done list.
+// plan it's also marked done in the active week (switches included, see
+// planWeekCycle); once every day of that week is done, the other week becomes
+// active with a fresh (empty) done list, counted from next calendar week.
 function markScheduledDayLoaded(pick) {
   const a = db.activePlan;
   const plan = pick.plan;
   if (plan.fixedDays && planHasWeekSplit(plan) && a.lastDate !== todayStr()) {
-    let { week, done } = planWeekCycle(plan);
+    let { week, done, since } = planWeekCycle(plan);
     const w = inferDayWeekday(pick.day);
     if (pick.day.group === week && w !== undefined && !done.includes(w)) done = [...done, w];
-    if (planWeekWeekdays(plan, week).every(d => done.includes(d))) { week = week === 'A' ? 'B' : 'A'; done = []; }
+    if (planWeekWeekdays(plan, week).every(d => done.includes(d))) {
+      week = week === 'A' ? 'B' : 'A';
+      done = [];
+      since = mondayOf(todayStr(), 1);
+    } else if (!since) {
+      since = mondayOf(todayStr());
+    }
     a.activeWeek = week;
     a.doneWeekdays = done;
+    a.weekStart = since;
   }
   a.lastDayIndex = pick.dayIndex;
   a.lastDate = todayStr();
