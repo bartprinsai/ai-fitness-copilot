@@ -877,3 +877,19 @@ html, body { height: 100%; background: var(--bg); font-family: 'Roboto', sans-se
 /* Warm-up Calculator */
 .warmup-ex-options { grid-template-columns: repeat(3, 1fr); }
 .warmup-line-work { font-weight: 700; }
+
+/* ── DAY RECAP POPUP ──────────────────────────────────── */
+.recap-body { max-height: 60vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.recap-ex { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.recap-ex:first-child { padding-top: 0; }
+.recap-ex:last-child { border-bottom: none; padding-bottom: 0; }
+.recap-ex-name { font-size: 15px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
+.recap-line { display: flex; align-items: baseline; gap: 6px; font-size: 13px; color: var(--text-secondary); line-height: 1.45; }
+.recap-icon { width: 14px; flex-shrink: 0; text-align: center; font-weight: 700; }
+.recap-weight { font-weight: 700; color: var(--text-primary); }
+.recap-ok, .recap-up { color: var(--green); }
+.recap-warn { color: #e69500; }
+.recap-more { color: var(--blue); }
+.recap-down { color: var(--toast-error); }
+.recap-muted { color: var(--text-hint); }
+.recap-empty { text-align: center; color: var(--text-hint); font-size: 14px; padding: 16px 0; }

@@ -3659,6 +3659,7 @@ const OVERLAY_CANCEL_BUTTON = {
   'discard-changes-overlay': 'btn-discard-changes-cancel',
   'confirm-delete-overlay': 'btn-confirm-delete-cancel',
   'schedule-load-overlay': 'btn-schedule-load-cancel',
+  'recap-overlay': 'btn-recap-close',
 };
 
 function openOverlay(id) {
@@ -3771,9 +3772,8 @@ document.getElementById('btn-set-note-save').addEventListener('click', saveSetNo
 document.getElementById('btn-global-ai-coach').addEventListener('click', () => {
   // TODO: link to the Chat Coach screen once it's built
 });
-document.getElementById('btn-day-recap').addEventListener('click', () => {
-  // TODO: recap-functionaliteit volgt later
-});
+document.getElementById('btn-day-recap').addEventListener('click', openDayRecap);
+document.getElementById('btn-recap-close').addEventListener('click', () => closeOverlay('recap-overlay'));
 document.getElementById('btn-day-comment').addEventListener('click', openSessionCommentPopup);
 document.getElementById('btn-comment-edit').addEventListener('click', () => showCommentEdit(commentPopupCtx.getText()));
 document.getElementById('btn-comment-done').addEventListener('click', () => closeOverlay('comment-overlay'));
@@ -4142,6 +4142,80 @@ function clampAllOnBarToAvailable() {
   let changed = false;
   PLATE_TYPES.forEach(p => { if (clampOnBarToAvailable(p.id)) changed = true; });
   if (changed) persistPlateOnBar();
+}
+
+// -- Day Recap popup (#recap-overlay, the Fitness Tracker's "Recap" pill) --------
+// Summarizes the VIEWED day (currentDate): per exercise, logged sets vs. the plan
+// target it was loaded with (only when it has one), and its heaviest weight vs. the
+// most recent earlier session of that exercise.
+const recapDayFormat = new Intl.DateTimeFormat('nl-NL', { timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'long' });
+
+function recapDayName(dateStr) {
+  const s = recapDayFormat.format(new Date(dateStr + 'T00:00:00Z'));
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// Sets as the user counts them: a dropset continuation belongs to the set before it.
+function countWorkingSets(sets) {
+  return sets.filter(s => !s.isDropsetContinuation).length;
+}
+
+function heaviestWeight(sets) {
+  return Math.max(...sets.map(s => Number(s.weight) || 0));
+}
+
+// The most recent session BEFORE `date` with logged sets of `name`, or null.
+function previousSessionSets(name, date) {
+  const prev = Object.keys(db.workouts).filter(d => d < date).sort().reverse()
+    .map(d => db.workouts[d].find(e => e.name === name))
+    .find(e => e && e.sets && e.sets.length > 0);
+  return prev ? prev.sets : null;
+}
+
+function recapLine(cls, icon, html) {
+  return `<div class="recap-line ${cls}"><span class="recap-icon">${icon}</span><span>${html}</span></div>`;
+}
+
+function recapSetsLine(ex) {
+  const planned = ex.target.repsPerSet ? ex.target.repsPerSet.length : ex.target.sets;
+  const done = countWorkingSets(ex.sets || []);
+  if (done === planned) return recapLine('recap-ok', '✓', `${done}/${planned} sets (volgens schema)`);
+  if (done < planned) return recapLine('recap-warn', '⚠', `${done}/${planned} sets (${planned - done} minder dan gepland)`);
+  return recapLine('recap-more', '+', `${done}/${planned} sets (${done - planned} meer dan gepland)`);
+}
+
+function recapWeightLine(ex, date) {
+  const sets = ex.sets || [];
+  if (sets.length === 0) return recapLine('recap-muted', '', 'Nog geen sets gelogd');
+  const prevSets = previousSessionSets(ex.name, date);
+  if (!prevSets) return recapLine('recap-muted', '', 'Eerste keer deze oefening — geen vergelijking');
+  const now = heaviestWeight(sets), before = heaviestWeight(prevSets);
+  const nowHtml = `<span class="recap-weight">${formatKg(now)} kg</span>`;
+  const diff = Math.round((now - before) * 100) / 100;
+  if (diff > 0) return recapLine('', '', `${nowHtml} <span class="recap-up">↑ +${formatKg(diff)} kg t.o.v. vorige keer (${formatKg(before)} kg)</span>`);
+  if (diff < 0) return recapLine('', '', `${nowHtml} <span class="recap-down">↓ -${formatKg(-diff)} kg t.o.v. vorige keer (${formatKg(before)} kg)</span>`);
+  return recapLine('', '', `${nowHtml} <span class="recap-muted">(gelijk aan vorige keer)</span>`);
+}
+
+function openDayRecap() {
+  const date = currentDate;
+  const exercises = getWorkout(date);
+  document.getElementById('recap-title').textContent = `Recap — ${recapDayName(date)}`;
+  const body = document.getElementById('recap-body');
+  // Exercises with logged sets, plus planned ones still at 0 sets (they count as
+  // "minder dan gepland"); nothing logged at all on this day -> empty state.
+  const shown = exercises.filter(ex => (ex.sets && ex.sets.length > 0) || ex.target);
+  if (!exercises.some(ex => ex.sets && ex.sets.length > 0)) {
+    body.innerHTML = `<div class="recap-empty">${date === todayStr() ? 'Nog niets gelogd vandaag.' : 'Nog niets gelogd op deze dag.'}</div>`;
+  } else {
+    body.innerHTML = shown.map(ex => `
+      <div class="recap-ex">
+        <div class="recap-ex-name">${ex.name}</div>
+        ${ex.target ? recapSetsLine(ex) : ''}
+        ${recapWeightLine(ex, date)}
+      </div>`).join('');
+  }
+  openOverlay('recap-overlay');
 }
 
 // Dutch-locale kg formatting: 2 decimals max, trailing zeros trimmed, comma separator.
