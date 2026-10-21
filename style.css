@@ -467,7 +467,9 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .chip, .time-filter, .ps-day-circle, .day-picker-circle { border-radius: var(--radius-pill); }
 .extra-type-btn:disabled { opacity: .45; cursor: default; }
 .extra-type { display: flex; gap: var(--space-2); margin-top: var(--space-2); }
-/* Dropset under RPE: one button on the Partial/Forced row, exactly one of those buttons wide. */
+/* Dropset under RPE: one button on the Partial/Forced row, exactly one of those buttons wide,
+   right-aligned so its right edge lines up with the RPE + button above it. */
+.extra-type-single { justify-content: flex-end; }
 .extra-type-single .extra-type-btn { flex: 0 0 calc((100% - var(--space-2)) / 2); }
 .extra-type-btn, .pde-sr-mode-btn { flex: 1; min-width: 0; height: 36px; font-size: var(--fs-small); }
 
