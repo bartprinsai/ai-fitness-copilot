@@ -229,7 +229,7 @@ let currentExercise = null;
 let currentPlanId = null;
 let currentPlanData = null;
 let bannerDismissed = false;
-let bannerSuggestedDayIndex = null;
+let bannerSuggestedPick = null; // the getTodaysScheduledDay() result the banner is showing
 let selectedSetIndex = null;
 let currentTimeRange = 'all';
 let calLoadedMonths = []; // ascending {year, month} entries currently rendered in the calendar scroller
@@ -1277,18 +1277,61 @@ function openNewWorkoutScreen() {
   showScreen('screen-new-workout');
 }
 
-// The active plan's day that's up today: db.activePlan.lastDayIndex -> next index
-// in plan.days, wrapping around. Shared by the smart day banner, this screen's
-// subtitle and "Load Schedule Automatically". null without an active plan, or
-// when that plan no longer exists or has no days.
+// The active plan's day that's up today — the ONE function the smart day banner,
+// this screen's subtitle and "Load Schedule Automatically" all ask, so they can't
+// disagree. Returns { plan, dayIndex, day, dayName } or null (no active plan, plan
+// gone or empty, or — fixed-days plans — no day for today's weekday).
+//   - "Geen vaste dagen": sequential — the day after the last loaded one
+//     (db.activePlan.lastDayIndex), wrapping around.
+//   - "Vaste dagen in de week": the day for today's weekday, whatever was loaded
+//     before (so a break never builds up a backlog). With a Week A/B split, the
+//     week alternates from the last loaded day's week (db.activePlan.lastGroup):
+//     A -> B, B -> A, never loaded -> A. A day loaded earlier TODAY keeps its own
+//     week, so the suggestion doesn't flip to the other week right after loading.
 function getTodaysScheduledDay() {
   if (!db.activePlan) return null;
   const plan = db.plans[db.activePlan.planId];
   if (!plan || !plan.days || plan.days.length === 0) return null;
-  const lastIdx = db.activePlan.lastDayIndex ?? -1;
-  const dayIndex = (lastIdx + 1) % plan.days.length;
+  let dayIndex;
+  if (!plan.fixedDays) {
+    const lastIdx = db.activePlan.lastDayIndex ?? -1;
+    dayIndex = (lastIdx + 1) % plan.days.length;
+  } else {
+    const weekday = (new Date().getDay() + 6) % 7; // 0 = Maandag, like WEEKDAY_FULL_NAMES
+    const week = planHasWeekSplit(plan) ? todaysPlanWeek(plan) : null;
+    dayIndex = plan.days.findIndex(d => inferDayWeekday(d) === weekday && (!week || d.group === week));
+    if (dayIndex < 0) return null;
+  }
   const day = plan.days[dayIndex];
   return { plan, dayIndex, day, dayName: day.name || ('Day ' + (dayIndex + 1)) };
+}
+
+// Same test as Plan Detail's planHasWeekB(), for any plan (not just currentPlanData).
+function planHasWeekSplit(plan) {
+  return !!(plan.hasWeekB || (plan.days || []).some(d => d.group === 'B'));
+}
+
+// 'A' or 'B' for a split fixed-days plan, from the last day loaded via the
+// automatic suggestion. Older active-plan records only have lastDayIndex, so the
+// week is read from that day as a fallback.
+function todaysPlanWeek(plan) {
+  const a = db.activePlan;
+  const lastDay = a.lastDayIndex >= 0 ? plan.days[a.lastDayIndex] : null;
+  const lastWeek = a.lastGroup || (lastDay && lastDay.group);
+  if (!lastWeek) return 'A';
+  if (a.lastDate === todayStr()) return lastWeek;
+  return lastWeek === 'A' ? 'B' : 'A';
+}
+
+// Records a suggested day as loaded (banner "Yes, load it" / Automatically "Laden"):
+// what getTodaysScheduledDay() bases the next suggestion on.
+function markScheduledDayLoaded(pick) {
+  db.activePlan.lastDayIndex = pick.dayIndex;
+  db.activePlan.lastDate = todayStr();
+  if (pick.day.group) db.activePlan.lastGroup = pick.day.group;
+  else delete db.activePlan.lastGroup;
+  bannerDismissed = true;
+  return persistActivePlan(db.activePlan);
 }
 
 function renderNewWorkoutScreen() {
@@ -1423,9 +1466,14 @@ let pendingScheduleLoad = null;
 function openScheduleLoadAuto() {
   const pick = getTodaysScheduledDay();
   pendingScheduleLoad = pick;
-  document.getElementById('schedule-load-title').textContent = pick ? `Vandaag is ${pick.dayName}` : 'Geen actief plan';
+  // No pick but a usable active plan: that plan simply has no day for today.
+  const activePlan = db.activePlan && db.plans[db.activePlan.planId];
+  const noDayToday = !pick && activePlan && (activePlan.days || []).length > 0;
+  document.getElementById('schedule-load-title').textContent = pick ? `Vandaag is ${pick.dayName}`
+    : noDayToday ? 'Geen dag voor vandaag' : 'Geen actief plan';
   document.getElementById('schedule-load-msg').textContent = pick
     ? 'Oefeningen van dit plan laden voor vandaag?'
+    : noDayToday ? `Je actieve plan "${activePlan.name}" heeft geen passende dag voor vandaag.`
     : 'Geen actief plan gevonden. Stel een plan in als actief via Workout Plan Builder.';
   document.getElementById('btn-schedule-load-cancel').classList.toggle('hidden', !pick);
   document.getElementById('btn-schedule-load-confirm').textContent = pick ? 'Laden' : 'OK';
@@ -1445,10 +1493,7 @@ document.getElementById('btn-schedule-load-confirm').addEventListener('click', a
     return;
   }
   loadPlanDayIntoWorkout(pick.day, todayStr());
-  // Advance the rotation exactly like the banner's "Yes, load it" does.
-  db.activePlan.lastDayIndex = pick.dayIndex;
-  bannerDismissed = true;
-  persistActivePlan(db.activePlan);
+  markScheduledDayLoaded(pick);
   // Popup + New Workout in ONE history traversal (two back() calls in a row leave a
   // dead back press behind — see the calendar detail's "go to day").
   overlayStack.pop();
@@ -5477,9 +5522,10 @@ async function addExerciseToPlanDay(name, setsReps) {
 function renderSmartBanner() {
   const banner = document.getElementById('smart-day-banner');
   if (!banner) return;
-  const pick = getTodaysScheduledDay();
+  // Only on today's log: the suggestion is for today (fixed-days plans: today's weekday).
+  const pick = currentDate === todayStr() ? getTodaysScheduledDay() : null;
+  bannerSuggestedPick = pick;
   if (bannerDismissed || !pick) { banner.classList.add('hidden'); return; }
-  bannerSuggestedDayIndex = pick.dayIndex;
   document.getElementById('smart-banner-msg').textContent = `Based on your plan, today is ${pick.dayName}. Load it?`;
   banner.classList.remove('hidden');
 }
@@ -5494,14 +5540,10 @@ document.getElementById('btn-banner-skip').addEventListener('click', () => {
 // today's suggested plan day into today's workout log, in one tap.
 document.getElementById('btn-banner-load').addEventListener('click', async () => {
   document.getElementById('smart-day-banner').classList.add('hidden');
-  if (!db.activePlan || bannerSuggestedDayIndex === null) return;
-  const plan = db.plans[db.activePlan.planId];
-  const day = plan && plan.days[bannerSuggestedDayIndex];
-  if (!day) return;
-  loadPlanDayIntoWorkout(day, currentDate);
-  db.activePlan.lastDayIndex = bannerSuggestedDayIndex;
-  await persistActivePlan(db.activePlan);
-  bannerDismissed = true;
+  const pick = bannerSuggestedPick;
+  if (!db.activePlan || !pick) return;
+  loadPlanDayIntoWorkout(pick.day, currentDate);
+  await markScheduledDayLoaded(pick);
   renderHome();
   toast('Workout geladen!');
 });
