@@ -309,8 +309,8 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .exercise-card:active { background: var(--bg); }
 .exercise-card-selected { background: var(--primary-light) !important; outline: 2px solid var(--primary); outline-offset: 0; }
 .exercise-card-dragging { z-index: 10; will-change: transform; box-shadow: var(--card-shadow-elevated); }
-/* Header starts at the same x as the rows' comment column (rows pad by --space-2, see SET ROW). */
-.exercise-card-header, .history-card-header { display: flex; align-items: center; min-height: 48px; padding: var(--space-2) var(--space-1) var(--space-1) var(--space-2); }
+/* Header keeps the standard card padding (16px), like every other card; the set rows below pad by --space-2 (see SET ROW). */
+.exercise-card-header, .history-card-header { display: flex; align-items: center; min-height: 48px; padding: var(--space-2) var(--space-1) var(--space-1) var(--card-padding); }
 .exercise-card-name { flex: 1; font-size: var(--fs-heading); font-weight: var(--fw-medium); color: var(--text); }
 .exercise-card-drag-handle { display: none; width: var(--control-height); height: var(--control-height); align-items: center; justify-content: center; cursor: grab; flex-shrink: 0; touch-action: none; }
 .exercise-card-drag-handle:active { cursor: grabbing; }
@@ -318,7 +318,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 #screen-fitness-tracker.sel-single .exercise-card-selected .exercise-card-drag-handle { display: flex; }
 .exercise-card-divider, .history-card-divider { height: 2px; background: var(--primary); }
 .exercise-card-sets, .history-card-sets { padding: var(--space-2) 0; }
-.exercise-card-empty { padding: var(--space-2) var(--space-2) var(--space-3); text-align: left; }
+.exercise-card-empty { padding: var(--space-2) var(--card-padding) var(--space-3); text-align: left; }
 /* History: the date header is tappable ("Go to"); its press tint follows the card's top corners. */
 .history-card-header.clickable { cursor: pointer; border-radius: var(--radius-lg) var(--radius-lg) 0 0; transition: background 0.08s; }
 .history-card-header.clickable:active { background: var(--primary-light); }
@@ -330,7 +330,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
      comment · PR trophy or dropset arrow · set number · weight · reps · RPE/partial/"—"
    Columns: 28px · 20px · 24px · flexible · 56px · 72px. The dropset arrow sits in the trophy
    column (a dropset is never a PR, so they never share a row). The weight is a fixed 76px block
-   (just fits "132.5 kgs") placed --space-1 after the set number, at the start of the flexible column — so any extra width
+   (just fits "132.5 kgs") placed --space-3 after the set number, at the start of the flexible column — so any extra width
    ends up between weight and reps. Inside the block, reps and the effort cell, everything is
    right-aligned, so "kgs" ends on the same x in every row.
    Content edge: 24px from the screen edge in every list (--screen-gutter + --space-2).
@@ -363,7 +363,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .set-pr-icon { width: var(--icon-list); height: var(--icon-list); fill: var(--pr-gold); flex-shrink: 0; }
 .set-num { font-size: var(--fs-body); font-weight: var(--fw-bold); color: var(--text); }
 .set-weight, .set-reps { display: flex; align-items: baseline; justify-content: flex-end; gap: var(--space-1); min-width: 0; }
-.set-weight { justify-self: start; width: 76px; margin-left: var(--space-1); }
+.set-weight { justify-self: start; width: 76px; margin-left: var(--space-3); }
 .set-val { font-size: var(--fs-number); font-weight: var(--fw-bold); color: var(--text); }
 .set-unit { font-size: var(--fs-small); font-weight: var(--fw-regular); color: var(--text-secondary); }
 /* Dropset (a set flagged isDropsetContinuation hangs under the previous set): the arrow sits in the
@@ -606,7 +606,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .cal-detail-body { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; }
 .cal-detail-ex { padding-top: var(--space-3); }
 .cal-detail-ex:first-child { padding-top: 0; }
-.cal-detail-ex-name { font-size: var(--fs-heading); font-weight: var(--fw-medium); color: var(--text); margin-bottom: var(--space-1); padding: 0 var(--space-2); }
+.cal-detail-ex-name { font-size: var(--fs-heading); font-weight: var(--fw-medium); color: var(--text); margin-bottom: var(--space-1); padding: 0 var(--card-padding); }
 
 /* ══ TOAST ══════════════════════════════════════════════
    FitNotes-style full-width banner right under the header, covering the tab bar while it is up.
