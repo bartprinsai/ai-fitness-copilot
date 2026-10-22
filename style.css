@@ -328,11 +328,12 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    Calendar day popup and Graph "Go to" popup — built by setRowInnerHtml() in app.js.
    One fixed grid, every cell always rendered (empty when unused), left to right:
      comment · PR trophy or dropset arrow · set number · weight · reps · RPE/partial/"—"
-   Columns: 22px · 20px · 24px · flexible · 56px · 56px. The dropset arrow sits in the trophy
+   Columns: 22px · 20px · 24px · flexible · 60px · 56px. The dropset arrow sits in the trophy
    column (a dropset is never a PR, so they never share a row). The weight is a fixed 84px block
-   (fits "232,25 kg" — weights have up to 2 decimals) placed 20px after the set number, at the
+   (fits "232,25 kg" — weights have up to 2 decimals) placed --space-4 after the set number, at the
    start of the flexible column — so the rest of that column (26px at 360px) and any extra width
-   ends up between weight and reps. Inside the block, reps and the effort cell, everything is
+   ends up between weight and reps. The reps column is 60px: 56px of reps plus --space-1 between
+   reps and the RPE column. Inside the block, reps and the effort cell, everything is
    right-aligned, so "kg" ends on the same x in every row. The 56px effort column fits "RPE 9,5"
    and "+9 partial" — which is why extra reps stop at 9 (EXTRA_MAX).
    Content edge: 24px from the left and 28px from the right screen edge in every list
@@ -340,7 +341,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    a bottom sheet (popups) already sit one gutter in, so they pad by --space-2 left and
    --space-3 right; the TRACK list runs edge to edge and pads by the sums. That puts every
    column on the same x on every screen. */
-.set-row { display: grid; grid-template-columns: 22px var(--icon-list) 24px minmax(0, 1fr) 56px 56px; align-items: center; padding: var(--space-3) var(--space-3) var(--space-3) var(--space-2); border-bottom: 1px solid var(--border); }
+.set-row { display: grid; grid-template-columns: 22px var(--icon-list) 24px minmax(0, 1fr) 60px 56px; align-items: center; padding: var(--space-3) var(--space-3) var(--space-3) var(--space-2); border-bottom: 1px solid var(--border); }
 #set-list .set-row { padding-left: calc(var(--screen-gutter) + var(--space-2)); padding-right: calc(var(--screen-gutter) + var(--space-3)); cursor: pointer; transition: background 0.08s; }
 /* No zebra: a row takes the colour of whatever it sits on (--bg in TRACK, --surface in cards and
    popups), with a 1px --border line between rows. The last row of a list keeps its 1px border, but
@@ -367,7 +368,8 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .set-pr-icon { width: var(--icon-list); height: var(--icon-list); fill: var(--pr-gold); flex-shrink: 0; }
 .set-num { font-size: var(--fs-body); font-weight: var(--fw-bold); color: var(--text); }
 .set-weight, .set-reps { display: flex; align-items: baseline; justify-content: flex-end; gap: var(--space-1); min-width: 0; }
-.set-weight { justify-self: start; width: 84px; margin-left: 20px; }
+.set-weight { justify-self: start; width: 84px; margin-left: var(--space-4); }
+.set-reps { margin-right: var(--space-1); }
 .set-val { font-size: var(--fs-number); font-weight: var(--fw-bold); color: var(--text); }
 .set-unit { font-size: var(--fs-small); font-weight: var(--fw-regular); color: var(--text-secondary); }
 /* Dropset (a set flagged isDropsetContinuation hangs under the previous set): the arrow sits in the
