@@ -344,7 +344,10 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    --space-3 right; the TRACK list runs edge to edge and pads by the sums. That puts every
    column on the same x on every screen. */
 .set-row { display: grid; grid-template-columns: 22px var(--icon-list) 24px minmax(0, 1fr) 60px 56px; align-items: center; padding: var(--space-3) var(--space-3) var(--space-3) var(--space-2); border-bottom: 1px solid var(--border); }
-#set-list .set-row { padding-left: calc(var(--screen-gutter) + var(--space-2)); padding-right: calc(var(--screen-gutter) + var(--space-3)); cursor: pointer; transition: background 0.08s; }
+/* TRACK has no frame: each row sits --screen-gutter in from the screen edge (as wide as a card), so
+   its line starts and ends 16px from the edge; inside, the normal 8/12 padding keeps every column on
+   the same x as in the cards and popups. */
+#set-list .set-row { margin: 0 var(--screen-gutter); cursor: pointer; transition: background 0.08s; }
 /* No zebra: a row takes the colour of whatever it sits on (--bg in TRACK, --surface in cards and
    popups), with a 1px --border line between rows. The last row of a list keeps its 1px border, but
    transparent, so every row has the same height and there's no line under the list. */
@@ -353,6 +356,15 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .set-row.clickable { cursor: pointer; transition: background 0.08s; }
 .set-row.clickable:active { background: var(--primary-light); }
 .set-row.graph-goto-set-point { background: var(--primary-light); }
+/* A highlighted row without a frame (TRACK pressed/selected, the marked set in the Go to popup, the
+   chosen option in the field picker) is as wide as its line and gets --radius-sm corners. The colour
+   is a rounded ::before behind the content rather than the row's own background, so the row's
+   bottom line stays straight (a radius on the row itself would curl the line up at both ends).
+   Highlighted rows in a card keep the full card width (no change there). */
+#set-list .set-row, .history-goto-body .set-row, .field-picker-row { position: relative; isolation: isolate; }
+#set-list .set-row:active, #set-list .set-row.selected, .history-goto-body .set-row.graph-goto-set-point, .field-picker-list .field-picker-row.selected, .field-picker-list .field-picker-row:active { background: transparent; }
+#set-list .set-row:active::before, #set-list .set-row.selected::before, .history-goto-body .set-row.graph-goto-set-point::before, .field-picker-list .field-picker-row.selected::before, .field-picker-list .field-picker-row:active::before { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: var(--radius-sm); background: var(--primary-light); }
+.field-picker-list .field-picker-row:active:not(.selected)::before { background: var(--bg); }
 .set-row-dragging { position: relative; z-index: 10; will-change: transform; box-shadow: var(--card-shadow-elevated); background: var(--bg); }
 .set-row span { text-align: center; }
 /* Comment: TRACK shows the icon on every row (tap = add/edit a note, grey until there is one);
@@ -536,13 +548,9 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .graph-sel-main { display: flex; align-items: baseline; gap: var(--space-1); font-size: var(--fs-number); font-weight: var(--fw-bold); color: var(--text); }
 .graph-sel-date { font-size: var(--fs-small); color: var(--text-secondary); }
 /* Set overview inside the shared "Go to…" overlay (opened from the Graph tab). */
-/* Row lines in a popup / bottom sheet run to the edge of the white panel: every list in a sheet
-   (field picker, Calendar and Go to set lists, records history, Samenvatting) pulls out over the
-   panel's --screen-gutter padding, and its rows add that gutter to their own padding, so the content
-   stays exactly where it was — set rows get the TRACK values (gutter + 8 / gutter + 12), so their
-   columns sit on the same x as in every other set list. */
-.field-picker-list, .cal-detail-body, .history-goto-body, .records-history-body, .recap-body { margin-left: calc(-1 * var(--screen-gutter)); margin-right: calc(-1 * var(--screen-gutter)); }
-.cal-detail-body .set-row, .history-goto-body .set-row { padding-left: calc(var(--screen-gutter) + var(--space-2)); padding-right: calc(var(--screen-gutter) + var(--space-3)); }
+/* Lines without a frame (DESIGN_SYSTEM.md "Scheidingslijnen tussen rijen"): in a popup / bottom sheet
+   the lists sit inside the panel's --screen-gutter padding, so their lines start and end 16px from
+   the panel edge — as wide as a card would be. */
 .history-goto-body { max-height: 45vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 
 /* ══ MODALS (shared base for every .overlay bottom sheet) ═
@@ -597,8 +605,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    of a group. The group labels sit on --card-padding, in line with the RM label / weight, like the
    other popup headings; the spacing around them is unchanged (8px below, 20px above). */
 .records-history-body { max-height: 45vh; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; }
-.records-history-body .section-label { padding-left: calc(var(--screen-gutter) + var(--card-padding)); margin-bottom: var(--space-2); }
-.records-history-body .records-row { padding-left: calc(var(--screen-gutter) + var(--card-padding)); padding-right: calc(var(--screen-gutter) + var(--space-3)); }
+.records-history-body .section-label { padding-left: var(--card-padding); margin-bottom: var(--space-2); }
 .records-history-body .section-label:not(:first-child) { margin-top: calc(var(--space-2) + var(--space-3)); }
 .records-history-body .records-row:last-child, .records-history-body .records-row:has(+ .section-label) { border-bottom: none; }
 /* RM label = the set number (.set-num): Body, 700, --text. */
@@ -675,7 +682,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .cal-detail-body { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; }
 .cal-detail-ex { padding-top: var(--space-3); }
 .cal-detail-ex:first-child { padding-top: 0; }
-.cal-detail-ex-name { font-size: var(--fs-heading); font-weight: var(--fw-medium); color: var(--text); margin-bottom: var(--space-1); padding: 0 calc(var(--screen-gutter) + var(--card-padding)); }
+.cal-detail-ex-name { font-size: var(--fs-heading); font-weight: var(--fw-medium); color: var(--text); margin-bottom: var(--space-1); padding: 0 var(--card-padding); }
 
 /* ══ TOAST ══════════════════════════════════════════════
    FitNotes-style full-width banner right under the header, covering the tab bar while it is up.
@@ -887,7 +894,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 /* Generic delete confirm: can be opened from within the (base-tier) comment-overlay. */
 #confirm-delete-overlay { z-index: var(--z-overlay-nested); }
 .field-picker-list { display: flex; flex-direction: column; max-height: 60vh; overflow-y: auto; }
-.field-picker-row { display: flex; align-items: center; gap: var(--space-3); min-height: var(--control-height); padding: var(--space-2) calc(var(--screen-gutter) + var(--space-1)); border-bottom: 1px solid var(--border); cursor: pointer; background: var(--surface); transition: background .08s; }
+.field-picker-row { display: flex; align-items: center; gap: var(--space-3); min-height: var(--control-height); padding: var(--space-2) var(--space-1); border-bottom: 1px solid var(--border); cursor: pointer; background: var(--surface); transition: background .08s; }
 .field-picker-row:last-child { border-bottom: none; }
 .field-picker-row.selected { background: var(--primary-light); }
 .field-picker-row:active { background: var(--bg); }
@@ -954,7 +961,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 
 /* ══ DAY RECAP POPUP ════════════════════════════════════ */
 .recap-body { max-height: 60vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-.recap-ex { padding: var(--space-3) var(--screen-gutter); border-bottom: 1px solid var(--border); }
+.recap-ex { padding: var(--space-3) 0; border-bottom: 1px solid var(--border); }
 .recap-ex:first-child { padding-top: 0; }
 .recap-ex:last-child { border-bottom: none; padding-bottom: 0; }
 .recap-ex-name { font-size: var(--fs-heading); font-weight: var(--fw-medium); color: var(--text); margin-bottom: var(--space-1); }
@@ -976,4 +983,4 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    --text-secondary and the block's indent, all inherited from .recap-set.
    "Gevolgd door dropset": the set rows' dropset arrow (same icon and colour), at the trophy's 1em */
 .recap-drop .drop-arrow { width: 1em; height: 1em; vertical-align: -2px; margin-right: var(--space-1); }
-.recap-empty { padding: var(--space-4) var(--screen-gutter); }
+.recap-empty { padding: var(--space-4) 0; }
