@@ -914,6 +914,8 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .recap-set + .recap-set, .recap-line + .recap-set, .recap-set + .recap-line { margin-top: var(--space-2); }
 .recap-set-head { font-weight: var(--fw-bold); color: var(--text); }
 .recap-set-pr { width: 1em; height: 1em; fill: var(--pr-gold); vertical-align: -2px; margin-left: 2px; }
-/* "Gevolgd door dropset": the set rows' dropset arrow (same icon and colour), at the trophy's 1em */
+/* .recap-note: extra lines in a set block ("+2 partial", "Gevolgd door dropset") — Klein,
+   --text-secondary and the block's indent, all inherited from .recap-set.
+   "Gevolgd door dropset": the set rows' dropset arrow (same icon and colour), at the trophy's 1em */
 .recap-drop .drop-arrow { width: 1em; height: 1em; vertical-align: -2px; margin-right: var(--space-1); }
 .recap-empty { padding: var(--space-4) 0; }

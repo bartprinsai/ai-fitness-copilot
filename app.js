@@ -1982,11 +1982,16 @@ function updateDropsetToggle() {
 // Effort marker for a logged set — ONE component used by the TRACK list, the day
 // overview and History: RPE as plain text (never a badge), plus a small "+N partial/forced"
 // line under it when there are extra reps; a muted dash when there is neither.
+// "+N partial" / "+N forced", or '' without extra reps — shared by the set rows and the Recap.
+function extraRepsText(s) {
+  const extra = parseInt(s.extra) || 0;
+  return extra > 0 ? `+${extra} ${s.extraType === 'forced' ? 'forced' : 'partial'}` : '';
+}
 function effortCellHtml(s) {
   const rpe = parseFloat(s.rpe) || 0;
-  const extra = parseInt(s.extra) || 0;
+  const extra = extraRepsText(s);
   const rpeText = rpe > 0 ? `<span class="set-rpe">RPE ${formatRpe(rpe)}</span>` : '';
-  const extraLine = extra > 0 ? `<span class="set-effort-extra">+${extra} ${s.extraType === 'forced' ? 'forced' : 'partial'}</span>` : '';
+  const extraLine = extra ? `<span class="set-effort-extra">${extra}</span>` : '';
   return `<span class="set-effort">${rpeText || extraLine ? rpeText + extraLine : '<span class="set-effort-none">—</span>'}</span>`;
 }
 
@@ -4308,6 +4313,7 @@ function workingSetGroups(sets) {
 //   "Set N" — N is the Track set number, so a dropset's number is skipped
 //     (+ the trophy when it is a PR — its dropsets never are)
 //   weight × reps, with weight and reps judged separately
+//   "+N partial/forced" when it has extra reps (same text as the set rows; never compared)
 //   RPE, judged on its own (higher = felt heavier, so red)
 //   what that set was last time
 //   "Gevolgd door (N) dropset(s)" when dropsets hang on it (their own values aren't shown)
@@ -4344,13 +4350,15 @@ function recapSetLines(ex, date, prKeys) {
       prevLine = '(geen vorige set)';
     }
     const drops = idxs.length - 1;
+    const extra = extraRepsText(s);
     return `
       <div class="recap-set">
         <div class="recap-set-head">Set ${idxs[0] + 1}${isPR ? ' ' + prTrophySvg('recap-set-pr') : ''}</div>
         <div>${formatKg(w)} kg × ${r}${wrMarks}</div>
+        ${extra ? `<div class="recap-note recap-extra">${extra}</div>` : ''}
         <div>${rpe > 0 ? `RPE ${formatRpe(rpe)}${rpeMark}` : '<span class="recap-muted">Geen RPE gelogd</span>'}</div>
         ${prevLine ? `<div class="recap-prev">${prevLine}</div>` : ''}
-        ${drops > 0 ? `<div class="recap-drop">${DROP_ARROW_SVG}Gevolgd door ${drops === 1 ? 'dropset' : `${drops} dropsets`}</div>` : ''}
+        ${drops > 0 ? `<div class="recap-note recap-drop">${DROP_ARROW_SVG}Gevolgd door ${drops === 1 ? 'dropset' : `${drops} dropsets`}</div>` : ''}
       </div>`;
   });
   if (!prev) blocks.push(recapLine('recap-muted', '', 'Eerste keer deze oefening — geen vergelijking'));
