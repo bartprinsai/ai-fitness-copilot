@@ -24,7 +24,7 @@ let db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePla
 // Fitness Tracker's long-press selection mode (see createSelectionMode).
 const homeSel = createSelectionMode({
   screenId: 'screen-fitness-tracker', countId: 'home-sel-count',
-  countLabel: n => (n === 1 ? '1 exercise' : `${n} exercises`),
+  countLabel: n => (n === 1 ? '1 oefening' : `${n} oefeningen`),
 });
 let homeExDragItem = null;
 let homeExDragStartY = 0;
@@ -74,28 +74,28 @@ function prTrophySvg(className) {
 // Shared comment/note speech-bubble icon markup (set-row and exercise-card comment indicators).
 const COMMENT_ICON_SVG = '<svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>';
 
-// Shared date-formatting helper — `format` selects which display variant to
-// produce for a given YYYY-MM-DD `str`:
-//   'long'   — day-nav label: "TODAY"/"YESTERDAY", else e.g. "SATURDAY, 20 SEPTEMBER"
-//   'short'  — history/calendar-goto labels, e.g. "20 SEP 2026"
-//   'detail' — calendar workout-detail popup title, e.g. "Saturday, Sep 20 2026" (not uppercased)
-function formatDateStr(str, format) {
-  const d = new Date(str + 'T12:00:00');
-  if (format === 'long') {
+// The ONE date helper (nl-NL, first letter capitalised) for a YYYY-MM-DD `str`.
+// Standard everywhere: "Donderdag 22 oktober 2026". Named variants for the exceptions:
+//   'nav'       — tracker day navigation: "Vandaag" / "Gisteren", else the standard
+//   'noWeekday' — the gold One rep max card: "22 oktober 2026"
+//   'month'     — calendar month headings: "Oktober 2026" (`str` may be any day of the month)
+//   'axis'      — the Graph's x-axis: "6 okt"
+// A label that shows a date in capitals (.section-label, day nav) does that in CSS.
+const NL_DATE_FORMATS = {
+  full: new Intl.DateTimeFormat('nl-NL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
+  noWeekday: new Intl.DateTimeFormat('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' }),
+  month: new Intl.DateTimeFormat('nl-NL', { month: 'long', year: 'numeric' }),
+  axis: new Intl.DateTimeFormat('nl-NL', { day: 'numeric', month: 'short' }),
+};
+function formatDateStr(str, format = 'full') {
+  if (format === 'nav') {
     const today = todayStr();
-    const yesterday = addDaysToDateStr(today, -1);
-    if (str === today) return 'TODAY';
-    if (str === yesterday) return 'YESTERDAY';
-    return d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase();
+    if (str === today) return 'Vandaag';
+    if (str === addDaysToDateStr(today, -1)) return 'Gisteren';
+    format = 'full';
   }
-  if (format === 'short') {
-    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase();
-  }
-  if (format === 'detail') {
-    const weekday = d.toLocaleDateString('en-GB', { weekday: 'long' });
-    const month = d.toLocaleDateString('en-GB', { month: 'short' });
-    return `${weekday}, ${month} ${d.getDate()} ${d.getFullYear()}`;
-  }
+  const s = NL_DATE_FORMATS[format].format(new Date(str + 'T12:00:00')).replace(/\.$/, '');
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 function changeDate(delta) {
   currentDate = addDaysToDateStr(currentDate, delta);
@@ -127,7 +127,7 @@ function toast(msg, { type = 'success', duration } = {}) {
 // optimistically, so a failed write must not stay silent.
 function persistFailed(e) {
   console.error(e);
-  toast('Couldn\u2019t save \u2014 check your connection', { type: 'error' });
+  toast('Opslaan mislukt \u2014 controleer je verbinding', { type: 'error' });
 }
 function allExercises() {
   const custom = db.custom_exercises || [];
@@ -652,7 +652,7 @@ async function initAuth() {
     }
   } catch (err) {
     console.error('[Auth] getRedirectResult error:', err);
-    toast('Sign-in failed');
+    toast('Inloggen mislukt');
   }
 
   // Step 2: register onAuthStateChanged for normal visits and sign-out
@@ -701,11 +701,11 @@ document.getElementById('btn-google-signin').addEventListener('click', async () 
         await fAuth.signInWithRedirect(provider);
       } catch (redirectErr) {
         console.error('[Auth] signInWithRedirect error:', redirectErr);
-        toast('Sign-in failed');
+        toast('Inloggen mislukt');
       }
     } else {
       console.error('[Auth] unhandled sign-in error:', err);
-      toast('Sign-in failed');
+      toast('Inloggen mislukt');
     }
   }
 });
@@ -742,15 +742,15 @@ document.getElementById('overflow-menu').addEventListener('click', e => {
 });
 document.getElementById('btn-overflow-home').addEventListener('click', e => {
   showOverflowMenu([
-    { label: 'Sign out', action: signOutUser },
-    { label: 'Reset to default', action: openResetOverlay, danger: true },
+    { label: 'Uitloggen', action: signOutUser },
+    { label: 'Alles resetten', action: openResetOverlay, danger: true },
   ], e.currentTarget);
 });
 document.getElementById('btn-overflow-training').addEventListener('click', e => {
-  showOverflowMenu([{ label: 'Sign out', action: signOutUser }], e.currentTarget);
+  showOverflowMenu([{ label: 'Uitloggen', action: signOutUser }], e.currentTarget);
 });
 document.getElementById('btn-overflow-exercises').addEventListener('click', e => {
-  showOverflowMenu([{ label: 'Sign out', action: signOutUser }], e.currentTarget);
+  showOverflowMenu([{ label: 'Uitloggen', action: signOutUser }], e.currentTarget);
 });
 
 // -- Reset to default ------------------------------------
@@ -904,7 +904,7 @@ function getPRSetKeys(exerciseName) {
 
 function renderHome() {
   renderSmartBanner();
-  document.getElementById('day-nav-label').textContent = formatDateStr(currentDate, 'long');
+  document.getElementById('day-nav-label').textContent = formatDateStr(currentDate, 'nav');
   const exercises = getWorkout(currentDate);
   const container = document.getElementById('home-content');
   const screenEl = document.getElementById('screen-fitness-tracker');
@@ -914,11 +914,11 @@ function renderHome() {
     container.innerHTML = `
       <div class="home-empty">
         <div class="home-empty-title-wrap">
-          <span class="home-empty-title">Workout Log Empty</span>
+          <span class="home-empty-title">Nog geen workout gelogd</span>
         </div>
         <button class="home-empty-action" id="btn-start-new">
           <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-          <span>Start New Workout</span>
+          <span>Nieuwe workout</span>
         </button>
       </div>`;
     document.getElementById('btn-start-new').addEventListener('click', openNewWorkoutScreen);
@@ -939,7 +939,7 @@ function renderHome() {
     header.className = 'exercise-card-header';
     header.innerHTML = `
       <div class="exercise-card-name">${ex.name}</div>
-      <div class="exercise-card-drag-handle" aria-label="Drag to reorder">
+      <div class="exercise-card-drag-handle" aria-label="Sleep om te verplaatsen">
         <svg viewBox="0 0 24 24"><path d="M3 15h18v-2H3v2zm0 4h18v-2H3v2zm0-8h18V9H3v2zm0-6v2h18V5H3z"/></svg>
       </div>`;
     card.appendChild(header);
@@ -949,7 +949,7 @@ function renderHome() {
     setsDiv.className = 'exercise-card-sets';
     if (sets.length === 0) {
       // Loaded from a plan day: show the plan's sets/reps until the first set is logged.
-      setsDiv.innerHTML = `<div class="exercise-card-empty">${ex.target ? 'Plan: ' + formatExerciseSetsReps(ex.target) : 'No sets'}</div>`;
+      setsDiv.innerHTML = `<div class="exercise-card-empty">${ex.target ? 'Plan: ' + formatExerciseSetsReps(ex.target) : 'Geen sets'}</div>`;
     } else {
       sets.forEach((s, setIdx) => {
         const isFirstPR = firstPRKeys.has(currentDate + '#' + setIdx);
@@ -1013,7 +1013,7 @@ function openSetCommentPopup(exIdx, setIdx, date = currentDate) {
   };
   const exName = (getWorkout(date)[exIdx] || {}).name;
   openCommentPopup({
-    label: `Comment bij set ${setIdx + 1} van "${exName}"`,
+    label: `Notitie bij set ${setIdx + 1} van "${exName}"`,
     getText: () => {
       const ex = getWorkout(date)[exIdx];
       return (ex && ex.sets[setIdx] && ex.sets[setIdx].note) || '';
@@ -1040,7 +1040,7 @@ function openSetCommentPopup(exIdx, setIdx, date = currentDate) {
 function openSessionCommentPopup() {
   const date = currentDate;
   openCommentPopup({
-    label: 'Comment bij deze workout',
+    label: 'Notitie bij deze workout',
     getText: () => getSessionNote(date),
     onSave: val => saveSessionNote(date, val),
     onDelete: () => saveSessionNote(date, '')
@@ -1216,7 +1216,7 @@ function setupHomeExDragReorder() {
     if (JSON.stringify(newExercises.map(e => e.name)) !== JSON.stringify(exercises.map(e => e.name))) {
       setWorkout(currentDate, newExercises);
       cards.forEach((card, i) => { card.dataset.exIdx = i; });
-      toast('Order saved');
+      toast('Volgorde opgeslagen');
     }
     homeExDragItem = null;
   };
@@ -1262,7 +1262,7 @@ function endSetDrag() {
       if (selectedSetIndex !== null) selectedSetIndex = oldIdxOrder.indexOf(selectedSetIndex);
       ex.sets = newSets;
       setWorkout(currentDate, workout);
-      toast('Order saved');
+      toast('Volgorde opgeslagen');
     }
   }
   setDragItem = null;
@@ -1321,7 +1321,7 @@ function setExercisesTitle(text) {
 // The top-level (unfiltered) title: "Toevoegen: [Dag]" while this screen is doubling
 // as the Plan Day add-exercise flow, "All Exercises" for its normal Fitness Tracker use.
 function defaultExercisesTitle() {
-  return exerciseScreenMode === 'plan-add' ? ('Toevoegen: ' + exerciseLoadDayName) : 'All Exercises';
+  return exerciseScreenMode === 'plan-add' ? ('Toevoegen: ' + exerciseLoadDayName) : 'Alle oefeningen';
 }
 
 // -- New Workout intermediate screen --------------------
@@ -1371,7 +1371,7 @@ function getTodaysScheduledDay() {
     if (dayIndex < 0) return null;
   }
   const day = plan.days[dayIndex];
-  return { plan, dayIndex, day, dayName: day.name || ('Day ' + (dayIndex + 1)) };
+  return { plan, dayIndex, day, dayName: day.name || ('Dag ' + (dayIndex + 1)) };
 }
 
 // Same test as Plan Detail's planHasWeekB(), for any plan (not just currentPlanData).
@@ -1458,8 +1458,8 @@ function markScheduledDayLoaded(pick) {
 function renderNewWorkoutScreen() {
   const pick = getTodaysScheduledDay();
   document.getElementById('nw-schema-auto-desc').textContent = pick
-    ? `Today you have ${pick.dayName}.`
-    : 'Automatic planning not set up yet';
+    ? `Vandaag staat ${pick.dayName} op het programma.`
+    : 'Automatische planning nog niet ingesteld';
 }
 
 // A plan exercise's sets/reps as a workout exercise's `target`: {sets, reps} or
@@ -1518,7 +1518,7 @@ function renderSchedulePickPlan() {
   const scroll = document.getElementById('schedule-pick-plan-scroll');
   const plans = sortedPlans();
   if (plans.length === 0) {
-    scroll.innerHTML = '<div class="plan-list-empty">Nog geen plannen. Maak er eerst een aan via Workout Plan Builder.</div>';
+    scroll.innerHTML = '<div class="plan-list-empty">Nog geen plannen. Maak er eerst een aan via Trainingsplannen.</div>';
     return;
   }
   scroll.innerHTML = '';
@@ -1598,9 +1598,9 @@ function openScheduleLoadAuto() {
   document.getElementById('schedule-load-msg').textContent = pick
     ? 'Oefeningen van dit plan laden voor vandaag?'
     : noDayToday ? `Je actieve plan "${activePlan.name}" heeft geen passende dag voor vandaag.`
-    : 'Geen actief plan gevonden. Stel een plan in als actief via Workout Plan Builder.';
+    : 'Geen actief plan gevonden. Stel een plan in als actief via Trainingsplannen.';
   document.getElementById('btn-schedule-load-cancel').classList.toggle('hidden', !pick);
-  document.getElementById('btn-schedule-load-confirm').textContent = pick ? 'Laden' : 'OK';
+  document.getElementById('btn-schedule-load-confirm').textContent = pick ? 'Laden' : 'Sluiten';
   openOverlay('schedule-load-overlay');
 }
 
@@ -1630,7 +1630,7 @@ function openExerciseList() {
   exerciseBrowserMode = 'categories';
   currentBrowseCategory = null;
   document.getElementById('exercise-search').value = '';
-  setExercisesTitle('All Exercises');
+  setExercisesTitle('Alle oefeningen');
   renderCategoryBrowser();
   showScreen('screen-exercises');
 }
@@ -1665,7 +1665,7 @@ function syncExerciseBrowseToHistory(browse) {
   } else if (exerciseBrowserMode !== 'exercises' || currentBrowseCategory !== browse) {
     exerciseBrowserMode = 'exercises';
     currentBrowseCategory = browse;
-    if (browse === FAVORITES_CATEGORY) { setExercisesTitle('Favorites'); renderFavoriteExercises(); }
+    if (browse === FAVORITES_CATEGORY) { setExercisesTitle('Favorieten'); renderFavoriteExercises(); }
     else { setExercisesTitle(browse); renderExercisesInCategory(browse); }
   }
 }
@@ -1680,10 +1680,10 @@ function renderCategoryBrowser() {
     item.className = 'category-item category-item-favorites list-row';
     item.innerHTML = `
       <svg class="category-item-fav-star" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
-      <span class="category-item-name">Favorites</span>
+      <span class="category-item-name">Favorieten</span>
     `;
     item.addEventListener('click', () => {
-      enterExerciseBrowseCategory(FAVORITES_CATEGORY, 'Favorites', renderFavoriteExercises);
+      enterExerciseBrowseCategory(FAVORITES_CATEGORY, 'Favorieten', renderFavoriteExercises);
     });
     list.appendChild(item);
   }
@@ -1701,8 +1701,8 @@ function renderCategoryBrowser() {
     item.querySelector('.category-item-dots').addEventListener('click', e => {
       e.stopPropagation();
       showOverflowMenu([
-        { label: 'Edit', action: () => editCategory(cat) },
-        { label: 'Delete', action: () => deleteCategory(cat) }
+        { label: 'Bewerken', action: () => editCategory(cat) },
+        { label: 'Verwijderen', action: () => deleteCategory(cat) }
       ], e.currentTarget);
     });
     list.appendChild(item);
@@ -1751,7 +1751,7 @@ document.getElementById('btn-cat-edit-save').addEventListener('click', () => {
   closeOverlay('cat-edit-overlay');
   pendingEditCategory = null;
   renderCategoryBrowser();
-  toast('Category renamed');
+  toast('Categorie hernoemd');
 });
 document.getElementById('btn-cat-delete-cancel').addEventListener('click', () => closeOverlay('cat-delete-overlay'));
 document.getElementById('btn-cat-delete-confirm').addEventListener('click', () => {
@@ -1771,7 +1771,7 @@ function renderExercisesInCategory(cat) {
   list.innerHTML = '';
   const exercises = allExercises().filter(e => e.category === cat);
   if (exercises.length === 0) {
-    list.insertAdjacentHTML('beforeend', `<div class="exercise-empty">No exercises found</div>`);
+    list.insertAdjacentHTML('beforeend', `<div class="exercise-empty">Geen oefeningen gevonden</div>`);
     return;
   }
   exercises.forEach(ex => renderExerciseItem(list, ex));
@@ -1782,7 +1782,7 @@ function renderFavoriteExercises() {
   list.innerHTML = '';
   const favs = allExercises().filter(e => isFavoriteExercise(e.name));
   if (favs.length === 0) {
-    list.insertAdjacentHTML('beforeend', `<div class="exercise-empty">No favorites yet</div>`);
+    list.insertAdjacentHTML('beforeend', `<div class="exercise-empty">Nog geen favorieten</div>`);
     return;
   }
   favs.forEach(ex => renderExerciseItem(list, ex));
@@ -1793,7 +1793,7 @@ function renderExerciseSearchResults(q) {
   list.innerHTML = '';
   const filtered = allExercises().filter(e => e.name.toLowerCase().includes(q));
   if (filtered.length === 0) {
-    list.insertAdjacentHTML('beforeend', `<div class="exercise-empty">No exercises found</div>`);
+    list.insertAdjacentHTML('beforeend', `<div class="exercise-empty">Geen oefeningen gevonden</div>`);
     return;
   }
   filtered.forEach(ex => renderExerciseItem(list, ex));
@@ -1823,7 +1823,7 @@ function renderExerciseItem(list, ex) {
     <button class="btn btn-primary ex-add-btn${inPlanDay ? ' ex-add-btn-done' : ''}"${inPlanDay ? ' disabled' : ''}>${
       inPlanDay
         ? `<svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>Toegevoegd`
-        : `Voeg toe`
+        : `Toevoegen`
     }</button>` : (isFav ? `<svg class="exercise-item-fav-star" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>` : '')}
     <svg class="exercise-item-dots" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
   `;
@@ -1839,10 +1839,10 @@ function renderExerciseItem(list, ex) {
   item.querySelector('.exercise-item-dots').addEventListener('click', e => {
     e.stopPropagation();
     showOverflowMenu([
-      { label: 'Edit', action: () => openEditExerciseScreen(ex) },
-      { label: 'Delete', action: () => openDeleteExerciseConfirm(ex), danger: true },
+      { label: 'Bewerken', action: () => openEditExerciseScreen(ex) },
+      { label: 'Verwijderen', action: () => openDeleteExerciseConfirm(ex), danger: true },
       {
-        label: isFav ? 'Unfavorite' : 'Favorite',
+        label: isFav ? 'Uit favorieten' : 'Favoriet maken',
         action: () => { toggleFavoriteExercise(ex.name); refreshExerciseList(); }
       }
     ], e.currentTarget);
@@ -1957,7 +1957,7 @@ function countsForRecords(sets, i) { return !isDropChild(sets, i); }
 // column: a dropset can never be a PR (countsForRecords), so they never meet.
 //   comment: 'always' = icon on every row (TRACK: tap to add a note),
 //            'note'   = icon only on a set that has a note, 'none' = never (popups)
-function setRowInnerHtml(sets, i, { comment = 'note', commentLabel = 'Set comment', isPR = false } = {}) {
+function setRowInnerHtml(sets, i, { comment = 'note', commentLabel = 'Notitie bij set', isPR = false } = {}) {
   const s = sets[i];
   const hasNote = comment !== 'none' && !!(s.note && s.note.trim());
   const showIcon = comment === 'always' || hasNote;
@@ -2045,8 +2045,8 @@ function updateActionButtonsUI() {
   const isEditing = selectedSetIndex !== null;
   const saveBtn = document.getElementById('btn-save-set');
   const clearBtn = document.getElementById('btn-clear');
-  saveBtn.textContent = isEditing ? 'UPDATE' : 'SAVE';
-  clearBtn.textContent = isEditing ? 'DELETE' : 'CLEAR';
+  saveBtn.textContent = isEditing ? 'Bijwerken' : 'Opslaan';
+  clearBtn.textContent = isEditing ? 'Verwijderen' : 'Wissen';
   clearBtn.classList.toggle('btn-delete-mode', isEditing);
 }
 
@@ -2058,7 +2058,7 @@ function renderSetList() {
   updateDropsetToggle();
 
   if (sets.length === 0) {
-    list.innerHTML = `<div class="set-list-empty">No sets yet. Enter weight and reps, then tap SAVE.</div>`;
+    list.innerHTML = `<div class="set-list-empty">Nog geen sets. Vul gewicht en reps in en tik op Opslaan.</div>`;
     return;
   }
 
@@ -2071,7 +2071,7 @@ function renderSetList() {
     const row = document.createElement('div');
     row.className = setRowClass(sets, i) + (isSelected ? ' selected' : '');
     row.dataset.setIdx = i;
-    row.innerHTML = setRowInnerHtml(sets, i, { comment: 'always', commentLabel: 'Set note', isPR });
+    row.innerHTML = setRowInnerHtml(sets, i, { comment: 'always', commentLabel: 'Notitie', isPR });
     row.querySelector('.set-comment').addEventListener('click', e => { e.stopPropagation(); openSetNote(i); });
     row.addEventListener('click', () => selectSet(i));
     list.appendChild(row);
@@ -2102,7 +2102,7 @@ function saveSetNote() {
   noteEditIndex = null;
   closeOverlay('set-note-overlay');
   renderSetList();
-  toast(note ? 'Comment saved' : 'Comment verwijderd');
+  toast(note ? 'Notitie opgeslagen' : 'Notitie verwijderd');
 }
 
 // Personal Records: 1..12 reps, or up to the highest rep count ever logged for
@@ -2116,7 +2116,7 @@ function saveSetNote() {
 // Everything here goes by WORKOUT DATE (the day a set is logged on), never by the
 // moment it was entered — a set added later to an older day counts as if it had
 // always been there.
-function recordsRepLabel(n) { return n === 1 ? 'One Rep Max' : n + 'RM'; }
+function recordsRepLabel(n) { return n === 1 ? 'One rep max' : n + 'RM'; }
 
 // Every valid set (>= 1 rep, > 0 kg, not a dropset) of an exercise in workout-date
 // order: by day, then by position within the day.
@@ -2188,7 +2188,7 @@ function recordsStepRowHtml(weight, date, sourceReps, direct) {
   return `
     <div class="records-row records-row-clickable" data-date="${date}" data-val="${weight}" data-src-reps="${sourceReps}">
       <span class="records-row-weight">${weightValueHtml(weight)}</span>
-      <span class="records-row-date">${formatDateStr(date, 'short')}${direct ? '' : `<span class="records-row-via"> \u00b7 via ${recordsRepLabel(sourceReps)}</span>`}</span>
+      <span class="records-row-date">${formatDateStr(date)}${direct ? '' : `<span class="records-row-via"> \u00b7 via ${recordsRepLabel(sourceReps)}</span>`}</span>
     </div>`;
 }
 function openRecordsHistory(reps) {
@@ -2197,29 +2197,30 @@ function openRecordsHistory(reps) {
   recordsHistoryReps = reps;
   const cur = steps[steps.length - 1];
   const previous = steps.slice(0, -1).reverse(); // everything BEFORE the current record, newest first
-  document.getElementById('records-history-title').textContent = recordsRepLabel(reps) + ' history';
+  document.getElementById('records-history-title').textContent = recordsRepLabel(reps) + '-geschiedenis';
   document.getElementById('records-history-body').innerHTML = `
-    <div class="section-label">Current record</div>
+    <div class="section-label">Huidig record</div>
     ${recordsStepRowHtml(cur.weight, cur.date, cur.sourceReps, cur.direct)}
-    <div class="section-label">${recordsRepLabel(reps)} previous records</div>
-    ${previous.length ? previous.map(st => recordsStepRowHtml(st.weight, st.date, st.sourceReps, st.direct)).join('') : '<div class="records-empty">No previous records</div>'}`;
+    <div class="section-label">Eerdere ${recordsRepLabel(reps)}-records</div>
+    ${previous.length ? previous.map(st => recordsStepRowHtml(st.weight, st.date, st.sourceReps, st.direct)).join('') : '<div class="records-empty">Geen eerdere records</div>'}`;
   openOverlay('records-history-overlay');
 }
 
 // Right-hand side of a record row/block: weight + workout date; a direct record
 // (set with exactly this rep count) also gets the trophy, a derived one gets
-// "via MRM" behind the date and no trophy; or "No data".
-function recordsValueHtml(rec) {
-  if (!rec) return `<span class="records-row-nodata">No data</span>`;
+// "via MRM" behind the date and no trophy; or "Geen gegevens". The gold One rep max card
+// leaves the weekday out (`noWeekday`), so date + "via" stay on one line.
+function recordsValueHtml(rec, noWeekday = false) {
+  if (!rec) return `<span class="records-row-nodata">Geen gegevens</span>`;
   return `<span class="records-row-value">
         <span class="records-row-weight">${rec.direct ? prTrophySvg() : ''}${weightValueHtml(rec.weight)}</span>
-        <span class="records-row-date">${formatDateStr(rec.date, 'short')}${rec.direct ? '' : `<span class="records-row-via"> \u00b7 via ${recordsRepLabel(rec.viaReps)}</span>`}</span>
+        <span class="records-row-date">${formatDateStr(rec.date, noWeekday ? 'noWeekday' : 'full')}${rec.direct ? '' : `<span class="records-row-via"> \u00b7 via ${recordsRepLabel(rec.viaReps)}</span>`}</span>
       </span>`;
 }
 const CROWN_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 16L3 6l5.5 4L12 4l3.5 6L21 6l-2 10H5zm0 2h14v2H5z"/></svg>';
 
 function openExerciseRecords() {
-  document.getElementById('records-title').textContent = (currentExercise || '') + ' records';
+  document.getElementById('records-title').textContent = (currentExercise || '');
   const maxReps = getExerciseMaxReps(currentExercise);
   const leaders = getRepLeaders(currentExercise, maxReps);
   // One Rep Max: its own block on top (same rule as a normal row); the list below starts at 2RM.
@@ -2227,7 +2228,7 @@ function openExerciseRecords() {
   const hero = document.getElementById('records-hero');
   hero.className = 'records-hero' + (oneRm ? ' records-hero-clickable' : '');
   if (oneRm) hero.dataset.reps = '1'; else delete hero.dataset.reps;
-  hero.innerHTML = `<span class="records-hero-label">${CROWN_SVG}One rep max</span>${recordsValueHtml(oneRm)}`;
+  hero.innerHTML = `<span class="records-hero-label">${CROWN_SVG}One rep max</span>${recordsValueHtml(oneRm, true)}`;
   const list = document.getElementById('records-list');
   list.innerHTML = Array.from({ length: maxReps - 1 }, (_, k) => {
     const reps = k + 2;
@@ -2246,13 +2247,13 @@ function openExerciseRecords() {
 // Exercise-own data, keyed by exercise name (same join key as favorites/
 // hiddenBuiltins) — not tied to any session/set, so it's stored and loaded
 // independently of db.workouts.
-const MUSCLE_OPTIONS = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Quadriceps', 'Hamstrings', 'Glutes', 'Core', 'Calves'];
+const MUSCLE_OPTIONS = ['Borst', 'Rug', 'Schouders', 'Biceps', 'Triceps', 'Quadriceps', 'Hamstrings', 'Bilspieren', 'Core', 'Kuiten'];
 
 // Every equipment dropdown shares the same "Not set" first option, both so
 // it's the natural default for a new/empty exercise and so a dropdown opened
 // by accident can be closed by picking it, without a separate reset control.
 function equipmentRangeOptions(start, end, step) {
-  const opts = [{ value: '', label: 'Not set' }];
+  const opts = [{ value: '', label: 'Niet ingesteld' }];
   const count = Math.round((end - start) / step);
   for (let i = 0; i <= count; i++) {
     const v = Math.round((start + i * step) * 100) / 100;
@@ -2261,11 +2262,11 @@ function equipmentRangeOptions(start, end, step) {
   return opts;
 }
 const BENCH_SETTING_OLD_OPTIONS = [
-  { value: '', label: 'Not set' },
+  { value: '', label: 'Niet ingesteld' },
   ...[0, 15, 30, 45, 60, 90].map(v => ({ value: String(v), label: v + '°' })),
 ];
 const BENCH_SETTING_NEW_OPTIONS = [
-  { value: '', label: 'Not set' },
+  { value: '', label: 'Niet ingesteld' },
   ...[0, 1, 2, 3, 4, 5, 6].map(v => ({ value: String(v), label: String(v) })),
 ];
 const BENCH_HEIGHT_OPTIONS = equipmentRangeOptions(1, 9, 0.5);
@@ -2284,16 +2285,16 @@ const SAFETY_BAR_OPTIONS = equipmentRangeOptions(1, 10, 1);
 // (prefix 'info') and in the New/Edit Exercise screen (prefix 'new-ex-info')
 // — so an element id is `<prefix>-<idSuffix>` (see EXERCISE_INFO_FORMS).
 const EXERCISE_INFO_EQUIPMENT_FIELDS = [
-  { key: 'benchSettingOld', label: 'Bench setting (old)', idSuffix: 'bench-setting-old', kind: 'picker', options: BENCH_SETTING_OLD_OPTIONS },
-  { key: 'benchSettingNew', label: 'Bench setting (new)', idSuffix: 'bench-setting-new', kind: 'picker', options: BENCH_SETTING_NEW_OPTIONS },
-  { key: 'benchHeight', label: 'Bench height', idSuffix: 'bench-height', kind: 'picker', options: BENCH_HEIGHT_OPTIONS },
-  { key: 'powerliftBench', label: 'Powerlift bench', idSuffix: 'powerlift-bench', kind: 'checkbox' },
-  { key: 'cableHeightOld', label: 'Cable height (old)', idSuffix: 'cable-height-old', kind: 'picker', options: CABLE_HEIGHT_OLD_OPTIONS },
-  { key: 'cableHeightNew', label: 'Cable height (new)', idSuffix: 'cable-height-new', kind: 'picker', options: CABLE_HEIGHT_NEW_OPTIONS },
-  { key: 'squatRackHeight', label: 'Squat rack height', idSuffix: 'squat-rack-height', kind: 'picker', options: SQUAT_RACK_HEIGHT_OPTIONS },
-  { key: 'safetyBar', label: 'Safety bar', idSuffix: 'safety-bar', kind: 'picker', options: SAFETY_BAR_OPTIONS },
-  { key: 'handPosition', label: 'Hand position', idSuffix: 'hand-position', kind: 'text' },
-  { key: 'footPosition', label: 'Foot position', idSuffix: 'foot-position', kind: 'text' },
+  { key: 'benchSettingOld', label: 'Bankstand (oud)', idSuffix: 'bench-setting-old', kind: 'picker', options: BENCH_SETTING_OLD_OPTIONS },
+  { key: 'benchSettingNew', label: 'Bankstand (nieuw)', idSuffix: 'bench-setting-new', kind: 'picker', options: BENCH_SETTING_NEW_OPTIONS },
+  { key: 'benchHeight', label: 'Bankhoogte', idSuffix: 'bench-height', kind: 'picker', options: BENCH_HEIGHT_OPTIONS },
+  { key: 'powerliftBench', label: 'Powerliftbank', idSuffix: 'powerlift-bench', kind: 'checkbox' },
+  { key: 'cableHeightOld', label: 'Kabelhoogte (oud)', idSuffix: 'cable-height-old', kind: 'picker', options: CABLE_HEIGHT_OLD_OPTIONS },
+  { key: 'cableHeightNew', label: 'Kabelhoogte (nieuw)', idSuffix: 'cable-height-new', kind: 'picker', options: CABLE_HEIGHT_NEW_OPTIONS },
+  { key: 'squatRackHeight', label: 'Hoogte squatrek', idSuffix: 'squat-rack-height', kind: 'picker', options: SQUAT_RACK_HEIGHT_OPTIONS },
+  { key: 'safetyBar', label: 'Valbeugels', idSuffix: 'safety-bar', kind: 'picker', options: SAFETY_BAR_OPTIONS },
+  { key: 'handPosition', label: 'Handpositie', idSuffix: 'hand-position', kind: 'text' },
+  { key: 'footPosition', label: 'Voetpositie', idSuffix: 'foot-position', kind: 'text' },
   { key: 'extra', label: 'Extra', idSuffix: 'extra', kind: 'text' },
 ];
 const EXERCISE_INFO_EQUIPMENT_PAIRS = [
@@ -2312,7 +2313,7 @@ function equipmentFieldIsFilled(f, info) {
   return v !== undefined && v !== null && v !== '';
 }
 function equipmentFieldViewValue(f, info) {
-  if (f.kind === 'checkbox') return 'Yes';
+  if (f.kind === 'checkbox') return 'Ja';
   if (f.kind === 'picker') {
     const opt = f.options.find(o => o.value === String(info[f.key]));
     return opt ? opt.label : String(info[f.key]);
@@ -2322,12 +2323,12 @@ function equipmentFieldViewValue(f, info) {
 
 function renderExerciseInfoView() {
   const info = getExerciseInfo(currentExercise) || {};
-  document.getElementById('exercise-info-view-title').textContent = currentExercise + ' info';
+  document.getElementById('exercise-info-view-title').textContent = 'Info ' + currentExercise;
   const sections = [];
   if (info.primaryMuscle || info.secondaryMuscle) {
-    sections.push(`<div class="section-label">Muscle group</div><div class="info-two-col">
-      ${info.primaryMuscle ? `<div class="info-view-stat"><span class="section-label">Primary</span><span class="info-view-stat-value">${info.primaryMuscle}</span></div>` : ''}
-      ${info.secondaryMuscle ? `<div class="info-view-stat"><span class="section-label">Secondary</span><span class="info-view-stat-value">${info.secondaryMuscle}</span></div>` : ''}
+    sections.push(`<div class="section-label">Spiergroep</div><div class="info-two-col">
+      ${info.primaryMuscle ? `<div class="info-view-stat"><span class="section-label">Primair</span><span class="info-view-stat-value">${info.primaryMuscle}</span></div>` : ''}
+      ${info.secondaryMuscle ? `<div class="info-view-stat"><span class="section-label">Secundair</span><span class="info-view-stat-value">${info.secondaryMuscle}</span></div>` : ''}
     </div>`);
   }
   let equipHtml = '';
@@ -2343,17 +2344,17 @@ function renderExerciseInfoView() {
     if (!equipmentFieldIsFilled(f, info)) return;
     equipHtml += `<div class="info-view-stat"><span class="section-label">${f.label}</span><span class="info-view-stat-value">${equipmentFieldViewValue(f, info)}</span></div>`;
   });
-  if (equipHtml) sections.push('<div class="section-label">Equipment setup</div>' + equipHtml);
+  if (equipHtml) sections.push('<div class="section-label">Apparatuur</div>' + equipHtml);
   const content = document.getElementById('exercise-info-view-content');
   content.innerHTML = sections.length === 0
-    ? `<div class="exercise-info-empty">No info added yet</div>`
+    ? `<div class="exercise-info-empty">Nog geen info toegevoegd</div>`
     : sections.join('');
   document.getElementById('exercise-info-view-mode').classList.remove('hidden');
   document.getElementById('exercise-info-edit-mode').classList.add('hidden');
 }
 
 const MUSCLE_PRIMARY_OPTIONS = MUSCLE_OPTIONS.map(m => ({ value: m, label: m }));
-const MUSCLE_SECONDARY_OPTIONS = [{ value: '', label: 'None' }, ...MUSCLE_PRIMARY_OPTIONS];
+const MUSCLE_SECONDARY_OPTIONS = [{ value: '', label: 'Geen' }, ...MUSCLE_PRIMARY_OPTIONS];
 
 // The muscle-group/equipment fields live in two places — the Exercise Info
 // overlay and the New/Edit Exercise screen — and both are built, wired,
@@ -2364,7 +2365,7 @@ const MUSCLE_SECONDARY_OPTIONS = [{ value: '', label: 'None' }, ...MUSCLE_PRIMAR
 // untouched form doesn't invent a muscle group.
 const EXERCISE_INFO_FORMS = {
   overlay: { prefix: 'info', primaryOptions: MUSCLE_PRIMARY_OPTIONS },
-  newEx: { prefix: 'new-ex-info', primaryOptions: [{ value: '', label: 'Not set' }, ...MUSCLE_PRIMARY_OPTIONS] },
+  newEx: { prefix: 'new-ex-info', primaryOptions: [{ value: '', label: 'Niet ingesteld' }, ...MUSCLE_PRIMARY_OPTIONS] },
 };
 
 function renderExerciseInfoFormFields(form) {
@@ -2382,12 +2383,12 @@ function renderExerciseInfoFormFields(form) {
     // suppress it. A fresh random name on every load means it never finds a
     // history match — same trick as the weight/reps fields. The app itself
     // only ever looks the field up by id, never by name.
-    else control = `<input type="text" id="${id}" name="${id}-${Math.random().toString(36).slice(2)}" class="new-ex-input" placeholder="Leave empty to hide" autocomplete="off"/>`;
+    else control = `<input type="text" id="${id}" name="${id}-${Math.random().toString(36).slice(2)}" class="new-ex-input" placeholder="Leeg laten om te verbergen" autocomplete="off"/>`;
     return field(id, f.label, control);
   };
   document.getElementById(`${p}-muscle-fields`).innerHTML =
-    field(`${p}-primary-muscle`, 'Primary', pickerBtn(`${p}-primary-muscle`)) +
-    field(`${p}-secondary-muscle`, 'Secondary', pickerBtn(`${p}-secondary-muscle`));
+    field(`${p}-primary-muscle`, 'Primair', pickerBtn(`${p}-primary-muscle`)) +
+    field(`${p}-secondary-muscle`, 'Secundair', pickerBtn(`${p}-secondary-muscle`));
   document.getElementById(`${p}-equipment-fields`).innerHTML =
     EXERCISE_INFO_EQUIPMENT_PAIRS.map(pair => `<div class="info-two-col">${pair.map(equipmentField).join('')}</div>`).join('') +
     EXERCISE_INFO_FULLWIDTH_KEYS.map(equipmentField).join('');
@@ -2402,12 +2403,12 @@ function wireExerciseInfoFormPickers(form) {
     document.getElementById(id).addEventListener('click', () => {
       openFieldPicker(title, options, getFieldBtnValue(id), value => {
         const opt = options.find(o => o.value === value);
-        setFieldBtnValue(id, value, opt ? opt.label : 'Not set');
+        setFieldBtnValue(id, value, opt ? opt.label : 'Niet ingesteld');
       });
     });
   };
-  wire(`${p}-primary-muscle`, 'Primary', form.primaryOptions);
-  wire(`${p}-secondary-muscle`, 'Secondary', MUSCLE_SECONDARY_OPTIONS);
+  wire(`${p}-primary-muscle`, 'Primair', form.primaryOptions);
+  wire(`${p}-secondary-muscle`, 'Secundair', MUSCLE_SECONDARY_OPTIONS);
   EXERCISE_INFO_EQUIPMENT_FIELDS.filter(f => f.kind === 'picker').forEach(f => wire(`${p}-${f.idSuffix}`, f.label, f.options));
 }
 
@@ -2486,7 +2487,7 @@ let exerciseInfoEditBaseline = null;
 
 function showExerciseInfoEdit() {
   const info = getExerciseInfo(currentExercise) || {};
-  document.getElementById('exercise-info-edit-title').textContent = currentExercise + ' info';
+  document.getElementById('exercise-info-edit-title').textContent = 'Info ' + currentExercise;
   populateExerciseInfoForm(EXERCISE_INFO_FORMS.overlay, info);
   document.getElementById('exercise-info-edit-mode').classList.remove('hidden');
   document.getElementById('exercise-info-view-mode').classList.add('hidden');
@@ -2511,16 +2512,16 @@ function setExerciseInfoFor(name, info) {
 function saveExerciseInfo() {
   setExerciseInfoFor(currentExercise, readExerciseInfoForm(EXERCISE_INFO_FORMS.overlay));
   renderExerciseInfoView();
-  toast('Info saved');
+  toast('Info opgeslagen');
 }
 
 function saveSet() {
   const weight = parseWeight(document.getElementById('field-weight').value);
   const reps = parseWholeNumber(document.getElementById('field-reps').value);
-  if (reps < 1) { toast('Enter reps', { type: 'error' }); return; }
+  if (reps < 1) { toast('Vul reps in', { type: 'error' }); return; }
   reconcileExtraWithRpe(); // a typed RPE below 10 whose change event hasn't fired yet
   const rpe = parseRpe(document.getElementById('field-rpe').value);
-  if (!isValidRpe(rpe)) { toast('RPE: 6 to 10, in steps of 0,5', { type: 'error' }); return; }
+  if (!isValidRpe(rpe)) { toast('RPE: 6 tot 10, in stappen van 0,5', { type: 'error' }); return; }
   const extra = getExtraReps();
   const extraType = extra > 0 ? (getExtraType() || 'partial') : '';
 
@@ -2536,18 +2537,18 @@ function saveSet() {
     ex.sets[selectedSetIndex] = { weight, reps, ...(rpe > 0 && { rpe }), ...(extra > 0 && { extra, extraType }), ...(dropset && { isDropsetContinuation: true }), ...(existingNote && { note: existingNote }) };
     savedIdx = selectedSetIndex;
     selectedSetIndex = null;
-    savedMsg = 'Set updated';
+    savedMsg = 'Set bijgewerkt';
   } else {
     ex.sets.push({ weight, reps, ...(rpe > 0 && { rpe }), ...(extra > 0 && { extra, extraType }), ...(dropset && { isDropsetContinuation: true }) });
     savedIdx = ex.sets.length - 1;
-    savedMsg = 'Set saved';
+    savedMsg = 'Set opgeslagen';
   }
 
   setWorkout(currentDate, workout);
   // A PR replaces the plain confirmation entirely (two consecutive toast()
   // calls would just overwrite each other anyway).
   const isPR = getPRSetKeys(currentExercise).has(currentDate + '#' + savedIdx);
-  if (isPR) toast('\u{1F3C6} Personal record! \u{1F3C6}', { type: 'pr' });
+  if (isPR) toast('\u{1F3C6} Nieuw PR! \u{1F3C6}', { type: 'pr' });
   else toast(savedMsg);
   setDropsetField(false); // linking is per set — the next one starts unlinked again
   trackFieldsBaseline = getTrackFieldsSnapshot();
@@ -2787,7 +2788,7 @@ function renderHistoryTab() {
     .slice(0, 20);
 
   if (relevantDates.length === 0) {
-    container.innerHTML = '<div class="plan-list-empty">No history yet</div>';
+    container.innerHTML = '<div class="plan-list-empty">Nog geen geschiedenis</div>';
     return;
   }
 
@@ -2804,7 +2805,7 @@ function renderHistoryTab() {
     card.className = 'history-card';
     const header = document.createElement('div');
     header.className = 'history-card-header clickable';
-    header.innerHTML = `<div class="section-label">${formatDateStr(date, 'short')}</div>`;
+    header.innerHTML = `<div class="section-label">${formatDateStr(date)}</div>`;
     header.addEventListener('click', () => openHistoryGotoDate(date));
     card.appendChild(header);
     card.appendChild(Object.assign(document.createElement('div'), { className: 'history-card-divider' }));
@@ -2851,7 +2852,7 @@ function openHistoryGoto(title, action, bodyEl, underOverlayId = null) {
 }
 
 function openHistoryGotoDate(dateStr) {
-  openHistoryGoto('Go to ' + formatDateStr(dateStr, 'short'), () => {
+  openHistoryGoto(formatDateStr(dateStr), () => {
     currentDate = dateStr;
     showScreen('screen-fitness-tracker');
   });
@@ -2877,7 +2878,7 @@ function openHistoryGotoDaySets(dateStr, markReps, markVal, underOverlayId) {
     row.innerHTML = setRowInnerHtml(sets, i, { comment: 'none' });
     body.appendChild(row);
   });
-  openHistoryGoto('Go to ' + formatDateStr(dateStr, 'short'), () => {
+  openHistoryGoto(formatDateStr(dateStr), () => {
     currentDate = dateStr;
     showScreen('screen-fitness-tracker');
   }, body, underOverlayId);
@@ -2913,7 +2914,7 @@ document.getElementById('history-goto-confirm').addEventListener('click', () => 
 const GRAPH_MIN_MAX_REPS = 12;
 const graphRepsByExercise = {}; // last explicit choice per exercise (this session)
 
-function graphRepsLabel(n) { return n === 1 ? 'One Rep Max' : String(n); }
+function graphRepsLabel(n) { return n === 1 ? 'One rep max' : String(n); }
 
 // Per rep count: in how many sessions (dates) it was logged; plus the highest rep count ever.
 // Dropsets don't count (countsForRecords), like everywhere records/progression are derived.
@@ -3168,7 +3169,7 @@ function drawGraphChart() {
   }
 
   ctx.fillStyle = tok('--text-muted'); ctx.font = '11px Roboto';
-  const dateLabel = d => new Date(d.date + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short' });
+  const dateLabel = d => formatDateStr(d.date, 'axis');
   if (data.length === 1) {
     ctx.textAlign = 'center';
     ctx.fillText(dateLabel(data[0]), pts[0].x, H - 10);
@@ -3187,11 +3188,11 @@ function updateGraphPanel() {
   // A derived point shows the REAL rep count of its source set plus what it counts as.
   document.getElementById('graph-sel-main').innerHTML = `${weightValueHtml(pt.val)}<span class="set-unit">×</span><span class="set-val">${pt.reps}</span><span class="set-unit">rep${pt.reps === 1 ? '' : 's'}</span>`;
   const dateEl = document.getElementById('graph-sel-date');
-  dateEl.textContent = formatDateStr(pt.date, 'detail');
+  dateEl.textContent = formatDateStr(pt.date);
   if (pt.derived) {
     const via = document.createElement('span');
     via.className = 'graph-sel-via';
-    via.textContent = 'Derived \u2014 counts as ' + recordsRepLabel(graphReps);
+    via.textContent = 'Afgeleid \u2014 telt als ' + recordsRepLabel(graphReps);
     dateEl.appendChild(via);
   }
   document.getElementById('btn-graph-prev').disabled = graphSelected <= 0;
@@ -3256,7 +3257,7 @@ function calBuildMonthEl(year, month) {
   wrap.className = 'cal-month';
   wrap.dataset.ym = `${year}-${String(month + 1).padStart(2, '0')}`;
 
-  const label = new Date(year, month, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  const label = formatDateStr(`${year}-${String(month + 1).padStart(2, '0')}-01`, 'month');
   const hdr = document.createElement('div');
   hdr.className = 'section-label';
   hdr.textContent = label;
@@ -3341,7 +3342,7 @@ function calJumpTo(y, m, dateStr) {
 
 function calUpdateWorkoutCount() {
   const n = calWorkoutDates.length;
-  document.getElementById('cal-workout-count').textContent = `${n} WORKOUT${n === 1 ? '' : 'S'}`;
+  document.getElementById('cal-workout-count').textContent = `${n} ${n === 1 ? 'workout' : 'workouts'}`;
 }
 
 function calFindAdjacentWorkoutDate(dir) {
@@ -3440,14 +3441,14 @@ document.getElementById('cal-next-workout').addEventListener('click', () => calJ
 // -- Calendar workout detail popup ------------------------
 function openWorkoutDetail(dateStr) {
   calDetailDate = dateStr;
-  document.getElementById('cal-detail-date').textContent = formatDateStr(dateStr, 'detail');
+  document.getElementById('cal-detail-date').textContent = formatDateStr(dateStr);
 
   const body = document.getElementById('cal-detail-body');
   body.innerHTML = '';
   const exercises = (db.workouts[dateStr] || []).filter(ex => (ex.sets || []).length > 0);
 
   if (exercises.length === 0) {
-    body.innerHTML = `<div class="records-empty">There is no workout saved for this day.</div>`;
+    body.innerHTML = `<div class="records-empty">Er is voor deze dag geen workout opgeslagen.</div>`;
     openOverlay('cal-detail-overlay');
     return;
   }
@@ -3498,10 +3499,10 @@ let pendingEditExerciseOriginalName = null;
 
 // -- Custom field picker (replaces native <select>/picker for Category/Type) --
 const EX_TYPE_OPTIONS = [
-  { value: 'weight_reps', label: 'Weight and Reps' },
-  { value: 'reps_only', label: 'Reps Only' },
-  { value: 'duration', label: 'Duration' },
-  { value: 'distance', label: 'Distance' },
+  { value: 'weight_reps', label: 'Gewicht en reps' },
+  { value: 'reps_only', label: 'Alleen reps' },
+  { value: 'duration', label: 'Duur' },
+  { value: 'distance', label: 'Afstand' },
 ];
 
 function setFieldBtnValue(id, value, label) {
@@ -3533,7 +3534,7 @@ document.getElementById('field-picker-list').addEventListener('click', e => {
 });
 document.getElementById('new-ex-category').addEventListener('click', () => {
   const categories = [...new Set(allExercises().map(e => e.category))].sort();
-  openFieldPicker('Category', categories.map(c => ({ value: c, label: c })), getFieldBtnValue('new-ex-category'), value => {
+  openFieldPicker('Categorie', categories.map(c => ({ value: c, label: c })), getFieldBtnValue('new-ex-category'), value => {
     setFieldBtnValue('new-ex-category', value, value);
   });
 });
@@ -3544,7 +3545,7 @@ document.getElementById('new-ex-type').addEventListener('click', () => {
 });
 
 function populateNewExCategorySelect(selected) {
-  setFieldBtnValue('new-ex-category', selected || '', selected || 'Choose category...');
+  setFieldBtnValue('new-ex-category', selected || '', selected || 'Kies een categorie...');
 }
 
 function getNewExerciseFormSnapshot() {
@@ -3569,9 +3570,9 @@ document.getElementById('btn-new-ex-equipment-toggle').addEventListener('click',
 
 function openNewExerciseScreen() {
   pendingEditExerciseOriginalName = null;
-  document.getElementById('new-ex-title').textContent = 'New Exercise';
+  document.getElementById('new-ex-title').textContent = 'Nieuwe oefening';
   document.getElementById('new-ex-name').value = '';
-  setFieldBtnValue('new-ex-type', 'weight_reps', 'Weight and Reps');
+  setFieldBtnValue('new-ex-type', 'weight_reps', 'Gewicht en reps');
   populateNewExCategorySelect();
   populateExerciseInfoForm(EXERCISE_INFO_FORMS.newEx, {});
   setNewExEquipmentOpen(false);
@@ -3582,7 +3583,7 @@ function openNewExerciseScreen() {
 
 function openEditExerciseScreen(ex) {
   pendingEditExerciseOriginalName = ex.name;
-  document.getElementById('new-ex-title').textContent = 'Update Exercise';
+  document.getElementById('new-ex-title').textContent = 'Oefening bewerken';
   document.getElementById('new-ex-name').value = ex.name;
   const typeOpt = EX_TYPE_OPTIONS.find(o => o.value === ex.type) || EX_TYPE_OPTIONS[0];
   setFieldBtnValue('new-ex-type', typeOpt.value, typeOpt.label);
@@ -3639,20 +3640,20 @@ function updateExistingExercise(originalName, updated) {
       persistExerciseInfo();
     }
   }
-  toast('Exercise updated');
+  toast('Oefening bijgewerkt');
 }
 
 function saveNewExerciseFromScreen() {
   const name = document.getElementById('new-ex-name').value.trim();
   const cat = getFieldBtnValue('new-ex-category');
   const type = getFieldBtnValue('new-ex-type');
-  if (!name) { toast('Enter a name'); return; }
-  if (!cat) { toast('Choose a category'); return; }
+  if (!name) { toast('Vul een naam in'); return; }
+  if (!cat) { toast('Kies een categorie'); return; }
 
   if (pendingEditExerciseOriginalName) {
     const nameTaken = name.toLowerCase() !== pendingEditExerciseOriginalName.toLowerCase()
       && allExercises().find(e => e.name.toLowerCase() === name.toLowerCase());
-    if (nameTaken) { toast('Exercise already exists'); return; }
+    if (nameTaken) { toast('Deze oefening bestaat al'); return; }
     updateExistingExercise(pendingEditExerciseOriginalName, { category: cat, name, type });
     // After the rename above has moved any existing info over to the new name.
     setExerciseInfoFor(name, readExerciseInfoForm(EXERCISE_INFO_FORMS.newEx));
@@ -3664,12 +3665,12 @@ function saveNewExerciseFromScreen() {
     return;
   }
 
-  if (allExercises().find(e => e.name.toLowerCase() === name.toLowerCase())) { toast('Exercise already exists'); return; }
+  if (allExercises().find(e => e.name.toLowerCase() === name.toLowerCase())) { toast('Deze oefening bestaat al'); return; }
   if (!db.custom_exercises) db.custom_exercises = [];
   db.custom_exercises.push({ category: cat, name, type });
   persistCustomExercises();
   setExerciseInfoFor(name, readExerciseInfoForm(EXERCISE_INFO_FORMS.newEx));
-  toast('Exercise created');
+  toast('Oefening aangemaakt');
   exerciseBrowserMode = 'categories';
   currentBrowseCategory = null;
   renderCategoryBrowser();
@@ -3902,13 +3903,13 @@ document.getElementById('btn-comment-delete').addEventListener('click', () => {
   const doDelete = () => {
     if (ctx) ctx.onDelete();
     closeOverlay('comment-overlay');
-    toast('Comment verwijderd');
+    toast('Notitie verwijderd');
   };
   // Nothing saved yet (popup opened straight into edit mode): nothing to lose, just close.
   const saved = ctx && ctx.getText();
   if (!saved || !saved.trim()) { doDelete(); return; }
   openConfirmDelete({
-    title: 'Comment verwijderen?',
+    title: 'Notitie verwijderen?',
     message: `${ctx.label} verwijderen? Dit kan niet ongedaan worden gemaakt.`,
     onConfirm: doDelete,
   });
@@ -3918,7 +3919,7 @@ document.getElementById('btn-comment-save').addEventListener('click', () => {
   if (commentPopupCtx) commentPopupCtx.onSave(val);
   closeOverlay('comment-overlay');
   // Saving an emptied comment removes it, same as Delete.
-  toast(val ? 'Comment saved' : 'Comment verwijderd');
+  toast(val ? 'Notitie opgeslagen' : 'Notitie verwijderd');
 });
 
 document.getElementById('exercise-search').addEventListener('input', e => {
@@ -3928,7 +3929,7 @@ document.getElementById('exercise-search').addEventListener('input', e => {
     setExercisesTitle(defaultExercisesTitle());
   } else if (exerciseBrowserMode === 'exercises' && currentBrowseCategory === FAVORITES_CATEGORY) {
     renderFavoriteExercises();
-    setExercisesTitle('Favorites');
+    setExercisesTitle('Favorieten');
   } else if (exerciseBrowserMode === 'exercises' && currentBrowseCategory) {
     renderExercisesInCategory(currentBrowseCategory);
     setExercisesTitle(currentBrowseCategory);
@@ -3948,7 +3949,7 @@ document.getElementById('exercise-search').addEventListener('input', e => {
 function renderMenuUserBar() {
   const bar = document.getElementById('menu-user-bar');
   if (!currentUser) { bar.innerHTML = ''; return; }
-  const name = currentUser.displayName || currentUser.email || 'User';
+  const name = currentUser.displayName || currentUser.email || 'Gebruiker';
   const photo = currentUser.photoURL;
   bar.innerHTML = photo
     ? `<img src="${photo}" class="menu-user-photo" alt="${name}"/><span class="menu-user-name">${name}</span>`
@@ -3983,7 +3984,7 @@ function applyTheme(theme) {
   // Android status bar follows the active theme's toolbar color.
   document.querySelector('meta[name="theme-color"]').content =
     getComputedStyle(document.documentElement).getPropertyValue('--toolbar').trim();
-  document.getElementById('btn-theme-toggle').setAttribute('aria-label', theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme');
+  document.getElementById('btn-theme-toggle').setAttribute('aria-label', theme === 'dark' ? 'Licht thema' : 'Donker thema');
   // The canvas chart reads its colors from the tokens only while drawing, so redraw it if it's on screen.
   if (graphPlot && document.getElementById('tab-graph').offsetParent) drawGraphChart();
 }
@@ -4027,11 +4028,11 @@ function parseOrmNumber(str) {
 
 // Returns { error } or { oneRm, rows: [{ reps, weight, percent }] }.
 function computeOneRm(weightStr, repsStr) {
-  if (String(weightStr).trim() === '' || String(repsStr).trim() === '') return { error: 'Vul zowel gewicht als herhalingen in.' };
+  if (String(weightStr).trim() === '' || String(repsStr).trim() === '') return { error: 'Vul zowel gewicht als reps in.' };
   const weight = parseOrmNumber(weightStr);
   const reps = parseOrmNumber(repsStr);
   if (!isFinite(weight) || weight <= 0) return { error: 'Gewicht moet een getal groter dan 0 zijn.' };
-  if (!isFinite(reps) || reps < 1 || !Number.isInteger(reps)) return { error: 'Herhalingen moet een geheel getal van minimaal 1 zijn.' };
+  if (!isFinite(reps) || reps < 1 || !Number.isInteger(reps)) return { error: 'Reps moet een geheel getal van minimaal 1 zijn.' };
   const oneRm = epley1rm(weight, reps);
   const rows = ORM_TABLE_REPS.map(n => ({ reps: n, weight: weightAtReps(oneRm, n), percent: percentAtReps(n) }));
   return { oneRm, rows };
@@ -4296,12 +4297,6 @@ function clampAllOnBarToAvailable() {
 // Summarizes the VIEWED day (currentDate): how many PRs it has, then per exercise,
 // logged sets vs. the plan target it was loaded with (only when it has one), and each
 // set's weight, reps and RPE vs. the same set in the most recent earlier session.
-const recapDayFormat = new Intl.DateTimeFormat('nl-NL', { timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'long' });
-
-function recapDayName(dateStr) {
-  const s = recapDayFormat.format(new Date(dateStr + 'T00:00:00Z'));
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
 
 // Sets as the user counts them: a dropset continuation belongs to the set before it.
 function workingSets(sets) {
@@ -4415,7 +4410,7 @@ function recapPRKeys(exercises, date) {
 function openDayRecap() {
   const date = currentDate;
   const exercises = getWorkout(date);
-  document.getElementById('recap-title').textContent = `Recap — ${recapDayName(date)}`;
+  document.getElementById('recap-title').textContent = `Samenvatting — ${formatDateStr(date)}`;
   const body = document.getElementById('recap-body');
   // Exercises with logged sets, plus planned ones still at 0 sets (they count as
   // "minder dan gepland"); nothing logged at all on this day -> empty state.
@@ -4877,7 +4872,7 @@ function buildPlanItem(plan, { withMenu }) {
       <div class="plan-item-meta">${dayCount} dag${dayCount !== 1 ? 'en' : ''}</div>
       ${isActive ? '<div class="badge badge-primary plan-item-active-pill">★ ACTIEF</div>' : ''}
     </div>
-    ${withMenu ? '<button class="plan-item-dots" aria-label="Options"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button>' : ''}
+    ${withMenu ? '<button class="plan-item-dots" aria-label="Opties"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button>' : ''}
   `;
   return item;
 }
@@ -5418,7 +5413,7 @@ function renderPlanDayEdit() {
           <span class="pde-ex-meta">${formatExerciseSetsReps(ex)}</span>
         </div>
         <svg class="pde-chevron" viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
-        <div class="pde-drag-handle" aria-label="Drag to reorder">
+        <div class="pde-drag-handle" aria-label="Sleep om te verplaatsen">
           <svg viewBox="0 0 24 24"><path d="M3 15h18v-2H3v2zm0 4h18v-2H3v2zm0-8h18V9H3v2zm0-6v2h18V5H3z"/></svg>
         </div>
       </div>
@@ -5731,6 +5726,13 @@ function getAiGenFormSnapshot() {
 // screen behavior, not something this discard-check changes.
 const AI_GEN_DEFAULT_SNAPSHOT = { goal: 'Muscle Growth', level: 'Intermediate', days: '4', pref: '' };
 
+// The AI plan builder answers in Dutch, except for these terms (same list as PROJECT_CONTEXT.md)
+// and exercise names, which must come from the dataset so a plan links to the same exercises
+// and history. The chips' data-val stays English (Muscle Growth, Intermediate, ...) so the
+// prompt input is unambiguous; only their labels are Dutch.
+const AI_ENGLISH_TERMS = ['reps', 'sets', 'RPE', 'dropset', 'PR', 'partial', 'forced', 'extra reps', 'warm-up', '1RM', 'xRM (5RM, 8RM)', 'One rep max', 'Workout'];
+function aiExerciseNameList() { return allExercises().map(e => e.name).join('\n'); }
+
 function openAIGenerate() {
   document.getElementById('ai-gen-form').classList.remove('hidden');
   document.getElementById('ai-gen-loading').classList.add('hidden');
@@ -5742,7 +5744,7 @@ document.getElementById('btn-back-ai-generate').addEventListener('click', () => 
 
 document.getElementById('btn-ai-generate-submit').addEventListener('click', async () => {
   if (!ANTHROPIC_API_KEY || ANTHROPIC_API_KEY.includes('YOUR_KEY')) {
-    toast('Add your Anthropic API key in app.js');
+    toast('Voeg je Anthropic API-sleutel toe in app.js');
     return;
   }
   const goal = document.querySelector('#chips-goal .chip.active')?.dataset.val || 'Muscle Growth';
@@ -5753,7 +5755,14 @@ document.getElementById('btn-ai-generate-submit').addEventListener('click', asyn
   document.getElementById('ai-gen-form').classList.add('hidden');
   document.getElementById('ai-gen-loading').classList.remove('hidden');
 
-  const systemPrompt = `You are a professional fitness coach. Generate a workout plan based on the user's input. Respond ONLY with a valid JSON object, no markdown, no explanation. Format:
+  const systemPrompt = `You are a professional fitness coach. Generate a workout plan based on the user's input.
+
+Language: write the plan name, the day names and any explanation in Dutch. Keep exercise names and these fitness terms in English, also inside Dutch text: ${AI_ENGLISH_TERMS.join(', ')}. Workout split names Push, Pull, Legs, Upper and Lower may stay English too.
+
+Exercises: use ONLY exercise names from this list, spelled exactly as written (same capitals, same brackets) — never invent, translate or rename one:
+${aiExerciseNameList()}
+
+Respond ONLY with a valid JSON object, no markdown, no explanation. Format:
 {
   "name": "string",
   "days": [
@@ -5774,12 +5783,12 @@ document.getElementById('btn-ai-generate-submit').addEventListener('click', asyn
     if (!plan.name || !Array.isArray(plan.days)) throw new Error('Invalid format');
     const planId = await createPlan(plan.name, plan.days);
     openPlanDetail(planId);
-    toast('Plan generated!');
+    toast('Plan gemaakt!');
   } catch(e) {
     console.error('AI gen error', e);
     document.getElementById('ai-gen-form').classList.remove('hidden');
     document.getElementById('ai-gen-loading').classList.add('hidden');
-    toast('Generation failed: ' + (e.message || 'try again'));
+    toast('Plan maken mislukt. Probeer het opnieuw.', { type: 'error' });
   }
 });
 
@@ -5796,27 +5805,27 @@ document.querySelectorAll('.chip-group').forEach(group => {
 // ── Presets ───────────────────────────────────────────
 const PLAN_PRESETS = [
   { name: 'Push / Pull / Legs', days: [
-    { name: 'Push', exercises: [{ name:'Bench Press', sets:4, reps:8 }, { name:'Overhead Press', sets:3, reps:10 }, { name:'Incline Dumbbell Press', sets:3, reps:12 }, { name:'Tricep Dips', sets:3, reps:12 }] },
-    { name: 'Pull', exercises: [{ name:'Deadlift', sets:4, reps:5 }, { name:'Pull-Ups', sets:4, reps:8 }, { name:'Barbell Row', sets:3, reps:10 }, { name:'Bicep Curl', sets:3, reps:12 }] },
-    { name: 'Legs', exercises: [{ name:'Squat', sets:4, reps:8 }, { name:'Romanian Deadlift', sets:3, reps:10 }, { name:'Leg Press', sets:3, reps:12 }, { name:'Calf Raise', sets:4, reps:15 }] },
+    { name: 'Push', exercises: [{ name:'Bench press', sets:4, reps:8 }, { name:'Military press (barbell)', sets:3, reps:10 }, { name:'Incline bench press (dumbbell)', sets:3, reps:12 }, { name:'Dips (triceps)', sets:3, reps:12 }] },
+    { name: 'Pull', exercises: [{ name:'Deadlift', sets:4, reps:5 }, { name:'Pull-ups', sets:4, reps:8 }, { name:'Bent-over barbell row', sets:3, reps:10 }, { name:'Dumbbell curl', sets:3, reps:12 }] },
+    { name: 'Legs', exercises: [{ name:'Squat', sets:4, reps:8 }, { name:'Romanian deadlift', sets:3, reps:10 }, { name:'Leg press', sets:3, reps:12 }, { name:'Standing calf raise (machine)', sets:4, reps:15 }] },
   ]},
-  { name: 'Upper / Lower (4-day)', days: [
-    { name: 'Upper A', exercises: [{ name:'Bench Press', sets:4, reps:6 }, { name:'Barbell Row', sets:4, reps:6 }, { name:'Overhead Press', sets:3, reps:8 }, { name:'Pull-Ups', sets:3, reps:8 }] },
-    { name: 'Lower A', exercises: [{ name:'Squat', sets:4, reps:6 }, { name:'Romanian Deadlift', sets:3, reps:8 }, { name:'Leg Press', sets:3, reps:10 }, { name:'Leg Curl', sets:3, reps:12 }] },
-    { name: 'Upper B', exercises: [{ name:'Incline Bench Press', sets:4, reps:8 }, { name:'Cable Row', sets:4, reps:10 }, { name:'Dumbbell Shoulder Press', sets:3, reps:10 }, { name:'Bicep Curl', sets:3, reps:12 }] },
-    { name: 'Lower B', exercises: [{ name:'Deadlift', sets:4, reps:5 }, { name:'Hack Squat', sets:3, reps:10 }, { name:'Walking Lunge', sets:3, reps:12 }, { name:'Calf Raise', sets:4, reps:15 }] },
+  { name: 'Upper / Lower (4 dagen)', days: [
+    { name: 'Upper A', exercises: [{ name:'Bench press', sets:4, reps:6 }, { name:'Bent-over barbell row', sets:4, reps:6 }, { name:'Military press (barbell)', sets:3, reps:8 }, { name:'Pull-ups', sets:3, reps:8 }] },
+    { name: 'Lower A', exercises: [{ name:'Squat', sets:4, reps:6 }, { name:'Romanian deadlift', sets:3, reps:8 }, { name:'Leg press', sets:3, reps:10 }, { name:'Leg curl (machine)', sets:3, reps:12 }] },
+    { name: 'Upper B', exercises: [{ name:'Incline bench press', sets:4, reps:8 }, { name:'Seated cable row', sets:4, reps:10 }, { name:'Shoulder press (dumbbell)', sets:3, reps:10 }, { name:'Dumbbell curl', sets:3, reps:12 }] },
+    { name: 'Lower B', exercises: [{ name:'Deadlift', sets:4, reps:5 }, { name:'Hack squat', sets:3, reps:10 }, { name:'Lunges (dumbbell)', sets:3, reps:12 }, { name:'Standing calf raise (machine)', sets:4, reps:15 }] },
   ]},
-  { name: 'Full Body (3-day)', days: [
-    { name: 'Day A', exercises: [{ name:'Squat', sets:3, reps:8 }, { name:'Bench Press', sets:3, reps:8 }, { name:'Barbell Row', sets:3, reps:8 }, { name:'Overhead Press', sets:3, reps:8 }] },
-    { name: 'Day B', exercises: [{ name:'Deadlift', sets:3, reps:5 }, { name:'Incline Bench Press', sets:3, reps:10 }, { name:'Pull-Ups', sets:3, reps:8 }, { name:'Bicep Curl', sets:3, reps:12 }] },
-    { name: 'Day C', exercises: [{ name:'Front Squat', sets:3, reps:8 }, { name:'Dips', sets:3, reps:10 }, { name:'Chin-Ups', sets:3, reps:8 }, { name:'Lateral Raise', sets:3, reps:15 }] },
+  { name: 'Full body (3 dagen)', days: [
+    { name: 'Dag A', exercises: [{ name:'Squat', sets:3, reps:8 }, { name:'Bench press', sets:3, reps:8 }, { name:'Bent-over barbell row', sets:3, reps:8 }, { name:'Military press (barbell)', sets:3, reps:8 }] },
+    { name: 'Dag B', exercises: [{ name:'Deadlift', sets:3, reps:5 }, { name:'Incline bench press', sets:3, reps:10 }, { name:'Pull-ups', sets:3, reps:8 }, { name:'Dumbbell curl', sets:3, reps:12 }] },
+    { name: 'Dag C', exercises: [{ name:'Front squat', sets:3, reps:8 }, { name:'Dips (chest)', sets:3, reps:10 }, { name:'Chin-ups', sets:3, reps:8 }, { name:'Lateral raises (dumbbell)', sets:3, reps:15 }] },
   ]},
-  { name: 'Bro Split (5-day)', days: [
-    { name: 'Chest', exercises: [{ name:'Bench Press', sets:4, reps:8 }, { name:'Incline Dumbbell Press', sets:3, reps:10 }, { name:'Cable Fly', sets:3, reps:12 }, { name:'Dips', sets:3, reps:12 }] },
-    { name: 'Back', exercises: [{ name:'Deadlift', sets:4, reps:5 }, { name:'Pull-Ups', sets:4, reps:8 }, { name:'Barbell Row', sets:3, reps:10 }, { name:'Cable Row', sets:3, reps:12 }] },
-    { name: 'Shoulders', exercises: [{ name:'Overhead Press', sets:4, reps:8 }, { name:'Lateral Raise', sets:4, reps:15 }, { name:'Front Raise', sets:3, reps:12 }, { name:'Shrugs', sets:3, reps:12 }] },
-    { name: 'Arms', exercises: [{ name:'Barbell Curl', sets:4, reps:10 }, { name:'Hammer Curl', sets:3, reps:12 }, { name:'Skull Crushers', sets:4, reps:10 }, { name:'Tricep Pushdown', sets:3, reps:12 }] },
-    { name: 'Legs', exercises: [{ name:'Squat', sets:4, reps:8 }, { name:'Romanian Deadlift', sets:3, reps:10 }, { name:'Leg Press', sets:3, reps:12 }, { name:'Calf Raise', sets:5, reps:15 }] },
+  { name: 'Bro split (5 dagen)', days: [
+    { name: 'Borst', exercises: [{ name:'Bench press', sets:4, reps:8 }, { name:'Incline bench press (dumbbell)', sets:3, reps:10 }, { name:'Flyes (cable)', sets:3, reps:12 }, { name:'Dips (chest)', sets:3, reps:12 }] },
+    { name: 'Rug', exercises: [{ name:'Deadlift', sets:4, reps:5 }, { name:'Pull-ups', sets:4, reps:8 }, { name:'Bent-over barbell row', sets:3, reps:10 }, { name:'Seated cable row', sets:3, reps:12 }] },
+    { name: 'Schouders', exercises: [{ name:'Military press (barbell)', sets:4, reps:8 }, { name:'Lateral raises (dumbbell)', sets:4, reps:15 }, { name:'Front raises (dumbbell)', sets:3, reps:12 }, { name:'Shrugs (barbell)', sets:3, reps:12 }] },
+    { name: 'Armen', exercises: [{ name:'Barbell curl', sets:4, reps:10 }, { name:'Hammer curl', sets:3, reps:12 }, { name:'Skull crushers (barbell)', sets:4, reps:10 }, { name:'Triceps pushdown (cable)', sets:3, reps:12 }] },
+    { name: 'Benen', exercises: [{ name:'Squat', sets:4, reps:8 }, { name:'Romanian deadlift', sets:3, reps:10 }, { name:'Leg press', sets:3, reps:12 }, { name:'Standing calf raise (machine)', sets:5, reps:15 }] },
   ]},
 ];
 
@@ -5829,7 +5838,7 @@ function openPresetsOverlay() {
     item.innerHTML = `
       <div class="preset-item-body">
         <div class="preset-item-name">${preset.name}</div>
-        <div class="preset-item-meta">${preset.days.length} days</div>
+        <div class="preset-item-meta">${preset.days.length} dagen</div>
       </div>
       <span class="preset-item-arrow">›</span>
     `;
@@ -5837,7 +5846,7 @@ function openPresetsOverlay() {
       closeOverlay('presets-overlay');
       const planId = await createPlan(preset.name, JSON.parse(JSON.stringify(preset.days)));
       openPlanDetail(planId);
-      toast('Preset added!');
+      toast('Sjabloon toegevoegd!');
     });
     list.appendChild(item);
   });
@@ -5868,7 +5877,7 @@ document.getElementById('btn-presets-close').addEventListener('click', () => clo
 
 document.getElementById('btn-new-plan-save').addEventListener('click', async () => {
   const name = document.getElementById('new-plan-name').value.trim();
-  if (!name) { toast('Enter a plan name'); return; }
+  if (!name) { toast('Vul een naam voor het plan in'); return; }
   closeOverlay('new-plan-overlay');
   await createPlan(name, []);
   renderPlanList();
@@ -5923,7 +5932,7 @@ function renderSmartBanner() {
   const pick = getTodaysScheduledDay();
   bannerSuggestedPick = pick;
   if (bannerDismissed || !pick || getWorkout(todayStr()).length > 0) { banner.classList.add('hidden'); return; }
-  document.getElementById('smart-banner-msg').textContent = `Based on your plan, today is ${pick.dayName}. Load it?`;
+  document.getElementById('smart-banner-msg').textContent = `Volgens je plan staat vandaag ${pick.dayName} op het programma. Laden?`;
   banner.classList.remove('hidden');
 }
 
