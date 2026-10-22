@@ -467,9 +467,6 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .field-row-pair .field-group { flex: 1 1 0; min-width: 0; }
 .field-row-pair .field-group:first-child { padding-right: var(--space-2); }
 .field-row-pair .field-group:last-child { padding-left: var(--space-2); }
-/* Round check box, still used by the Graph tab's "Include derived" toggle */
-.dropset-box { width: 16px; height: 16px; border-radius: var(--radius-pill); border: 2px solid var(--primary); display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-sizing: border-box; transition: background .1s; }
-.dropset-box svg { width: 10px; height: 10px; fill: var(--on-primary); opacity: 0; }
 /* Unit inside a label ("GEWICHT (kgs)"): keeps its own lowercase casing. */
 .label-unit { text-transform: none; }
 
@@ -510,10 +507,11 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 /* Just wide enough for a 3-digit rep count ("100", digits are 27px in Roboto 16px) + the chevron:
    1px border + 12px padding + 27px + 40px chevron padding + 1px border = 81, +1px slack. */
 .graph-reps-row .new-ex-select-btn { flex: 0 0 auto; width: 82px; }
-.graph-derived-check { display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0; font-size: var(--fs-body); color: var(--text-secondary); cursor: pointer; user-select: none; position: relative; padding: var(--space-2) 0; }
-.graph-derived-check input { position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none; }
-.graph-derived-check input:checked + .dropset-box { background: var(--primary); }
-.graph-derived-check input:checked + .dropset-box svg { opacity: 1; }
+/* "Afgeleide punten": the Partial/Forced on/off button (.extra-type-btn: 36px, --radius-sm, 1px
+   border, 12px text), but as wide as its text needs — on one line, with --space-3 inside left and
+   right (the inner spacing of the select next to it). Vertically centred on the REPS select by
+   .graph-reps-row (align-items: center), --space-3 away from it. */
+.graph-reps-row .graph-derived-btn { flex: 0 0 auto; padding: 0 var(--space-3); white-space: nowrap; }
 .graph-legend { display: flex; justify-content: center; gap: var(--space-5); padding: var(--space-2) var(--screen-gutter); flex-shrink: 0; font-size: var(--fs-small); color: var(--text-secondary); }
 .graph-legend-item { display: flex; align-items: center; gap: var(--space-2); }
 .graph-legend-dot { width: 10px; height: 10px; border-radius: var(--radius-pill); flex-shrink: 0; box-sizing: border-box; }

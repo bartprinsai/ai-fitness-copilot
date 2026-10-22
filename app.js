@@ -2365,19 +2365,17 @@ function renderExerciseInfoView() {
   document.getElementById('exercise-info-edit-mode').classList.add('hidden');
 }
 
-const MUSCLE_PRIMARY_OPTIONS = MUSCLE_OPTIONS.map(m => ({ value: m, label: m }));
-const MUSCLE_SECONDARY_OPTIONS = [{ value: '', label: 'Niet ingesteld' }, ...MUSCLE_PRIMARY_OPTIONS];
+// Primary and Secondary share one list, "Niet ingesteld" first: an exercise without a muscle group
+// shows that (placeholder colour) and saving an untouched field stores nothing.
+const MUSCLE_FIELD_OPTIONS = [{ value: '', label: 'Niet ingesteld' }, ...MUSCLE_OPTIONS.map(m => ({ value: m, label: m }))];
 
 // The muscle-group/equipment fields live in two places — the Exercise Info
 // overlay and the New/Edit Exercise screen — and both are built, wired,
 // populated and read by the same generic functions below, parameterised by one
-// of these forms (element ids are `<prefix>-<field>`). primaryOptions[0] is
-// what Primary shows for an exercise without data: the info overlay has always
-// defaulted to Chest, whereas New/Edit Exercise shows "Not set" so saving an
-// untouched form doesn't invent a muscle group.
+// of these forms (element ids are `<prefix>-<field>`).
 const EXERCISE_INFO_FORMS = {
-  overlay: { prefix: 'info', primaryOptions: MUSCLE_PRIMARY_OPTIONS },
-  newEx: { prefix: 'new-ex-info', primaryOptions: [{ value: '', label: 'Niet ingesteld' }, ...MUSCLE_PRIMARY_OPTIONS] },
+  overlay: { prefix: 'info' },
+  newEx: { prefix: 'new-ex-info' },
 };
 
 function renderExerciseInfoFormFields(form) {
@@ -2425,8 +2423,8 @@ function wireExerciseInfoFormPickers(form) {
     const id = `${p}-${f.idSuffix}`;
     document.getElementById(id).addEventListener('click', () => setInfoToggle(id, !getInfoToggle(id)));
   });
-  wire(`${p}-primary-muscle`, 'Primair', form.primaryOptions);
-  wire(`${p}-secondary-muscle`, 'Secundair', MUSCLE_SECONDARY_OPTIONS);
+  wire(`${p}-primary-muscle`, 'Primair', MUSCLE_FIELD_OPTIONS);
+  wire(`${p}-secondary-muscle`, 'Secundair', MUSCLE_FIELD_OPTIONS);
   EXERCISE_INFO_EQUIPMENT_FIELDS.filter(f => f.kind === 'picker').forEach(f => wire(`${p}-${f.idSuffix}`, f.label, f.options));
 }
 
@@ -2448,8 +2446,8 @@ function setExerciseInfoPicker(id, options, val) {
 // Fills every field of a form from an exercise's stored info ({} = nothing set).
 function populateExerciseInfoForm(form, info) {
   const p = form.prefix;
-  setExerciseInfoPicker(`${p}-primary-muscle`, form.primaryOptions, info.primaryMuscle);
-  setExerciseInfoPicker(`${p}-secondary-muscle`, MUSCLE_SECONDARY_OPTIONS, info.secondaryMuscle);
+  setExerciseInfoPicker(`${p}-primary-muscle`, MUSCLE_FIELD_OPTIONS, info.primaryMuscle);
+  setExerciseInfoPicker(`${p}-secondary-muscle`, MUSCLE_FIELD_OPTIONS, info.secondaryMuscle);
   EXERCISE_INFO_EQUIPMENT_FIELDS.forEach(f => {
     const id = `${p}-${f.idSuffix}`;
     const val = info[f.key];
@@ -3296,8 +3294,12 @@ document.getElementById('progress-chart').addEventListener('click', e => {
 });
 
 // Tapping the weight × reps text: overview of ALL of that day's sets for this exercise + "Go To" (same overlay as History/Calendar).
-document.getElementById('graph-derived').addEventListener('change', e => {
-  graphIncludeDerived = e.target.checked;
+// "Afgeleide punten": an on/off button in the Partial/Forced look (.extra-type-btn, on = .active).
+// The Partial/Forced logic only looks inside #extra-type, so it never touches this button.
+document.getElementById('graph-derived').addEventListener('click', e => {
+  graphIncludeDerived = !graphIncludeDerived;
+  e.currentTarget.classList.toggle('active', graphIncludeDerived);
+  e.currentTarget.setAttribute('aria-pressed', String(graphIncludeDerived));
   renderGraph();
 });
 
