@@ -329,10 +329,10 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    One fixed grid, every cell always rendered (empty when unused), left to right:
      comment · PR trophy or dropset arrow · set number · weight · reps · RPE/partial/"—"
    Columns: 28px · 20px · 24px · flexible · 56px · 72px. The dropset arrow sits in the trophy
-   column (a dropset is never a PR, so they never share a row). The weight is a fixed 76px block
-   (just fits "132.5 kgs") placed --space-3 after the set number, at the start of the flexible column — so any extra width
+   column (a dropset is never a PR, so they never share a row). The weight is a fixed 84px block
+   (fits "232,25 kg" — weights have up to 2 decimals) placed --space-3 after the set number, at the start of the flexible column — so any extra width
    ends up between weight and reps. Inside the block, reps and the effort cell, everything is
-   right-aligned, so "kgs" ends on the same x in every row.
+   right-aligned, so "kg" ends on the same x in every row.
    Content edge: 24px from the left and 28px from the right screen edge in every list
    (--screen-gutter + --space-2 / --space-3). Rows inside a card (day overview, History) or
    a bottom sheet (popups) already sit one gutter in, so they pad by --space-2 left and
@@ -364,7 +364,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .set-pr-icon { width: var(--icon-list); height: var(--icon-list); fill: var(--pr-gold); flex-shrink: 0; }
 .set-num { font-size: var(--fs-body); font-weight: var(--fw-bold); color: var(--text); }
 .set-weight, .set-reps { display: flex; align-items: baseline; justify-content: flex-end; gap: var(--space-1); min-width: 0; }
-.set-weight { justify-self: start; width: 76px; margin-left: var(--space-3); }
+.set-weight { justify-self: start; width: 84px; margin-left: var(--space-3); }
 .set-val { font-size: var(--fs-number); font-weight: var(--fw-bold); color: var(--text); }
 .set-unit { font-size: var(--fs-small); font-weight: var(--fw-regular); color: var(--text-secondary); }
 /* Dropset (a set flagged isDropsetContinuation hangs under the previous set): the arrow sits in the
