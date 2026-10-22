@@ -468,7 +468,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    right-aligned so its right edge lines up with the RPE + button above it. */
 .extra-type-single { justify-content: flex-end; }
 .extra-type-single .extra-type-btn { flex: 0 0 calc((100% - var(--space-2)) / 2); }
-.extra-type-btn, .pde-sr-mode-btn { flex: 1; min-width: 0; height: 36px; font-size: var(--fs-small); }
+.extra-type-btn, .pde-sr-mode-btn, .ps-toggle-option { flex: 1; min-width: 0; height: 36px; font-size: var(--fs-small); }
 
 /* ── Action buttons (SAVE / CLEAR) ── */
 .action-buttons { display: flex; flex-shrink: 0; gap: var(--space-3); padding: var(--space-3) var(--screen-gutter); }
@@ -513,7 +513,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .graph-sel-arrow:disabled svg { fill: var(--text-muted); opacity: .45; }
 .graph-sel-info { flex: 1; border: none; background: none; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: var(--space-2) var(--space-1); cursor: pointer; }
 .graph-sel-info:active { background: var(--primary-light); }
-.graph-sel-main { font-size: var(--fs-number); font-weight: var(--fw-bold); color: var(--text); }
+.graph-sel-main { display: flex; align-items: baseline; gap: var(--space-1); font-size: var(--fs-number); font-weight: var(--fw-bold); color: var(--text); }
 .graph-sel-date { font-size: var(--fs-small); color: var(--text-secondary); }
 /* Set overview inside the shared "Go to…" overlay (opened from the Graph tab). */
 .history-goto-body { max-height: 45vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
@@ -558,15 +558,15 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .records-hero-label svg { width: var(--icon-list); height: var(--icon-list); fill: var(--on-gold); flex-shrink: 0; }
 .records-hero .records-row-weight { color: var(--on-gold); }
 .records-hero .records-row-weight svg { fill: var(--on-gold); }
-.records-hero .records-row-date, .records-hero .records-row-via, .records-hero .records-row-nodata { color: var(--on-gold); }
+.records-hero .records-row-date, .records-hero .records-row-via, .records-hero .records-row-nodata, .records-hero .set-val, .records-hero .set-unit { color: var(--on-gold); }
 .records-row-clickable { cursor: pointer; }
 .records-row-clickable:active { background: var(--bg); }
 .records-history-body { max-height: 45vh; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: var(--space-2); }
 .records-history-body .section-label:not(:first-child) { margin-top: var(--space-3); }
 .records-history-body .records-row:last-child { border-bottom: none; }
 .records-row-reps { font-size: var(--fs-body); font-weight: var(--fw-bold); color: var(--text-secondary); }
-.records-row-weight { display: flex; align-items: center; gap: var(--space-2); font-size: var(--fs-number); font-weight: var(--fw-bold); color: var(--text); }
-.records-row-weight svg { width: var(--icon-list); height: var(--icon-list); fill: var(--pr-gold); }
+.records-row-weight { display: flex; align-items: baseline; gap: var(--space-1); font-size: var(--fs-number); font-weight: var(--fw-bold); color: var(--text); }
+.records-row-weight svg { align-self: center; margin-right: var(--space-1); width: var(--icon-list); height: var(--icon-list); fill: var(--pr-gold); }
 .records-row-value { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
 .records-row-date { font-size: var(--fs-small); color: var(--text-secondary); }
 .records-row-via { font-size: var(--fs-small); font-style: italic; color: var(--text-secondary); }
@@ -655,7 +655,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .plan-active-star.is-active svg { fill: var(--primary); }
 
 .plan-create-row { display: flex; gap: var(--card-gap); padding: var(--space-4) var(--screen-gutter) var(--space-3); flex-shrink: 0; }
-.plan-create-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-2); padding: var(--card-padding) var(--space-2); border: none; border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--card-shadow); color: var(--text-secondary); font-family: inherit; font-size: var(--fs-small); font-weight: var(--fw-medium); cursor: pointer; transition: background .12s; line-height: 1.3; text-align: center; }
+.plan-create-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-2); padding: var(--card-padding) var(--space-2); border: none; border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--card-shadow); color: var(--text); font-family: inherit; font-size: var(--fs-heading); font-weight: var(--fw-medium); cursor: pointer; transition: background .12s; line-height: 1.3; text-align: center; }
 .plan-create-btn:active { background: var(--bg); }
 .plan-create-btn svg { width: var(--icon-list); height: var(--icon-list); fill: var(--primary); }
 
@@ -739,7 +739,6 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .ps-num-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: var(--space-2); }
 .ps-num-box { height: 40px; padding: 0; }
 .ps-toggle-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-3); }
-.ps-toggle-option { min-height: var(--control-height); padding: var(--space-2); text-align: center; }
 .ps-weekdays-counter { font-size: var(--fs-small); font-weight: var(--fw-medium); color: var(--text-secondary); }
 .ps-week-block { display: flex; flex-direction: column; gap: var(--space-2); }
 .ps-weekday-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: var(--space-2); }

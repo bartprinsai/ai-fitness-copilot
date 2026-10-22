@@ -1869,19 +1869,33 @@ let trackFieldsBaseline = { weight: '0', reps: '0', rpe: '0', extra: '0', extraT
 // Number entry for sets (the TRACK tab is the only place sets are entered or edited):
 // a decimal comma (Dutch keyboard) counts as a point; weight and RPE keep at most
 // 1 decimal (more is rounded), reps and extra reps are whole numbers (a typed
-// decimal is rounded). Shown without a superfluous ".0" (150, not 150.0).
+// decimal is rounded). Shown with a decimal comma and without a superfluous ",0" (150, not 150,0).
 function parseDecimal(str) { return parseFloat(String(str).replace(',', '.')) || 0; }
 function round1(v) { return Math.round(v * 10) / 10; }
 function parseWeight(str) { return Math.max(0, round1(parseDecimal(str))); }
-function formatWeight(v) { return String(round1(v)); }
+// The ONE display format for numbers anywhere in the app: decimal comma, no thousands
+// separator, at most `decimals` decimals and no trailing zeros ("132,5", "150") — or,
+// with `fixed`, always exactly `decimals` (only the Graph's y-axis: "82,5", "90,0").
+// Display only: stored data stays plain numbers, input accepts comma and point.
+function formatNumber(n, decimals = 2, fixed = false) {
+  const v = Number(n) || 0;
+  const s = fixed ? v.toFixed(decimals) : String(Math.round(v * 10 ** decimals) / 10 ** decimals);
+  return s.replace('.', ',');
+}
+function formatWeight(v) { return formatNumber(v, 1); }
+// A weight as value + unit: the number on Groot getal, "kg" apart on Klein (same
+// classes as the set rows), wherever a weight is shown as a value.
+function weightValueHtml(w) {
+  return `<span class="set-val">${formatNumber(parseDecimal(w))}</span><span class="set-unit">kg</span>`;
+}
 function parseWholeNumber(str) { return Math.max(0, Math.round(parseDecimal(str))); }
 
 // RPE: 0 = not filled in; otherwise 6..10 in steps of 0.5. Whole numbers show
-// without a decimal ("8"), halves with one ("8.5").
+// without a decimal ("8"), halves with one ("8,5").
 const RPE_MIN = 6, RPE_MAX = 10, RPE_STEP = 0.5;
 function parseRpe(str) { return round1(parseDecimal(str)); }
 function isValidRpe(v) { return v === 0 || (v >= RPE_MIN && v <= RPE_MAX && (v / RPE_STEP) % 1 === 0); }
-function formatRpe(v) { return Number.isInteger(v) ? String(v) : v.toFixed(1); }
+function formatRpe(v) { return formatNumber(v, 1); }
 // Stepper: 0 -> 6 on +, 6 -> 0 on -, +/-0.5 in between (max 10).
 function stepRpe(current, dir) {
   const v = parseRpe(current);
@@ -1945,7 +1959,7 @@ function setRowInnerHtml(sets, i, { comment = 'note', commentLabel = 'Set commen
       <span class="set-comment${hasNote ? ' has-note' : ''}"${comment === 'none' ? '' : ` aria-label="${commentLabel}"`}>${showIcon ? COMMENT_ICON_SVG : ''}</span>
       <span class="set-pr">${isPR ? prTrophySvg('set-pr-icon') : isDropChild(sets, i) ? DROP_ARROW_SVG : ''}</span>
       <span class="set-num">${i + 1}</span>
-      <span class="set-weight"><span class="set-val">${s.weight}</span><span class="set-unit">kgs</span></span>
+      <span class="set-weight">${weightValueHtml(s.weight)}</span>
       <span class="set-reps"><span class="set-val">${s.reps}</span><span class="set-unit">reps</span></span>
       ${effortCellHtml(s)}`;
 }
@@ -2167,7 +2181,7 @@ let recordsHistoryReps = null;
 function recordsStepRowHtml(weight, date, sourceReps, direct) {
   return `
     <div class="records-row records-row-clickable" data-date="${date}" data-val="${weight}" data-src-reps="${sourceReps}">
-      <span class="records-row-weight">${weight} kgs</span>
+      <span class="records-row-weight">${weightValueHtml(weight)}</span>
       <span class="records-row-date">${formatDateStr(date, 'short')}${direct ? '' : `<span class="records-row-via"> \u00b7 via ${recordsRepLabel(sourceReps)}</span>`}</span>
     </div>`;
 }
@@ -2192,7 +2206,7 @@ function openRecordsHistory(reps) {
 function recordsValueHtml(rec) {
   if (!rec) return `<span class="records-row-nodata">No data</span>`;
   return `<span class="records-row-value">
-        <span class="records-row-weight">${rec.direct ? prTrophySvg() : ''}${rec.weight} kgs</span>
+        <span class="records-row-weight">${rec.direct ? prTrophySvg() : ''}${weightValueHtml(rec.weight)}</span>
         <span class="records-row-date">${formatDateStr(rec.date, 'short')}${rec.direct ? '' : `<span class="records-row-via"> \u00b7 via ${recordsRepLabel(rec.viaReps)}</span>`}</span>
       </span>`;
 }
@@ -2500,7 +2514,7 @@ function saveSet() {
   if (reps < 1) { toast('Enter reps', { type: 'error' }); return; }
   reconcileExtraWithRpe(); // a typed RPE below 10 whose change event hasn't fired yet
   const rpe = parseRpe(document.getElementById('field-rpe').value);
-  if (!isValidRpe(rpe)) { toast('RPE: 6 to 10, in steps of 0.5', { type: 'error' }); return; }
+  if (!isValidRpe(rpe)) { toast('RPE: 6 to 10, in steps of 0,5', { type: 'error' }); return; }
   const extra = getExtraReps();
   const extraType = extra > 0 ? (getExtraType() || 'partial') : '';
 
@@ -3095,7 +3109,7 @@ function drawGraphChart() {
   for (let i = 0; i <= 4; i++) {
     const y = pad.top + (gH / 4) * i;
     ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + gW, y); ctx.stroke();
-    const label = (maxV - (range / 4) * i).toFixed(1);
+    const label = formatNumber(maxV - (range / 4) * i, 1, true); // deliberately a fixed decimal, so the axis labels line up
     ctx.fillStyle = tok('--text-muted'); ctx.font = '11px Roboto'; ctx.textAlign = 'right';
     ctx.fillText(label, pad.left - 4, y + 4);
   }
@@ -3161,7 +3175,7 @@ function updateGraphPanel() {
   const pt = graphSeries[graphSelected];
   if (!pt) return;
   // A derived point shows the REAL rep count of its source set plus what it counts as.
-  document.getElementById('graph-sel-main').textContent = `${pt.val} kg × ${pt.reps} rep${pt.reps === 1 ? '' : 's'}`;
+  document.getElementById('graph-sel-main').innerHTML = `${weightValueHtml(pt.val)}<span class="set-unit">×</span><span class="set-val">${pt.reps}</span><span class="set-unit">rep${pt.reps === 1 ? '' : 's'}</span>`;
   const dateEl = document.getElementById('graph-sel-date');
   dateEl.textContent = formatDateStr(pt.date, 'detail');
   if (pt.derived) {
@@ -3993,7 +4007,6 @@ function epley1rm(weight, reps) { return reps === 1 ? weight : weight * (1 + rep
 function weightAtReps(oneRm, reps) { return reps === 1 ? oneRm : oneRm / (1 + reps / 30); }
 function percentAtReps(reps) { return reps === 1 ? 100 : Math.round(100 / (1 + reps / 30)); }
 
-function formatKg1(n) { return n.toFixed(1).replace('.', ','); }
 
 // Strict parse (Dutch comma allowed); NaN for empty/garbage like "5abc".
 function parseOrmNumber(str) {
@@ -4032,9 +4045,9 @@ document.getElementById('btn-orm-calculate').addEventListener('click', () => {
     return;
   }
   errEl.classList.add('hidden');
-  document.getElementById('orm-result-value').textContent = formatKg1(res.oneRm) + ' kg';
+  document.getElementById('orm-result-value').textContent = formatNumber(res.oneRm, 1) + ' kg';
   document.getElementById('orm-table-body').innerHTML = res.rows.map(r =>
-    `<div class="orm-table-row"><div>${r.reps}</div><div>${formatKg1(r.weight)} kg</div><div>${r.percent}%</div></div>`
+    `<div class="orm-table-row"><div>${r.reps}</div><div>${formatNumber(r.weight, 1)} kg</div><div>${r.percent}%</div></div>`
   ).join('');
   document.getElementById('orm-result-card').classList.remove('hidden');
   document.getElementById('orm-table-section').classList.remove('hidden');
@@ -4403,11 +4416,8 @@ function openDayRecap() {
   openOverlay('recap-overlay');
 }
 
-// Dutch-locale kg formatting: 2 decimals max, trailing zeros trimmed, comma separator.
-function formatKg(n) {
-  let s = (Math.round(n * 100) / 100).toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
-  return s.replace('.', ',');
-}
+// kg amounts in the calculators and the Recap: the shared formatNumber (2 decimals max).
+function formatKg(n) { return formatNumber(n, 2); }
 
 function renderPlateList() {
   document.getElementById('plate-list').innerHTML = PLATE_TYPES.map(p => {
