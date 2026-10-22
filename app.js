@@ -1880,13 +1880,13 @@ function parseWeight(str) { return Math.max(0, roundWeight(parseDecimal(str))); 
 // separator, rounded half away from zero (not truncated), no trailing zeros ("132,5", "150").
 // At most 1 decimal (RPE, percentages, ...), or 2 for a weight — `weight`, used through
 // formatWeight() for every weight in the app (sets, records, graph, Samenvatting, calculators,
-// plates: "93,75", "0,25"). `fixed`: always exactly 1 decimal — only the Graph's y-axis.
+// plates: "93,75", "0,25").
 // Display only: stored data stays plain numbers, input accepts comma and point.
-function formatNumber(n, { fixed = false, weight = false } = {}) {
+function formatNumber(n, { weight = false } = {}) {
   const d = weight ? WEIGHT_DECIMALS : MAX_DECIMALS;
   const v = Number(n) || 0, f = 10 ** d;
   const r = Math.sign(v) * Math.round((Math.abs(v) + Number.EPSILON) * f) / f;
-  const s = fixed ? r.toFixed(d) : String(r === 0 ? 0 : r);
+  const s = String(r === 0 ? 0 : r);
   return s.replace('.', ',');
 }
 function formatWeight(v) { return formatNumber(v, { weight: true }); }
@@ -3104,6 +3104,41 @@ function renderGraph(keepSelection = false) {
   updateGraphPanel();
 }
 
+const GRAPH_LABEL_GAP = 8; // px between the right edge of the y-axis labels and the chart area (--space-2)
+// Y-axis for the plotted values: gridlines on round steps (1, 2, 2,5 or 5 × 10ⁿ), 4 to 6 of them,
+// with the ends rounded outward to a multiple of the step. A point within 5% of either end gets
+// one extra step on that side, so the highest/lowest point never sits on the outer line. All
+// values equal (or one point): a range with that value in the middle (150 → 140 … 160).
+// Never below 0 (weights). Returns { lo, hi, step, ticks }.
+function graphYAxis(vals) {
+  const minV = Math.min(...vals), maxV = Math.max(...vals);
+  const clean = x => Math.round(x * 1e6) / 1e6; // keeps 0,25-steps exact (no 152.49999)
+  const niceSteps = [];
+  for (let e = -2; e <= 6; e++) [1, 2, 2.5, 5].forEach(m => niceSteps.push(clean(m * 10 ** e)));
+  const build = (lo, hi, step) => {
+    const ticks = [];
+    for (let v = lo; v <= hi + step / 2; v = clean(v + step)) ticks.push(v);
+    return { lo, hi: ticks[ticks.length - 1], step, ticks };
+  };
+  if (maxV === minV) {
+    const step = niceSteps.find(s => s >= Math.max(1, Math.abs(minV) / 40));
+    const below = clean(Math.floor(minV / step + 1e-9) * step), above = clean(Math.ceil(minV / step - 1e-9) * step);
+    return build(Math.max(0, clean(below - 2 * step)), clean(above + 2 * step), step);
+  }
+  let best = null;
+  niceSteps.forEach(step => {
+    let lo = clean(Math.floor(minV / step + 1e-9) * step);
+    let hi = clean(Math.ceil(maxV / step - 1e-9) * step);
+    if (minV - lo < 0.05 * (hi - lo)) lo = clean(lo - step);
+    if (hi - maxV < 0.05 * (hi - lo)) hi = clean(hi + step);
+    lo = Math.max(0, lo);
+    const lines = Math.round((hi - lo) / step) + 1;
+    // Tightest range with 4–6 lines; on a tie the fewer (rounder) lines.
+    if (lines >= 4 && lines <= 6 && (!best || hi - lo <= best.hi - best.lo)) best = { lo, hi, step };
+  });
+  return best ? build(best.lo, best.hi, best.step) : build(0, Math.max(1, maxV), Math.max(1, maxV));
+}
+
 // Draws graphSeries filling the chart area, with the selected point ringed in green.
 function drawGraphChart() {
   const canvas = document.getElementById('progress-chart');
@@ -3117,12 +3152,9 @@ function drawGraphChart() {
   canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-  const vals = data.map(d => d.val);
-  let minV = Math.min(...vals);
-  let maxV = Math.max(...vals);
-  // All values equal (e.g. a single point): pad the axis so the point sits mid-chart instead of on the floor.
-  if (maxV === minV) { minV -= 1; maxV += 1; }
-  const range = maxV - minV;
+  const axis = graphYAxis(data.map(d => d.val));
+  const minV = axis.lo;
+  const range = axis.hi - axis.lo;
   const pad = { top: 24, right: 20, bottom: 36, left: 48 };
   const gW = W - pad.left - pad.right;
   const gH = H - pad.top - pad.bottom;
@@ -3134,13 +3166,13 @@ function drawGraphChart() {
   const hexAlpha = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; };
   const primary = tok('--primary');
   ctx.strokeStyle = tok('--border'); ctx.lineWidth = 1;
-  for (let i = 0; i <= 4; i++) {
-    const y = pad.top + (gH / 4) * i;
+  // Gridlines on the round axis values; labels right-aligned, GRAPH_LABEL_GAP left of the chart area.
+  axis.ticks.forEach(v => {
+    const y = pad.top + gH - ((v - minV) / range) * gH;
     ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + gW, y); ctx.stroke();
-    const label = formatNumber(maxV - (range / 4) * i, { fixed: true }); // deliberately a fixed decimal, so the axis labels line up
     ctx.fillStyle = tok('--text-muted'); ctx.font = '11px Roboto'; ctx.textAlign = 'right';
-    ctx.fillText(label, pad.left - 4, y + 4);
-  }
+    ctx.fillText(formatWeight(v), pad.left - GRAPH_LABEL_GAP, y + 4);
+  });
 
   const pts = data.map((d, i) => ({
     x: data.length === 1 ? pad.left + gW / 2 : pad.left + (i / (data.length - 1)) * gW,
