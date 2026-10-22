@@ -3075,7 +3075,8 @@ function renderGraph(keepSelection = false) {
   const stats = getExerciseRepStats(currentExercise);
   const maxReps = getExerciseMaxReps(currentExercise);
   const reps = resolveGraphReps(stats, maxReps);
-  setFieldBtnValue('graph-reps', String(reps), graphRepsLabel(reps));
+  // The narrow select shows the plain rep count ("1", not "One rep max"); the picker list keeps the labels.
+  setFieldBtnValue('graph-reps', String(reps), String(reps));
 
   let data = getGraphPoints(currentExercise, reps, graphIncludeDerived);
 
