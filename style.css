@@ -479,8 +479,11 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .field-row-pair .field-group { flex: 1 1 0; min-width: 0; }
 .field-row-pair .field-group:first-child { padding-right: var(--space-2); }
 .field-row-pair .field-group:last-child { padding-left: var(--space-2); }
-/* Unit inside a label ("GEWICHT (kgs)"): keeps its own lowercase casing. */
-.label-unit { text-transform: none; }
+/* Addition in brackets in or under a label ("GEWICHT (kg)", "(per kant)"), everywhere: same size
+   (--fs-label, 11px, the smallest level) and colour as the label, but lighter instead of smaller —
+   400, lowercase, no letter-spacing. Inline after the label; a block (own line) only under a narrow
+   column header. */
+.label-unit { text-transform: none; font-weight: var(--fw-regular); letter-spacing: normal; }
 
 /* ══ CHOICE CONTROLS ════════════════════════════════════
    Toggles, chips, number blocks, day circles, bar options, time filters:
@@ -920,7 +923,6 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    since the name's own content width shifts everything after it. */
 .plate-list-header { display: grid; grid-template-columns: 1fr 100px 100px; gap: var(--space-2); padding: 0 var(--card-padding) 0; }
 .plate-list-header-col { text-align: center; font-size: var(--fs-label); font-weight: var(--fw-medium); color: var(--text-secondary); text-transform: uppercase; letter-spacing: var(--ls-label); }
-.plate-list-header-sub { font-size: var(--fs-small); font-weight: var(--fw-regular); color: var(--text-muted); text-transform: none; letter-spacing: normal; margin-top: 2px; }
 /* Lines run to the card edge: the card has no side padding, the rows carry --card-padding. */
 .plate-list { display: flex; flex-direction: column; background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--card-shadow); overflow: hidden; }
 .plate-row { display: grid; grid-template-columns: 1fr 100px 100px; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--card-padding); border-bottom: 1px solid var(--border); }
@@ -939,7 +941,8 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .plate-result-list { display: flex; flex-direction: column; gap: var(--space-1); }
 .plate-result-line { font-size: var(--fs-body); color: var(--text); }
 .plate-result-empty { font-size: var(--fs-body); color: var(--text-muted); }
-.plate-result-total { font-size: var(--fs-number); font-weight: var(--fw-bold); color: var(--text); margin-top: var(--space-1); }
+/* Totals: number (with ±) on Groot getal, "kg" apart on Klein — .set-val / .set-unit, like the set rows. */
+.plate-result-total { display: flex; align-items: baseline; gap: var(--space-1); margin-top: var(--space-1); }
 .plate-result-cards { display: flex; flex-direction: column; gap: var(--card-gap); }
 .plate-result-current { gap: var(--space-1); }
 .plate-result-current .plate-result-total { margin-top: 0; }

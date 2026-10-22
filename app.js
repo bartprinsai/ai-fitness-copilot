@@ -2319,6 +2319,12 @@ const EXERCISE_INFO_FULLWIDTH_KEYS = ['handPosition', 'footPosition', 'extra'];
 const EXERCISE_INFO_FIELDS_BY_KEY = {};
 EXERCISE_INFO_EQUIPMENT_FIELDS.forEach(f => { EXERCISE_INFO_FIELDS_BY_KEY[f.key] = f; });
 
+// A label with an addition in brackets ("Bankstand (oud)"): the addition goes in .label-unit —
+// same size and colour as the label, but 400 and lowercase (see DESIGN_SYSTEM.md).
+function labelHtml(label) {
+  return label.replace(/\s*(\([^)]*\))$/, ' <span class="label-unit">$1</span>');
+}
+
 function equipmentFieldIsFilled(f, info) {
   if (f.kind === 'toggle') return !!info[f.key];
   const v = info[f.key];
@@ -2348,13 +2354,13 @@ function renderExerciseInfoView() {
     const cells = pair
       .map(key => EXERCISE_INFO_FIELDS_BY_KEY[key])
       .filter(f => equipmentFieldIsFilled(f, info))
-      .map(f => `<div class="info-view-stat"><span class="section-label">${f.label}</span><span class="info-view-stat-value">${equipmentFieldViewValue(f, info)}</span></div>`);
+      .map(f => `<div class="info-view-stat"><span class="section-label">${labelHtml(f.label)}</span><span class="info-view-stat-value">${equipmentFieldViewValue(f, info)}</span></div>`);
     if (cells.length > 0) equipHtml += `<div class="info-two-col">${cells.join('')}</div>`;
   });
   EXERCISE_INFO_FULLWIDTH_KEYS.forEach(key => {
     const f = EXERCISE_INFO_FIELDS_BY_KEY[key];
     if (!equipmentFieldIsFilled(f, info)) return;
-    equipHtml += `<div class="info-view-stat"><span class="section-label">${f.label}</span><span class="info-view-stat-value">${equipmentFieldViewValue(f, info)}</span></div>`;
+    equipHtml += `<div class="info-view-stat"><span class="section-label">${labelHtml(f.label)}</span><span class="info-view-stat-value">${equipmentFieldViewValue(f, info)}</span></div>`;
   });
   if (equipHtml) sections.push('<div class="section-label">Apparatuur</div>' + equipHtml);
   const content = document.getElementById('exercise-info-view-content');
@@ -2381,7 +2387,7 @@ const EXERCISE_INFO_FORMS = {
 function renderExerciseInfoFormFields(form) {
   const p = form.prefix;
   const pickerBtn = id => `<button type="button" class="new-ex-select new-ex-select-btn" id="${id}"></button>`;
-  const field = (id, label, control) => `<div class="info-field"><label class="section-label" for="${id}">${label}</label>${control}</div>`;
+  const field = (id, label, control) => `<div class="info-field"><label class="section-label" for="${id}">${labelHtml(label)}</label>${control}</div>`;
   const equipmentField = key => {
     const f = EXERCISE_INFO_FIELDS_BY_KEY[key];
     const id = `${p}-${f.idSuffix}`;
@@ -4515,7 +4521,7 @@ function openDayRecap() {
 function renderPlateList() {
   document.getElementById('plate-list').innerHTML = PLATE_TYPES.map(p => {
     const meta = p.deviation > 0
-      ? `Gem. ${formatWeight(p.weight)} kg · max ±${formatWeight(p.deviation)} kg`
+      ? `gem. ${formatWeight(p.weight)} · ±${formatWeight(p.deviation)} kg`
       : `${formatWeight(p.weight)} kg`;
     const onBarCount = getPlateOnBarCount(p.id);
     const onBarAtMax = onBarCount >= getPlateOnBarMax(p.id);
@@ -4746,18 +4752,23 @@ function buildOnBarCountsForRemoval() {
   return adjusted;
 }
 
+// A plate-calculator total: the number (with "±" when a plate type deviates) on Groot getal and
+// "kg" apart on Klein — the same .set-val / .set-unit as the set rows.
+function plateTotalHtml(weight, approx) {
+  return `<span class="set-val">${approx ? '±' : ''}${formatWeight(weight)}</span><span class="set-unit">kg</span>`;
+}
 function renderPlateResult(remainingPerSide, targetWeight, barWeight, onBarWeightPerSide) {
   const card = document.getElementById('plate-result-card');
   card.classList.remove('hidden');
   const titleEl = document.getElementById('plate-result-title');
   const listEl = document.getElementById('plate-result-list');
   const noteEl = document.getElementById('plate-result-note');
-  document.getElementById('plate-result-current-total').textContent = (onBarHasDeviation() ? '±' : '') + formatWeight(calcCurrentBarTotal(barWeight)) + ' kg';
+  document.getElementById('plate-result-current-total').innerHTML = plateTotalHtml(calcCurrentBarTotal(barWeight), onBarHasDeviation());
 
   if (Math.round(remainingPerSide * 100) === 0) {
     titleEl.textContent = 'Per kant';
     listEl.innerHTML = `<div class="plate-result-empty">Niets bijleggen of weghalen — je zit al op het doelgewicht.</div>`;
-    document.getElementById('plate-result-total').textContent = formatWeight(barWeight + onBarWeightPerSide * 2) + ' kg';
+    document.getElementById('plate-result-total').innerHTML = plateTotalHtml(barWeight + onBarWeightPerSide * 2, false);
     noteEl.classList.add('hidden');
     return;
   }
@@ -4775,7 +4786,7 @@ function renderPlateResult(remainingPerSide, targetWeight, barWeight, onBarWeigh
   const finalOnBarWeight = removing ? onBarWeightPerSide - result.perSideKg : onBarWeightPerSide + result.perSideKg;
   const totalWeight = barWeight + finalOnBarWeight * 2;
   const hasDeviation = result.used.some(u => u.deviation > 0);
-  document.getElementById('plate-result-total').textContent = (hasDeviation ? '±' : '') + formatWeight(totalWeight) + ' kg';
+  document.getElementById('plate-result-total').innerHTML = plateTotalHtml(totalWeight, hasDeviation);
 
   if (!result.exact) {
     const diff = Math.abs(targetWeight - totalWeight);
