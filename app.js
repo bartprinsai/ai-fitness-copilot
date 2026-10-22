@@ -1912,8 +1912,10 @@ function stepRpe(current, dir) {
 function setRpeField(v) { document.getElementById('field-rpe').value = v ? formatRpe(v) : 0; }
 // Extra reps (partials / forced) on top of the set, 0 = not applicable. Only
 // possible at RPE 10: extra reps > 0 sets RPE to 10 (a real, editable value),
-// and lowering RPE below 10 again clears the extra reps.
-const EXTRA_MAX = 20;
+// and lowering RPE below 10 again clears the extra reps. At most 9: the set rows' 56px
+// effort column is built for one digit ("+9 partial"). Typing, pasting and + all stop at 9
+// (FIELD_MAX); an existing set with a higher value stays stored as it is.
+const EXTRA_MAX = 9;
 function getExtraReps() { return Math.min(EXTRA_MAX, parseWholeNumber(document.getElementById('field-extra').value)); }
 function getExtraType() { const b = document.querySelector('#extra-type .extra-type-btn.active'); return b ? b.dataset.type : ''; }
 // Type toggle follows the amount: disabled + nothing selected at 0, otherwise one
@@ -2646,6 +2648,9 @@ const FIELD_DECIMALS = {
   'field-weight': WEIGHT_DECIMALS, 'field-rpe': 1, 'field-reps': 0, 'field-extra': 0,
   'plate-target-weight': WEIGHT_DECIMALS, 'orm-weight': WEIGHT_DECIMALS, 'orm-reps': 0, 'warmup-weight': WEIGHT_DECIMALS,
 };
+// Upper limits on top of FIELD_DECIMALS: a typed digit that would exceed it is rejected,
+// a pasted value is clamped to it.
+const FIELD_MAX = { 'field-extra': EXTRA_MAX };
 function restrictNumber(str, decimals) {
   let out = '', sep = false, after = 0;
   for (const ch of str) {
@@ -2682,6 +2687,16 @@ Object.entries(FIELD_DECIMALS).forEach(([id, decimals]) => {
       const caret = restrictNumber(input.value.slice(0, input.selectionStart), decimals).length;
       input.value = clean;
       input.setSelectionRange(caret, caret);
+    }
+  });
+  const max = FIELD_MAX[id];
+  if (max !== undefined) input.addEventListener('input', e => {
+    if (parseWholeNumber(input.value) <= max) return;
+    if (e.inputType === 'insertText' && before && parseWholeNumber(before.value) <= max) {
+      input.value = before.value;
+      input.setSelectionRange(before.start, before.end);
+    } else {
+      input.value = String(max);
     }
   });
 });
