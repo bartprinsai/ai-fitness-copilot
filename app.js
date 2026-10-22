@@ -4520,9 +4520,10 @@ function openDayRecap() {
 
 function renderPlateList() {
   document.getElementById('plate-list').innerHTML = PLATE_TYPES.map(p => {
+    // A plate with a deviation: average and deviation on two lines; otherwise just the weight.
     const meta = p.deviation > 0
-      ? `gem. ${formatWeight(p.weight)} · ±${formatWeight(p.deviation)} kg`
-      : `${formatWeight(p.weight)} kg`;
+      ? `<span class="plate-row-meta">gem. ${formatWeight(p.weight)} kg</span><span class="plate-row-meta">±${formatWeight(p.deviation)} kg</span>`
+      : `<span class="plate-row-meta">${formatWeight(p.weight)} kg</span>`;
     const onBarCount = getPlateOnBarCount(p.id);
     const onBarAtMax = onBarCount >= getPlateOnBarMax(p.id);
     const availableAtMax = getPlateCount(p.id) >= getPlateAvailableMax(p.id);
@@ -4530,7 +4531,7 @@ function renderPlateList() {
       <div class="plate-row" data-plate-id="${p.id}">
         <div class="plate-row-info">
           <span class="plate-row-name">${p.label}</span>
-          <span class="plate-row-meta">${meta}</span>
+          ${meta}
         </div>
         <div class="plate-stepper" data-kind="available">
           <button type="button" class="plate-stepper-btn" data-dir="-">−</button>

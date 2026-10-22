@@ -212,6 +212,12 @@ button.pill:active { filter: brightness(.92); transform: scale(0.97); }
 .input, .overlay-panel input[type="text"], .overlay-panel input[type="number"], .overlay-panel select, .overlay-panel textarea, .new-ex-input, .new-ex-select, .search-bar input, .plate-target-input, .ai-gen-textarea, .field-group input { width: 100%; height: var(--control-height); padding: 0 var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-family: inherit; font-size: var(--fs-heading); font-weight: var(--fw-regular); outline: none; transition: border-color .15s; -moz-appearance: textfield; }
 .input:focus, .overlay-panel input:focus, .overlay-panel select:focus, .overlay-panel textarea:focus, .new-ex-input:focus, .new-ex-select:focus, .search-bar input:focus, .plate-target-input:focus, .ai-gen-textarea:focus, .field-group input:focus { border-color: var(--primary); }
 .input::placeholder, input::placeholder, textarea::placeholder { color: var(--text-muted); }
+/* A typed number is always 700 (like the TRACK fields), in every number field — they all carry
+   inputmode="decimal"/"numeric". The size stays each field's own. Placeholders ("bijv. 100") stay
+   400 in the placeholder colour, so an empty field still reads as empty; text fields stay 400.
+   (The .overlay-panel selector out-ranks the shared modal input rule above.) */
+input[inputmode="decimal"], input[inputmode="numeric"], .overlay-panel input[inputmode="numeric"], .overlay-panel input[inputmode="decimal"] { font-weight: var(--fw-bold); }
+input[inputmode="decimal"]::placeholder, input[inputmode="numeric"]::placeholder { font-weight: var(--fw-regular); }
 .overlay-panel textarea, .ai-gen-textarea { height: auto; min-height: 80px; padding: var(--space-3); line-height: 1.4; resize: none; }
 input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-appearance: none; }
 /* Select-style button (opens a picker): the input box + a chevron. */
@@ -929,7 +935,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .plate-row:last-child { border-bottom: none; }
 .plate-row-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .plate-row-name { font-size: var(--fs-body); font-weight: var(--fw-medium); color: var(--text); }
-.plate-row-meta { font-size: var(--fs-small); color: var(--text-secondary); }
+.plate-row-meta { font-size: var(--fs-small); color: var(--text-secondary); white-space: nowrap; }
 .plate-stepper { display: flex; align-items: center; justify-content: center; gap: var(--space-1); }
 .plate-stepper-btn { width: 36px; height: 36px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; font-size: var(--fs-number); font-weight: var(--fw-regular); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .1s; line-height: 1; flex-shrink: 0; }
 .plate-stepper-btn:active { background: var(--pressed); }
