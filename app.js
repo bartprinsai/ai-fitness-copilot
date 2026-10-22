@@ -2301,8 +2301,8 @@ function renderExerciseInfoView() {
   const sections = [];
   if (info.primaryMuscle || info.secondaryMuscle) {
     sections.push(`<div class="section-label">Muscle group</div><div class="info-two-col">
-      ${info.primaryMuscle ? `<div class="info-view-stat"><span class="info-view-stat-label">Primary</span><span class="info-view-stat-value">${info.primaryMuscle}</span></div>` : ''}
-      ${info.secondaryMuscle ? `<div class="info-view-stat"><span class="info-view-stat-label">Secondary</span><span class="info-view-stat-value">${info.secondaryMuscle}</span></div>` : ''}
+      ${info.primaryMuscle ? `<div class="info-view-stat"><span class="section-label">Primary</span><span class="info-view-stat-value">${info.primaryMuscle}</span></div>` : ''}
+      ${info.secondaryMuscle ? `<div class="info-view-stat"><span class="section-label">Secondary</span><span class="info-view-stat-value">${info.secondaryMuscle}</span></div>` : ''}
     </div>`);
   }
   let equipHtml = '';
@@ -2310,13 +2310,13 @@ function renderExerciseInfoView() {
     const cells = pair
       .map(key => EXERCISE_INFO_FIELDS_BY_KEY[key])
       .filter(f => equipmentFieldIsFilled(f, info))
-      .map(f => `<div class="info-view-stat"><span class="info-view-stat-label">${f.label}</span><span class="info-view-stat-value">${equipmentFieldViewValue(f, info)}</span></div>`);
+      .map(f => `<div class="info-view-stat"><span class="section-label">${f.label}</span><span class="info-view-stat-value">${equipmentFieldViewValue(f, info)}</span></div>`);
     if (cells.length > 0) equipHtml += `<div class="info-two-col">${cells.join('')}</div>`;
   });
   EXERCISE_INFO_FULLWIDTH_KEYS.forEach(key => {
     const f = EXERCISE_INFO_FIELDS_BY_KEY[key];
     if (!equipmentFieldIsFilled(f, info)) return;
-    equipHtml += `<div class="info-view-stat"><span class="info-view-stat-label">${f.label}</span><span class="info-view-stat-value">${equipmentFieldViewValue(f, info)}</span></div>`;
+    equipHtml += `<div class="info-view-stat"><span class="section-label">${f.label}</span><span class="info-view-stat-value">${equipmentFieldViewValue(f, info)}</span></div>`;
   });
   if (equipHtml) sections.push('<div class="section-label">Equipment setup</div>' + equipHtml);
   const content = document.getElementById('exercise-info-view-content');
@@ -2345,7 +2345,7 @@ const EXERCISE_INFO_FORMS = {
 function renderExerciseInfoFormFields(form) {
   const p = form.prefix;
   const pickerBtn = id => `<button type="button" class="new-ex-select new-ex-select-btn" id="${id}"></button>`;
-  const field = (id, label, control) => `<div class="info-field"><label class="info-field-label" for="${id}">${label}</label>${control}</div>`;
+  const field = (id, label, control) => `<div class="info-field"><label class="section-label" for="${id}">${label}</label>${control}</div>`;
   const equipmentField = key => {
     const f = EXERCISE_INFO_FIELDS_BY_KEY[key];
     const id = `${p}-${f.idSuffix}`;
@@ -4305,10 +4305,12 @@ function workingSetGroups(sets) {
 
 // One block per working set of the day, each compared with the set at the SAME
 // position in the most recent earlier session (Set 1 vs Set 1, ...):
-//   "Set N" (+ the trophy when it is a PR — its dropsets never are)
+//   "Set N" — N is the Track set number, so a dropset's number is skipped
+//     (+ the trophy when it is a PR — its dropsets never are)
 //   weight × reps, with weight and reps judged separately
 //   RPE, judged on its own (higher = felt heavier, so red)
 //   what that set was last time
+//   "Gevolgd door (N) dropset(s)" when dropsets hang on it (their own values aren't shown)
 // Extra sets today have no counterpart; extra sets last time are simply not shown.
 // No earlier session at all: no comparisons, one note under the last set.
 function recapSetLines(ex, date, prKeys) {
@@ -4341,12 +4343,14 @@ function recapSetLines(ex, date, prKeys) {
     } else if (prev) {
       prevLine = '(geen vorige set)';
     }
+    const drops = idxs.length - 1;
     return `
       <div class="recap-set">
-        <div class="recap-set-head">Set ${i + 1}${isPR ? ' ' + prTrophySvg('recap-set-pr') : ''}</div>
+        <div class="recap-set-head">Set ${idxs[0] + 1}${isPR ? ' ' + prTrophySvg('recap-set-pr') : ''}</div>
         <div>${formatKg(w)} kg × ${r}${wrMarks}</div>
         <div>${rpe > 0 ? `RPE ${formatRpe(rpe)}${rpeMark}` : '<span class="recap-muted">Geen RPE gelogd</span>'}</div>
         ${prevLine ? `<div class="recap-prev">${prevLine}</div>` : ''}
+        ${drops > 0 ? `<div class="recap-drop">${DROP_ARROW_SVG}Gevolgd door ${drops === 1 ? 'dropset' : `${drops} dropsets`}</div>` : ''}
       </div>`;
   });
   if (!prev) blocks.push(recapLine('recap-muted', '', 'Eerste keer deze oefening — geen vergelijking'));
