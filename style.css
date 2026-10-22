@@ -517,7 +517,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .graph-legend-dot { width: 10px; height: 10px; border-radius: var(--radius-pill); flex-shrink: 0; box-sizing: border-box; }
 .graph-legend-direct { background: var(--primary); }
 .graph-legend-derived { background: var(--pr-gold); border: 1.5px solid var(--surface); box-shadow: 0 0 0 1px var(--border); }
-.graph-sel-via { display: block; margin-top: 2px; font-size: var(--fs-small); font-style: italic; color: var(--text-secondary); }
+.graph-sel-via { display: block; margin-top: 2px; font-size: var(--fs-small); color: var(--text-secondary); }
 .graph-sel-via::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: var(--space-2); border-radius: var(--radius-pill); background: var(--pr-gold); border: 1.5px solid var(--surface); box-shadow: 0 0 0 1px var(--border); box-sizing: border-box; vertical-align: baseline; }
 /* Graph tab: the chart takes all vertical space left between the Reps/period controls and the selection panel; the panel sits above the AI Coach pill. */
 #tab-graph { overflow: hidden; padding-bottom: var(--ai-bar-space); }
@@ -567,8 +567,12 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 
 /* ══ RECORDS SCREEN ═════════════════════════════════════ */
 .records-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: var(--space-4) var(--screen-gutter) calc(var(--ai-bar-space) + var(--space-4)); display: flex; flex-direction: column; gap: var(--card-gap); }
-.records-list { flex-shrink: 0; display: flex; flex-direction: column; background: var(--surface); border-radius: var(--radius-lg); padding: 0 var(--card-padding); box-shadow: var(--card-shadow); }
-.records-row { display: flex; align-items: center; justify-content: space-between; padding: var(--space-3) 0; border-bottom: 1px solid var(--border); }
+/* Record rows follow the set rows (.set-row): the 1px --border line runs to the edge of the card
+   (the card has no side padding, the rows carry it), no line above the first or below the last
+   row; --card-padding left and --space-3 right, so weight and date end 12px from the card edge,
+   like the RPE column. overflow: hidden keeps the pressed-row colour inside the rounded corners. */
+.records-list { flex-shrink: 0; display: flex; flex-direction: column; background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--card-shadow); overflow: hidden; }
+.records-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) var(--space-3) var(--space-3) var(--card-padding); border-bottom: 1px solid var(--border); }
 .records-row:last-child { border-bottom: none; }
 /* One Rep Max: its own gold card above the RM list (PR gold), dark text on gold. */
 .records-hero { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); background: var(--pr-gold); color: var(--on-gold); border-radius: var(--radius-lg); padding: var(--card-padding); box-shadow: var(--card-shadow); flex-shrink: 0; }
@@ -581,16 +585,24 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .records-hero .records-row-date, .records-hero .records-row-via, .records-hero .records-row-nodata, .records-hero .set-val, .records-hero .set-unit { color: var(--on-gold); }
 .records-row-clickable { cursor: pointer; }
 .records-row-clickable:active { background: var(--bg); }
-.records-history-body { max-height: 45vh; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: var(--space-2); }
-.records-history-body .section-label:not(:first-child) { margin-top: var(--space-3); }
-.records-history-body .records-row:last-child { border-bottom: none; }
-.records-row-reps { font-size: var(--fs-body); font-weight: var(--fw-bold); color: var(--text-secondary); }
+/* Records history popup: the same rows, lines across the full width of the sheet content and no
+   gap between rows (like the set rows in the Calendar / Go to popups); no line under the last row
+   of a group. The group labels sit on --card-padding, in line with the RM label / weight, like the
+   other popup headings; the spacing around them is unchanged (8px below, 20px above). */
+.records-history-body { max-height: 45vh; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; }
+.records-history-body .section-label { padding-left: var(--card-padding); margin-bottom: var(--space-2); }
+.records-history-body .section-label:not(:first-child) { margin-top: calc(var(--space-2) + var(--space-3)); }
+.records-history-body .records-row:last-child, .records-history-body .records-row:has(+ .section-label) { border-bottom: none; }
+/* RM label = the set number (.set-num): Body, 700, --text. */
+.records-row-reps { font-size: var(--fs-body); font-weight: var(--fw-bold); color: var(--text); }
 .records-row-weight { display: flex; align-items: baseline; gap: var(--space-1); font-size: var(--fs-number); font-weight: var(--fw-bold); color: var(--text); }
 .records-row-weight svg { align-self: center; margin-right: var(--space-1); width: var(--icon-list); height: var(--icon-list); fill: var(--pr-gold); }
 .records-row-value { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
-.records-row-date { font-size: var(--fs-small); color: var(--text-secondary); }
-.records-row-via { font-size: var(--fs-small); font-style: italic; color: var(--text-secondary); }
-.records-row-nodata { font-size: var(--fs-body); color: var(--text-muted); }
+/* Date line = the set row's second line ("+2 partial"): Klein, --text-secondary, upright ("via" is
+   never italic), one line. "Geen gegevens": Klein, --text-muted. */
+.records-row-date { font-size: var(--fs-small); color: var(--text-secondary); white-space: nowrap; }
+.records-row-via { font-size: var(--fs-small); color: var(--text-secondary); }
+.records-row-nodata { font-size: var(--fs-small); color: var(--text-muted); }
 .records-empty { padding: var(--space-5) 0; }
 
 /* ══ EXERCISE INFO OVERLAY (muscle group / equipment setup) ═ */
