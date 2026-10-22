@@ -449,12 +449,15 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .field-row-pair .field-group:first-child { padding-right: var(--space-2); }
 .field-row-pair .field-group:last-child { padding-left: var(--space-2); }
 /* DROPSET checkbox on the REPS label line: same label type in the accent colour */
+.field-label-row { display: flex; align-items: center; justify-content: space-between; height: 16px; margin-bottom: var(--space-2); }
+.field-label-row .section-label { margin-bottom: 0; }
+.dropset-check { display: flex; align-items: center; gap: var(--space-2); font-size: var(--fs-label); font-weight: var(--fw-medium); letter-spacing: var(--ls-label); color: var(--primary); cursor: pointer; user-select: none; position: relative; padding: var(--space-2) 0 var(--space-2) var(--space-3); margin: calc(-1 * var(--space-2)) 0; }
+.field-group .dropset-check input { position: absolute; opacity: 0; width: 0; height: 0; flex: none; pointer-events: none; }
 .dropset-box { width: 16px; height: 16px; border-radius: var(--radius-pill); border: 2px solid var(--primary); display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-sizing: border-box; transition: background .1s; }
 .dropset-box svg { width: 10px; height: 10px; fill: var(--on-primary); opacity: 0; }
-/* Deliberate exception, TRACK tab only (see DESIGN_SYSTEM.md): the labels above the steppers
-   (GEWICHT (kgs), REPS, RPE, EXTRA REPS) are 15px (Body size); weight 500, uppercase, colour,
-   letter-spacing and line-height stay those of .section-label. Labels elsewhere stay at 11px. */
-#tab-track .field-group .section-label { font-size: var(--fs-body); }
+.dropset-check input:checked + .dropset-box { background: var(--primary); }
+.dropset-check input:checked + .dropset-box svg { opacity: 1; }
+.field-label-optional { font-weight: var(--fw-regular); color: var(--text-muted); letter-spacing: 0; text-transform: none; }
 /* Unit inside a label ("WEIGHT (kgs)"): keeps its own lowercase casing. */
 .label-unit { text-transform: none; }
 
@@ -467,10 +470,6 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .chip, .time-filter, .ps-day-circle, .day-picker-circle { border-radius: var(--radius-pill); }
 .extra-type-btn:disabled { opacity: .45; cursor: default; }
 .extra-type { display: flex; gap: var(--space-2); margin-top: var(--space-2); }
-/* Dropset under RPE: one button on the Partial/Forced row, exactly one of those buttons wide,
-   right-aligned so its right edge lines up with the RPE + button above it. */
-.extra-type-single { justify-content: flex-end; }
-.extra-type-single .extra-type-btn { flex: 0 0 calc((100% - var(--space-2)) / 2); }
 .extra-type-btn, .pde-sr-mode-btn { flex: 1; min-width: 0; height: 36px; font-size: var(--fs-small); }
 
 /* ── Action buttons (SAVE / CLEAR) ── */
