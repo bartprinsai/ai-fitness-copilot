@@ -618,7 +618,14 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .exercise-info-empty { padding: var(--space-5) 0; }
 
 /* ══ CALENDAR ═══════════════════════════════════════════ */
-.cal-grid-header { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: var(--fs-label); font-weight: var(--fw-medium); color: var(--text-muted); padding: var(--space-2) var(--space-3) var(--space-1); text-transform: uppercase; letter-spacing: var(--ls-label); background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+/* Weekday header: styled like the dark bars (calendar footer, Fitness Tracker day navigation) —
+   --toolbar background, the .day-nav-label text (label size, medium, uppercase, --ls-label) in
+   --on-toolbar, and the same 2px --primary line, here at the bottom. It sits outside .cal-scroll,
+   so it stays on top and is opaque: no dates show through while scrolling. Same height and the same
+   7 columns, 2px column gap and --space-3 side padding as .cal-grid, so every weekday sits exactly
+   above its dates (before, the missing gap put the outer weekdays up to 0.9px off); the line
+   is 1px thicker than the old one, so the bottom padding is 1px less. */
+.cal-grid-header { display: grid; grid-template-columns: repeat(7, 1fr); column-gap: 2px; text-align: center; font-size: var(--fs-label); font-weight: var(--fw-medium); color: var(--on-toolbar); padding: var(--space-2) var(--space-3) calc(var(--space-1) - 1px); text-transform: uppercase; letter-spacing: var(--ls-label); background: var(--toolbar); border-bottom: 2px solid var(--primary); flex-shrink: 0; }
 /* calOnScroll() (app.js) prepends older months above the viewport and
    manually compensates scrollTop by the exact height added, to keep the
    visual position stable. The browser's own CSS scroll-anchoring does the
