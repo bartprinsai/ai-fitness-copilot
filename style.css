@@ -400,13 +400,23 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    compute the same numbers. */
 .list-row { width: 100%; box-sizing: border-box; margin: 0; padding-left: var(--screen-gutter); padding-right: var(--screen-gutter); }
 
-.search-bar { position: relative; display: flex; align-items: center; background: var(--surface); border-bottom: 1px solid var(--border); padding-top: var(--space-2); padding-bottom: var(--space-2); flex-shrink: 0; }
+/* The search strip sits outside the scrolling list, on --bg (no white strip, no line under it), so it
+   stays on top and the list card never shows behind it while scrolling. The field itself is the
+   shared white input. */
+.search-bar { position: relative; display: flex; align-items: center; background: var(--bg); padding-top: var(--space-2); padding-bottom: var(--space-2); flex-shrink: 0; }
 .search-bar input { padding-left: 44px; }
 .search-icon { position: absolute; left: calc(var(--screen-gutter) + var(--space-3)); top: 50%; transform: translateY(-50%); width: var(--icon-list); height: var(--icon-list); fill: var(--text-muted); pointer-events: none; }
 
-.exercise-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; background: var(--bg); padding-bottom: var(--ai-bar-space); }
+.exercise-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; background: var(--bg); padding-bottom: calc(var(--ai-bar-space) + var(--space-4)); }
+/* Every list on this screen (categories, a category, search results, Favorieten) is one .card on
+   --bg — same margin, radius and shadow as .history-card / .exercise-card. Rows take the card's
+   white, --card-padding inside, a 1px --border line between rows and none after the last one;
+   overflow: hidden keeps the pressed-row background inside the rounded corners. */
+.card.list-card { padding: 0; margin: var(--card-gap) var(--screen-gutter) 0; overflow: hidden; }
+.list-card .list-row { padding-left: var(--card-padding); padding-right: var(--card-padding); }
+.list-card > :last-child { border-bottom: none; }
 
-.category-item, .exercise-item { display: flex; align-items: center; min-height: 56px; padding-top: var(--space-3); padding-bottom: var(--space-3); border-bottom: 1px solid var(--border); font-size: var(--fs-body); color: var(--text); cursor: pointer; background: var(--surface); transition: background 0.08s; }
+.category-item, .exercise-item { display: flex; align-items: center; min-height: 56px; padding-top: var(--space-3); padding-bottom: var(--space-3); border-bottom: 1px solid var(--border); font-size: var(--fs-body); color: var(--text); cursor: pointer; background: transparent; transition: background 0.08s; }
 .category-item:active, .exercise-item:active { background: var(--bg); }
 .category-item-name, .exercise-item-name { flex: 1; }
 .category-item-dots, .exercise-item-dots { width: var(--icon-list); height: var(--icon-list); fill: var(--text-muted); flex-shrink: 0; }

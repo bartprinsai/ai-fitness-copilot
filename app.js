@@ -1670,10 +1670,21 @@ function syncExerciseBrowseToHistory(browse) {
   }
 }
 
-function renderCategoryBrowser() {
-  setExercisesTitle(defaultExercisesTitle());
+// Every list on the Alle oefeningen screen (categories, a category, search results, Favorieten)
+// sits in one white card (.card.list-card) on --bg, like the History and day-overview cards.
+// Empty-state text stays outside the card. Returns the card to append rows to.
+function exerciseListCard() {
   const list = document.getElementById('exercise-list');
   list.innerHTML = '';
+  const card = document.createElement('div');
+  card.className = 'card list-card';
+  list.appendChild(card);
+  return card;
+}
+
+function renderCategoryBrowser() {
+  setExercisesTitle(defaultExercisesTitle());
+  const list = exerciseListCard();
   const hasFavorites = Object.keys(db.favoriteExercises || {}).length > 0;
   if (hasFavorites) {
     const item = document.createElement('div');
@@ -1767,33 +1778,30 @@ document.getElementById('btn-cat-delete-confirm').addEventListener('click', () =
 });
 
 function renderExercisesInCategory(cat) {
-  const list = document.getElementById('exercise-list');
-  list.innerHTML = '';
+  const list = exerciseListCard();
   const exercises = allExercises().filter(e => e.category === cat);
   if (exercises.length === 0) {
-    list.insertAdjacentHTML('beforeend', `<div class="exercise-empty">Geen oefeningen gevonden</div>`);
+    document.getElementById('exercise-list').innerHTML = `<div class="exercise-empty">Geen oefeningen gevonden</div>`;
     return;
   }
   exercises.forEach(ex => renderExerciseItem(list, ex));
 }
 
 function renderFavoriteExercises() {
-  const list = document.getElementById('exercise-list');
-  list.innerHTML = '';
+  const list = exerciseListCard();
   const favs = allExercises().filter(e => isFavoriteExercise(e.name));
   if (favs.length === 0) {
-    list.insertAdjacentHTML('beforeend', `<div class="exercise-empty">Nog geen favorieten</div>`);
+    document.getElementById('exercise-list').innerHTML = `<div class="exercise-empty">Nog geen favorieten</div>`;
     return;
   }
   favs.forEach(ex => renderExerciseItem(list, ex));
 }
 
 function renderExerciseSearchResults(q) {
-  const list = document.getElementById('exercise-list');
-  list.innerHTML = '';
+  const list = exerciseListCard();
   const filtered = allExercises().filter(e => e.name.toLowerCase().includes(q));
   if (filtered.length === 0) {
-    list.insertAdjacentHTML('beforeend', `<div class="exercise-empty">Geen oefeningen gevonden</div>`);
+    document.getElementById('exercise-list').innerHTML = `<div class="exercise-empty">Geen oefeningen gevonden</div>`;
     return;
   }
   filtered.forEach(ex => renderExerciseItem(list, ex));
