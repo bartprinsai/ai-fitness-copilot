@@ -333,12 +333,13 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    (just fits "132.5 kgs") placed --space-3 after the set number, at the start of the flexible column — so any extra width
    ends up between weight and reps. Inside the block, reps and the effort cell, everything is
    right-aligned, so "kgs" ends on the same x in every row.
-   Content edge: 24px from the screen edge in every list (--screen-gutter + --space-2).
-   Rows inside a card (day overview, History) or a bottom sheet (popups) already sit one
-   gutter in, so they pad by --space-2; the TRACK list runs edge to edge and pads by the
-   sum. That puts every column on the same x on every screen. */
-.set-row { display: grid; grid-template-columns: 28px var(--icon-list) 24px minmax(0, 1fr) 56px 72px; align-items: center; padding: var(--space-3) var(--space-2); border-bottom: 1px solid var(--border); }
-#set-list .set-row { padding-left: calc(var(--screen-gutter) + var(--space-2)); padding-right: calc(var(--screen-gutter) + var(--space-2)); cursor: pointer; transition: background 0.08s; }
+   Content edge: 24px from the left and 28px from the right screen edge in every list
+   (--screen-gutter + --space-2 / --space-3). Rows inside a card (day overview, History) or
+   a bottom sheet (popups) already sit one gutter in, so they pad by --space-2 left and
+   --space-3 right; the TRACK list runs edge to edge and pads by the sums. That puts every
+   column on the same x on every screen. */
+.set-row { display: grid; grid-template-columns: 28px var(--icon-list) 24px minmax(0, 1fr) 56px 72px; align-items: center; padding: var(--space-3) var(--space-3) var(--space-3) var(--space-2); border-bottom: 1px solid var(--border); }
+#set-list .set-row { padding-left: calc(var(--screen-gutter) + var(--space-2)); padding-right: calc(var(--screen-gutter) + var(--space-3)); cursor: pointer; transition: background 0.08s; }
 /* No zebra: a row takes the colour of whatever it sits on (--bg in TRACK, --surface in cards and
    popups), with a 1px --border line between rows. The last row of a list keeps its 1px border, but
    transparent, so every row has the same height and there's no line under the list. */
