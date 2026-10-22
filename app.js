@@ -1874,15 +1874,21 @@ function parseDecimal(str) { return parseFloat(String(str).replace(',', '.')) ||
 function round1(v) { return Math.round(v * 10) / 10; }
 function parseWeight(str) { return Math.max(0, round1(parseDecimal(str))); }
 // The ONE display format for numbers anywhere in the app: decimal comma, no thousands
-// separator, at most `decimals` decimals and no trailing zeros ("132,5", "150") — or,
-// with `fixed`, always exactly `decimals` (only the Graph's y-axis: "82,5", "90,0").
+// separator, at most 1 decimal, rounded half away from zero (not truncated), and no
+// trailing zero ("132,5", "150"). Two options, each for exactly one place:
+//   fixed: always exactly 1 decimal — only the Graph's y-axis ("82,5", "90,0").
+//   plateWeight: up to 2 decimals — only plate weights in the Plate Calculator, which has
+//     0,25 kg plates ("0,25", "20,8", "25"). Don't use it for anything else.
 // Display only: stored data stays plain numbers, input accepts comma and point.
-function formatNumber(n, decimals = 2, fixed = false) {
-  const v = Number(n) || 0;
-  const s = fixed ? v.toFixed(decimals) : String(Math.round(v * 10 ** decimals) / 10 ** decimals);
+const MAX_DECIMALS = 1, PLATE_WEIGHT_DECIMALS = 2;
+function formatNumber(n, { fixed = false, plateWeight = false } = {}) {
+  const d = plateWeight ? PLATE_WEIGHT_DECIMALS : MAX_DECIMALS;
+  const v = Number(n) || 0, f = 10 ** d;
+  const r = Math.sign(v) * Math.round((Math.abs(v) + Number.EPSILON) * f) / f;
+  const s = fixed ? r.toFixed(d) : String(r === 0 ? 0 : r);
   return s.replace('.', ',');
 }
-function formatWeight(v) { return formatNumber(v, 1); }
+function formatWeight(v) { return formatNumber(v); }
 // A weight as value + unit: the number on Groot getal, "kg" apart on Klein (same
 // classes as the set rows), wherever a weight is shown as a value.
 function weightValueHtml(w) {
@@ -1895,7 +1901,7 @@ function parseWholeNumber(str) { return Math.max(0, Math.round(parseDecimal(str)
 const RPE_MIN = 6, RPE_MAX = 10, RPE_STEP = 0.5;
 function parseRpe(str) { return round1(parseDecimal(str)); }
 function isValidRpe(v) { return v === 0 || (v >= RPE_MIN && v <= RPE_MAX && (v / RPE_STEP) % 1 === 0); }
-function formatRpe(v) { return formatNumber(v, 1); }
+function formatRpe(v) { return formatNumber(v); }
 // Stepper: 0 -> 6 on +, 6 -> 0 on -, +/-0.5 in between (max 10).
 function stepRpe(current, dir) {
   const v = parseRpe(current);
@@ -2630,10 +2636,14 @@ document.querySelectorAll('.field-btn').forEach(btn => {
 });
 
 // Block invalid characters while typing (also paste, and Android keyboards that
-// show a separator anyway): weight and RPE take digits plus ONE decimal separator
-// (comma or point) with at most 1 digit after it; reps and extra reps take digits
-// only. A rejected keystroke simply doesn't appear; the caret stays where it was.
-const FIELD_DECIMALS = { 'field-weight': 1, 'field-rpe': 1, 'field-reps': 0, 'field-extra': 0 };
+// show a separator anyway): every decimal field in the app (TRACK weight and RPE, the
+// Plate/1RM/Warm-up Calculator weights) takes digits plus ONE decimal separator (comma
+// or point) with at most 1 digit after it; counts (TRACK reps and extra reps, 1RM reps)
+// take digits only. A rejected keystroke simply doesn't appear; the caret stays where it was.
+const FIELD_DECIMALS = {
+  'field-weight': 1, 'field-rpe': 1, 'field-reps': 0, 'field-extra': 0,
+  'plate-target-weight': 1, 'orm-weight': 1, 'orm-reps': 0, 'warmup-weight': 1,
+};
 function restrictNumber(str, decimals) {
   let out = '', sep = false, after = 0;
   for (const ch of str) {
@@ -3109,7 +3119,7 @@ function drawGraphChart() {
   for (let i = 0; i <= 4; i++) {
     const y = pad.top + (gH / 4) * i;
     ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + gW, y); ctx.stroke();
-    const label = formatNumber(maxV - (range / 4) * i, 1, true); // deliberately a fixed decimal, so the axis labels line up
+    const label = formatNumber(maxV - (range / 4) * i, { fixed: true }); // deliberately a fixed decimal, so the axis labels line up
     ctx.fillStyle = tok('--text-muted'); ctx.font = '11px Roboto'; ctx.textAlign = 'right';
     ctx.fillText(label, pad.left - 4, y + 4);
   }
@@ -4045,9 +4055,9 @@ document.getElementById('btn-orm-calculate').addEventListener('click', () => {
     return;
   }
   errEl.classList.add('hidden');
-  document.getElementById('orm-result-value').textContent = formatNumber(res.oneRm, 1) + ' kg';
+  document.getElementById('orm-result-value').textContent = formatNumber(res.oneRm) + ' kg';
   document.getElementById('orm-table-body').innerHTML = res.rows.map(r =>
-    `<div class="orm-table-row"><div>${r.reps}</div><div>${formatNumber(r.weight, 1)} kg</div><div>${r.percent}%</div></div>`
+    `<div class="orm-table-row"><div>${r.reps}</div><div>${formatNumber(r.weight)} kg</div><div>${r.percent}%</div></div>`
   ).join('');
   document.getElementById('orm-result-card').classList.remove('hidden');
   document.getElementById('orm-table-section').classList.remove('hidden');
@@ -4173,12 +4183,13 @@ document.getElementById('warmup-ex-options').addEventListener('click', e => {
 });
 // Calculator number fields (Plate, 1RM, Warm-up): like the TRACK fields, a typed number is
 // shown through the shared formatNumber() once the field is left ("102.5" -> "102,5",
-// "150.0" -> "150"). Every typed decimal is kept, so the calculation doesn't change; text
-// that isn't a number stays as typed, so the calculator's own error still appears.
+// "150.0" -> "150"); typing is already limited to 1 decimal (FIELD_DECIMALS), so nothing
+// is rounded away. Text that isn't a number stays as typed, so the calculator's own error
+// still appears.
 ['plate-target-weight', 'orm-weight', 'orm-reps', 'warmup-weight'].forEach(id => {
   document.getElementById(id).addEventListener('change', e => {
     const n = parseWarmupNumber(e.target.value);
-    if (!isNaN(n)) e.target.value = formatNumber(n, 10);
+    if (!isNaN(n)) e.target.value = formatNumber(n);
   });
 });
 document.getElementById('btn-warmup-calculate').addEventListener('click', () => {
@@ -4194,8 +4205,8 @@ document.getElementById('btn-warmup-calculate').addEventListener('click', () => 
   errEl.classList.add('hidden');
   document.getElementById('warmup-result-list').innerHTML = res.rows.map(r => {
     if (r.bar) return `<div class="plate-result-line">Lege stang × ${r.reps}</div>`;
-    if (r.work) return `<div class="plate-result-line warmup-line-work">${formatKg(r.weight)} kg (werkset)</div>`;
-    return `<div class="plate-result-line">${formatKg(r.weight)} kg × ${r.reps}</div>`;
+    if (r.work) return `<div class="plate-result-line warmup-line-work">${formatNumber(r.weight)} kg (werkset)</div>`;
+    return `<div class="plate-result-line">${formatNumber(r.weight)} kg × ${r.reps}</div>`;
   }).join('');
   const noteEl = document.getElementById('warmup-result-note');
   noteEl.textContent = 'Werkgewicht te laag voor tussenstappen — alleen lege stang, dan de werkset.';
@@ -4357,8 +4368,8 @@ function recapSetLines(ex, date, prKeys) {
       const pw = Number(p.weight) || 0, pr = Number(p.reps) || 0, prpe = parseFloat(p.rpe) || 0;
       const dw = Math.round((w - pw) * 100) / 100, dr = r - pr;
       const marks = [];
-      if (dw > 0) marks.push(`<span class="recap-up">↑ +${formatKg(dw)} kg</span>`);
-      if (dw < 0) marks.push(`<span class="recap-down">↓ -${formatKg(-dw)} kg</span>`);
+      if (dw > 0) marks.push(`<span class="recap-up">↑ +${formatNumber(dw)} kg</span>`);
+      if (dw < 0) marks.push(`<span class="recap-down">↓ -${formatNumber(-dw)} kg</span>`);
       if (dr > 0) marks.push(`<span class="recap-up">↑ +${reps(dr)}</span>`);
       if (dr < 0) marks.push(`<span class="recap-down">↓ -${reps(-dr)}</span>`);
       wrMarks = ' ' + (marks.length ? marks.join(' ') : '<span class="recap-muted">(gelijk)</span>');
@@ -4368,7 +4379,7 @@ function recapSetLines(ex, date, prKeys) {
           : d < 0 ? ` <span class="recap-up">↓ -${formatRpe(-d)}</span>`
           : ' <span class="recap-muted">(gelijk)</span>';
       }
-      prevLine = `Vorige keer: ${formatKg(pw)}×${pr}${prpe > 0 ? `, RPE ${formatRpe(prpe)}` : ''}`;
+      prevLine = `Vorige keer: ${formatNumber(pw)}×${pr}${prpe > 0 ? `, RPE ${formatRpe(prpe)}` : ''}`;
     } else if (prev) {
       prevLine = '(geen vorige set)';
     }
@@ -4377,7 +4388,7 @@ function recapSetLines(ex, date, prKeys) {
     return `
       <div class="recap-set">
         <div class="recap-set-head">Set ${idxs[0] + 1}${isPR ? ' ' + prTrophySvg('recap-set-pr') : ''}</div>
-        <div>${formatKg(w)} kg × ${r}${wrMarks}</div>
+        <div>${formatNumber(w)} kg × ${r}${wrMarks}</div>
         ${extra ? `<div class="recap-note recap-extra">${extra}</div>` : ''}
         <div>${rpe > 0 ? `RPE ${formatRpe(rpe)}${rpeMark}` : '<span class="recap-muted">Geen RPE gelogd</span>'}</div>
         ${prevLine ? `<div class="recap-prev">${prevLine}</div>` : ''}
@@ -4426,14 +4437,12 @@ function openDayRecap() {
   openOverlay('recap-overlay');
 }
 
-// kg amounts in the calculators and the Recap: the shared formatNumber (2 decimals max).
-function formatKg(n) { return formatNumber(n, 2); }
 
 function renderPlateList() {
   document.getElementById('plate-list').innerHTML = PLATE_TYPES.map(p => {
     const meta = p.deviation > 0
-      ? `Gem. ${formatKg(p.weight)} kg · max ±${formatKg(p.deviation)} kg`
-      : `${formatKg(p.weight)} kg`;
+      ? `Gem. ${formatNumber(p.weight, { plateWeight: true })} kg · max ±${formatNumber(p.deviation, { plateWeight: true })} kg`
+      : `${formatNumber(p.weight, { plateWeight: true })} kg`;
     const onBarCount = getPlateOnBarCount(p.id);
     const onBarAtMax = onBarCount >= getPlateOnBarMax(p.id);
     const availableAtMax = getPlateCount(p.id) >= getPlateAvailableMax(p.id);
@@ -4669,12 +4678,12 @@ function renderPlateResult(remainingPerSide, targetWeight, barWeight, onBarWeigh
   const titleEl = document.getElementById('plate-result-title');
   const listEl = document.getElementById('plate-result-list');
   const noteEl = document.getElementById('plate-result-note');
-  document.getElementById('plate-result-current-total').textContent = (onBarHasDeviation() ? '±' : '') + formatKg(calcCurrentBarTotal(barWeight)) + ' kg';
+  document.getElementById('plate-result-current-total').textContent = (onBarHasDeviation() ? '±' : '') + formatNumber(calcCurrentBarTotal(barWeight)) + ' kg';
 
   if (Math.round(remainingPerSide * 100) === 0) {
     titleEl.textContent = 'Per kant';
     listEl.innerHTML = `<div class="plate-result-empty">Niets bijleggen of weghalen — je zit al op het doelgewicht.</div>`;
-    document.getElementById('plate-result-total').textContent = formatKg(barWeight + onBarWeightPerSide * 2) + ' kg';
+    document.getElementById('plate-result-total').textContent = formatNumber(barWeight + onBarWeightPerSide * 2) + ' kg';
     noteEl.classList.add('hidden');
     return;
   }
@@ -4692,11 +4701,11 @@ function renderPlateResult(remainingPerSide, targetWeight, barWeight, onBarWeigh
   const finalOnBarWeight = removing ? onBarWeightPerSide - result.perSideKg : onBarWeightPerSide + result.perSideKg;
   const totalWeight = barWeight + finalOnBarWeight * 2;
   const hasDeviation = result.used.some(u => u.deviation > 0);
-  document.getElementById('plate-result-total').textContent = (hasDeviation ? '±' : '') + formatKg(totalWeight) + ' kg';
+  document.getElementById('plate-result-total').textContent = (hasDeviation ? '±' : '') + formatNumber(totalWeight) + ' kg';
 
   if (!result.exact) {
     const diff = Math.abs(targetWeight - totalWeight);
-    noteEl.textContent = `Doel niet exact haalbaar — dichtstbijzijnde combinatie, ${formatKg(diff)} kg verschil`;
+    noteEl.textContent = `Doel niet exact haalbaar — dichtstbijzijnde combinatie, ${formatNumber(diff)} kg verschil`;
     noteEl.classList.remove('hidden');
   } else {
     noteEl.classList.add('hidden');
