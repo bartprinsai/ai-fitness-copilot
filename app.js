@@ -2287,8 +2287,9 @@ const SQUAT_RACK_HEIGHT_OPTIONS = equipmentRangeOptions(1, 10, 1);
 const SAFETY_BAR_OPTIONS = equipmentRangeOptions(1, 10, 1);
 
 // `kind: 'picker'` fields open the shared field-picker overlay (see
-// wireExerciseInfoFormPickers below); `'checkbox'` and `'text'` read/write
-// their input directly. View mode pairs the picker/checkbox fields up
+// wireExerciseInfoFormPickers below); `'toggle'` is a Ja/Nee on/off button
+// (getInfoToggle/setInfoToggle) and `'text'` reads/writes its input directly.
+// View mode pairs the picker/toggle fields up
 // (EXERCISE_INFO_EQUIPMENT_PAIRS) the same way Muscle group pairs
 // Primary/Secondary, and only renders whichever half of a pair is filled;
 // the free-text fields stay full-width rows like before.
@@ -2299,7 +2300,7 @@ const EXERCISE_INFO_EQUIPMENT_FIELDS = [
   { key: 'benchSettingOld', label: 'Bankstand (oud)', idSuffix: 'bench-setting-old', kind: 'picker', options: BENCH_SETTING_OLD_OPTIONS },
   { key: 'benchSettingNew', label: 'Bankstand (nieuw)', idSuffix: 'bench-setting-new', kind: 'picker', options: BENCH_SETTING_NEW_OPTIONS },
   { key: 'benchHeight', label: 'Bankhoogte', idSuffix: 'bench-height', kind: 'picker', options: BENCH_HEIGHT_OPTIONS },
-  { key: 'powerliftBench', label: 'Powerliftbank', idSuffix: 'powerlift-bench', kind: 'checkbox' },
+  { key: 'powerliftBench', label: 'Powerliftbank', idSuffix: 'powerlift-bench', kind: 'toggle' },
   { key: 'cableHeightOld', label: 'Kabelhoogte (oud)', idSuffix: 'cable-height-old', kind: 'picker', options: CABLE_HEIGHT_OLD_OPTIONS },
   { key: 'cableHeightNew', label: 'Kabelhoogte (nieuw)', idSuffix: 'cable-height-new', kind: 'picker', options: CABLE_HEIGHT_NEW_OPTIONS },
   { key: 'squatRackHeight', label: 'Hoogte squatrek', idSuffix: 'squat-rack-height', kind: 'picker', options: SQUAT_RACK_HEIGHT_OPTIONS },
@@ -2319,12 +2320,12 @@ const EXERCISE_INFO_FIELDS_BY_KEY = {};
 EXERCISE_INFO_EQUIPMENT_FIELDS.forEach(f => { EXERCISE_INFO_FIELDS_BY_KEY[f.key] = f; });
 
 function equipmentFieldIsFilled(f, info) {
-  if (f.kind === 'checkbox') return !!info[f.key];
+  if (f.kind === 'toggle') return !!info[f.key];
   const v = info[f.key];
   return v !== undefined && v !== null && v !== '';
 }
 function equipmentFieldViewValue(f, info) {
-  if (f.kind === 'checkbox') return 'Ja';
+  if (f.kind === 'toggle') return 'Ja';
   if (f.kind === 'picker') {
     const opt = f.options.find(o => o.value === String(info[f.key]));
     return opt ? opt.label : String(info[f.key]);
@@ -2365,7 +2366,7 @@ function renderExerciseInfoView() {
 }
 
 const MUSCLE_PRIMARY_OPTIONS = MUSCLE_OPTIONS.map(m => ({ value: m, label: m }));
-const MUSCLE_SECONDARY_OPTIONS = [{ value: '', label: 'Geen' }, ...MUSCLE_PRIMARY_OPTIONS];
+const MUSCLE_SECONDARY_OPTIONS = [{ value: '', label: 'Niet ingesteld' }, ...MUSCLE_PRIMARY_OPTIONS];
 
 // The muscle-group/equipment fields live in two places — the Exercise Info
 // overlay and the New/Edit Exercise screen — and both are built, wired,
@@ -2388,7 +2389,9 @@ function renderExerciseInfoFormFields(form) {
     const id = `${p}-${f.idSuffix}`;
     let control;
     if (f.kind === 'picker') control = pickerBtn(id);
-    else if (f.kind === 'checkbox') control = `<input type="checkbox" class="info-checkbox" id="${id}"/>`;
+    // Same look as Partial/Forced (.extra-type-btn), but its own element: the Partial/Forced
+    // logic only ever looks inside #extra-type, so it never touches this button.
+    else if (f.kind === 'toggle') control = `<div class="info-toggle"><button type="button" class="extra-type-btn" id="${id}" aria-pressed="false">Nee</button></div>`;
     // Chrome keys its "previously entered values" suggestion list by the
     // field's name (falling back to id), so autocomplete="off" alone doesn't
     // suppress it. A fresh random name on every load means it never finds a
@@ -2418,9 +2421,22 @@ function wireExerciseInfoFormPickers(form) {
       });
     });
   };
+  EXERCISE_INFO_EQUIPMENT_FIELDS.filter(f => f.kind === 'toggle').forEach(f => {
+    const id = `${p}-${f.idSuffix}`;
+    document.getElementById(id).addEventListener('click', () => setInfoToggle(id, !getInfoToggle(id)));
+  });
   wire(`${p}-primary-muscle`, 'Primair', form.primaryOptions);
   wire(`${p}-secondary-muscle`, 'Secundair', MUSCLE_SECONDARY_OPTIONS);
   EXERCISE_INFO_EQUIPMENT_FIELDS.filter(f => f.kind === 'picker').forEach(f => wire(`${p}-${f.idSuffix}`, f.label, f.options));
+}
+
+// Ja/Nee on/off button (Powerliftbank): on = .active (--primary filled) with "Ja", off = "Nee".
+function getInfoToggle(id) { return document.getElementById(id).classList.contains('active'); }
+function setInfoToggle(id, on) {
+  const b = document.getElementById(id);
+  b.classList.toggle('active', !!on);
+  b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  b.textContent = on ? 'Ja' : 'Nee';
 }
 
 function setExerciseInfoPicker(id, options, val) {
@@ -2437,7 +2453,7 @@ function populateExerciseInfoForm(form, info) {
   EXERCISE_INFO_EQUIPMENT_FIELDS.forEach(f => {
     const id = `${p}-${f.idSuffix}`;
     const val = info[f.key];
-    if (f.kind === 'checkbox') document.getElementById(id).checked = !!val;
+    if (f.kind === 'toggle') setInfoToggle(id, !!val);
     else if (f.kind === 'picker') setExerciseInfoPicker(id, f.options, val);
     else document.getElementById(id).value = (val !== undefined && val !== null) ? val : '';
   });
@@ -2454,7 +2470,7 @@ function getExerciseInfoFormSnapshot(form) {
   };
   EXERCISE_INFO_EQUIPMENT_FIELDS.forEach(f => {
     const id = `${p}-${f.idSuffix}`;
-    if (f.kind === 'checkbox') snapshot[f.key] = document.getElementById(id).checked;
+    if (f.kind === 'toggle') snapshot[f.key] = getInfoToggle(id);
     else if (f.kind === 'picker') snapshot[f.key] = getFieldBtnValue(id);
     else snapshot[f.key] = document.getElementById(id).value;
   });
@@ -2472,8 +2488,8 @@ function readExerciseInfoForm(form) {
   if (secondary) info.secondaryMuscle = secondary;
   EXERCISE_INFO_EQUIPMENT_FIELDS.forEach(f => {
     const id = `${p}-${f.idSuffix}`;
-    if (f.kind === 'checkbox') {
-      if (document.getElementById(id).checked) info[f.key] = true;
+    if (f.kind === 'toggle') {
+      if (getInfoToggle(id)) info[f.key] = true;
       return;
     }
     if (f.kind === 'picker') {
@@ -3562,10 +3578,13 @@ const EX_TYPE_OPTIONS = [
   { value: 'distance', label: 'Afstand' },
 ];
 
+// An empty value ("Kies een categorie...", "Niet ingesteld") is the field's empty state: shown in
+// the placeholder colour (.new-ex-select-empty), a real choice in the normal text colour.
 function setFieldBtnValue(id, value, label) {
   const btn = document.getElementById(id);
   btn.dataset.value = value;
   btn.textContent = label;
+  btn.classList.toggle('new-ex-select-empty', value === '');
 }
 function getFieldBtnValue(id) { return document.getElementById(id).dataset.value || ''; }
 

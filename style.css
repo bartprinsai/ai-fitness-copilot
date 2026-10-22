@@ -218,6 +218,8 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .new-ex-select { position: relative; display: flex; align-items: center; padding-right: 40px; text-align: left; cursor: pointer; appearance: none; -webkit-appearance: none; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .new-ex-select::after { content: ''; position: absolute; right: 18px; top: 50%; width: 7px; height: 7px; border-right: 2px solid var(--text-secondary); border-bottom: 2px solid var(--text-secondary); transform: translateY(-70%) rotate(45deg); }
 .new-ex-select-btn:active { border-color: var(--primary); }
+/* Empty state ("Kies een categorie...", "Niet ingesteld"): the placeholder colour of text fields. */
+.new-ex-select-empty { color: var(--text-muted); }
 
 /* ══ TOOLBAR ════════════════════════════════════════════ */
 .toolbar { height: calc(var(--toolbar-height) + var(--safe-top)); padding: var(--safe-top) var(--space-1) 0; background: var(--toolbar); color: var(--on-toolbar); display: flex; align-items: center; flex-shrink: 0; box-shadow: var(--toolbar-shadow); z-index: 10; }
@@ -605,7 +607,14 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 /* Wrapper for the generated equipment fields (rendered into both the info overlay and the New/Edit Exercise screen). */
 .info-fields-group { display: flex; flex-direction: column; gap: var(--space-3); }
 .info-field { display: flex; flex-direction: column; gap: var(--space-1); }
-.info-checkbox { width: 24px; height: 24px; accent-color: var(--primary); cursor: pointer; margin-top: var(--space-2); }
+/* Group headers in the Exercise Info edit form: same --space-4 extra above as .new-ex-group. */
+.exercise-info-scroll .info-group-label:not(:first-child) { margin-top: var(--space-4); }
+/* Ja/Nee toggle (Powerliftbank): the Partial/Forced button (.extra-type-btn, 36px, 12px text),
+   exactly as wide as Partial/Forced in TRACK — a quarter of the screen minus the gutters and the
+   8px gaps there: (100vw − 2 × gutter − 4 × --space-2) / 4 — left in its column and vertically
+   centred on the 48px select next to it (Bankhoogte). */
+.info-toggle { display: flex; align-items: center; height: var(--control-height); }
+.info-toggle .extra-type-btn { flex: 0 0 auto; width: calc((100vw - 2 * var(--screen-gutter) - 4 * var(--space-2)) / 4); }
 .info-view-stat { display: flex; flex-direction: column; gap: 2px; }
 .info-view-stat-value { font-size: var(--fs-heading); font-weight: var(--fw-medium); color: var(--text); }
 .exercise-info-empty { padding: var(--space-5) 0; }
@@ -828,8 +837,12 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 
 /* ══ NEW EXERCISE SCREEN ════════════════════════════════ */
 .new-ex-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: var(--ai-bar-space); }
-.new-ex-section { padding: var(--space-4) var(--screen-gutter); border-bottom: 1px solid var(--border); background: var(--surface); }
-.new-ex-section:last-child { border-bottom: none; }
+/* The form sits on the screen's --bg like the TRACK input block: no white strips, no lines between
+   sections; the 16px padding of each section (32px between fields) keeps them apart. Fields, selects
+   and buttons stay white with a border. A group header (Spiergroep, Apparatuur: .new-ex-group) gets
+   --space-4 extra above it, so it reads as the start of a group, not as one more field label. */
+.new-ex-section { padding: var(--space-4) var(--screen-gutter); }
+.new-ex-group { margin-top: var(--space-4); }
 .new-ex-section > .section-label { margin-bottom: var(--space-2); }
 .new-ex-field-row { display: flex; align-items: center; gap: var(--space-3); }
 .new-ex-add-cat-btn { width: var(--control-height); height: var(--control-height); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text-secondary); font-family: inherit; font-size: var(--fs-number); line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .1s; }
