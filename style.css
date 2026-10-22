@@ -387,7 +387,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    all end on exactly the same x; the 2px vertical padding of the former badge stays (row height). */
 .set-effort { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 2px; text-align: right; }
 .set-effort .set-rpe { display: inline-flex; align-items: center; padding: 2px 0; font-size: var(--fs-small); font-weight: var(--fw-medium); color: var(--text-secondary); white-space: nowrap; }
-.set-effort .set-effort-extra { font-size: var(--fs-small); font-weight: var(--fw-regular); color: var(--text-muted); white-space: nowrap; }
+.set-effort .set-effort-extra { font-size: var(--fs-small); font-weight: var(--fw-regular); color: var(--text-secondary); white-space: nowrap; }
 .set-effort .set-effort-none { font-size: var(--fs-small); font-weight: var(--fw-regular); color: var(--text-muted); }
 
 /* ══ NEW WORKOUT SCREEN ═════════════════════════════════ */
