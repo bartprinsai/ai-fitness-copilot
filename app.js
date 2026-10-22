@@ -4358,8 +4358,9 @@ function workingSetGroups(sets) {
 //   "Set N" — N is the Track set number, so a dropset's number is skipped
 //     (+ the trophy when it is a PR — its dropsets never are)
 //   weight × reps, with weight and reps judged separately
-//   "+N partial/forced" when it has extra reps (same text as the set rows; never compared)
 //   RPE, judged on its own (higher = felt heavier, so red)
+//   "+N partial/forced" when it has extra reps (same text as the set rows; never compared) —
+//     under RPE, as in the set rows' effort cell
 //   what that set was last time
 //   "Gevolgd door (N) dropset(s)" when dropsets hang on it (their own values aren't shown)
 // Extra sets today have no counterpart; extra sets last time are simply not shown.
@@ -4400,8 +4401,8 @@ function recapSetLines(ex, date, prKeys) {
       <div class="recap-set">
         <div class="recap-set-head">Set ${idxs[0] + 1}${isPR ? ' ' + prTrophySvg('recap-set-pr') : ''}</div>
         <div>${formatWeight(w)} kg × ${r}${wrMarks}</div>
-        ${extra ? `<div class="recap-note recap-extra">${extra}</div>` : ''}
         <div>${rpe > 0 ? `RPE ${formatRpe(rpe)}${rpeMark}` : '<span class="recap-muted">Geen RPE gelogd</span>'}</div>
+        ${extra ? `<div class="recap-note recap-extra">${extra}</div>` : ''}
         ${prevLine ? `<div class="recap-prev">${prevLine}</div>` : ''}
         ${drops > 0 ? `<div class="recap-note recap-drop">${DROP_ARROW_SVG}Gevolgd door ${drops === 1 ? 'dropset' : `${drops} dropsets`}</div>` : ''}
       </div>`;
