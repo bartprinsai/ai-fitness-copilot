@@ -536,6 +536,13 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .graph-sel-main { display: flex; align-items: baseline; gap: var(--space-1); font-size: var(--fs-number); font-weight: var(--fw-bold); color: var(--text); }
 .graph-sel-date { font-size: var(--fs-small); color: var(--text-secondary); }
 /* Set overview inside the shared "Go to…" overlay (opened from the Graph tab). */
+/* Row lines in a popup / bottom sheet run to the edge of the white panel: every list in a sheet
+   (field picker, Calendar and Go to set lists, records history, Samenvatting) pulls out over the
+   panel's --screen-gutter padding, and its rows add that gutter to their own padding, so the content
+   stays exactly where it was — set rows get the TRACK values (gutter + 8 / gutter + 12), so their
+   columns sit on the same x as in every other set list. */
+.field-picker-list, .cal-detail-body, .history-goto-body, .records-history-body, .recap-body { margin-left: calc(-1 * var(--screen-gutter)); margin-right: calc(-1 * var(--screen-gutter)); }
+.cal-detail-body .set-row, .history-goto-body .set-row { padding-left: calc(var(--screen-gutter) + var(--space-2)); padding-right: calc(var(--screen-gutter) + var(--space-3)); }
 .history-goto-body { max-height: 45vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 
 /* ══ MODALS (shared base for every .overlay bottom sheet) ═
@@ -590,7 +597,8 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    of a group. The group labels sit on --card-padding, in line with the RM label / weight, like the
    other popup headings; the spacing around them is unchanged (8px below, 20px above). */
 .records-history-body { max-height: 45vh; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; }
-.records-history-body .section-label { padding-left: var(--card-padding); margin-bottom: var(--space-2); }
+.records-history-body .section-label { padding-left: calc(var(--screen-gutter) + var(--card-padding)); margin-bottom: var(--space-2); }
+.records-history-body .records-row { padding-left: calc(var(--screen-gutter) + var(--card-padding)); padding-right: calc(var(--screen-gutter) + var(--space-3)); }
 .records-history-body .section-label:not(:first-child) { margin-top: calc(var(--space-2) + var(--space-3)); }
 .records-history-body .records-row:last-child, .records-history-body .records-row:has(+ .section-label) { border-bottom: none; }
 /* RM label = the set number (.set-num): Body, 700, --text. */
@@ -667,7 +675,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .cal-detail-body { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; }
 .cal-detail-ex { padding-top: var(--space-3); }
 .cal-detail-ex:first-child { padding-top: 0; }
-.cal-detail-ex-name { font-size: var(--fs-heading); font-weight: var(--fw-medium); color: var(--text); margin-bottom: var(--space-1); padding: 0 var(--card-padding); }
+.cal-detail-ex-name { font-size: var(--fs-heading); font-weight: var(--fw-medium); color: var(--text); margin-bottom: var(--space-1); padding: 0 calc(var(--screen-gutter) + var(--card-padding)); }
 
 /* ══ TOAST ══════════════════════════════════════════════
    FitNotes-style full-width banner right under the header, covering the tab bar while it is up.
@@ -879,7 +887,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 /* Generic delete confirm: can be opened from within the (base-tier) comment-overlay. */
 #confirm-delete-overlay { z-index: var(--z-overlay-nested); }
 .field-picker-list { display: flex; flex-direction: column; max-height: 60vh; overflow-y: auto; }
-.field-picker-row { display: flex; align-items: center; gap: var(--space-3); min-height: var(--control-height); padding: var(--space-2) var(--space-1); border-bottom: 1px solid var(--border); cursor: pointer; background: var(--surface); transition: background .08s; }
+.field-picker-row { display: flex; align-items: center; gap: var(--space-3); min-height: var(--control-height); padding: var(--space-2) calc(var(--screen-gutter) + var(--space-1)); border-bottom: 1px solid var(--border); cursor: pointer; background: var(--surface); transition: background .08s; }
 .field-picker-row:last-child { border-bottom: none; }
 .field-picker-row.selected { background: var(--primary-light); }
 .field-picker-row:active { background: var(--bg); }
@@ -906,8 +914,9 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .plate-list-header { display: grid; grid-template-columns: 1fr 100px 100px; gap: var(--space-2); padding: 0 var(--card-padding) 0; }
 .plate-list-header-col { text-align: center; font-size: var(--fs-label); font-weight: var(--fw-medium); color: var(--text-secondary); text-transform: uppercase; letter-spacing: var(--ls-label); }
 .plate-list-header-sub { font-size: var(--fs-small); font-weight: var(--fw-regular); color: var(--text-muted); text-transform: none; letter-spacing: normal; margin-top: 2px; }
-.plate-list { display: flex; flex-direction: column; background: var(--surface); border-radius: var(--radius-lg); padding: 0 var(--card-padding); box-shadow: var(--card-shadow); }
-.plate-row { display: grid; grid-template-columns: 1fr 100px 100px; align-items: center; gap: var(--space-2); padding: var(--space-3) 0; border-bottom: 1px solid var(--border); }
+/* Lines run to the card edge: the card has no side padding, the rows carry --card-padding. */
+.plate-list { display: flex; flex-direction: column; background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--card-shadow); overflow: hidden; }
+.plate-row { display: grid; grid-template-columns: 1fr 100px 100px; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--card-padding); border-bottom: 1px solid var(--border); }
 .plate-row:last-child { border-bottom: none; }
 .plate-row-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .plate-row-name { font-size: var(--fs-body); font-weight: var(--fw-medium); color: var(--text); }
@@ -945,7 +954,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 
 /* ══ DAY RECAP POPUP ════════════════════════════════════ */
 .recap-body { max-height: 60vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-.recap-ex { padding: var(--space-3) 0; border-bottom: 1px solid var(--border); }
+.recap-ex { padding: var(--space-3) var(--screen-gutter); border-bottom: 1px solid var(--border); }
 .recap-ex:first-child { padding-top: 0; }
 .recap-ex:last-child { border-bottom: none; padding-bottom: 0; }
 .recap-ex-name { font-size: var(--fs-heading); font-weight: var(--fw-medium); color: var(--text); margin-bottom: var(--space-1); }
@@ -967,4 +976,4 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    --text-secondary and the block's indent, all inherited from .recap-set.
    "Gevolgd door dropset": the set rows' dropset arrow (same icon and colour), at the trophy's 1em */
 .recap-drop .drop-arrow { width: 1em; height: 1em; vertical-align: -2px; margin-right: var(--space-1); }
-.recap-empty { padding: var(--space-4) 0; }
+.recap-empty { padding: var(--space-4) var(--screen-gutter); }
