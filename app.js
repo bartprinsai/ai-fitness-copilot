@@ -4171,6 +4171,16 @@ document.getElementById('warmup-ex-options').addEventListener('click', e => {
   warmupExercise = opt.dataset.ex;
   document.querySelectorAll('#warmup-ex-options .plate-bar-option').forEach(o => o.classList.toggle('selected', o === opt));
 });
+// Calculator number fields (Plate, 1RM, Warm-up): like the TRACK fields, a typed number is
+// shown through the shared formatNumber() once the field is left ("102.5" -> "102,5",
+// "150.0" -> "150"). Every typed decimal is kept, so the calculation doesn't change; text
+// that isn't a number stays as typed, so the calculator's own error still appears.
+['plate-target-weight', 'orm-weight', 'orm-reps', 'warmup-weight'].forEach(id => {
+  document.getElementById(id).addEventListener('change', e => {
+    const n = parseWarmupNumber(e.target.value);
+    if (!isNaN(n)) e.target.value = formatNumber(n, 10);
+  });
+});
 document.getElementById('btn-warmup-calculate').addEventListener('click', () => {
   const errEl = document.getElementById('warmup-error');
   const card = document.getElementById('warmup-result-card');

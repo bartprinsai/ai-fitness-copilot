@@ -738,7 +738,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .plan-schedule-footer { padding: var(--space-3) var(--screen-gutter) calc(var(--safe-bottom) + var(--space-3)); background: var(--surface); border-top: 1px solid var(--border); flex-shrink: 0; margin-bottom: var(--ai-bar-space); }
 .ps-num-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: var(--space-2); }
 .ps-num-box { height: 40px; padding: 0; }
-.ps-toggle-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-3); }
+.ps-toggle-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-2); }
 .ps-weekdays-counter { font-size: var(--fs-small); font-weight: var(--fw-medium); color: var(--text-secondary); }
 .ps-week-block { display: flex; flex-direction: column; gap: var(--space-2); }
 .ps-weekday-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: var(--space-2); }
