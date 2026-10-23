@@ -4113,10 +4113,12 @@ const ORM_TABLE_REPS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20];
 function epley1rm(weight, reps) { return reps === 1 ? weight : weight * (1 + reps / 30); }
 function weightAtReps(oneRm, reps) { return reps === 1 ? oneRm : oneRm / (1 + reps / 30); }
 function percentAtReps(reps) { return reps === 1 ? 100 : Math.round(100 / (1 + reps / 30)); }
-// The table shows loadable weights: rounded to the nearest 1,25 kg (the smallest step you can
-// load). The estimated 1RM itself stays exact; the percentage stays the calculated one.
-const ORM_LOAD_STEP = 1.25;
-function roundToLoadable(weight) { return Math.round(weight / ORM_LOAD_STEP) * ORM_LOAD_STEP; }
+// The estimated 1RM and every table weight are rounded to 1 decimal, half away from zero
+// (164,06 → 164,1); the table weights are computed from the unrounded 1RM, so the 1-rep row
+// equals the shown 1RM. The percentage stays the calculated one. toPrecision(12) first strips
+// floating-point noise, so an exact half like 118,75 (= 3800 / 32, computed as 118,7499999…)
+// rounds up to 118,8 as it should.
+function roundOrm(weight) { return Math.round(Number(weight.toPrecision(12)) * 10) / 10; }
 
 
 // Strict parse (Dutch comma allowed); NaN for empty/garbage like "5abc".
@@ -4134,8 +4136,8 @@ function computeOneRm(weightStr, repsStr) {
   if (!isFinite(weight) || weight <= 0) return { error: 'Gewicht moet een getal groter dan 0 zijn.' };
   if (!isFinite(reps) || reps < 1 || !Number.isInteger(reps)) return { error: 'Reps moet een geheel getal van minimaal 1 zijn.' };
   const oneRm = epley1rm(weight, reps);
-  const rows = ORM_TABLE_REPS.map(n => ({ reps: n, weight: roundToLoadable(weightAtReps(oneRm, n)), percent: percentAtReps(n) }));
-  return { oneRm, rows };
+  const rows = ORM_TABLE_REPS.map(n => ({ reps: n, weight: roundOrm(weightAtReps(oneRm, n)), percent: percentAtReps(n) }));
+  return { oneRm: roundOrm(oneRm), rows };
 }
 // </1rm-pure>
 
@@ -4160,14 +4162,21 @@ document.getElementById('btn-orm-calculate').addEventListener('click', () => {
   document.getElementById('orm-result-value').innerHTML = plateTotalHtml(res.oneRm);
   // Rows in set-row style; the row for the reps you entered is marked (none if it isn't in the table).
   const ownReps = parseOrmNumber(document.getElementById('orm-reps').value);
+  // Columns % · weight · reps. The weight sits right-aligned in a box (.orm-weight-box) so "kg"
+  // lines up in every row, as in the set rows.
   document.getElementById('orm-table-body').innerHTML = res.rows.map(r =>
     `<div class="orm-table-row${r.reps === ownReps ? ' orm-table-row-own' : ''}">` +
-    `<div><span class="set-val">${r.reps}</span></div>` +
-    `<div><span class="set-val">${formatWeight(r.weight)}</span><span class="set-unit">kg</span></div>` +
-    `<div><span class="set-val">${r.percent}</span><span class="set-unit">%</span></div></div>`
+    `<div><span class="set-val">${r.percent}</span><span class="set-unit">%</span></div>` +
+    `<div><span class="orm-weight-box"><span class="set-val">${formatWeight(r.weight)}</span><span class="set-unit">kg</span></span></div>` +
+    `<div><span class="set-val">${r.reps}</span></div></div>`
   ).join('');
   document.getElementById('orm-result-card').classList.remove('hidden');
   document.getElementById('orm-table-section').classList.remove('hidden');
+  // Every weight box exactly as wide as the longest value in the table needs, centred in its column.
+  const boxes = [...document.querySelectorAll('#orm-table-body .orm-weight-box')];
+  boxes.forEach(b => { b.style.width = ''; });
+  const boxWidth = Math.max(...boxes.map(b => b.getBoundingClientRect().width));
+  boxes.forEach(b => { b.style.width = `${boxWidth}px`; });
 });
 // The accuracy hint only adds something above 5 reps; it follows the field while typing.
 document.getElementById('orm-reps').addEventListener('input', e => {

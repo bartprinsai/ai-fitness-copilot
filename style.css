@@ -979,6 +979,9 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    lines edge to edge of the card. minmax(0, 1fr) keeps the thirds equal whatever the content. */
 .orm-table-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: center; padding: var(--space-3) var(--space-2); color: var(--text); }
 .orm-table-row > div { display: flex; align-items: baseline; justify-content: center; gap: var(--space-1); }
+/* Weight column: number + "kg" right-aligned in a box as wide as the longest value (set by app.js),
+   so "kg" sits at the same x in every row (as in the set rows); the box is centred in its column. */
+.orm-weight-box { display: inline-flex; align-items: baseline; justify-content: flex-end; gap: var(--space-1); white-space: nowrap; }
 /* The row for the reps you entered: --primary-light over the full card width. */
 .orm-table-row-own { background: var(--primary-light); }
 /* No zebra: rows on the card's --surface, 1px --border line between them (none under the head). */
