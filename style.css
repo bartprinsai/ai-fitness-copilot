@@ -861,8 +861,9 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .pde-item-inner.exercise-card-selected { outline-offset: -2px; }
 #screen-plan-day-edit.sel-mode .pde-drag-handle { opacity: .3; cursor: default; }
 /* An empty plan day shows the Fitness Tracker's empty state (.home-empty); the list then takes
-   .home-content's padding, so the + sits at exactly the same spot. */
-.pde-list.is-empty { padding: 0 0 calc(var(--ai-bar-space) + var(--space-4)); }
+   .home-content's padding, so the + sits at exactly the same spot. The top padding stands in for
+   the tracker's day-nav bar (--control-height), so the title is centred at the same height too. */
+.pde-list.is-empty { padding: var(--control-height) 0 calc(var(--ai-bar-space) + var(--space-4)); }
 /* Sets/reps popup: uniform vs per-set mode toggle — a choice control (see CHOICE CONTROLS). */
 .pde-sr-mode-toggle { display: flex; gap: var(--space-2); }
 .pde-sr-set-list { display: flex; flex-direction: column; gap: var(--space-2); max-height: 240px; overflow-y: auto; }

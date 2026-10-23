@@ -5497,7 +5497,7 @@ function renderPlanDayEdit() {
 
   if (exercises.length === 0) {
     // Same empty state as the Fitness Tracker; the + does what the toolbar + does.
-    list.innerHTML = emptyAddStateHtml('btn-pde-empty-add', 'Nieuwe oefening');
+    list.innerHTML = emptyAddStateHtml('btn-pde-empty-add', 'Nieuwe oefening', 'Nog geen oefeningen');
     document.getElementById('btn-pde-empty-add').addEventListener('click', () => openPlanDayAddExercises(currentEditDayIndex));
     return;
   }
