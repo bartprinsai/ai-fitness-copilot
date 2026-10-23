@@ -499,7 +499,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 /* ══ CHOICE CONTROLS ════════════════════════════════════
    Toggles, chips, number blocks, day circles, bar options, time filters:
    one look — bordered surface, selected = --primary filled with white text. */
-.extra-type-btn, .pde-sr-mode-btn, .ps-num-box, .ps-toggle-option, .chip, .ps-day-circle, .day-picker-circle, .plate-bar-option, .time-filter { border: 1px solid var(--border); background: var(--surface); color: var(--text-secondary); font-family: inherit; font-size: var(--fs-body); font-weight: var(--fw-medium); cursor: pointer; transition: background .1s, border-color .1s, color .1s; }
+.extra-type-btn, .pde-sr-mode-btn, .ps-num-box, .ps-toggle-option, .chip, .ps-day-circle, .day-picker-circle, .plate-bar-option, .time-filter { border: 1px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; font-size: var(--fs-body); font-weight: var(--fw-medium); cursor: pointer; transition: background .1s, border-color .1s, color .1s; }
 .extra-type-btn.active, .pde-sr-mode-btn.active, .ps-num-box.selected, .ps-toggle-option.selected, .chip.active, .ps-day-circle.selected, .plate-bar-option.selected, .time-filter.active { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
 .extra-type-btn, .pde-sr-mode-btn, .ps-num-box, .ps-toggle-option, .plate-bar-option { border-radius: var(--radius-sm); }
 .chip, .time-filter, .ps-day-circle, .day-picker-circle { border-radius: var(--radius-pill); }
@@ -1000,3 +1000,22 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    "Gevolgd door dropset": the set rows' dropset arrow (same icon and colour), at the trophy's 1em */
 .recap-drop .drop-arrow { width: 1em; height: 1em; vertical-align: -2px; margin-right: var(--space-1); }
 .recap-empty { padding: var(--space-4) 0; }
+
+/* ── Typografie per rol ──────────────────────────────────────────────────────────────────────────
+   Every text takes the style of its role (see DESIGN_SYSTEM.md, "Typografie per rol"). This block
+   comes last so it wins over the components' own rules; a new screen uses the .role-* class.
+   Colours stay with the components (--text / --text-secondary; --on-primary in a selected button,
+   --on-gold on the One rep max card). Fixed exceptions (set rows, number fields, Hero, toolbar
+   titles, empty states, toasts) are not in here. */
+/* Titel in een blok — Kop, 16px/500, line-height normal */
+.role-title, .nav-card-title, .plan-create-btn span, .plan-item-name, .plan-day-name, .preset-item-name, .pde-ex-name,
+.exercise-card-name, .cal-detail-ex-name, .recap-ex-name, .records-hero-label, .plate-bar-option-title { font-size: var(--fs-heading); font-weight: var(--fw-medium); line-height: normal; }
+/* Subregel onder een titel — Klein, 12px/400 (never the 500 of its button) */
+.role-sub, .nav-card-desc, .plan-item-meta, .plan-day-sub, .preset-item-meta, .pde-ex-meta, .plan-day-preview-meta,
+.plate-bar-option-weight, .plate-row-meta, .records-row-date, .graph-sel-date { font-size: var(--fs-small); font-weight: var(--fw-regular); }
+/* Rij in een lijst — Body, 15px/400 */
+.role-row, .category-item, .exercise-item, .dropdown-item, .field-picker-label, .plan-day-preview-name { font-size: var(--fs-body); font-weight: var(--fw-regular); }
+/* Compacte keuzeknop (één regel) — 12px/500 */
+.role-choice, .extra-type-btn, .pde-sr-mode-btn, .ps-toggle-option, .chip, .time-filter { font-size: var(--fs-small); font-weight: var(--fw-medium); }
+.role-title, .role-row { color: var(--text); }
+.role-sub { color: var(--text-secondary); }
