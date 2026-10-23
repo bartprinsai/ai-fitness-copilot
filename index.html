@@ -838,13 +838,13 @@
     <div class="plate-section">
       <div class="section-label">Reps</div>
       <input type="text" inputmode="numeric" id="orm-reps" class="plate-target-input" placeholder="bijv. 5" autocomplete="off"/>
-      <div class="orm-hint">Werkt het meest nauwkeurig bij 1-5 reps.</div>
+      <div class="orm-hint hidden" id="orm-hint">Werkt het meest nauwkeurig bij 1-5 reps.</div>
     </div>
     <button type="button" class="btn btn-primary btn-block" id="btn-orm-calculate">Berekenen</button>
     <div class="orm-error hidden" id="orm-error" role="alert"></div>
     <div class="plate-result-card hidden" id="orm-result-card">
       <div class="section-label">Geschat 1RM</div>
-      <div class="orm-result-value" id="orm-result-value"></div>
+      <div class="plate-result-total" id="orm-result-value"></div>
     </div>
     <div class="plate-section hidden" id="orm-table-section">
       <div class="section-label">Rep max-tabel</div>

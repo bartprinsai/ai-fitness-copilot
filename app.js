@@ -4105,6 +4105,10 @@ const ORM_TABLE_REPS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20];
 function epley1rm(weight, reps) { return reps === 1 ? weight : weight * (1 + reps / 30); }
 function weightAtReps(oneRm, reps) { return reps === 1 ? oneRm : oneRm / (1 + reps / 30); }
 function percentAtReps(reps) { return reps === 1 ? 100 : Math.round(100 / (1 + reps / 30)); }
+// The table shows loadable weights: rounded to the nearest 1,25 kg (the smallest step you can
+// load). The estimated 1RM itself stays exact; the percentage stays the calculated one.
+const ORM_LOAD_STEP = 1.25;
+function roundToLoadable(weight) { return Math.round(weight / ORM_LOAD_STEP) * ORM_LOAD_STEP; }
 
 
 // Strict parse (Dutch comma allowed); NaN for empty/garbage like "5abc".
@@ -4122,7 +4126,7 @@ function computeOneRm(weightStr, repsStr) {
   if (!isFinite(weight) || weight <= 0) return { error: 'Gewicht moet een getal groter dan 0 zijn.' };
   if (!isFinite(reps) || reps < 1 || !Number.isInteger(reps)) return { error: 'Reps moet een geheel getal van minimaal 1 zijn.' };
   const oneRm = epley1rm(weight, reps);
-  const rows = ORM_TABLE_REPS.map(n => ({ reps: n, weight: weightAtReps(oneRm, n), percent: percentAtReps(n) }));
+  const rows = ORM_TABLE_REPS.map(n => ({ reps: n, weight: roundToLoadable(weightAtReps(oneRm, n)), percent: percentAtReps(n) }));
   return { oneRm, rows };
 }
 // </1rm-pure>
@@ -4130,7 +4134,7 @@ function computeOneRm(weightStr, repsStr) {
 function open1rmCalculator() {
   document.getElementById('orm-weight').value = '';
   document.getElementById('orm-reps').value = '';
-  ['orm-error', 'orm-result-card', 'orm-table-section'].forEach(id => document.getElementById(id).classList.add('hidden'));
+  ['orm-error', 'orm-result-card', 'orm-table-section', 'orm-hint'].forEach(id => document.getElementById(id).classList.add('hidden'));
   showScreen('screen-calculator-1rm');
 }
 document.getElementById('btn-orm-calculate').addEventListener('click', () => {
@@ -4144,12 +4148,22 @@ document.getElementById('btn-orm-calculate').addEventListener('click', () => {
     return;
   }
   errEl.classList.add('hidden');
-  document.getElementById('orm-result-value').textContent = formatWeight(res.oneRm) + ' kg';
+  // Same markup as the Plate Calculator's results: number on Groot getal, "kg" apart on Klein.
+  document.getElementById('orm-result-value').innerHTML = plateTotalHtml(res.oneRm);
+  // Rows in set-row style; the row for the reps you entered is marked (none if it isn't in the table).
+  const ownReps = parseOrmNumber(document.getElementById('orm-reps').value);
   document.getElementById('orm-table-body').innerHTML = res.rows.map(r =>
-    `<div class="orm-table-row"><div>${r.reps}</div><div>${formatWeight(r.weight)} kg</div><div>${r.percent}%</div></div>`
+    `<div class="orm-table-row${r.reps === ownReps ? ' orm-table-row-own' : ''}">` +
+    `<div><span class="set-val">${r.reps}</span></div>` +
+    `<div><span class="set-val">${formatWeight(r.weight)}</span><span class="set-unit">kg</span></div>` +
+    `<div><span class="orm-table-pct">${r.percent}%</span></div></div>`
   ).join('');
   document.getElementById('orm-result-card').classList.remove('hidden');
   document.getElementById('orm-table-section').classList.remove('hidden');
+});
+// The accuracy hint only adds something above 5 reps; it follows the field while typing.
+document.getElementById('orm-reps').addEventListener('input', e => {
+  document.getElementById('orm-hint').classList.toggle('hidden', !(parseOrmNumber(e.target.value) > 5));
 });
 document.getElementById('btn-back-calculator-1rm').addEventListener('click', () => goBack('screen-calculator'));
 

@@ -408,7 +408,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    --surface (cards, popups). No horizontal padding, so RPE, the "+N partial/forced" line and "—"
    all end on exactly the same x; the 2px vertical padding of the former badge stays (row height). */
 .set-effort { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 2px; text-align: right; }
-.set-effort .set-rpe { display: inline-flex; align-items: center; padding: 2px 0; font-size: var(--fs-small); font-weight: var(--fw-medium); color: var(--text-secondary); white-space: nowrap; }
+.set-effort .set-rpe, .orm-table-pct { display: inline-flex; align-items: center; padding: 2px 0; font-size: var(--fs-small); font-weight: var(--fw-medium); color: var(--text-secondary); white-space: nowrap; }
 .set-effort .set-effort-extra { font-size: var(--fs-small); font-weight: var(--fw-regular); color: var(--text-secondary); white-space: nowrap; }
 .set-effort .set-effort-none { font-size: var(--fs-small); font-weight: var(--fw-regular); color: var(--text-muted); }
 
@@ -966,14 +966,17 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .plate-result-note { font-size: var(--fs-small); color: var(--text-secondary); }
 
 /* 1RM Calculator */
-.orm-hint { font-size: var(--fs-small); color: var(--text-secondary); }
 .orm-error { font-size: var(--fs-small); color: var(--danger); line-height: 1.4; }
-.orm-result-value { font-size: var(--fs-hero); font-weight: var(--fw-bold); color: var(--primary); line-height: 1.1; }
 .orm-table-card { background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--card-shadow); overflow: hidden; }
-.orm-table-row { display: grid; grid-template-columns: 1fr 1.4fr 1.2fr; text-align: center; padding: var(--space-3) var(--space-2); font-size: var(--fs-body); color: var(--text); }
+/* Rep max table: three centred columns, rows in set-row style (same vertical padding, values on
+   Groot getal, "kg" on Klein, the percentage like RPE), 1px --border lines edge to edge of the card. */
+.orm-table-row { display: grid; grid-template-columns: 1fr 1.4fr 1.2fr; align-items: center; padding: var(--space-3) var(--space-2); color: var(--text); }
+.orm-table-row > div { display: flex; align-items: baseline; justify-content: center; gap: var(--space-1); }
+/* The row for the reps you entered: --primary-light over the full card width. */
+.orm-table-row-own { background: var(--primary-light); }
 /* No zebra: rows on the card's --surface, 1px --border line between them (none under the head). */
 .orm-table-row + .orm-table-row { border-top: 1px solid var(--border); }
-.orm-table-head { background: var(--toolbar); color: var(--on-toolbar); font-size: var(--fs-label); font-weight: var(--fw-medium); text-transform: uppercase; letter-spacing: var(--ls-label); }
+.orm-table-head { background: var(--primary); color: var(--on-primary); font-size: var(--fs-label); font-weight: var(--fw-medium); text-transform: uppercase; letter-spacing: var(--ls-label); }
 
 /* Warm-up Calculator */
 .warmup-ex-options { grid-template-columns: repeat(3, 1fr); }
@@ -1023,6 +1026,8 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    Shape: dates and periods round (.ps-day-circle, .day-picker-circle; .cal-day), amounts square
    (.ps-num-box, --radius-sm). */
 .role-grid, .ps-num-box, .ps-day-circle, .day-picker-circle { font-size: var(--fs-body); font-weight: var(--fw-medium); }
+/* Hulpregel bij een veld — 11px/400, --text-secondary, normal case; shown only when it adds something */
+.role-hint, .orm-hint { font-size: var(--fs-label); font-weight: var(--fw-regular); color: var(--text-secondary); }
 /* Compacte keuzeknop (één regel) — 12px/500 */
 .role-choice, .extra-type-btn, .pde-sr-mode-btn, .ps-toggle-option, .chip, .time-filter { font-size: var(--fs-small); font-weight: var(--fw-medium); }
 .role-title, .role-row { color: var(--text); }
