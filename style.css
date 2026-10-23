@@ -762,7 +762,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 /* Small pencil next to the plan name in the header, shown only in the editable
    state (planDetailEditMode) — opens the shared #plan-rename-overlay. */
 .plan-title-edit-btn svg { width: var(--icon-list); height: var(--icon-list); }
-.plan-detail-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: var(--space-3) var(--screen-gutter) calc(var(--ai-bar-space) + var(--space-5)); }
+.plan-detail-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: var(--space-4) var(--screen-gutter) calc(var(--ai-bar-space) + var(--space-5)); }
 .plan-day-card { background: var(--surface); box-shadow: var(--card-shadow); border-radius: var(--radius-lg); margin-bottom: var(--card-gap); overflow: hidden; }
 .plan-day-head { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--card-padding); cursor: pointer; }
 .plan-day-num { width: 28px; height: 28px; border-radius: var(--radius-pill); background: var(--primary); color: var(--on-primary); font-size: var(--fs-small); font-weight: var(--fw-bold); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -845,25 +845,25 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .smart-banner-actions { display: flex; gap: var(--space-3); flex: 1 1 auto; }
 
 /* ── Plan day edit screen ── */
-.pde-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: var(--space-1) var(--screen-gutter) calc(var(--ai-bar-space) + var(--space-5)); display: flex; flex-direction: column; gap: var(--card-gap); }
-.pde-item { position: relative; border-radius: var(--radius-lg); overflow: hidden; flex-shrink: 0; }
-.pde-item-inner { display: flex; align-items: center; gap: var(--space-1); background: var(--surface); box-shadow: var(--card-shadow); border-radius: var(--radius-lg); padding: var(--space-2) var(--space-1) var(--space-2) var(--card-padding); position: relative; z-index: 1; will-change: transform; cursor: pointer; }
-/* While dragged: the inner card is translateY'd out of its own .pde-item slot, so the
-   wrapper must stop clipping it (overflow) and stack above every sibling (z-index) —
-   otherwise later items paint over it. `scale` (not transform) so it composes with
-   dragReorderStep's inline translateY instead of being overwritten by it. */
-.pde-item.pde-dragging { z-index: 10; overflow: visible; }
-.pde-item.pde-dragging .pde-item-inner { box-shadow: var(--card-shadow-elevated); scale: 1.015; }
+/* Cards like the plan cards in Trainingsplannen (.plan-item): --space-4 under the toolbar, --card-gap
+   between them, the same bottom room as the plan list. The wrapper doesn't clip, so the card shadow shows. */
+.pde-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: var(--space-4) var(--screen-gutter) calc(var(--ai-bar-space) + var(--space-4)); display: flex; flex-direction: column; gap: var(--card-gap); }
+.pde-item { position: relative; border-radius: var(--radius-lg); flex-shrink: 0; }
+.pde-item-inner { display: flex; align-items: center; gap: var(--space-1); background: var(--surface); box-shadow: var(--card-shadow); border-radius: var(--radius-lg); padding: var(--space-3) var(--space-2) var(--space-3) var(--card-padding); position: relative; z-index: 1; will-change: transform; cursor: pointer; }
+/* While dragged: the inner card is translateY'd out of its own .pde-item slot, so the wrapper
+   stacks above every sibling (z-index) — otherwise later items paint over it. Same lifted look
+   as a dragged exercise card in the Fitness Tracker (.exercise-card-dragging). */
+.pde-item.pde-dragging { z-index: 10; }
+.pde-item.pde-dragging .pde-item-inner { box-shadow: var(--card-shadow-elevated); }
 .pde-ex-info { flex: 1; min-width: 0; }
 .pde-ex-name { font-size: var(--fs-heading); font-weight: var(--fw-medium); color: var(--text); display: block; }
 .pde-ex-meta { font-size: var(--fs-small); color: var(--text-secondary); display: block; margin-top: 2px; }
 .pde-chevron { width: var(--icon-list); height: var(--icon-list); fill: var(--text-muted); flex-shrink: 0; }
-.pde-drag-handle { width: var(--control-height); height: var(--control-height); display: flex; align-items: center; justify-content: center; cursor: grab; flex-shrink: 0; touch-action: none; }
+.pde-drag-handle { width: var(--control-height); height: var(--control-height); margin: calc(-1 * var(--space-1)) 0; display: flex; align-items: center; justify-content: center; cursor: grab; flex-shrink: 0; touch-action: none; }
 .pde-drag-handle:active { cursor: grabbing; }
 .pde-drag-handle svg { width: var(--icon-list); height: var(--icon-list); fill: var(--text-muted); }
-/* Selection mode: .pde-item clips overflow, so the shared highlight's outline goes inside;
-   reordering is off, so the handle is dimmed. */
-.pde-item-inner.exercise-card-selected { outline-offset: -2px; }
+/* Selection mode: the shared highlight (.exercise-card-selected); reordering is off, so the
+   handle is dimmed. */
 #screen-plan-day-edit.sel-mode .pde-drag-handle { opacity: .3; cursor: default; }
 /* An empty plan day shows the Fitness Tracker's empty state (.home-empty); the list then takes
    .home-content's padding, so the + sits at exactly the same spot. The top padding stands in for

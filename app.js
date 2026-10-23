@@ -5533,8 +5533,6 @@ function renderPlanDayEdit() {
     setupPdeItemInteractions(item);
     list.appendChild(item);
   });
-
-  setupPdeDragReorder(list);
 }
 
 async function savePlanDayExercises(newExercises) {
@@ -5711,6 +5709,9 @@ document.getElementById('btn-delete-pde-exercise-confirm').addEventListener('cli
 document.getElementById('btn-pde-sel-done').addEventListener('click', () => pdeSel.exit());
 document.getElementById('btn-pde-sel-delete').addEventListener('click', openPdeDeleteSelectedConfirm);
 
+// Wired once at startup (like the Fitness Tracker's and the set list's reordering): #pde-list
+// is a fixed element, and wiring it on every render stacked handlers, whose second touchend
+// undid the first one's saved order.
 function setupPdeDragReorder(list) {
   list.addEventListener('touchstart', e => {
     if (pdeSel.active || !e.target.closest('.pde-drag-handle')) return; // no reordering while selecting
@@ -5752,6 +5753,7 @@ function setupPdeDragReorder(list) {
   list.addEventListener('touchend', endDrag, { passive: true });
   list.addEventListener('touchcancel', endDrag, { passive: true });
 }
+setupPdeDragReorder(document.getElementById('pde-list'));
 
 // Long-press (not the drag handle — that's drag-to-reorder) starts selection mode
 // with this exercise selected, like the Fitness Tracker's exercise cards. A plain
