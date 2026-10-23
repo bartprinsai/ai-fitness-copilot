@@ -219,6 +219,9 @@ button.pill:active { filter: brightness(.92); transform: scale(0.97); }
    (The .overlay-panel selector out-ranks the shared modal input rule above.) */
 input[inputmode="decimal"], input[inputmode="numeric"], .overlay-panel input[inputmode="numeric"], .overlay-panel input[inputmode="decimal"] { font-size: var(--fs-number); font-weight: var(--fw-bold); }
 input[inputmode="decimal"]::placeholder, input[inputmode="numeric"]::placeholder { font-size: var(--fs-number); font-weight: var(--fw-regular); }
+/* Exception: Sets & reps aanpassen is a compact popup with several fields side by side and stacked,
+   so its number fields stay 16px (still 700); placeholders follow. */
+#pde-sets-reps-overlay input[inputmode="numeric"], #pde-sets-reps-overlay input[inputmode="numeric"]::placeholder { font-size: var(--fs-heading); }
 .overlay-panel textarea, .ai-gen-textarea { height: auto; min-height: 80px; padding: var(--space-3); line-height: 1.4; resize: none; }
 input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-appearance: none; }
 /* Select-style button (opens a picker): the input box + a chevron. */
