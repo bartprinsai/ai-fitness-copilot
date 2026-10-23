@@ -448,12 +448,13 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .category-item-fav-star, .exercise-item-fav-star { width: var(--icon-list); height: var(--icon-list); fill: var(--primary); flex-shrink: 0; margin-right: var(--space-3); }
 .exercise-item-custom .exercise-item-name { color: var(--primary); }
 .exercise-empty { padding: var(--space-6); }
-/* Plan Day add-exercise flow only (exerciseScreenMode === 'plan-add') — per-row
-   .btn that writes straight into the plan day, next to the ⋮ menu. */
-.ex-add-btn { flex: none; margin: calc(-1 * var(--space-1)) var(--space-3) calc(-1 * var(--space-1)) 0; padding: 0 var(--space-3); }
-.ex-add-btn-done { background: var(--success-light); color: var(--success); cursor: default; }
-.ex-add-btn-done:active { filter: none; }
-.ex-add-btn-done:disabled { opacity: 1; }
+/* Plan Day add-exercise flow only (exerciseScreenMode === 'plan-add') — the per-row add control
+   is the stepper button (.plate-stepper-btn, 36×36) at the row's right padding; the whole row is
+   the tap target. The negative vertical margin keeps the row at its 56px. Added = --primary
+   filled with a white check, same size. */
+.ex-add-btn { margin: calc(-1 * var(--space-1)) 0 calc(-1 * var(--space-1)) var(--space-3); }
+.plate-stepper-btn.ex-add-btn-done:disabled { background: var(--primary); border-color: var(--primary); cursor: default; opacity: 1; }
+.ex-add-btn-done svg { width: var(--icon-list); height: var(--icon-list); fill: var(--on-primary); }
 
 /* ══ TRAINING: TRACK TAB ════════════════════════════════ */
 .training-content-wrap { flex: 1; display: flex; flex-direction: column; min-height: 0; touch-action: pan-y; }

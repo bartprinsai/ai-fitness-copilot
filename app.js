@@ -262,7 +262,7 @@ let currentBrowseCategory = null;
 // The exercise browser (screen-exercises) doubles as the Plan Day "Add Exercise" flow
 // for a plan day's pencil icon: 'browse' is its normal Fitness Tracker behavior
 // (tapping a row opens Training), 'plan-add' is the plan flow (each row gets its own
-// Voeg toe/Toegevoegd button that writes straight into the plan day being edited —
+// + / check that writes straight into the plan day being edited —
 // see currentEditDayIndex/planDayHasExercise/addExerciseToPlanDay — and NEVER touches
 // a Fitness Tracker workout).
 let exerciseScreenMode = 'browse';
@@ -295,7 +295,7 @@ const pdeSel = createSelectionMode({
 // directly; only committed to the exercise on Opslaan).
 let pdeSrMode = 'uniform';
 let pdeSrPerSetReps = [];
-// Name of the exercise being added via screen-exercises' Voeg toe (plan-add mode)
+// Name of the exercise being added via screen-exercises' + per row (plan-add mode)
 // while #pde-sets-reps-overlay is open in its "<name> toevoegen" variant; null when
 // the popup is instead editing an existing exercise (pendingPdeSetsRepsIndex).
 let pendingPdeSrAddName = null;
@@ -1831,25 +1831,23 @@ function renderExerciseItem(list, ex) {
   const inPlanDay = isPlanAddMode && planDayHasExercise(ex.name);
   item.className = 'exercise-item list-row' + (ex.custom ? ' exercise-item-custom' : '');
   const isFav = isFavoriteExercise(ex.name);
+  // Plan-add mode: a small stepper-style + that turns into a filled check once the exercise
+  // is in the plan day; the whole row is the tap target and there's no ⋮ per row.
   item.innerHTML = `
     <span class="exercise-item-name">${ex.name}</span>
     ${isPlanAddMode ? `
-    <button class="btn btn-primary ex-add-btn${inPlanDay ? ' ex-add-btn-done' : ''}"${inPlanDay ? ' disabled' : ''}>${
-      inPlanDay
-        ? `<svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>Toegevoegd`
-        : `Toevoegen`
-    }</button>` : (isFav ? `<svg class="exercise-item-fav-star" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>` : '')}
-    <svg class="exercise-item-dots" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+    <button type="button" class="plate-stepper-btn ex-add-btn${inPlanDay ? ' ex-add-btn-done' : ''}" aria-label="${inPlanDay ? 'Toegevoegd' : 'Toevoegen'}"${inPlanDay ? ' disabled' : ''}>${
+      inPlanDay ? `<svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>` : '+'
+    }</button>` : `${isFav ? `<svg class="exercise-item-fav-star" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>` : ''}
+    <svg class="exercise-item-dots" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>`}
   `;
-  item.querySelector('.exercise-item-name').addEventListener('click', () => {
-    if (!isPlanAddMode) openTraining(ex.name);
-  });
-  if (isPlanAddMode && !inPlanDay) {
-    item.querySelector('.ex-add-btn').addEventListener('click', e => {
-      e.stopPropagation();
-      openPdeSrAdd(ex.name);
-    });
+  if (isPlanAddMode) {
+    // Once added the row stays a check: a second tap does nothing (as before).
+    if (!inPlanDay) item.addEventListener('click', () => openPdeSrAdd(ex.name));
+    list.appendChild(item);
+    return;
   }
+  item.querySelector('.exercise-item-name').addEventListener('click', () => openTraining(ex.name));
   item.querySelector('.exercise-item-dots').addEventListener('click', e => {
     e.stopPropagation();
     showOverflowMenu([
@@ -5544,7 +5542,7 @@ function openPdeSetsRepsEdit(exIdx) {
   openPdeSrPopup(ex, 'Sets & reps aanpassen', 'Opslaan');
 }
 
-// Same popup, opened from screen-exercises' Voeg toe (plan-add mode): nothing is
+// Same popup, opened from screen-exercises' + per row (plan-add mode): nothing is
 // written to the plan day until Toevoegen — see btn-pde-sr-save.
 function openPdeSrAdd(name) {
   pendingPdeSetsRepsIndex = null;
@@ -5985,9 +5983,9 @@ document.getElementById('btn-new-plan-save').addEventListener('click', async () 
 
 // ── Plan Day Add Exercise Flow (screen-plan-day-edit's "+" button) ──────
 // Reuses the exercise browser screen (screen-exercises) wholesale, in 'plan-add'
-// mode: same categories, same exercise lists, same ⋮ menu and New Exercise form as
-// the Fitness Tracker's own "All Exercises" — only each row's own Voeg toe/Toegevoegd
-// button differs, and it writes straight into currentPlanData.days[currentEditDayIndex]
+// mode: same categories, same exercise lists, same New Exercise form as
+// the Fitness Tracker's own "All Exercises" — only the rows differ: the whole row is the tap
+// target, with a small + (a check once added) and no ⋮ menu, and it writes straight into currentPlanData.days[currentEditDayIndex]
 // (never into a Fitness Tracker workout). See exerciseScreenMode / renderExerciseItem.
 // Always entered from screen-plan-day-edit (currentEditDayIndex is already set by
 // openPlanDayEdit) and always returns there — see btn-back-exercises.
@@ -6004,7 +6002,7 @@ function openPlanDayAddExercises(dayIndex) {
 }
 
 // Whether `name` is already part of the plan day currently being edited via the
-// pencil icon — drives the Voeg toe / Toegevoegd button state per row.
+// pencil icon — drives the + / check state per row.
 function planDayHasExercise(name) {
   const day = currentPlanData && currentPlanData.days[currentEditDayIndex];
   return !!(day && (day.exercises || []).some(e => e.name === name));
