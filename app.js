@@ -4164,7 +4164,7 @@ document.getElementById('btn-orm-calculate').addEventListener('click', () => {
     `<div class="orm-table-row${r.reps === ownReps ? ' orm-table-row-own' : ''}">` +
     `<div><span class="set-val">${r.reps}</span></div>` +
     `<div><span class="set-val">${formatWeight(r.weight)}</span><span class="set-unit">kg</span></div>` +
-    `<div><span class="orm-table-pct">${r.percent}%</span></div></div>`
+    `<div><span class="set-val">${r.percent}</span><span class="set-unit">%</span></div></div>`
   ).join('');
   document.getElementById('orm-result-card').classList.remove('hidden');
   document.getElementById('orm-table-section').classList.remove('hidden');
