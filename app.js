@@ -904,17 +904,25 @@ function getPRSetKeys(exerciseName) {
 
 // Empty state for a list you can add to (Fitness Tracker day, plan day): the big + with a label,
 // near the bottom; an optional muted title is centred in the space above it.
-function emptyAddStateHtml(btnId, label, title = '') {
+// With placeholder: true the + keeps its place in the layout but is invisible and not tappable —
+// see emptyTitleOnlyHtml().
+function emptyAddStateHtml(btnId, label, title = '', { placeholder = false } = {}) {
   return `
       <div class="home-empty">
         <div class="home-empty-title-wrap">
           ${title ? `<span class="home-empty-title">${title}</span>` : ''}
         </div>
-        <button class="home-empty-action" id="${btnId}">
+        <button class="home-empty-action${placeholder ? ' home-empty-action-placeholder' : ''}"${placeholder ? ' aria-hidden="true" tabindex="-1"' : ` id="${btnId}"`}>
           <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
           <span>${label}</span>
         </button>
       </div>`;
+}
+// The same block for a list whose adding happens elsewhere on the screen (Trainingsplannen: the
+// tiles above): only the title shows. The invisible + reserves the tracker's exact space (same
+// label, so the same two-line height), so the title is centred at the same height.
+function emptyTitleOnlyHtml(title) {
+  return emptyAddStateHtml('', 'Nieuwe workout', title, { placeholder: true });
 }
 
 function renderHome() {
@@ -4989,8 +4997,11 @@ function buildPlanItem(plan, { withMenu }) {
 function renderPlanList() {
   const scroll = document.getElementById('plan-list-scroll');
   const plans = sortedPlans();
+  const emptyState = document.getElementById('plan-list-empty-state');
+  emptyState.classList.toggle('hidden', plans.length > 0);
   if (plans.length === 0) {
-    scroll.innerHTML = '<div class="plan-list-empty">Nog geen plannen. Maak er hierboven een aan!</div>';
+    scroll.innerHTML = '';
+    emptyState.innerHTML = emptyTitleOnlyHtml('Nog geen plannen');
     return;
   }
   scroll.innerHTML = '';
