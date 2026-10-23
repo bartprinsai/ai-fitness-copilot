@@ -5811,7 +5811,7 @@ function getAiGenFormSnapshot() {
   return {
     goal: document.querySelector('#chips-goal .chip.active')?.dataset.val || '',
     level: document.querySelector('#chips-level .chip.active')?.dataset.val || '',
-    days: document.querySelector('#chips-days .chip.active')?.dataset.val || '',
+    days: document.querySelector('#chips-days .ps-num-box.selected')?.dataset.val || '',
     pref: document.getElementById('ai-gen-pref').value,
   };
 }
@@ -5847,7 +5847,7 @@ document.getElementById('btn-ai-generate-submit').addEventListener('click', asyn
   }
   const goal = document.querySelector('#chips-goal .chip.active')?.dataset.val || 'Muscle Growth';
   const level = document.querySelector('#chips-level .chip.active')?.dataset.val || 'Intermediate';
-  const days = document.querySelector('#chips-days .chip.active')?.dataset.val || '4';
+  const days = document.querySelector('#chips-days .ps-num-box.selected')?.dataset.val || '4';
   const pref = document.getElementById('ai-gen-pref').value.trim();
 
   document.getElementById('ai-gen-form').classList.add('hidden');
@@ -5890,13 +5890,15 @@ Respond ONLY with a valid JSON object, no markdown, no explanation. Format:
   }
 });
 
-// Chip group click delegation
-document.querySelectorAll('.chip-group').forEach(group => {
+// Chip group click delegation — text chips (.chip, on = .active) and the "Dagen per week"
+// number boxes (.ps-num-box, on = .selected, the same boxes as Plan schedule's Aantal dagen).
+document.querySelectorAll('.chip-group, #chips-days').forEach(group => {
   group.addEventListener('click', e => {
-    const chip = e.target.closest('.chip');
+    const chip = e.target.closest('.chip, .ps-num-box');
     if (!chip) return;
-    group.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-    chip.classList.add('active');
+    const on = chip.classList.contains('chip') ? 'active' : 'selected';
+    group.querySelectorAll('.chip, .ps-num-box').forEach(c => c.classList.remove(on));
+    chip.classList.add(on);
   });
 });
 

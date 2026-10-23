@@ -801,7 +801,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 /* Weekday picker inside #day-picker-overlay ("Dag toevoegen" on a "Vaste dagen" plan) —
    same circle as .ps-day-circle; taken days are disabled, tapping one commits it. */
 .day-picker-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: var(--space-2); }
-.day-picker-circle { aspect-ratio: 1; font-size: var(--fs-small); display: flex; align-items: center; justify-content: center; }
+.day-picker-circle { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; }
 .day-picker-circle:active { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
 .day-picker-circle:disabled { border-color: var(--border); background: var(--bg); color: var(--text-muted); cursor: not-allowed; }
 
@@ -810,14 +810,15 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .ps-section { display: flex; flex-direction: column; gap: var(--space-3); }
 /* Non-scrolling footer: its own margin-bottom reserves room above the floating
    AI Coach pill, so the button never sits permanently behind it. */
-.plan-schedule-footer { padding: var(--space-3) var(--screen-gutter) calc(var(--safe-bottom) + var(--space-3)); background: var(--surface); border-top: 1px solid var(--border); flex-shrink: 0; margin-bottom: var(--ai-bar-space); }
+.plan-schedule-footer { padding: var(--space-3) var(--screen-gutter) calc(var(--safe-bottom) + var(--space-3)); background: var(--bg); flex-shrink: 0; margin-bottom: var(--ai-bar-space); }
 .ps-num-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: var(--space-2); }
-.ps-num-box { height: 40px; padding: 0; }
+/* A square of the grid cell, so it is exactly as big as a weekday circle in the same grid. */
+.ps-num-box { aspect-ratio: 1; padding: 0; }
 .ps-toggle-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-2); }
-.ps-weekdays-counter { font-size: var(--fs-small); font-weight: var(--fw-medium); color: var(--text-secondary); }
+.ps-weekdays-counter { color: var(--text-secondary); }
 .ps-week-block { display: flex; flex-direction: column; gap: var(--space-2); }
 .ps-weekday-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: var(--space-2); }
-.ps-day-circle { aspect-ratio: 1; font-size: var(--fs-small); display: flex; align-items: center; justify-content: center; }
+.ps-day-circle { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; }
 .ps-day-circle:disabled { opacity: .4; cursor: not-allowed; }
 
 /* ── AI generate form ── */
@@ -1012,9 +1013,13 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .exercise-card-name, .cal-detail-ex-name, .recap-ex-name, .records-hero-label, .plate-bar-option-title { font-size: var(--fs-heading); font-weight: var(--fw-medium); line-height: normal; }
 /* Subregel onder een titel — Klein, 12px/400 (never the 500 of its button) */
 .role-sub, .nav-card-desc, .plan-item-meta, .plan-day-sub, .preset-item-meta, .pde-ex-meta, .plan-day-preview-meta,
-.plate-bar-option-weight, .plate-row-meta, .records-row-date, .graph-sel-date { font-size: var(--fs-small); font-weight: var(--fw-regular); }
+.plate-bar-option-weight, .plate-row-meta, .records-row-date, .graph-sel-date, .ps-weekdays-counter { font-size: var(--fs-small); font-weight: var(--fw-regular); }
 /* Rij in een lijst — Body, 15px/400 */
 .role-row, .category-item, .exercise-item, .dropdown-item, .field-picker-label, .plan-day-preview-name { font-size: var(--fs-body); font-weight: var(--fw-regular); }
+/* Keuzeraster — a grid of buttons holding only a number or a short day name, 15px/500.
+   Shape: dates and periods round (.ps-day-circle, .day-picker-circle; .cal-day), amounts square
+   (.ps-num-box, --radius-sm). */
+.role-grid, .ps-num-box, .ps-day-circle, .day-picker-circle { font-size: var(--fs-body); font-weight: var(--fw-medium); }
 /* Compacte keuzeknop (één regel) — 12px/500 */
 .role-choice, .extra-type-btn, .pde-sr-mode-btn, .ps-toggle-option, .chip, .time-filter { font-size: var(--fs-small); font-weight: var(--fw-medium); }
 .role-title, .role-row { color: var(--text); }
