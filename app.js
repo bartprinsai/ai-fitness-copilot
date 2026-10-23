@@ -1829,25 +1829,25 @@ function renderExerciseItem(list, ex) {
   const item = document.createElement('div');
   const isPlanAddMode = exerciseScreenMode === 'plan-add';
   const inPlanDay = isPlanAddMode && planDayHasExercise(ex.name);
-  item.className = 'exercise-item list-row' + (ex.custom ? ' exercise-item-custom' : '');
+  item.className = 'exercise-item list-row' + (ex.custom ? ' exercise-item-custom' : '') + (isPlanAddMode ? ' exercise-item-add' : '');
   const isFav = isFavoriteExercise(ex.name);
-  // Plan-add mode: a small stepper-style + that turns into a filled check once the exercise
-  // is in the plan day; the whole row is the tap target and there's no ⋮ per row.
+  // Plan-add mode: a small stepper-style + directly left of the ⋮ menu, which turns into a
+  // filled check once the exercise is in the plan day. Only the + adds; the rest of the row
+  // does nothing in this mode.
   item.innerHTML = `
     <span class="exercise-item-name">${ex.name}</span>
     ${isPlanAddMode ? `
     <button type="button" class="plate-stepper-btn ex-add-btn${inPlanDay ? ' ex-add-btn-done' : ''}" aria-label="${inPlanDay ? 'Toegevoegd' : 'Toevoegen'}"${inPlanDay ? ' disabled' : ''}>${
       inPlanDay ? `<svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>` : '+'
-    }</button>` : `${isFav ? `<svg class="exercise-item-fav-star" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>` : ''}
-    <svg class="exercise-item-dots" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>`}
+    }</button>` : (isFav ? `<svg class="exercise-item-fav-star" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>` : '')}
+    <svg class="exercise-item-dots" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
   `;
   if (isPlanAddMode) {
-    // Once added the row stays a check: a second tap does nothing (as before).
-    if (!inPlanDay) item.addEventListener('click', () => openPdeSrAdd(ex.name));
-    list.appendChild(item);
-    return;
+    // Once added the + is a disabled check: a second tap does nothing (as before).
+    if (!inPlanDay) item.querySelector('.ex-add-btn').addEventListener('click', () => openPdeSrAdd(ex.name));
+  } else {
+    item.querySelector('.exercise-item-name').addEventListener('click', () => openTraining(ex.name));
   }
-  item.querySelector('.exercise-item-name').addEventListener('click', () => openTraining(ex.name));
   item.querySelector('.exercise-item-dots').addEventListener('click', e => {
     e.stopPropagation();
     showOverflowMenu([
@@ -5985,9 +5985,9 @@ document.getElementById('btn-new-plan-save').addEventListener('click', async () 
 
 // ── Plan Day Add Exercise Flow (screen-plan-day-edit's "+" button) ──────
 // Reuses the exercise browser screen (screen-exercises) wholesale, in 'plan-add'
-// mode: same categories, same exercise lists, same New Exercise form as
-// the Fitness Tracker's own "All Exercises" — only the rows differ: the whole row is the tap
-// target, with a small + (a check once added) and no ⋮ menu, and it writes straight into currentPlanData.days[currentEditDayIndex]
+// mode: same categories, same exercise lists, same ⋮ menu and New Exercise form as
+// the Fitness Tracker's own "All Exercises" — only the rows differ: a small + left of the ⋮ menu
+// (a check once added) is the only add target, and it writes straight into currentPlanData.days[currentEditDayIndex]
 // (never into a Fitness Tracker workout). See exerciseScreenMode / renderExerciseItem.
 // Always entered from screen-plan-day-edit (currentEditDayIndex is already set by
 // openPlanDayEdit) and always returns there — see btn-back-exercises.
