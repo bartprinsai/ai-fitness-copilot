@@ -902,6 +902,21 @@ function getPRSetKeys(exerciseName) {
   return result;
 }
 
+// Empty state for a list you can add to (Fitness Tracker day, plan day): the big + with a label,
+// near the bottom; an optional muted title is centred in the space above it.
+function emptyAddStateHtml(btnId, label, title = '') {
+  return `
+      <div class="home-empty">
+        <div class="home-empty-title-wrap">
+          ${title ? `<span class="home-empty-title">${title}</span>` : ''}
+        </div>
+        <button class="home-empty-action" id="${btnId}">
+          <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          <span>${label}</span>
+        </button>
+      </div>`;
+}
+
 function renderHome() {
   renderSmartBanner();
   document.getElementById('day-nav-label').textContent = formatDateStr(currentDate, 'nav');
@@ -911,16 +926,7 @@ function renderHome() {
 
   if (exercises.length === 0) {
     screenEl.classList.remove('has-day-actions');
-    container.innerHTML = `
-      <div class="home-empty">
-        <div class="home-empty-title-wrap">
-          <span class="home-empty-title">Nog geen workout gelogd</span>
-        </div>
-        <button class="home-empty-action" id="btn-start-new">
-          <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-          <span>Nieuwe workout</span>
-        </button>
-      </div>`;
+    container.innerHTML = emptyAddStateHtml('btn-start-new', 'Nieuwe workout', 'Nog geen workout gelogd');
     document.getElementById('btn-start-new').addEventListener('click', openNewWorkoutScreen);
     return;
   }
@@ -5487,9 +5493,12 @@ function renderPlanDayEdit() {
   const day = currentPlanData.days[currentEditDayIndex];
   const exercises = day.exercises || [];
   list.innerHTML = '';
+  list.classList.toggle('is-empty', exercises.length === 0);
 
   if (exercises.length === 0) {
-    list.innerHTML = '<div class="pde-empty">Geen oefeningen. Tik op het potlood-icoon om oefeningen aan deze dag toe te voegen.</div>';
+    // Same empty state as the Fitness Tracker; the + does what the toolbar + does.
+    list.innerHTML = emptyAddStateHtml('btn-pde-empty-add', 'Nieuwe oefening');
+    document.getElementById('btn-pde-empty-add').addEventListener('click', () => openPlanDayAddExercises(currentEditDayIndex));
     return;
   }
 
