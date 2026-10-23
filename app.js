@@ -1892,9 +1892,21 @@ let trackFieldsBaseline = { weight: '0', reps: '0', rpe: '0', extra: '0', extraT
 // whole numbers (more is rounded). Shown with a decimal comma and without superfluous
 // zeros (150, not 150,00).
 function parseDecimal(str) { return parseFloat(String(str).replace(',', '.')) || 0; }
-function round1(v) { return Math.round(v * 10) / 10; }
+// The ONE rounding function for decimals in the app (formatNumber, roundWeight, round1, roundOrm):
+// half away from zero. toPrecision(12) first strips floating-point noise, so a computed exact half
+// like 118,75 (3800 / 32, computed as 118,7499999…) rounds up as it should; the decimal point is
+// then shifted in the string form ("118.75e1"), because multiplying (1,005 × 100 = 100,4999…)
+// would bring the noise back.
+function roundTo(n, decimals) {
+  const v = Number(n) || 0;
+  const clean = Number(Math.abs(v).toPrecision(12));
+  if (clean < 1e-6) return 0; // String() would switch to exponent notation below this
+  const r = Number(Math.round(Number(`${clean}e${decimals}`)) + `e-${decimals}`);
+  return r === 0 ? 0 : (v < 0 ? -r : r);
+}
+function round1(v) { return roundTo(v, 1); }
 const WEIGHT_DECIMALS = 2, MAX_DECIMALS = 1;
-function roundWeight(v) { return Math.round((v + Number.EPSILON) * 10 ** WEIGHT_DECIMALS) / 10 ** WEIGHT_DECIMALS; }
+function roundWeight(v) { return roundTo(v, WEIGHT_DECIMALS); }
 function parseWeight(str) { return Math.max(0, roundWeight(parseDecimal(str))); }
 // The ONE display format for numbers anywhere in the app: decimal comma, no thousands
 // separator, rounded half away from zero (not truncated), no trailing zeros ("132,5", "150").
@@ -1903,11 +1915,7 @@ function parseWeight(str) { return Math.max(0, roundWeight(parseDecimal(str))); 
 // plates: "93,75", "0,25").
 // Display only: stored data stays plain numbers, input accepts comma and point.
 function formatNumber(n, { weight = false } = {}) {
-  const d = weight ? WEIGHT_DECIMALS : MAX_DECIMALS;
-  const v = Number(n) || 0, f = 10 ** d;
-  const r = Math.sign(v) * Math.round((Math.abs(v) + Number.EPSILON) * f) / f;
-  const s = String(r === 0 ? 0 : r);
-  return s.replace('.', ',');
+  return String(roundTo(n, weight ? WEIGHT_DECIMALS : MAX_DECIMALS)).replace('.', ',');
 }
 function formatWeight(v) { return formatNumber(v, { weight: true }); }
 // A weight as value + unit: the number on Groot getal, "kg" apart on Klein (same
@@ -4104,7 +4112,8 @@ document.getElementById('btn-calc-plate').addEventListener('click', openPlateCal
 
 // -- 1RM Calculator ---------------------------------------
 // Epley: 1RM = weight × (1 + reps / 30). Pure helpers sit between the markers
-// below so they can be unit-tested headless (extracted and eval'd in Node).
+// below so they can be unit-tested headless (extracted and eval'd in Node, together with
+// roundTo() from the number helpers, which roundOrm() uses).
 // <1rm-pure>
 const ORM_TABLE_REPS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20];
 
@@ -4115,10 +4124,9 @@ function weightAtReps(oneRm, reps) { return reps === 1 ? oneRm : oneRm / (1 + re
 function percentAtReps(reps) { return reps === 1 ? 100 : Math.round(100 / (1 + reps / 30)); }
 // The estimated 1RM and every table weight are rounded to 1 decimal, half away from zero
 // (164,06 → 164,1); the table weights are computed from the unrounded 1RM, so the 1-rep row
-// equals the shown 1RM. The percentage stays the calculated one. toPrecision(12) first strips
-// floating-point noise, so an exact half like 118,75 (= 3800 / 32, computed as 118,7499999…)
-// rounds up to 118,8 as it should.
-function roundOrm(weight) { return Math.round(Number(weight.toPrecision(12)) * 10) / 10; }
+// equals the shown 1RM. The percentage stays the calculated one. Via the app's one rounding
+// function, roundTo() (which also handles floating-point noise: 118,7499999… → 118,8).
+function roundOrm(weight) { return roundTo(weight, 1); }
 
 
 // Strict parse (Dutch comma allowed); NaN for empty/garbage like "5abc".
@@ -4162,21 +4170,24 @@ document.getElementById('btn-orm-calculate').addEventListener('click', () => {
   document.getElementById('orm-result-value').innerHTML = plateTotalHtml(res.oneRm);
   // Rows in set-row style; the row for the reps you entered is marked (none if it isn't in the table).
   const ownReps = parseOrmNumber(document.getElementById('orm-reps').value);
-  // Columns % · weight · reps. The weight sits right-aligned in a box (.orm-weight-box) so "kg"
-  // lines up in every row, as in the set rows.
+  // Columns % · weight · reps. Percentage and weight sit right-aligned in a box (.orm-pct-box,
+  // .orm-weight-box) so "%" and "kg" line up in every row, as in the set rows. "%" directly after
+  // the number ("94%"), "kg" with a space.
   document.getElementById('orm-table-body').innerHTML = res.rows.map(r =>
     `<div class="orm-table-row${r.reps === ownReps ? ' orm-table-row-own' : ''}">` +
-    `<div><span class="set-val">${r.percent}</span><span class="set-unit">%</span></div>` +
+    `<div><span class="orm-pct-box"><span class="set-val">${r.percent}</span><span class="set-unit">%</span></span></div>` +
     `<div><span class="orm-weight-box"><span class="set-val">${formatWeight(r.weight)}</span><span class="set-unit">kg</span></span></div>` +
     `<div><span class="set-val">${r.reps}</span></div></div>`
   ).join('');
   document.getElementById('orm-result-card').classList.remove('hidden');
   document.getElementById('orm-table-section').classList.remove('hidden');
-  // Every weight box exactly as wide as the longest value in the table needs, centred in its column.
-  const boxes = [...document.querySelectorAll('#orm-table-body .orm-weight-box')];
-  boxes.forEach(b => { b.style.width = ''; });
-  const boxWidth = Math.max(...boxes.map(b => b.getBoundingClientRect().width));
-  boxes.forEach(b => { b.style.width = `${boxWidth}px`; });
+  // Every box exactly as wide as the longest value of its column needs, centred in its column.
+  ['.orm-pct-box', '.orm-weight-box'].forEach(sel => {
+    const boxes = [...document.querySelectorAll(`#orm-table-body ${sel}`)];
+    boxes.forEach(b => { b.style.width = ''; });
+    const boxWidth = Math.max(...boxes.map(b => b.getBoundingClientRect().width));
+    boxes.forEach(b => { b.style.width = `${boxWidth}px`; });
+  });
 });
 // The accuracy hint only adds something above 5 reps; it follows the field while typing.
 document.getElementById('orm-reps').addEventListener('input', e => {
