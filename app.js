@@ -6072,13 +6072,14 @@ async function addExerciseToPlanDay(name, setsReps) {
 // ── Smart Day Banner ──────────────────────────────────
 // Re-checked on every renderHome(), so it follows today's workout however it got
 // filled (manual add, Load Schedule Manually/Automatically, the banner itself):
-// shown only while TODAY's workout (todayStr(), not the viewed day) is still empty.
+// shown only while TODAY's workout (todayStr(), not the viewed day) is still empty,
+// and only while the tracker shows today (hidden on any other day, back on today).
 function renderSmartBanner() {
   const banner = document.getElementById('smart-day-banner');
   if (!banner) return;
   const pick = getTodaysScheduledDay();
   bannerSuggestedPick = pick;
-  if (bannerDismissed || !pick || getWorkout(todayStr()).length > 0) { banner.classList.add('hidden'); return; }
+  if (bannerDismissed || !pick || currentDate !== todayStr() || getWorkout(todayStr()).length > 0) { banner.classList.add('hidden'); return; }
   document.getElementById('smart-banner-msg').textContent = `Volgens je plan staat vandaag ${pick.dayName} op het programma. Laden?`;
   banner.classList.remove('hidden');
 }

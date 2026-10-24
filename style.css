@@ -845,10 +845,10 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .ai-gen-loading-text { font-size: var(--fs-body); color: var(--text-secondary); }
 
 /* ── Smart day banner ── a card under the day bar, the first block above the content (same margin,
-   radius, shadow and padding as the other cards). The 3px --primary stripe on the left is a ::before,
-   clipped by the rounded corners. Text: Rij in een lijst; buttons: Compacte actieknop, half each. */
-.smart-banner { position: relative; overflow: hidden; display: flex; flex-direction: column; gap: var(--space-3); margin: var(--space-4) var(--screen-gutter) 0; padding: var(--card-padding); background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--card-shadow); flex-shrink: 0; }
-.smart-banner::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--primary); }
+   radius, shadow and padding as the other cards), only on today. A 2px --primary border all round;
+   the padding gives up those 2px, so the content and the button widths stay where they were.
+   Text: Rij in een lijst; buttons: Compacte actieknop, half each. */
+.smart-banner { display: flex; flex-direction: column; gap: var(--space-3); margin: var(--space-4) var(--screen-gutter) 0; padding: calc(var(--card-padding) - 2px); background: var(--surface); border: 2px solid var(--primary); border-radius: var(--radius-lg); box-shadow: var(--card-shadow); flex-shrink: 0; }
 .smart-banner.hidden { display: none; }
 .smart-banner-body { display: flex; align-items: flex-start; gap: var(--space-2); }
 .smart-banner-icon { flex-shrink: 0; font-size: var(--fs-body); }
