@@ -137,9 +137,16 @@ Schaal: `--space-1` 4px · `--space-2` 8px · `--space-3` 12px · `--space-4` 16
 
 Semantische aliassen:
 - `--screen-gutter` = 16px — **zijmarge van elk scherm**, ook van bottom sheets, toolbars-zonder-terugknop, lijsten en formulieren.
+- `--screen-top` = 16px — **bovenruimte van elk scherm**: zie "Bovenruimte van schermen" hieronder.
 - `--card-padding` = 16px — binnenruimte van een kaart.
 - `--card-gap` = 12px — ruimte tussen kaarten.
 - `--section-gap` = 24px — ruimte tussen secties (Plan schedule, AI-formulier, calculators).
+
+### Bovenruimte van schermen (`--screen-top`)
+- **Het eerste element van de inhoud** (kaart, label, invoerveld, tegel, lijst, zoekbalk of de planbanner) **begint 16px (`--screen-top`) onder de onderkant van de toolbar**, of onder de onderkant van een balk die direct aan de toolbar vastzit: de dagbalk (Fitness Tracker), de tabbalk Loggen/Geschiedenis/Grafiek, de weekdagkop van de kalender en het ★ ACTIEF PLAN-lint (Plan detail).
+- **Nieuwe schermen**: de scrollcontainer onder de toolbar krijgt `padding-top: var(--screen-top)` (zoals `.records-scroll`, `.plan-detail-scroll`, `.plate-calc-scroll`, `.pde-list`, `.ai-gen-form`, `.menu-wrapper`). Heeft het eerste element zelf al bovenruimte (kaarten met `margin-top: var(--card-gap)`, een label met eigen padding), dan vult de container alleen het verschil aan, zodat het totaal precies `--screen-top` is.
+- **Hoe de bestaande schermen dat doen**: kaartlijsten met `--card-gap`-marge (dagoverzicht Fitness Tracker, Geschiedenis) krijgen `padding-top: calc(var(--screen-top) - var(--card-gap))`, alleen als er kaarten zijn (`:has(> .exercise-card)` / `:has(> .history-card)`) — geen `:first-child`-marge, omdat herschikken de kaarten in de DOM verplaatst. Een WEEK A-label bovenaan een dagenlijst verliest zijn eigen bovenpadding (`.plan-day-group-label:first-child`). `.plan-list-scroll` direct onder de toolbar (Kies een plan) krijgt `--screen-top` in plaats van de 4px onder het MIJN PLANNEN-label. In Loggen krijgt de eerste rij velden (GEWICHT · REPS), in de Grafiek de rij periodefilters en in Alle oefeningen de zoekbalk `--screen-top` bovenaan.
+- **Bewuste uitzonderingen** (staan niet op 16px): de lege staten op een vaste hoogte (Fitness Tracker, Dag bewerken, Trainingsplannen, zie "Lege staten"); de **verticaal gecentreerde** schermen `.nav-card-list` (Nieuwe workout, Calculator-menu) en `.placeholder-content` (Voeding, Inzicht), waar `--screen-top` alleen de minimale bovenruimte is; de kalender is een doorlopende lijst die op de huidige maand opent: elk maandlabel heeft zelf 16px bovenpadding, dus bij openen staat het maandlabel ±0,3px rond 16px onder de weekdagkop (afronding van de vierkante dagcellen); en lege-lijst-teksten (`.plan-list-empty`, 32px eigen padding).
 
 ## Componenten
 
