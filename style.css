@@ -306,10 +306,12 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .home-empty { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 0 var(--space-5); }
 .home-empty-title-wrap { flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; }
 .home-empty-title { font-size: var(--fs-body); font-weight: var(--fw-regular); color: var(--text-muted); text-align: center; }
-.home-empty-action { flex: 0 0 auto; width: 120px; display: flex; flex-direction: column; align-items: center; gap: var(--space-2); border: none; background: none; cursor: pointer; font-family: inherit; padding: var(--space-2); margin-bottom: var(--ai-bar-space); }
+.home-empty-action { flex: 0 0 auto; min-width: 120px; display: flex; flex-direction: column; align-items: center; gap: var(--space-2); border: none; background: none; cursor: pointer; font-family: inherit; padding: var(--space-2); margin-bottom: var(--ai-bar-space); }
 .home-empty-action:active { opacity: 0.7; }
 .home-empty-action svg { width: 48px; height: 48px; fill: var(--primary); }
-.home-empty-action span { font-size: var(--fs-body); color: var(--text-secondary); text-align: center; }
+/* The label stays on one line ("Nieuwe workout", "Nieuwe oefening"); the button grows with it. It keeps
+   the height of the former two-line label, so the + and the title stay exactly where they were. */
+.home-empty-action span { min-height: 2lh; font-size: var(--fs-body); color: var(--text-secondary); text-align: center; white-space: nowrap; }
 /* Title-only empty state (emptyTitleOnlyHtml): the + keeps its space but isn't shown or tappable. */
 .home-empty-action-placeholder { visibility: hidden; pointer-events: none; }
 
@@ -842,13 +844,16 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 @keyframes spin { to { transform: rotate(360deg); } }
 .ai-gen-loading-text { font-size: var(--fs-body); color: var(--text-secondary); }
 
-/* ── Smart day banner ── */
-.smart-banner { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); background: var(--surface); border-left: 3px solid var(--primary); padding: var(--space-3) var(--screen-gutter); flex-shrink: 0; }
+/* ── Smart day banner ── a card under the day bar, the first block above the content (same margin,
+   radius, shadow and padding as the other cards). The 3px --primary stripe on the left is a ::before,
+   clipped by the rounded corners. Text: Rij in een lijst; buttons: Compacte actieknop, half each. */
+.smart-banner { position: relative; overflow: hidden; display: flex; flex-direction: column; gap: var(--space-3); margin: var(--space-4) var(--screen-gutter) 0; padding: var(--card-padding); background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--card-shadow); flex-shrink: 0; }
+.smart-banner::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--primary); }
 .smart-banner.hidden { display: none; }
-.smart-banner-body { flex: 1 1 200px; min-width: 0; display: flex; align-items: flex-start; gap: var(--space-2); }
+.smart-banner-body { display: flex; align-items: flex-start; gap: var(--space-2); }
 .smart-banner-icon { flex-shrink: 0; font-size: var(--fs-body); }
-.smart-banner-msg { font-size: var(--fs-body); color: var(--text-secondary); line-height: 1.4; }
-.smart-banner-actions { display: flex; gap: var(--space-3); flex: 1 1 auto; }
+.smart-banner-msg { color: var(--text-secondary); line-height: 1.4; }
+.smart-banner-actions { display: flex; gap: var(--space-3); }
 
 /* ── Plan day edit screen ── */
 /* Cards like the plan cards in Trainingsplannen (.plan-item): --space-4 under the toolbar, --card-gap
@@ -1036,7 +1041,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .role-sub, .nav-card-desc, .plan-item-meta, .plan-day-sub, .preset-item-meta, .pde-ex-meta, .plan-day-preview-meta,
 .plate-bar-option-weight, .plate-row-meta, .records-row-date, .graph-sel-date, .ps-weekdays-counter { font-size: var(--fs-small); font-weight: var(--fw-regular); }
 /* Rij in een lijst — Body, 15px/400 */
-.role-row, .category-item, .exercise-item, .dropdown-item, .field-picker-label, .plan-day-preview-name { font-size: var(--fs-body); font-weight: var(--fw-regular); }
+.role-row, .category-item, .exercise-item, .dropdown-item, .field-picker-label, .plan-day-preview-name, .smart-banner-msg { font-size: var(--fs-body); font-weight: var(--fw-regular); }
 /* Keuzeraster — a grid of buttons holding only a number or a short day name, 15px/500.
    Shape: dates and periods round (.ps-day-circle, .day-picker-circle; .cal-day), amounts square
    (.ps-num-box, --radius-sm). */
@@ -1045,5 +1050,8 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .role-hint, .orm-hint { font-size: var(--fs-label); font-weight: var(--fw-regular); color: var(--text-secondary); }
 /* Compacte keuzeknop (één regel) — 12px/500 */
 .role-choice, .extra-type-btn, .pde-sr-mode-btn, .ps-toggle-option, .chip, .time-filter { font-size: var(--fs-small); font-weight: var(--fw-medium); }
+/* Compacte actieknop — a .btn inside a card or banner, not a screen's/popup's main action: 36px high,
+   12px/500, uppercase with the normal .btn letter-spacing (Smart-banner: Overslaan · Ja, laden) */
+.btn.btn-compact { height: 36px; font-size: var(--fs-small); font-weight: var(--fw-medium); }
 .role-title, .role-row { color: var(--text); }
 .role-sub { color: var(--text-secondary); }

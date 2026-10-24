@@ -920,7 +920,7 @@ function emptyAddStateHtml(btnId, label, title = '', { placeholder = false } = {
 }
 // The same block for a list whose adding happens elsewhere on the screen (Trainingsplannen: the
 // tiles above): only the title shows. The invisible + reserves the tracker's exact space (same
-// label, so the same two-line height), so the title is centred at the same height.
+// label, so the same size), so the title is centred at the same height.
 function emptyTitleOnlyHtml(title) {
   return emptyAddStateHtml('', 'Nieuwe workout', title, { placeholder: true });
 }
