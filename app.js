@@ -3282,14 +3282,14 @@ function drawGraphChart() {
 function updateGraphPanel() {
   const pt = graphSeries[graphSelected];
   if (!pt) return;
-  // A derived point shows the REAL rep count of its source set plus what it counts as.
+  // A derived point shows the REAL rep count of its source set, plus "Afgeleid van N reps".
   document.getElementById('graph-sel-main').innerHTML = `${weightValueHtml(pt.val)}<span class="set-unit">×</span><span class="set-val">${pt.reps}</span><span class="set-unit">rep${pt.reps === 1 ? '' : 's'}</span>`;
   const dateEl = document.getElementById('graph-sel-date');
   dateEl.textContent = formatDateStr(pt.date);
   if (pt.derived) {
     const via = document.createElement('span');
     via.className = 'graph-sel-via';
-    via.textContent = 'Afgeleid \u2014 telt als ' + recordsRepLabel(graphReps);
+    via.textContent = 'Afgeleid van ' + pt.reps + ' reps';
     dateEl.appendChild(via);
   }
   document.getElementById('btn-graph-prev').disabled = graphSelected <= 0;
@@ -3320,7 +3320,7 @@ document.getElementById('progress-chart').addEventListener('click', e => {
 });
 
 // Tapping the weight × reps text: overview of ALL of that day's sets for this exercise + "Go To" (same overlay as History/Calendar).
-// "Afgeleide punten": an on/off button in the Partial/Forced look (.extra-type-btn, on = .active).
+// "Afgeleide sets": an on/off button in the Partial/Forced look (.extra-type-btn, on = .active).
 // The Partial/Forced logic only looks inside #extra-type, so it never touches this button.
 document.getElementById('graph-derived').addEventListener('click', e => {
   graphIncludeDerived = !graphIncludeDerived;
