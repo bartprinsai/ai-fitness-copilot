@@ -2086,7 +2086,7 @@ function renderSetList() {
   updateDropsetToggle();
 
   if (sets.length === 0) {
-    list.innerHTML = `<div class="set-list-empty">Nog geen sets. Vul gewicht en reps in en tik op Opslaan.</div>`;
+    list.innerHTML = `<div class="set-list-empty">Nog geen sets</div>`;
     return;
   }
 
