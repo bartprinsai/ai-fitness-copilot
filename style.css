@@ -750,7 +750,16 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .plan-create-btn svg { width: var(--icon-list); height: var(--icon-list); fill: var(--primary); }
 
 /* Typography comes from the shared .section-label; this only positions it. */
-.plan-list-label { padding: var(--space-2) var(--screen-gutter) var(--space-2); flex-shrink: 0; }
+/* The block above (tiles, or the ACTIEF PLAN card) ends with --space-3 padding, so the label tops it up to --section-gap. */
+.plan-list-label { padding: calc(var(--section-gap) - var(--space-3)) var(--screen-gutter) var(--space-2); flex-shrink: 0; }
+/* ACTIEF PLAN: label + the active plan's card, between the tiles and MIJN PLANNEN. Same label-to-card
+   distance as the list (--space-1 like .plan-list-scroll's top), --space-3 below like .plan-create-row. */
+.plan-active-section { flex-shrink: 0; }
+.plan-active-slot { padding: var(--space-1) var(--screen-gutter) var(--space-3); }
+.plan-active-slot .plan-item { margin-bottom: 0; }
+/* Highlighted item: a 2px --primary border all round (like the plan banner); the padding gives up the
+   2px so title, subline and ⋮ sit exactly where they are on a plain .plan-item. */
+.plan-item.plan-item-featured { border: 2px solid var(--primary); padding: calc(var(--space-3) - 2px) calc(var(--space-2) - 2px) calc(var(--space-3) - 2px) calc(var(--card-padding) - 2px); }
 .plan-list-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: var(--space-1) var(--screen-gutter) calc(var(--ai-bar-space) + var(--space-4)); }
 /* Directly under the toolbar (Kies een plan) instead of under the MIJN PLANNEN label: --screen-top. */
 .toolbar + .plan-list-scroll { padding-top: var(--screen-top); }

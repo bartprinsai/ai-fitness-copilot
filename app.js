@@ -4997,12 +4997,13 @@ function sortedPlans() {
 }
 
 // One plan card (name, day count, ★ ACTIEF pill). `withMenu` adds the ⋮ button;
-// callers attach their own click handlers.
-function buildPlanItem(plan, { withMenu }) {
-  const isActive = db.activePlan && db.activePlan.planId === plan.id;
+// `featured` is the ACTIEF PLAN card: blue border, no pill (the label already says it).
+// Callers attach their own click handlers.
+function buildPlanItem(plan, { withMenu, featured = false }) {
+  const isActive = !featured && db.activePlan && db.activePlan.planId === plan.id;
   const dayCount = (plan.days || []).length;
   const item = document.createElement('div');
-  item.className = 'plan-item';
+  item.className = 'plan-item' + (featured ? ' plan-item-featured' : '');
   item.innerHTML = `
     <div class="plan-item-info">
       <div class="plan-item-name">${plan.name}</div>
@@ -5018,33 +5019,45 @@ function renderPlanList() {
   const scroll = document.getElementById('plan-list-scroll');
   const plans = sortedPlans();
   const emptyState = document.getElementById('plan-list-empty-state');
+  const activeSection = document.getElementById('plan-active-section');
+  const activeSlot = document.getElementById('plan-active-slot');
+  const listLabel = document.getElementById('plan-list-label');
+  // The active plan gets its own ACTIEF PLAN section; MIJN PLANNEN lists the rest.
+  const active = plans.find(p => db.activePlan && db.activePlan.planId === p.id);
+  const others = plans.filter(p => p !== active);
   emptyState.classList.toggle('hidden', plans.length > 0);
+  activeSection.classList.toggle('hidden', !active);
+  listLabel.classList.toggle('hidden', !!active && others.length === 0);
+  activeSlot.innerHTML = '';
+  scroll.innerHTML = '';
   if (plans.length === 0) {
-    scroll.innerHTML = '';
     emptyState.innerHTML = emptyTitleOnlyHtml('Nog geen plannen');
     return;
   }
-  scroll.innerHTML = '';
-  plans.forEach(plan => {
-    const item = buildPlanItem(plan, { withMenu: true });
-    item.querySelector('.plan-item-info').addEventListener('click', () => {
-      // First tap after creation configures the schedule (Aantal dagen/Dagindeling);
-      // once that's been confirmed once, later taps go straight to the day cards —
-      // "Bewerken" in Plan Detail is the way to change the configuration after that.
-      if (plan.scheduleConfirmed) openPlanDetail(plan.id);
-      else openPlanSchedule(plan.id);
-    });
-    item.querySelector('.plan-item-dots').addEventListener('click', e => {
-      e.stopPropagation();
-      const isAct = db.activePlan && db.activePlan.planId === plan.id;
-      showOverflowMenu([
-        { label: isAct ? '★ Actief verwijderen' : 'Actief maken', action: async () => { await setActivePlan(plan.id); renderPlanList(); } },
-        { label: 'Dupliceren', action: () => duplicatePlan(plan.id) },
-        { label: 'Verwijderen', action: () => openDeletePlanConfirm(plan.id, plan.name) },
-      ], e.currentTarget);
-    });
-    scroll.appendChild(item);
+  if (active) activeSlot.appendChild(buildPlanListItem(active, true));
+  others.forEach(plan => scroll.appendChild(buildPlanListItem(plan, false)));
+}
+
+// A card in Trainingsplannen: tap opens the plan, ⋮ = Actief maken / Dupliceren / Verwijderen.
+function buildPlanListItem(plan, featured) {
+  const item = buildPlanItem(plan, { withMenu: true, featured });
+  item.querySelector('.plan-item-info').addEventListener('click', () => {
+    // First tap after creation configures the schedule (Aantal dagen/Dagindeling);
+    // once that's been confirmed once, later taps go straight to the day cards —
+    // "Bewerken" in Plan Detail is the way to change the configuration after that.
+    if (plan.scheduleConfirmed) openPlanDetail(plan.id);
+    else openPlanSchedule(plan.id);
   });
+  item.querySelector('.plan-item-dots').addEventListener('click', e => {
+    e.stopPropagation();
+    const isAct = db.activePlan && db.activePlan.planId === plan.id;
+    showOverflowMenu([
+      { label: isAct ? '★ Actief verwijderen' : 'Actief maken', action: async () => { await setActivePlan(plan.id); renderPlanList(); } },
+      { label: 'Dupliceren', action: () => duplicatePlan(plan.id) },
+      { label: 'Verwijderen', action: () => openDeletePlanConfirm(plan.id, plan.name) },
+    ], e.currentTarget);
+  });
+  return item;
 }
 
 // ── Plan Detail Screen ────────────────────────────────
