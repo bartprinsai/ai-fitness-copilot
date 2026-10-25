@@ -190,7 +190,7 @@ button.pill:active { filter: brightness(.92); transform: scale(0.97); }
 .pill svg { width: var(--icon-list); height: var(--icon-list); fill: currentColor; flex-shrink: 0; }
 .pill-ai { background: var(--ai); border-color: var(--ai); color: var(--on-primary); }
 .pill-pr { background: var(--pr-gold); border-color: var(--pr-gold); color: var(--on-gold); }
-/* Small inline badge ("★ ACTIEF") — same pill shape, compact. Never used for RPE in set rows (plain text there). */
+/* Small inline badge — same pill shape, compact (currently unused). Never used for RPE in set rows (plain text there). */
 .badge { display: inline-flex; align-items: center; border-radius: var(--radius-pill); padding: 2px var(--space-2); font-size: var(--fs-small); font-weight: var(--fw-medium); background: var(--bg); color: var(--text-secondary); white-space: nowrap; }
 .badge-primary { background: var(--primary-light); color: var(--primary); }
 
@@ -761,8 +761,11 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    2px so title, subline and ⋮ sit exactly where they are on a plain .plan-item. */
 .plan-item.plan-item-featured { border: 2px solid var(--primary); padding: calc(var(--space-3) - 2px) calc(var(--space-2) - 2px) calc(var(--space-3) - 2px) calc(var(--card-padding) - 2px); }
 .plan-list-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: var(--space-1) var(--screen-gutter) calc(var(--ai-bar-space) + var(--space-4)); }
-/* Directly under the toolbar (Kies een plan) instead of under the MIJN PLANNEN label: --screen-top. */
-.toolbar + .plan-list-scroll { padding-top: var(--screen-top); }
+/* Kies een plan has no tiles: the first label (ACTIEF PLAN, or MIJN PLANNEN when there is no active plan)
+   starts at --screen-top under the toolbar; with no plans at all the empty text keeps its spot there. */
+.toolbar + .plan-active-section > .plan-list-label,
+.toolbar + .plan-active-section.hidden + .plan-list-label,
+.toolbar + .plan-active-section.hidden + .plan-list-label.hidden + .plan-list-scroll { padding-top: var(--screen-top); }
 .plan-list-empty { padding: var(--space-6) var(--space-4); }
 /* "Nog geen plannen": the Fitness Tracker's empty state, title only, laid over the screen from the same
    top (toolbar + the tracker's day-nav bar) with .home-content's bottom padding, so the title lands at
@@ -774,7 +777,6 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .plan-item-info { flex: 1; min-width: 0; }
 .plan-item-name { font-size: var(--fs-heading); font-weight: var(--fw-medium); color: var(--text); }
 .plan-item-meta { font-size: var(--fs-small); color: var(--text-secondary); margin-top: 2px; }
-.plan-item-active-pill { margin-top: var(--space-1); }
 .plan-item-dots { width: 40px; height: 40px; border: none; background: none; color: var(--text-muted); cursor: pointer; border-radius: var(--radius-pill); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .1s; }
 .plan-item-dots:active { background: var(--pressed); }
 .plan-item-dots svg { width: var(--icon-list); height: var(--icon-list); fill: var(--text-muted); }

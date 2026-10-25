@@ -1528,19 +1528,16 @@ function openSchedulePickPlan() {
   showScreen('screen-schedule-pick-plan');
 }
 
+// Same ACTIEF PLAN / MIJN PLANNEN sections as Trainingsplannen; a card opens the day picker.
 function renderSchedulePickPlan() {
-  const scroll = document.getElementById('schedule-pick-plan-scroll');
-  const plans = sortedPlans();
-  if (plans.length === 0) {
-    scroll.innerHTML = '<div class="plan-list-empty">Nog geen plannen. Maak er eerst een aan via Trainingsplannen.</div>';
-    return;
-  }
-  scroll.innerHTML = '';
-  plans.forEach(plan => {
-    const item = buildPlanItem(plan, { withMenu: false });
+  const hasPlans = renderPlanSections('schedule-pick-plan', (plan, featured) => {
+    const item = buildPlanItem(plan, { withMenu: false, featured });
     item.addEventListener('click', () => openSchedulePickDay(plan.id));
-    scroll.appendChild(item);
-  });
+    return item;
+  }, { labelWhenEmpty: false });
+  if (!hasPlans) {
+    document.getElementById('schedule-pick-plan-scroll').innerHTML = '<div class="plan-list-empty">Nog geen plannen. Maak er eerst een aan via Trainingsplannen.</div>';
+  }
 }
 
 function openSchedulePickDay(planId) {
@@ -4996,11 +4993,10 @@ function sortedPlans() {
   return Object.values(db.plans).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 }
 
-// One plan card (name, day count, ★ ACTIEF pill). `withMenu` adds the ⋮ button;
-// `featured` is the ACTIEF PLAN card: blue border, no pill (the label already says it).
+// One plan card (name, day count). `withMenu` adds the ⋮ button; `featured` is the
+// ACTIEF PLAN card (blue border; the section label says it is active, so no badge).
 // Callers attach their own click handlers.
 function buildPlanItem(plan, { withMenu, featured = false }) {
-  const isActive = !featured && db.activePlan && db.activePlan.planId === plan.id;
   const dayCount = (plan.days || []).length;
   const item = document.createElement('div');
   item.className = 'plan-item' + (featured ? ' plan-item-featured' : '');
@@ -5008,34 +5004,38 @@ function buildPlanItem(plan, { withMenu, featured = false }) {
     <div class="plan-item-info">
       <div class="plan-item-name">${plan.name}</div>
       <div class="plan-item-meta">${dayCount} dag${dayCount !== 1 ? 'en' : ''}</div>
-      ${isActive ? '<div class="badge badge-primary plan-item-active-pill">★ ACTIEF</div>' : ''}
     </div>
     ${withMenu ? '<button class="plan-item-dots" aria-label="Opties"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button>' : ''}
   `;
   return item;
 }
 
-function renderPlanList() {
-  const scroll = document.getElementById('plan-list-scroll');
+// Every list of plans (Trainingsplannen, Kies een plan): the active plan in its own ACTIEF PLAN
+// section with the featured card, MIJN PLANNEN with the rest. `prefix` names the elements
+// (<prefix>-active-section / -active-slot / -label / -scroll); buildItem(plan, featured)
+// makes a card. No active plan → no ACTIEF PLAN section; only the active plan → no MIJN PLANNEN
+// label; no plans → false, the caller shows its own empty state (label kept if `labelWhenEmpty`).
+function renderPlanSections(prefix, buildItem, { labelWhenEmpty }) {
   const plans = sortedPlans();
-  const emptyState = document.getElementById('plan-list-empty-state');
-  const activeSection = document.getElementById('plan-active-section');
-  const activeSlot = document.getElementById('plan-active-slot');
-  const listLabel = document.getElementById('plan-list-label');
-  // The active plan gets its own ACTIEF PLAN section; MIJN PLANNEN lists the rest.
   const active = plans.find(p => db.activePlan && db.activePlan.planId === p.id);
   const others = plans.filter(p => p !== active);
-  emptyState.classList.toggle('hidden', plans.length > 0);
-  activeSection.classList.toggle('hidden', !active);
-  listLabel.classList.toggle('hidden', !!active && others.length === 0);
+  const activeSlot = document.getElementById(prefix + '-active-slot');
+  const scroll = document.getElementById(prefix + '-scroll');
+  document.getElementById(prefix + '-active-section').classList.toggle('hidden', !active);
+  document.getElementById(prefix + '-label').classList.toggle('hidden',
+    plans.length === 0 ? !labelWhenEmpty : !!active && others.length === 0);
   activeSlot.innerHTML = '';
   scroll.innerHTML = '';
-  if (plans.length === 0) {
-    emptyState.innerHTML = emptyTitleOnlyHtml('Nog geen plannen');
-    return;
-  }
-  if (active) activeSlot.appendChild(buildPlanListItem(active, true));
-  others.forEach(plan => scroll.appendChild(buildPlanListItem(plan, false)));
+  if (active) activeSlot.appendChild(buildItem(active, true));
+  others.forEach(plan => scroll.appendChild(buildItem(plan, false)));
+  return plans.length > 0;
+}
+
+function renderPlanList() {
+  const hasPlans = renderPlanSections('plan-list', buildPlanListItem, { labelWhenEmpty: true });
+  const emptyState = document.getElementById('plan-list-empty-state');
+  emptyState.classList.toggle('hidden', hasPlans);
+  emptyState.innerHTML = hasPlans ? '' : emptyTitleOnlyHtml('Nog geen plannen');
 }
 
 // A card in Trainingsplannen: tap opens the plan, ⋮ = Actief maken / Dupliceren / Verwijderen.
