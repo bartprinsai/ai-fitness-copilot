@@ -629,6 +629,7 @@ const SCREEN_ON_ENTER = {
   'screen-plan-day-edit': () => renderPlanDayEdit(),
   'screen-insight': () => renderInsight(),
   'screen-insight-day': () => renderInsightDay(),
+  'screen-insight-metric': () => renderInsightMetric(),
 };
 
 // Per-screen "does the CURRENTLY ACTIVE screen have unsaved input?" checks,
@@ -1936,6 +1937,7 @@ function getPlannedForDate(date) {
 // Saving a date again overwrites it (that's how a day is changed).
 const SLEEP_TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 function timeToMinutes(t) { return parseInt(t.slice(0, 2), 10) * 60 + parseInt(t.slice(3), 10); }
+function minutesToTime(m) { return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`; }
 // Minutes from bedtime to wake time, across midnight when the wake time is earlier.
 function sleepDurationMinutes(bedtime, wakeTime) {
   return (timeToMinutes(wakeTime) - timeToMinutes(bedtime) + 1440) % 1440;
@@ -2106,8 +2108,14 @@ function insightTrainingStats(days) {
 
 function insightAverage(values) { return values.reduce((a, b) => a + b, 0) / values.length; }
 
-function insightCardHtml(label, bodyHtml) {
-  return `<div class="card insight-card"><div class="section-label insight-card-label">${label}</div>${bodyHtml}</div>`;
+const INSIGHT_CHEVRON_SVG = '<svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>';
+// A figure card of the week. With `metric` ('sleep' / 'weight') the whole card is a button that
+// opens that detail screen, with a chevron on the right.
+function insightCardHtml(label, bodyHtml, metric) {
+  const inner = `<div class="section-label insight-card-label">${label}</div>${bodyHtml}`;
+  if (!metric) return `<div class="card insight-card">${inner}</div>`;
+  return `<button type="button" class="card insight-card insight-edit-card" data-insight-metric="${metric}">`
+    + `<div class="insight-edit-main">${inner}</div><span class="insight-edit-icon insight-chevron">${INSIGHT_CHEVRON_SVG}</span></button>`;
 }
 function insightFigureHtml(value, unit) {
   return `<div class="insight-figure"><span class="set-val">${value}</span><span class="set-unit">${unit}</span></div>`;
@@ -2127,25 +2135,52 @@ function insightTrainingCardHtml(stats) {
     + `<div class="role-sub">${parts.join(' · ')}</div>`;
 }
 
-function insightSleepCardHtml(weekStart) {
+// A bedtime on a scale that runs on past midnight: 00:00–11:59 counts as after midnight
+// (+24 h), so 23:50 and 00:30 average to 00:10, not 12:10.
+function bedtimeAfterNoonMinutes(t) { const m = timeToMinutes(t); return m < 720 ? m + 1440 : m; }
+// The week's nights: null without any, else { nights, avg (minutes), bedtime, wakeTime, shortest,
+// longest }. Average bedtime on the scale above; the average wake time is that bedtime plus the
+// average duration, so the three numbers always add up. Equal nights: the first one.
+function insightSleepWeek(weekStart) {
   const nights = getSleepRange(weekStart, addDaysToDateStr(weekStart, 6));
-  if (nights.length === 0) return insightEmptyHtml('Nog geen slaap ingevuld');
-  const shortest = nights.reduce((a, b) => b.minutes < a.minutes ? b : a);
-  return insightFigureHtml(formatDuration(Math.round(insightAverage(nights.map(n => n.minutes)))), 'u gemiddeld')
-    + `<div class="role-sub">Kortste nacht: ${WEEKDAY_FULL_NAMES[weekdayOfDateStr(shortest.date)].toLowerCase()}, ${formatDuration(shortest.minutes)} u</div>`;
+  if (nights.length === 0) return null;
+  const avg = Math.round(insightAverage(nights.map(n => n.minutes)));
+  const bed = Math.round(insightAverage(nights.map(n => bedtimeAfterNoonMinutes(n.bedtime))));
+  return {
+    nights, avg, bedtime: minutesToTime(bed % 1440), wakeTime: minutesToTime((bed + avg) % 1440),
+    shortest: nights.reduce((a, b) => b.minutes < a.minutes ? b : a),
+    longest: nights.reduce((a, b) => b.minutes > a.minutes ? b : a),
+  };
+}
+const insightNightOf = n => `${weekdayLower(n.date)}, ${formatDuration(n.minutes)} u`;
+
+function insightSleepCardHtml(weekStart) {
+  const s = insightSleepWeek(weekStart);
+  if (!s) return insightEmptyHtml('Nog geen slaap ingevuld');
+  return insightFigureHtml(formatDuration(s.avg), 'u gemiddeld')
+    + `<div class="role-sub">Kortste nacht: ${insightNightOf(s.shortest)}</div>`;
+}
+
+// The week's weights: null without any, else { days, avg (1 decimal), min, max }.
+function insightWeightWeek(weekStart) {
+  const days = getBodyWeightRange(weekStart, addDaysToDateStr(weekStart, 6));
+  if (days.length === 0) return null;
+  const kgs = days.map(e => e.kg);
+  return { days, avg: round1(insightAverage(kgs)), min: Math.min(...kgs), max: Math.max(...kgs) };
+}
+// "−0,3 kg t.o.v. week 42": the rounded averages of this and the previous week, neutral;
+// '' when the previous week has no weight.
+function insightWeightWeekCompareText(weekStart, avg) {
+  const prevStart = addDaysToDateStr(weekStart, -7);
+  const prev = insightWeightWeek(prevStart);
+  return prev ? `${formatSignedNumber(round1(avg - prev.avg))} kg t.o.v. week ${isoWeekOfDateStr(prevStart)}` : '';
 }
 
 function insightWeightCardHtml(weekStart) {
-  const weekAvg = start => {
-    const r = getBodyWeightRange(start, addDaysToDateStr(start, 6));
-    return r.length ? round1(insightAverage(r.map(e => e.kg))) : null;
-  };
-  const avg = weekAvg(weekStart);
-  if (avg === null) return insightEmptyHtml('Nog geen gewicht ingevuld');
-  const prevStart = addDaysToDateStr(weekStart, -7);
-  const prev = weekAvg(prevStart);
-  return insightFigureHtml(formatNumber(avg), 'kg gemiddeld')
-    + (prev === null ? '' : `<div class="role-sub">${formatSignedNumber(round1(avg - prev))} kg t.o.v. week ${isoWeekOfDateStr(prevStart)}</div>`);
+  const w = insightWeightWeek(weekStart);
+  if (!w) return insightEmptyHtml('Nog geen gewicht ingevuld');
+  const cmp = insightWeightWeekCompareText(weekStart, w.avg);
+  return insightFigureHtml(formatNumber(w.avg), 'kg gemiddeld') + (cmp ? `<div class="role-sub">${cmp}</div>` : '');
 }
 
 const INSIGHT_CHECK_SVG = '<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
@@ -2184,34 +2219,53 @@ function insightDaysGridHtml(days) {
   return html + '</div>';
 }
 
+// The top of every week screen (the week and the Slaap / Gewicht detail screens), one component:
+// Week · Maand · Jaar (Maand and Jaar disabled for now), ‹ Week 43 › (right disabled on the
+// current week) and the date line. The arrows step insightWeekStart (see the listener below).
+function insightWeekHeadHtml(weekStart) {
+  const atCurrent = weekStart >= weekStartOf(todayStr());
+  return '<div class="insight-periods">'
+    + '<button type="button" class="time-filter active" aria-pressed="true">Week</button>'
+    + '<button type="button" class="time-filter" disabled>Maand</button>'
+    + '<button type="button" class="time-filter" disabled>Jaar</button></div>'
+    + '<div class="insight-nav">'
+    + `<button type="button" class="insight-nav-btn" data-insight-step="-1" aria-label="Vorige week">${INSIGHT_CHEVRON_LEFT_SVG}</button>`
+    + `<span class="t-heading insight-nav-title">Week ${isoWeekOfDateStr(weekStart)}</span>`
+    + `<button type="button" class="insight-nav-btn" data-insight-step="1" aria-label="Volgende week"${atCurrent ? ' disabled' : ''}>${INSIGHT_CHEVRON_SVG}</button></div>`
+    + `<div class="t-small insight-meta">${formatDateRange(weekStart, addDaysToDateStr(weekStart, 6))}</div>`;
+}
+const INSIGHT_CHEVRON_LEFT_SVG = '<svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>';
+
 function renderInsight() {
   if (!insightWeekStart) insightWeekStart = weekStartOf(todayStr());
   const weekStart = insightWeekStart;
   const days = insightWeekDays(weekStart);
-  document.getElementById('insight-week-title').textContent = `Week ${isoWeekOfDateStr(weekStart)}`;
-  document.getElementById('insight-next').disabled = weekStart >= weekStartOf(todayStr());
-  document.getElementById('insight-dates').textContent = formatDateRange(weekStart, addDaysToDateStr(weekStart, 6));
+  document.getElementById('insight-head').innerHTML = insightWeekHeadHtml(weekStart);
   document.getElementById('insight-schema').textContent = insightScheduleText(days);
   document.getElementById('insight-days').innerHTML = insightDaysGridHtml(days);
   document.getElementById('insight-cards').innerHTML =
     insightCardHtml('Training', insightTrainingCardHtml(insightTrainingStats(days)))
     + insightCardHtml('Voeding', insightEmptyHtml('Nog geen voedingsschema'))
-    + insightCardHtml('Slaap', insightSleepCardHtml(weekStart))
-    + insightCardHtml('Gewicht', insightWeightCardHtml(weekStart));
+    + insightCardHtml('Slaap', insightSleepCardHtml(weekStart), 'sleep')
+    + insightCardHtml('Gewicht', insightWeightCardHtml(weekStart), 'weight');
 }
 
 function openInsight() {
   insightWeekStart = weekStartOf(todayStr());
   showScreen('screen-insight');
 }
-document.getElementById('insight-prev').addEventListener('click', () => {
-  insightWeekStart = addDaysToDateStr(insightWeekStart, -7);
-  renderInsight();
-});
-document.getElementById('insight-next').addEventListener('click', () => {
-  if (insightWeekStart >= weekStartOf(todayStr())) return;
-  insightWeekStart = addDaysToDateStr(insightWeekStart, 7);
-  renderInsight();
+// ‹ › on a week screen: step a week (not past the current one) and redraw that screen.
+['screen-insight', 'screen-insight-metric'].forEach(id => document.getElementById(id).addEventListener('click', e => {
+  const b = e.target.closest('[data-insight-step]');
+  if (!b || b.disabled) return;
+  const next = addDaysToDateStr(insightWeekStart, 7 * Number(b.dataset.insightStep));
+  if (next > weekStartOf(todayStr())) return;
+  insightWeekStart = next;
+  SCREEN_ON_ENTER[id]();
+}));
+document.getElementById('insight-cards').addEventListener('click', e => {
+  const c = e.target.closest('[data-insight-metric]');
+  if (c) openInsightMetric(c.dataset.insightMetric);
 });
 // A tap anywhere in a day's column (Per dag) opens that day; the whole column shows pressed.
 (function setupInsightDayColumns() {
@@ -2441,9 +2495,193 @@ document.getElementById('btn-back-insight-day').addEventListener('click', () => 
 document.getElementById('screen-insight-day').addEventListener('click', e => {
   const el = e.target.closest('[data-insight-edit]');
   if (!el) return;
-  if (el.dataset.insightEdit === 'sleep') openInsightSleepSheet();
-  else openInsightWeightSheet();
+  if (el.dataset.insightEdit === 'sleep') openInsightSleepSheet(insightDayDate);
+  else openInsightWeightSheet(insightDayDate);
 });
+
+// -- Inzicht: the detail screens Slaap and Gewicht (#screen-insight-metric) -----
+// One screen for both (insightMetric), for the week in insightWeekStart: opened from the week's
+// Slaap / Gewicht card on that week; browsing here moves insightWeekStart along, so back lands on
+// the week shown last. A summary card with three columns, a chart card and a list with a row per
+// day (Monday..today) that opens the day's sheet. Rules: PROJECT_CONTEXT.md, "Inzicht".
+let insightMetric = 'sleep';
+function openInsightMetric(kind) {
+  insightMetric = kind;
+  showScreen('screen-insight-metric');
+}
+
+// Summary: three columns, a Label above a Groot getal figure (unit on Klein).
+function insightSummaryHtml(cols, noteHtml) {
+  return '<div class="card insight-summary"><div class="insight-summary-cols">'
+    + cols.map(c => `<div><div class="section-label">${c.label}</div>`
+      + (c.unit ? insightFigureHtml(c.value, c.unit) : `<div class="insight-figure"><span class="set-val">${c.value}</span></div>`) + '</div>').join('')
+    + `</div>${noteHtml ? `<div class="role-sub insight-summary-note">${noteHtml}</div>` : ''}</div>`;
+}
+
+// Chart over the week (one column per day, Ma … Zo), an SVG drawn at the measured width so the
+// text stays 1:1; colours come from the tokens via CSS classes. y-axis labels on the left
+// (right-aligned, GRAPH_LABEL_GAP from the plot), light gridlines, a dashed line on the average
+// and Ma … Zo under the columns. A point sits in the middle of its day column, so the first
+// and last are half a column away from the axis labels.
+//   values: 7 numbers or null (no value: nothing drawn, the column stays empty)
+//   lo, hi: the y range; ticks: [{ v, label }]; base: a gridline without a label (the 0 of bars)
+//   type: 'bars' (danger(v) → --danger) or 'line' (the Grafiek's line: 2.5 wide, 4px points)
+const INSIGHT_CHART_H = 168, INSIGHT_CHART_AXIS_W = 32, INSIGHT_CHART_TOP = 8, INSIGHT_CHART_BOTTOM = 24;
+function insightChartSvg(width, o) {
+  const W = Math.max(200, Math.round(width)), H = INSIGHT_CHART_H;
+  const x0 = INSIGHT_CHART_AXIS_W + GRAPH_LABEL_GAP, plotB = H - INSIGHT_CHART_BOTTOM;
+  const cw = (W - x0) / 7;
+  const xAt = i => x0 + (i + 0.5) * cw;
+  const yAt = v => INSIGHT_CHART_TOP + (1 - (v - o.lo) / (o.hi - o.lo)) * (plotB - INSIGHT_CHART_TOP);
+  const crisp = y => Math.round(y) + 0.5;
+  const hline = (y, cls) => `<line class="${cls}" x1="${x0}" x2="${W}" y1="${crisp(y)}" y2="${crisp(y)}"/>`;
+  let svg = `<svg class="insight-chart-svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${o.aria}">`;
+  if (o.base !== undefined) svg += hline(yAt(o.base), 'insight-chart-grid');
+  o.ticks.forEach(t => {
+    svg += hline(yAt(t.v), 'insight-chart-grid');
+    svg += `<text class="insight-chart-tick" x="${INSIGHT_CHART_AXIS_W}" y="${yAt(t.v).toFixed(1)}">${t.label}</text>`;
+  });
+  if (o.type === 'bars') {
+    const bw = Math.min(24, Math.round(cw * 0.55)), r = Math.min(8, bw / 2), y0 = yAt(o.lo);
+    o.values.forEach((v, i) => {
+      if (v === null || v <= o.lo) return;
+      const x = xAt(i) - bw / 2, y = yAt(v), rr = Math.min(r, y0 - y);
+      // rounded top corners (--radius-sm), square at the base
+      svg += `<path class="insight-bar${o.danger(v) ? ' is-short' : ''}" d="M${x} ${y0}V${(y + rr).toFixed(1)}`
+        + `A${rr} ${rr} 0 0 1 ${x + rr} ${y.toFixed(1)}H${x + bw - rr}A${rr} ${rr} 0 0 1 ${x + bw} ${(y + rr).toFixed(1)}V${y0}Z"/>`;
+    });
+  }
+  if (o.avg !== null) svg += hline(yAt(o.avg), 'insight-chart-avg');
+  if (o.type === 'line') {
+    const pts = o.values.map((v, i) => v === null ? null : [xAt(i), yAt(v)]).filter(Boolean);
+    if (pts.length > 1) svg += `<polyline class="insight-line" points="${pts.map(p => p.map(n => n.toFixed(1)).join(',')).join(' ')}"/>`;
+    pts.forEach(p => { svg += `<circle class="insight-point" cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="4"/>`; });
+  }
+  INSIGHT_WEEKDAYS_SHORT.forEach((d, i) => { svg += `<text class="insight-chart-day" x="${xAt(i).toFixed(1)}" y="${H - 6}">${d}</text>`; });
+  return svg + '</svg>';
+}
+
+// Sleep: y from 0 with gridlines every 3 hours (3 u · 6 u · 9 u), at least up to 10 hours.
+function insightSleepChartOptions(weekStart, s) {
+  const values = [0, 1, 2, 3, 4, 5, 6].map(i => {
+    const n = s.nights.find(x => x.date === addDaysToDateStr(weekStart, i));
+    return n ? n.minutes : null;
+  });
+  const hi = Math.max(600, Math.ceil(Math.max(...s.nights.map(n => n.minutes)) / 180) * 180 + 60);
+  const ticks = [];
+  for (let v = 180; v < hi; v += 180) ticks.push({ v, label: `${v / 60} u` });
+  return { type: 'bars', values, lo: 0, hi, base: 0, ticks, avg: s.avg, danger: v => v < SLEEP_SHORT_MINUTES,
+    aria: `Slaap per nacht, gemiddeld ${formatDuration(s.avg)} u` };
+}
+
+// Weight: three gridlines on a round step (0,5 · 1 · 2 · 2,5 · 5 × 10ⁿ, at least 0,5 kg) around a
+// round middle, the smallest step whose outer lines enclose every value; the range runs half a
+// step beyond them, so no point touches the top or bottom and the axis never starts at 0.
+function insightWeightAxis(min, max) {
+  const steps = [];
+  for (let e = -1; e <= 3; e++) [1, 2, 2.5, 5].forEach(m => { const s = Math.round(m * 10 ** e * 100) / 100; if (s >= 0.5) steps.push(s); });
+  const clean = x => Math.round(x * 100) / 100;
+  for (const step of steps) {
+    const mid = clean(Math.round((min + max) / 2 / step) * step);
+    if (mid - step <= min + 1e-9 && mid + step >= max - 1e-9) {
+      return { lo: clean(mid - 1.5 * step), hi: clean(mid + 1.5 * step), ticks: [mid - step, mid, mid + step].map(clean) };
+    }
+  }
+  return { lo: min - 1, hi: max + 1, ticks: [min, (min + max) / 2, max] };
+}
+function insightWeightChartOptions(weekStart, w) {
+  const values = [0, 1, 2, 3, 4, 5, 6].map(i => getBodyWeight(addDaysToDateStr(weekStart, i)));
+  const axis = insightWeightAxis(w.min, w.max);
+  return { type: 'line', values, lo: axis.lo, hi: axis.hi, ticks: axis.ticks.map(v => ({ v, label: formatWeight(v) })), avg: w.avg,
+    aria: `Gewicht per dag, gemiddeld ${formatNumber(w.avg)} kg` };
+}
+
+// The list: a row per day from Monday up to today (no days still to come), in a card. Left the
+// date (Rij in een lijst) with a subline; right the figure (Groot getal), or nothing.
+function insightDayListHtml(weekStart, rowFor) {
+  const today = todayStr();
+  const rows = [0, 1, 2, 3, 4, 5, 6].map(i => addDaysToDateStr(weekStart, i)).filter(d => d <= today).map(date => {
+    const r = rowFor(date);
+    return `<button type="button" class="insight-mg-row insight-list-row" data-insight-fill="${date}">`
+      + `<div class="insight-mg-main"><div class="role-row">${formatDateStr(date)}</div>`
+      + (r ? (r.sub ? `<div class="role-sub">${r.sub}</div>` : '') : '<div class="role-sub insight-muted">Niet ingevuld</div>')
+      + `</div>${r ? `<div class="insight-mg-figure">${r.figure}</div>` : ''}</button>`;
+  });
+  return `<div class="card insight-day-card insight-list">${rows.join('')}</div>`;
+}
+const insightSleepFigureHtml = min =>
+  `<div class="insight-figure"><span class="set-val${min < SLEEP_SHORT_MINUTES ? ' insight-danger' : ''}">${formatDuration(min)}</span><span class="set-unit">u</span></div>`;
+
+function insightSleepDetailHtml(weekStart) {
+  const s = insightSleepWeek(weekStart);
+  const summary = s
+    ? insightSummaryHtml([
+      { label: 'Gemiddeld', value: formatDuration(s.avg), unit: 'u' },
+      { label: 'Naar bed', value: s.bedtime },
+      { label: 'Opgestaan', value: s.wakeTime },
+    ], `<span>Kortste nacht: ${insightNightOf(s.shortest)}</span> · <span>langste: ${insightNightOf(s.longest)}</span>`)
+    : `<div class="card insight-summary">${insightEmptyHtml('Nog geen slaap ingevuld')}</div>`;
+  const list = insightDayListHtml(weekStart, date => {
+    const n = getSleep(date);
+    if (!n) return null;
+    return { sub: `${n.bedtime} – ${n.wakeTime}`, figure: insightSleepFigureHtml(sleepDurationMinutes(n.bedtime, n.wakeTime)) };
+  });
+  return { summary, chart: s && insightSleepChartOptions(weekStart, s), label: 'Nachten', list };
+}
+
+function insightWeightDetailHtml(weekStart) {
+  const w = insightWeightWeek(weekStart);
+  const summary = w
+    ? insightSummaryHtml([
+      { label: 'Gemiddeld', value: formatNumber(w.avg), unit: 'kg' },
+      { label: 'Laagste', value: formatWeight(w.min), unit: 'kg' },
+      { label: 'Hoogste', value: formatWeight(w.max), unit: 'kg' },
+    ], insightWeightWeekCompareText(weekStart, w.avg))
+    : `<div class="card insight-summary">${insightEmptyHtml('Nog geen gewicht ingevuld')}</div>`;
+  const list = insightDayListHtml(weekStart, date => {
+    const kg = getBodyWeight(date);
+    return kg === null ? null : { figure: insightFigureHtml(formatWeight(kg), 'kg') };
+  });
+  return { summary, chart: w && insightWeightChartOptions(weekStart, w), label: 'Weegmomenten', list };
+}
+
+let insightChartOptions = null; // the drawn chart, redrawn at a new width (rotation)
+function drawInsightChart() {
+  const el = document.getElementById('insight-chart');
+  if (el && insightChartOptions) el.innerHTML = insightChartSvg(el.clientWidth || 296, insightChartOptions);
+}
+function renderInsightMetric() {
+  if (!insightWeekStart) insightWeekStart = weekStartOf(todayStr());
+  const weekStart = insightWeekStart;
+  document.getElementById('insight-metric-title').textContent = insightMetric === 'sleep' ? 'Slaap' : 'Gewicht';
+  document.getElementById('insight-metric-head').innerHTML = insightWeekHeadHtml(weekStart);
+  const d = insightMetric === 'sleep' ? insightSleepDetailHtml(weekStart) : insightWeightDetailHtml(weekStart);
+  insightChartOptions = d.chart;
+  // No value at all: only the summary's empty state, no empty chart.
+  const chart = d.chart ? '<div class="card insight-chart-card"><div class="insight-chart" id="insight-chart"></div>'
+    + '<div class="role-sub insight-chart-legend">- - - gemiddeld</div></div>' : '';
+  document.getElementById('insight-metric-body').innerHTML = d.summary + chart
+    + `<div class="section-label insight-label">${d.label}</div>` + d.list;
+  drawInsightChart();
+}
+document.getElementById('btn-back-insight-metric').addEventListener('click', () => goBack('screen-insight'));
+document.getElementById('insight-metric-body').addEventListener('click', e => {
+  const row = e.target.closest('[data-insight-fill]');
+  if (!row) return;
+  if (insightMetric === 'sleep') openInsightSleepSheet(row.dataset.insightFill);
+  else openInsightWeightSheet(row.dataset.insightFill);
+});
+window.addEventListener('resize', () => {
+  if (document.getElementById('screen-insight-metric').classList.contains('active')) drawInsightChart();
+});
+
+// The sheets below fill in insightSheetDate; after Opslaan or Wissen the screen they were opened
+// from (day overview or a detail screen) is redrawn at once.
+let insightSheetDate = null;
+function renderInsightAfterEdit() {
+  if (document.getElementById('screen-insight-metric').classList.contains('active')) renderInsightMetric();
+  else renderInsightDay();
+}
 
 // Sleep sheet: an own 24-hour clock (0 at the top, clockwise; DESIGN_SYSTEM.md "24-uursklok").
 // Drag a handle over the ring (5-minute steps, freely across 0) or tap a time in the middle and
@@ -2457,7 +2695,6 @@ let insightSleepBaseline = null;
 const insightSleepTimes = { bed: SLEEP_DEFAULT.bedtime, wake: SLEEP_DEFAULT.wakeTime };
 const insightSleepValues = () => [insightSleepTimes.bed, insightSleepTimes.wake];
 const sleepClock = document.getElementById('sleep-clock');
-const minutesToTime = m => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 // A point on the ring for a time of day, in viewBox units (0:00 at the top, clockwise).
 function sleepClockPoint(minutes) {
   const a = minutes / 1440 * 2 * Math.PI;
@@ -2552,13 +2789,14 @@ function insightSleepStart(date) {
   const prev = Object.keys(db.sleep || {}).filter(d => d < date).sort().pop();
   return getSleep(date) || (prev ? db.sleep[prev] : SLEEP_DEFAULT);
 }
-function openInsightSleepSheet() {
-  const start = insightSleepStart(insightDayDate);
+function openInsightSleepSheet(date) {
+  insightSheetDate = date;
+  const start = insightSleepStart(insightSheetDate);
   insightSleepTimes.bed = start.bedtime;
   insightSleepTimes.wake = start.wakeTime;
   ['bed', 'wake'].forEach(closeSleepClockInput);
-  document.getElementById('insight-sleep-sub').textContent = insightNightLongText(insightDayDate);
-  document.getElementById('btn-insight-sleep-clear').classList.toggle('hidden', !getSleep(insightDayDate));
+  document.getElementById('insight-sleep-sub').textContent = insightNightLongText(insightSheetDate);
+  document.getElementById('btn-insight-sleep-clear').classList.toggle('hidden', !getSleep(insightSheetDate));
   insightSleepBaseline = insightSleepValues();
   renderSleepClock();
   openOverlay('insight-sleep-overlay');
@@ -2567,29 +2805,30 @@ document.getElementById('btn-insight-sleep-cancel').addEventListener('click', ()
   confirmDiscardIfChanged(() => hasChanges(insightSleepBaseline, insightSleepValues()), () => closeOverlay('insight-sleep-overlay'));
 });
 document.getElementById('btn-insight-sleep-clear').addEventListener('click', () => {
-  deleteSleep(insightDayDate);
+  deleteSleep(insightSheetDate);
   toast('Slaap gewist');
   closeOverlay('insight-sleep-overlay');
-  renderInsightDay();
+  renderInsightAfterEdit();
 });
 document.getElementById('btn-insight-sleep-save').addEventListener('click', () => {
   const [bed, wake] = insightSleepValues();
   if (bed === wake) { toast('Naar bed en opgestaan kunnen niet gelijk zijn', { type: 'error' }); return; }
-  if (!saveSleep(insightDayDate, bed, wake)) { toast('Vul een geldige tijd in', { type: 'error' }); return; }
+  if (!saveSleep(insightSheetDate, bed, wake)) { toast('Vul een geldige tijd in', { type: 'error' }); return; }
   toast('Slaap opgeslagen');
   closeOverlay('insight-sleep-overlay');
-  renderInsightDay();
+  renderInsightAfterEdit();
 });
 
 // Weight sheet: one decimal field (comma or point, max. 2 decimals, FIELD_DECIMALS), 20 to 400
 // kg. Wissen (only for a day that is filled in) clears the weight at once; empty + Opslaan is an error.
 const INSIGHT_WEIGHT_MIN = 20, INSIGHT_WEIGHT_MAX = 400;
 let insightWeightBaseline = null;
-function openInsightWeightSheet() {
-  const kg = getBodyWeight(insightDayDate);
+function openInsightWeightSheet(date) {
+  insightSheetDate = date;
+  const kg = getBodyWeight(insightSheetDate);
   const input = document.getElementById('insight-weight-input');
   input.value = kg === null ? '' : formatWeight(kg);
-  document.getElementById('insight-weight-sub').textContent = formatDateStr(insightDayDate);
+  document.getElementById('insight-weight-sub').textContent = formatDateStr(insightSheetDate);
   document.getElementById('btn-insight-weight-clear').classList.toggle('hidden', kg === null);
   insightWeightBaseline = input.value;
   openOverlay('insight-weight-overlay');
@@ -2601,13 +2840,13 @@ document.getElementById('btn-insight-weight-cancel').addEventListener('click', (
   confirmDiscardIfChanged(() => hasChanges(insightWeightBaseline, document.getElementById('insight-weight-input').value), () => closeOverlay('insight-weight-overlay'));
 });
 document.getElementById('btn-insight-weight-clear').addEventListener('click', () => {
-  deleteBodyWeight(insightDayDate);
+  deleteBodyWeight(insightSheetDate);
   toast('Gewicht gewist');
   closeOverlay('insight-weight-overlay');
-  renderInsightDay();
+  renderInsightAfterEdit();
 });
 document.getElementById('btn-insight-weight-save').addEventListener('click', () => {
-  const date = insightDayDate;
+  const date = insightSheetDate;
   const raw = document.getElementById('insight-weight-input').value.trim();
   if (!raw) { toast('Vul een gewicht in', { type: 'error' }); return; }
   const kg = parseWeight(raw);
@@ -2615,7 +2854,7 @@ document.getElementById('btn-insight-weight-save').addEventListener('click', () 
   saveBodyWeight(date, kg);
   toast('Gewicht opgeslagen');
   closeOverlay('insight-weight-overlay');
-  renderInsightDay();
+  renderInsightAfterEdit();
 });
 
 function renderNewWorkoutScreen() {

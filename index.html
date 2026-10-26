@@ -925,25 +925,26 @@
     <span class="toolbar-title">Inzicht</span>
   </div>
   <div class="insight-scroll" id="insight-scroll">
-    <div class="insight-periods">
-      <button type="button" class="time-filter active" aria-pressed="true">Week</button>
-      <button type="button" class="time-filter" disabled>Maand</button>
-      <button type="button" class="time-filter" disabled>Jaar</button>
-    </div>
-    <div class="insight-nav">
-      <button type="button" class="insight-nav-btn" id="insight-prev" aria-label="Vorige week">
-        <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
-      </button>
-      <span class="t-heading insight-nav-title" id="insight-week-title"></span>
-      <button type="button" class="insight-nav-btn" id="insight-next" aria-label="Volgende week">
-        <svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
-      </button>
-    </div>
-    <div class="t-small insight-meta" id="insight-dates"></div>
+    <!-- Week · Maand · Jaar, ‹ Week 43 ›, the date line: insightWeekHeadHtml() (shared with the detail screens) -->
+    <div id="insight-head"></div>
     <div class="t-small insight-meta" id="insight-schema"></div>
     <div class="section-label insight-label">Per dag</div>
     <div class="card insight-days" id="insight-days"></div>
     <div class="insight-cards" id="insight-cards"></div>
+  </div>
+</div>
+
+<!-- INSIGHT DETAIL SCREEN (Slaap or Gewicht for one week, opened from the week's cards) -->
+<div id="screen-insight-metric" class="screen">
+  <div class="toolbar">
+    <button class="toolbar-btn" id="btn-back-insight-metric" aria-label="Terug">
+      <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </button>
+    <span class="toolbar-title" id="insight-metric-title"></span>
+  </div>
+  <div class="insight-scroll" id="insight-metric-scroll">
+    <div id="insight-metric-head"></div>
+    <div id="insight-metric-body"></div>
   </div>
 </div>
 
