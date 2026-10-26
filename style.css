@@ -55,6 +55,7 @@ input, textarea, .comment-text { user-select: text; -webkit-user-select: text; -
   --scrim: rgba(0,0,0,.46);
 
   /* Radius: exactly three */
+  --radius-xs: 4px;      /* checkboxes in a multiple-choice list: clearly square next to the radios */
   --radius-sm: 8px;      /* buttons, inputs, steppers, choice blocks, dropdowns */
   --radius-lg: 12px;     /* cards, bottom sheets, dashed blocks, result cards */
   --radius-pill: 999px;  /* pills, filter chips, time filters, circles */
@@ -178,8 +179,6 @@ html, body { height: 100%; background: var(--bg); font-family: var(--font); font
 .btn-ai { background: var(--ai); color: var(--on-primary); }
 .btn-block { flex: none; width: 100%; }
 /* Text button: a .btn without a fill, label in --primary (Klaar under a multiple-choice list). */
-.btn-text { flex: none; background: transparent; color: var(--primary); }
-.btn-text:active { filter: none; background: var(--pressed); }
 /* Two-line label (e.g. "Reset<br>beschikbaar") — same button, the label just wraps. */
 .btn-multiline { height: auto; min-height: var(--control-height); padding: var(--space-1) var(--space-1); font-size: var(--fs-small); white-space: normal; }
 
@@ -971,9 +970,9 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .field-picker-group-label { padding: var(--space-4) var(--space-1) var(--space-2); }
 .field-picker-group-label:first-child { padding-top: 0; }
 .field-picker-row:has(+ .field-picker-group-label) { border-bottom: none; }
-/* Multiple choice: a checkbox where the single-choice list has its radio, same size and border;
-   ticked = --primary filled with a white check (like an added row in the plan-day add list). */
-.field-picker-check { width: 20px; height: 20px; border-radius: var(--radius-sm); border: 2px solid var(--border); flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+/* Multiple choice: a checkbox where the single-choice list has its radio, same size and border, but
+   square (--radius-xs) so it never reads as a radio; ticked = --primary filled with a white check. */
+.field-picker-check { width: 20px; height: 20px; border-radius: var(--radius-xs); border: 2px solid var(--border); flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
 .field-picker-check svg { width: 16px; height: 16px; fill: var(--on-primary); opacity: 0; }
 .field-picker-row.selected .field-picker-check { background: var(--primary); border-color: var(--primary); }
 .field-picker-row.selected .field-picker-check svg { opacity: 1; }
@@ -983,7 +982,6 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .field-picker-list .field-picker-row.disabled:active::before { content: none; }
 .field-picker-row.disabled .field-picker-label { color: var(--text-muted); }
 .field-picker-note { margin-left: auto; font-size: var(--fs-small); font-weight: var(--fw-regular); color: var(--text-muted); }
-.field-picker-btns { justify-content: flex-end; }
 
 /* ══ CALCULATORS (Plate, 1RM, Warm-up) ══════════════════ */
 .plate-calc-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: var(--screen-top) var(--screen-gutter) calc(var(--ai-bar-space) + var(--space-4)); display: flex; flex-direction: column; gap: var(--section-gap); }
