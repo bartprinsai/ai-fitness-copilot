@@ -18,7 +18,7 @@ const fStore = firebase.firestore();
 let currentUser = null;
 
 // -- In-memory state ------------------------------------
-let db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, favoriteExercises: {}, hiddenBuiltins: {}, exerciseInfo: {}, plateInventory: {}, plateOnBar: {} };
+let db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, favoriteExercises: {}, hiddenBuiltins: {}, exerciseInfo: {}, plateInventory: {}, plateOnBar: {}, categories: { names: {}, custom: [], deleted: [] } };
 
 // -- Home selection mode state --------------------------
 // Fitness Tracker's long-press selection mode (see createSelectionMode).
@@ -137,6 +137,84 @@ function allExercises() {
   return [...builtins, ...custom.map(e => ({ ...e, custom: true }))];
 }
 
+// -- Categories -----------------------------------------
+// The rules (the seven standard categories, the fixed muscle-group list, the legacy name
+// conversion) live in exercises.js; this is the per-user part, stored in meta/categories:
+//   names:   { standardId: shown name } for a renamed standard category (id stays the same)
+//   custom:  [{ id, name }] user-added categories, shown after the seven in creation order
+//   deleted: [standardId] standard categories deleted while empty
+// Adding and renaming are always allowed; deleting only while no exercise is in it.
+function categoryState() {
+  if (!db.categories) db.categories = {};
+  const s = db.categories;
+  if (!s.names) s.names = {};
+  if (!s.custom) s.custom = [];
+  if (!s.deleted) s.deleted = [];
+  return s;
+}
+function allCategories() {
+  const s = categoryState();
+  return [
+    ...EXERCISE_CATEGORIES.filter(c => !s.deleted.includes(c.id)).map(c => ({ id: c.id, name: s.names[c.id] || c.name, standard: true })),
+    ...s.custom.map(c => ({ id: c.id, name: c.name, standard: false })),
+  ];
+}
+function categoryName(id) {
+  const c = allCategories().find(c => c.id === id);
+  return c ? c.name : '';
+}
+function findCategoryByName(name, exceptId) {
+  const n = name.trim().toLowerCase();
+  return allCategories().find(c => c.id !== exceptId && c.name.toLowerCase() === n) || null;
+}
+function exercisesInCategory(id) { return allExercises().filter(e => e.category === id); }
+async function persistCategories() {
+  if (!currentUser) return;
+  uDoc('meta/categories').set(categoryState()).catch(persistFailed);
+}
+// New category by name. A deleted standard category with that (default) name comes back as
+// itself, so it keeps its muscle groups; anything else becomes a user-added category.
+function addCategory(name) {
+  const s = categoryState();
+  const std = EXERCISE_CATEGORIES.find(c => s.deleted.includes(c.id) && c.name.toLowerCase() === name.toLowerCase());
+  let cat;
+  if (std) {
+    s.deleted = s.deleted.filter(id => id !== std.id);
+    delete s.names[std.id];
+    cat = { id: std.id, name: std.name };
+  } else {
+    cat = { id: 'custom-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name };
+    s.custom.push(cat);
+  }
+  persistCategories();
+  return cat;
+}
+// Self-added exercises from before this indeling stored a category NAME; convert it to an id
+// by meaning (LEGACY_CATEGORY_MAP). Names without a clear meaning are not guessed: they
+// become a user-added category with the same name. Returns whether anything changed.
+function migrateCustomExerciseCategories() {
+  const knownIds = new Set([...EXERCISE_CATEGORIES.map(c => c.id), ...categoryState().custom.map(c => c.id)]);
+  let changed = false;
+  (db.custom_exercises || []).forEach(ex => {
+    if (knownIds.has(ex.category)) return;
+    const old = String(ex.category || '').trim();
+    const key = old.toLowerCase();
+    const builtin = EXERCISE_DB.find(b => b.name === ex.name);
+    let id = LEGACY_CATEGORY_MAP[key] || (LEGACY_CATEGORY_FALLBACK[key] && (builtin ? builtin.category : LEGACY_CATEGORY_FALLBACK[key]));
+    if (!id) {
+      const existing = old && findCategoryByName(old);
+      id = existing ? existing.id : addCategory(old || 'Overig').id;
+      knownIds.add(id);
+      console.warn('[Categories] unclear old category, kept as own category:', old, '←', ex.name);
+    } else if (LEGACY_CATEGORY_FALLBACK[key] && !builtin) {
+      console.warn('[Categories] unclear old category, placed by best fit:', old, '→', id, '←', ex.name);
+    }
+    ex.category = id;
+    changed = true;
+  });
+  return changed;
+}
+
 // -- Firestore persistence ------------------------------
 function uDoc(path) { return fStore.doc('users/' + currentUser.uid + '/' + path); }
 
@@ -198,8 +276,8 @@ async function persistPlateOnBar() {
 async function loadUserData(userUid) {
   console.log('[Load] loadUserData start, uid:', userUid);
   try {
-    console.log('[Load] firing Promise.all for 10 Firestore reads...');
-    const [workoutsSnap, recordsSnap, customSnap, plansSnap, activePlanSnap, favoritesSnap, hiddenBuiltinsSnap, exerciseInfoSnap, plateInventorySnap, plateOnBarSnap] = await Promise.all([
+    console.log('[Load] firing Promise.all for 11 Firestore reads...');
+    const [workoutsSnap, recordsSnap, customSnap, plansSnap, activePlanSnap, favoritesSnap, hiddenBuiltinsSnap, exerciseInfoSnap, plateInventorySnap, plateOnBarSnap, categoriesSnap] = await Promise.all([
       fStore.collection('users/' + userUid + '/workouts').get(),
       fStore.doc('users/' + userUid + '/meta/records').get(),
       fStore.doc('users/' + userUid + '/meta/custom_exercises').get(),
@@ -210,6 +288,7 @@ async function loadUserData(userUid) {
       fStore.doc('users/' + userUid + '/meta/exercise_info').get(),
       fStore.doc('users/' + userUid + '/meta/plate_inventory').get(),
       fStore.doc('users/' + userUid + '/meta/plate_on_bar').get(),
+      fStore.doc('users/' + userUid + '/meta/categories').get(),
     ]);
     console.log('[Load] Promise.all resolved, exerciseInfoSnap.exists:', exerciseInfoSnap.exists);
     db.workouts = {};
@@ -235,6 +314,9 @@ async function loadUserData(userUid) {
     db.exerciseInfo = exerciseInfoSnap.exists ? (exerciseInfoSnap.data().data || {}) : {};
     db.plateInventory = plateInventorySnap.exists ? (plateInventorySnap.data().counts || {}) : {};
     db.plateOnBar = plateOnBarSnap.exists ? (plateOnBarSnap.data().counts || {}) : {};
+    db.categories = categoriesSnap.exists ? categoriesSnap.data() : {};
+    categoryState();
+    if (migrateCustomExerciseCategories()) persistCustomExercises();
     console.log('[Load] loadUserData finished OK');
   } catch(e) {
     console.error('[Load] loadUserData FAILED:', e && e.code, e && e.message, e);
@@ -763,6 +845,7 @@ document.getElementById('btn-overflow-exercises').addEventListener('click', e =>
 //   - users/{uid}/meta/records           (PR records)
 //   - users/{uid}/meta/custom_exercises  (self-added exercises)
 //   - users/{uid}/meta/activeplan        (active plan pointer)
+//   - users/{uid}/meta/categories        (renamed/added/deleted categories)
 let resetInProgress = false;
 
 function openResetOverlay() {
@@ -829,6 +912,7 @@ document.getElementById('btn-reset-confirm').addEventListener('click', async () 
       fStore.doc(userPrefix + 'meta/activeplan'),
       fStore.doc(userPrefix + 'meta/favorites'),
       fStore.doc(userPrefix + 'meta/hidden_builtins'),
+      fStore.doc(userPrefix + 'meta/categories'),
     ];
 
     // Explicit per-doc safety check: refuse to touch anything outside this user's own subtree.
@@ -1684,7 +1768,7 @@ function syncExerciseBrowseToHistory(browse) {
     exerciseBrowserMode = 'exercises';
     currentBrowseCategory = browse;
     if (browse === FAVORITES_CATEGORY) { setExercisesTitle('Favorieten'); renderFavoriteExercises(); }
-    else { setExercisesTitle(browse); renderExercisesInCategory(browse); }
+    else { setExercisesTitle(categoryName(browse)); renderExercisesInCategory(browse); }
   }
 }
 
@@ -1716,16 +1800,15 @@ function renderCategoryBrowser() {
     });
     list.appendChild(item);
   }
-  const cats = [...new Set(allExercises().map(e => e.category))].sort();
-  cats.forEach(cat => {
+  allCategories().forEach(cat => {
     const item = document.createElement('div');
     item.className = 'category-item list-row';
     item.innerHTML = `
-      <span class="category-item-name">${cat}</span>
+      <span class="category-item-name">${cat.name}</span>
       <svg class="category-item-dots" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
     `;
     item.querySelector('.category-item-name').addEventListener('click', () => {
-      enterExerciseBrowseCategory(cat, cat, () => renderExercisesInCategory(cat));
+      enterExerciseBrowseCategory(cat.id, cat.name, () => renderExercisesInCategory(cat.id));
     });
     item.querySelector('.category-item-dots').addEventListener('click', e => {
       e.stopPropagation();
@@ -1739,44 +1822,53 @@ function renderCategoryBrowser() {
 }
 
 // -- Category edit/delete -------------------------------
+// Renaming only changes the shown name (exercises keep the category id). Deleting is refused
+// while the category still holds exercises: the same popup then only says it must be empty first.
 let pendingEditCategory = null;
 let pendingDeleteCategory = null;
 
 function editCategory(cat) {
   pendingEditCategory = cat;
-  document.getElementById('cat-edit-input').value = cat;
+  document.getElementById('cat-edit-input').value = cat.name;
   openOverlay('cat-edit-overlay');
   setTimeout(() => document.getElementById('cat-edit-input').select(), 100);
 }
 
 function deleteCategory(cat) {
-  pendingDeleteCategory = cat;
-  const total = allExercises().filter(e => e.category === cat).length;
-  const custom = (db.custom_exercises || []).filter(e => e.category === cat).length;
-  let msg = `"${cat}"`;
-  if (total > 0) {
-    msg += ` en de ${total} oefening${total !== 1 ? 'en' : ''} erin verwijderen?`;
-    if (total > custom) msg += ` (${total - custom} ingebouwde oefening${total - custom !== 1 ? 'en kunnen' : ' kan'} niet worden verwijderd)`;
-  } else {
-    msg += ' verwijderen?';
-  }
-  document.getElementById('cat-delete-msg').textContent = msg;
+  const count = exercisesInCategory(cat.id).length;
+  pendingDeleteCategory = count > 0 ? null : cat;
+  document.getElementById('cat-delete-title').textContent = count > 0 ? 'Categorie niet leeg' : 'Categorie verwijderen?';
+  document.getElementById('cat-delete-msg').textContent = count > 0
+    ? `"${cat.name}" bevat nog ${count} oefening${count !== 1 ? 'en' : ''}. Een categorie kan pas worden verwijderd als hij leeg is: verplaats of verwijder eerst de oefeningen erin.`
+    : `"${cat.name}" verwijderen?`;
+  document.getElementById('btn-cat-delete-cancel').classList.toggle('hidden', count > 0);
+  const confirmBtn = document.getElementById('btn-cat-delete-confirm');
+  confirmBtn.textContent = count > 0 ? 'Sluiten' : 'Verwijderen';
+  confirmBtn.classList.toggle('btn-danger', count === 0);
+  confirmBtn.classList.toggle('btn-primary', count > 0);
   openOverlay('cat-delete-overlay');
 }
 
 document.getElementById('btn-cat-edit-cancel').addEventListener('click', () => {
   confirmDiscardIfChanged(
-    () => hasChanges(pendingEditCategory, document.getElementById('cat-edit-input').value),
+    () => hasChanges(pendingEditCategory && pendingEditCategory.name, document.getElementById('cat-edit-input').value),
     () => closeOverlay('cat-edit-overlay')
   );
 });
 document.getElementById('btn-cat-edit-save').addEventListener('click', () => {
   const newName = document.getElementById('cat-edit-input').value.trim();
-  if (!newName || !pendingEditCategory) return;
-  if (db.custom_exercises) {
-    db.custom_exercises.forEach(ex => { if (ex.category === pendingEditCategory) ex.category = newName; });
-    persistCustomExercises();
+  const cat = pendingEditCategory;
+  if (!newName || !cat) return;
+  if (findCategoryByName(newName, cat.id)) { toast('Deze categorie bestaat al'); return; }
+  const s = categoryState();
+  if (cat.standard) {
+    const std = EXERCISE_CATEGORIES.find(c => c.id === cat.id);
+    if (newName === std.name) delete s.names[cat.id];
+    else s.names[cat.id] = newName;
+  } else {
+    s.custom.find(c => c.id === cat.id).name = newName;
   }
+  persistCategories();
   closeOverlay('cat-edit-overlay');
   pendingEditCategory = null;
   renderCategoryBrowser();
@@ -1784,20 +1876,22 @@ document.getElementById('btn-cat-edit-save').addEventListener('click', () => {
 });
 document.getElementById('btn-cat-delete-cancel').addEventListener('click', () => closeOverlay('cat-delete-overlay'));
 document.getElementById('btn-cat-delete-confirm').addEventListener('click', () => {
-  if (!pendingDeleteCategory) return;
-  if (db.custom_exercises) {
-    db.custom_exercises = db.custom_exercises.filter(e => e.category !== pendingDeleteCategory);
-    persistCustomExercises();
-  }
-  closeOverlay('cat-delete-overlay');
+  const cat = pendingDeleteCategory;
   pendingDeleteCategory = null;
+  closeOverlay('cat-delete-overlay');
+  // Not-empty notice ("Sluiten"), or the category filled up meanwhile: nothing to delete.
+  if (!cat || exercisesInCategory(cat.id).length > 0) return;
+  const s = categoryState();
+  if (cat.standard) { if (!s.deleted.includes(cat.id)) s.deleted.push(cat.id); }
+  else s.custom = s.custom.filter(c => c.id !== cat.id);
+  persistCategories();
   renderCategoryBrowser();
   toast('Categorie verwijderd');
 });
 
 function renderExercisesInCategory(cat) {
   const list = exerciseListCard();
-  const exercises = allExercises().filter(e => e.category === cat);
+  const exercises = exercisesInCategory(cat);
   if (exercises.length === 0) {
     document.getElementById('exercise-list').innerHTML = `<div class="exercise-empty">Geen oefeningen gevonden</div>`;
     return;
@@ -3640,10 +3734,10 @@ document.getElementById('field-picker-list').addEventListener('click', e => {
   closeOverlay('field-picker-overlay');
   cb(row.dataset.value);
 });
+// Value is the category id, label its (possibly renamed) name; same order as Alle oefeningen.
 document.getElementById('new-ex-category').addEventListener('click', () => {
-  const categories = [...new Set(allExercises().map(e => e.category))].sort();
-  openFieldPicker('Categorie', categories.map(c => ({ value: c, label: c })), getFieldBtnValue('new-ex-category'), value => {
-    setFieldBtnValue('new-ex-category', value, value);
+  openFieldPicker('Categorie', allCategories().map(c => ({ value: c.id, label: c.name })), getFieldBtnValue('new-ex-category'), value => {
+    setFieldBtnValue('new-ex-category', value, categoryName(value));
   });
 });
 document.getElementById('new-ex-type').addEventListener('click', () => {
@@ -3653,7 +3747,8 @@ document.getElementById('new-ex-type').addEventListener('click', () => {
 });
 
 function populateNewExCategorySelect(selected) {
-  setFieldBtnValue('new-ex-category', selected || '', selected || 'Kies een categorie...');
+  const name = selected ? categoryName(selected) : '';
+  setFieldBtnValue('new-ex-category', name ? selected : '', name || 'Kies een categorie...');
 }
 
 function getNewExerciseFormSnapshot() {
@@ -3844,10 +3939,14 @@ document.getElementById('btn-new-category-cancel').addEventListener('click', () 
     () => closeOverlay('new-category-overlay')
   );
 });
+// Adds the category right away (it then shows in Alle oefeningen, empty until an exercise
+// uses it) and selects it in the form.
 document.getElementById('btn-new-category-save').addEventListener('click', () => {
   const newCat = document.getElementById('new-category-input').value.trim();
   if (!newCat) return;
-  setFieldBtnValue('new-ex-category', newCat, newCat);
+  if (findCategoryByName(newCat)) { toast('Deze categorie bestaat al'); return; }
+  const cat = addCategory(newCat);
+  setFieldBtnValue('new-ex-category', cat.id, cat.name);
   closeOverlay('new-category-overlay');
 });
 
@@ -4040,7 +4139,7 @@ document.getElementById('exercise-search').addEventListener('input', e => {
     setExercisesTitle('Favorieten');
   } else if (exerciseBrowserMode === 'exercises' && currentBrowseCategory) {
     renderExercisesInCategory(currentBrowseCategory);
-    setExercisesTitle(currentBrowseCategory);
+    setExercisesTitle(categoryName(currentBrowseCategory));
   } else {
     exerciseBrowserMode = 'categories';
     renderCategoryBrowser();
