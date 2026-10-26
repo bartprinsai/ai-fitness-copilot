@@ -321,8 +321,6 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 /* The label stays on one line ("Nieuwe workout", "Nieuwe oefening"); the button grows with it. It keeps
    the height of the former two-line label, so the + and the title stay exactly where they were. */
 .home-empty-action span { min-height: 2lh; font-size: var(--fs-body); color: var(--text-secondary); text-align: center; white-space: nowrap; }
-/* Title-only empty state (emptyTitleOnlyHtml): the + keeps its space but isn't shown or tappable. */
-.home-empty-action-placeholder { visibility: hidden; pointer-events: none; }
 
 /* ── LONG-PRESS SELECTION MODE (Fitness Tracker, Plan Day Edit — see createSelectionMode) ── */
 .sel-only { display: none !important; }
@@ -775,9 +773,11 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .toolbar + .plan-active-section.hidden + .plan-list-label,
 .toolbar + .plan-active-section.hidden + .plan-list-label.hidden + .plan-list-scroll { padding-top: var(--screen-top); }
 .plan-list-empty { padding: var(--space-6) var(--space-4); }
-/* "Nog geen plannen": the Fitness Tracker's empty state, title only, laid over the screen from the same
-   top (toolbar + the tracker's day-nav bar) with .home-content's bottom padding, so the title lands at
-   exactly the same height as "Nog geen workout gelogd". It lets taps through to the tiles. */
+/* "Nog geen plannen": the Fitness Tracker's empty state (title, + and "Nieuw plan"), laid over the screen
+   from the same top (toolbar + the tracker's day-nav bar) with .home-content's bottom padding, so title
+   and + land at exactly the same height as in the tracker. The layer lets taps through to the tiles;
+   only the + itself is tappable. */
+.plan-list-empty-state .home-empty-action { pointer-events: auto; }
 .plan-list-empty-state { position: absolute; left: 0; right: 0; top: calc(var(--toolbar-height) + var(--safe-top) + var(--control-height)); bottom: 0; display: flex; flex-direction: column; padding-bottom: calc(var(--ai-bar-space) + var(--space-4)); pointer-events: none; }
 
 .plan-item { display: flex; align-items: center; background: var(--surface); box-shadow: var(--card-shadow); border-radius: var(--radius-lg); padding: var(--space-3) var(--space-2) var(--space-3) var(--card-padding); margin-bottom: var(--card-gap); gap: var(--space-3); cursor: pointer; transition: background .1s; }

@@ -1175,27 +1175,19 @@ function getPRSetKeys(exId) {
   return result;
 }
 
-// Empty state for a list you can add to (Fitness Tracker day, plan day): the big + with a label,
-// near the bottom; an optional muted title is centred in the space above it.
-// With placeholder: true the + keeps its place in the layout but is invisible and not tappable —
-// see emptyTitleOnlyHtml().
-function emptyAddStateHtml(btnId, label, title = '', { placeholder = false } = {}) {
+// Empty state for a list you can add to (Fitness Tracker day, plan day, Trainingsplannen): the big +
+// with a label, near the bottom; an optional muted title is centred in the space above it.
+function emptyAddStateHtml(btnId, label, title = '') {
   return `
       <div class="home-empty">
         <div class="home-empty-title-wrap">
           ${title ? `<span class="home-empty-title">${title}</span>` : ''}
         </div>
-        <button class="home-empty-action${placeholder ? ' home-empty-action-placeholder' : ''}"${placeholder ? ' aria-hidden="true" tabindex="-1"' : ` id="${btnId}"`}>
+        <button class="home-empty-action" id="${btnId}">
           <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
           <span>${label}</span>
         </button>
       </div>`;
-}
-// The same block for a list whose adding happens elsewhere on the screen (Trainingsplannen: the
-// tiles above): only the title shows. The invisible + reserves the tracker's exact space (same
-// label, so the same size), so the title is centred at the same height.
-function emptyTitleOnlyHtml(title) {
-  return emptyAddStateHtml('', 'Nieuwe workout', title, { placeholder: true });
 }
 
 function renderHome() {
@@ -2255,7 +2247,7 @@ function renderSchedulePickPlan() {
     const item = buildPlanItem(plan, { withMenu: false, featured });
     item.addEventListener('click', () => openSchedulePickDay(plan.id));
     return item;
-  }, { labelWhenEmpty: false });
+  });
   if (!hasPlans) {
     document.getElementById('schedule-pick-plan-scroll').innerHTML = '<div class="plan-list-empty">Nog geen plannen. Maak er eerst een aan via Trainingsplannen.</div>';
   }
@@ -5834,8 +5826,8 @@ function buildPlanItem(plan, { withMenu, featured = false }) {
 // section with the featured card, MIJN PLANNEN with the rest. `prefix` names the elements
 // (<prefix>-active-section / -active-slot / -label / -scroll); buildItem(plan, featured)
 // makes a card. No active plan → no ACTIEF PLAN section; only the active plan → no MIJN PLANNEN
-// label; no plans → false, the caller shows its own empty state (label kept if `labelWhenEmpty`).
-function renderPlanSections(prefix, buildItem, { labelWhenEmpty }) {
+// label; no plans → no labels and false, the caller shows its own empty state.
+function renderPlanSections(prefix, buildItem) {
   const plans = sortedPlans();
   const active = plans.find(p => db.activePlan && db.activePlan.planId === p.id);
   const others = plans.filter(p => p !== active);
@@ -5843,7 +5835,7 @@ function renderPlanSections(prefix, buildItem, { labelWhenEmpty }) {
   const scroll = document.getElementById(prefix + '-scroll');
   document.getElementById(prefix + '-active-section').classList.toggle('hidden', !active);
   document.getElementById(prefix + '-label').classList.toggle('hidden',
-    plans.length === 0 ? !labelWhenEmpty : !!active && others.length === 0);
+    plans.length === 0 || (!!active && others.length === 0));
   activeSlot.innerHTML = '';
   scroll.innerHTML = '';
   if (active) activeSlot.appendChild(buildItem(active, true));
@@ -5852,10 +5844,12 @@ function renderPlanSections(prefix, buildItem, { labelWhenEmpty }) {
 }
 
 function renderPlanList() {
-  const hasPlans = renderPlanSections('plan-list', buildPlanListItem, { labelWhenEmpty: true });
+  const hasPlans = renderPlanSections('plan-list', buildPlanListItem);
   const emptyState = document.getElementById('plan-list-empty-state');
   emptyState.classList.toggle('hidden', hasPlans);
-  emptyState.innerHTML = hasPlans ? '' : emptyTitleOnlyHtml('Nog geen plannen');
+  emptyState.innerHTML = hasPlans ? '' : emptyAddStateHtml('btn-plan-empty-add', 'Nieuw plan', 'Nog geen plannen');
+  // Same action as the tile Zelf samenstellen.
+  if (!hasPlans) document.getElementById('btn-plan-empty-add').addEventListener('click', openMakeYourOwn);
 }
 
 // A card in Trainingsplannen: tap opens the plan, ⋮ = Actief maken / Dupliceren / Verwijderen.
