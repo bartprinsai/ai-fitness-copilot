@@ -190,6 +190,35 @@ function findCategoryByName(name, exceptId) {
   return allCategories().find(c => c.id !== exceptId && c.name.toLowerCase() === n) || null;
 }
 function exercisesInCategory(id) { return allExercises().filter(e => e.category === id); }
+// A category can be deleted while a deleted (hidden) exercise is still in it. A deleted custom
+// category is therefore remembered in `removed` ([{ id, name }]), so putting such an exercise
+// back (restoreExercise) can bring its category back too, with the same id and name.
+function removedCategoryName(id) {
+  const c = (categoryState().removed || []).find(c => c.id === id);
+  return c ? c.name : '';
+}
+function restoreCategoryOf(ex) {
+  if (allCategories().some(c => c.id === ex.category)) return;
+  const s = categoryState();
+  if (s.deleted.includes(ex.category)) {
+    s.deleted = s.deleted.filter(id => id !== ex.category);
+  } else {
+    const name = removedCategoryName(ex.category);
+    const builtin = EXERCISE_DB.find(b => b.id === ex.id);
+    // The same name was added again meanwhile: join that one. No name known (deleted before
+    // names were remembered): the category of the built-in it overrides, otherwise "Overig".
+    const existing = name ? findCategoryByName(name)
+      : (builtin && allCategories().find(c => c.id === builtin.category)) || findCategoryByName('Overig');
+    if (existing || !name) {
+      ex.category = existing ? existing.id : addCategory('Overig').id;
+      persistCustomExercises();
+      return;
+    }
+    s.custom.push({ id: ex.category, name });
+  }
+  s.removed = (s.removed || []).filter(c => c.id !== ex.category);
+  persistCategories();
+}
 async function persistCategories() {
   if (!currentUser) return;
   uDoc('meta/categories').set(categoryState()).catch(persistFailed);
@@ -2449,6 +2478,21 @@ function renderCategoryBrowser() {
     });
     list.appendChild(item);
   });
+  // Entry to Verwijderde oefeningen: its own card under the categories, only while something
+  // is deleted, and not when this screen picks an exercise for a plan day.
+  const deletedCount = deletedExercises().length;
+  if (deletedCount > 0 && exerciseScreenMode !== 'plan-add') {
+    const card = document.createElement('div');
+    card.className = 'card list-card';
+    card.innerHTML = `
+      <div class="category-item category-item-deleted list-row" id="exercises-deleted-row">
+        <span class="category-item-name">Verwijderde oefeningen (${deletedCount})</span>
+        <svg class="category-item-chevron" viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+      </div>
+    `;
+    card.firstElementChild.addEventListener('click', openDeletedExercises);
+    document.getElementById('exercise-list').appendChild(card);
+  }
 }
 
 // -- Category edit/delete -------------------------------
@@ -2513,7 +2557,11 @@ document.getElementById('btn-cat-delete-confirm').addEventListener('click', () =
   if (!cat || exercisesInCategory(cat.id).length > 0) return;
   const s = categoryState();
   if (cat.standard) { if (!s.deleted.includes(cat.id)) s.deleted.push(cat.id); }
-  else s.custom = s.custom.filter(c => c.id !== cat.id);
+  else {
+    s.custom = s.custom.filter(c => c.id !== cat.id);
+    // A deleted exercise may still be in it: remembered so terugzetten can bring it back.
+    if (deletedExercises().some(e => e.category === cat.id)) s.removed = [...(s.removed || []), { id: cat.id, name: cat.name }];
+  }
   persistCategories();
   renderCategoryBrowser();
   toast('Categorie verwijderd');
@@ -4600,18 +4648,21 @@ function saveNewExerciseFromScreen() {
 // -- Delete exercise (built-in or custom) ----------------
 let pendingDeleteExercise = null;
 
+// Popup text with the exercise name in bold; the name goes in as text, never as HTML.
+function setMsgWithName(el, before, name, after) {
+  const strong = document.createElement('strong');
+  strong.textContent = name;
+  el.replaceChildren(before, strong, after);
+}
+
+// No checkbox: hiding can be undone (Verwijderde oefeningen → terugzetten).
 function openDeleteExerciseConfirm(ex) {
   pendingDeleteExercise = ex;
-  document.getElementById('delete-ex-msg').innerHTML =
-    `Weet je zeker dat je <strong>${ex.name}</strong> wilt verwijderen? De oefening verdwijnt uit je lijsten. Je trainingsgeschiedenis blijft bewaard.`;
-  document.getElementById('delete-ex-confirm-check').checked = false;
-  document.getElementById('btn-delete-ex-confirm').disabled = true;
+  setMsgWithName(document.getElementById('delete-ex-msg'), 'Weet je zeker dat je ', ex.name,
+    ' wilt verwijderen? De oefening verdwijnt uit je lijsten. Je trainingsgeschiedenis blijft bewaard, en je kunt hem terugzetten via Verwijderde oefeningen.');
   openOverlay('delete-exercise-overlay');
 }
 
-document.getElementById('delete-ex-confirm-check').addEventListener('change', e => {
-  document.getElementById('btn-delete-ex-confirm').disabled = !e.target.checked;
-});
 document.getElementById('btn-delete-ex-cancel').addEventListener('click', () => {
   pendingDeleteExercise = null;
   closeOverlay('delete-exercise-overlay');
@@ -4639,6 +4690,141 @@ document.getElementById('btn-delete-ex-confirm').addEventListener('click', () =>
   renderHome();
   toast('Oefening verwijderd');
 });
+
+// -- Verwijderde oefeningen (#screen-deleted-exercises) ---------------------------
+// Every hidden exercise (deletedExercises()), sorted by name. Each can be put back
+// (terugzetten); an own exercise can also be deleted for good (permanent verwijderen).
+// Built-in = its id is in EXERCISE_DB, also when it was edited (it then has a custom entry).
+function isBuiltinExerciseId(id) { return EXERCISE_DB.some(b => b.id === id); }
+
+function openDeletedExercises() {
+  renderDeletedExercises();
+  showScreen('screen-deleted-exercises');
+}
+
+function renderDeletedExercises() {
+  const list = document.getElementById('deleted-ex-list');
+  list.innerHTML = '';
+  const items = deletedExercises().sort((a, b) => a.name.localeCompare(b.name, 'nl', { sensitivity: 'base' }));
+  if (items.length === 0) {
+    list.innerHTML = `<div class="exercise-empty">Geen verwijderde oefeningen</div>`;
+    return;
+  }
+  const intro = document.createElement('p');
+  intro.className = 't-small deleted-ex-intro';
+  intro.textContent = 'Je trainingsgeschiedenis van deze oefeningen is bewaard. Zet een oefening terug om hem weer in je lijsten te zien.';
+  list.appendChild(intro);
+  const card = document.createElement('div');
+  card.className = 'card list-card';
+  items.forEach(ex => {
+    const builtin = isBuiltinExerciseId(ex.id);
+    const row = document.createElement('div');
+    row.className = 'deleted-ex-row list-row';
+    row.innerHTML = `
+      <div class="deleted-ex-body">
+        <span class="role-row deleted-ex-name"></span>
+        <span class="role-sub deleted-ex-meta"></span>
+      </div>
+      <div class="deleted-ex-actions">
+        <button type="button" class="row-icon-btn row-icon-btn-primary deleted-ex-restore" aria-label="Terugzetten">
+          <svg viewBox="0 0 24 24"><path d="M9 14l-4 -4l4 -4"/><path d="M5 10h11a4 4 0 1 1 0 8h-1"/></svg>
+        </button>
+        ${builtin ? '' : `
+        <button type="button" class="row-icon-btn row-icon-btn-danger deleted-ex-purge" aria-label="Permanent verwijderen">
+          <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+        </button>`}
+      </div>
+    `;
+    row.querySelector('.deleted-ex-name').textContent = ex.name;
+    const cat = categoryName(ex.category) || removedCategoryName(ex.category);
+    row.querySelector('.deleted-ex-meta').textContent = (cat ? cat + ' · ' : '') + (builtin ? 'ingebouwd' : 'eigen oefening');
+    row.querySelector('.deleted-ex-restore').addEventListener('click', () => restoreExercise(ex.id));
+    if (!builtin) row.querySelector('.deleted-ex-purge').addEventListener('click', () => openPurgeExerciseConfirm(ex));
+    card.appendChild(row);
+  });
+  list.appendChild(card);
+}
+
+// Re-renders whatever shows deleted exercises, after one was put back or deleted for good.
+function refreshAfterDeletedChange() {
+  renderDeletedExercises();
+  refreshExerciseList();
+  renderHome();
+}
+
+// Terugzetten: undoes the hiding. Everything was kept (sets, records, Oefeninginfo, the
+// favorite mark), so the exercise is simply visible again, in its own category. If that
+// category was deleted in the meantime (allowed once it looked empty), it comes back too.
+function restoreExercise(id) {
+  const entry = (db.custom_exercises || []).find(e => e.id === id);
+  if (entry && entry.deleted) {
+    delete entry.deleted;
+    persistCustomExercises();
+  }
+  if (db.hiddenBuiltins && db.hiddenBuiltins[id]) {
+    delete db.hiddenBuiltins[id];
+    persistHiddenBuiltins();
+  }
+  const ex = findExercise(id);
+  if (ex) restoreCategoryOf(ex);
+  refreshAfterDeletedChange();
+  toast(`${exerciseName(id)} is teruggezet`);
+}
+
+// -- Permanent verwijderen (own exercises only) --------------------------------
+let pendingPurgeExercise = null;
+
+function openPurgeExerciseConfirm(ex) {
+  pendingPurgeExercise = ex;
+  setMsgWithName(document.getElementById('purge-ex-msg'), '', ex.name,
+    ' en alle gelogde sets, records en info worden definitief gewist, en de oefening verdwijnt uit je plannen. Ook je overzichten in Inzicht veranderen daardoor met terugwerkende kracht.');
+  document.getElementById('purge-ex-confirm-check').checked = false;
+  document.getElementById('btn-purge-ex-confirm').disabled = true;
+  openOverlay('purge-exercise-overlay');
+}
+
+document.getElementById('purge-ex-confirm-check').addEventListener('change', e => {
+  document.getElementById('btn-purge-ex-confirm').disabled = !e.target.checked;
+});
+document.getElementById('btn-purge-ex-cancel').addEventListener('click', () => {
+  pendingPurgeExercise = null;
+  closeOverlay('purge-exercise-overlay');
+});
+document.getElementById('btn-purge-ex-confirm').addEventListener('click', () => {
+  const ex = pendingPurgeExercise;
+  if (!ex || !document.getElementById('purge-ex-confirm-check').checked) return;
+  pendingPurgeExercise = null;
+  closeOverlay('purge-exercise-overlay');
+  purgeExercise(ex.id);
+  refreshAfterDeletedChange();
+  toast(`${ex.name} is permanent verwijderd`);
+});
+
+// Wipes an own exercise and everything that points at it: the exercise itself, its logged
+// sets (a workout left without exercises disappears), records, Oefeninginfo (incl. Kracht
+// volgen) and the favorite mark. It also leaves every plan day; for the active plan that
+// stores a new schedule version (persistPlan → syncInsightSchedule). Existing schedule
+// versions are not touched: they carry the exercise's name. The name is free again after.
+function purgeExercise(id) {
+  if (isBuiltinExerciseId(id)) return; // built-ins can only be hidden
+  db.custom_exercises = (db.custom_exercises || []).filter(e => e.id !== id);
+  persistCustomExercises();
+  Object.keys(db.workouts).forEach(date => {
+    const w = db.workouts[date] || [];
+    if (w.some(e => e.exerciseId === id)) setWorkout(date, w.filter(e => e.exerciseId !== id));
+  });
+  if (db.records && id in db.records) { delete db.records[id]; persistRecords(); }
+  if (db.exerciseInfo && id in db.exerciseInfo) { delete db.exerciseInfo[id]; persistExerciseInfo(); }
+  if (isFavoriteExercise(id)) { delete db.favoriteExercises[id]; persistFavorites(); }
+  Object.entries(db.plans || {}).forEach(([planId, plan]) => {
+    let changed = false;
+    (plan.days || []).forEach(day => {
+      const kept = (day.exercises || []).filter(e => e.exerciseId !== id);
+      if (kept.length !== (day.exercises || []).length) { day.exercises = kept; changed = true; }
+    });
+    if (changed) persistPlan(planId, plan).catch(() => {}); // persistFailed already reported it
+  });
+}
 
 document.getElementById('btn-new-ex-back').addEventListener('click', () => goBack('screen-exercises', () => hasChanges(newExerciseBaseline, getNewExerciseFormSnapshot())));
 document.getElementById('btn-new-ex-save').addEventListener('click', () => saveNewExerciseFromScreen());
@@ -4679,6 +4865,7 @@ const OVERLAY_CANCEL_BUTTON = {
   'new-category-overlay': 'btn-new-category-cancel',
   'cat-edit-overlay': 'btn-cat-edit-cancel',
   'delete-exercise-overlay': 'btn-delete-ex-cancel',
+  'purge-exercise-overlay': 'btn-purge-ex-cancel',
   'cat-delete-overlay': 'btn-cat-delete-cancel',
   'delete-plan-overlay': 'btn-delete-plan-cancel',
   'plan-rename-overlay': 'btn-plan-rename-cancel',
@@ -4741,6 +4928,7 @@ document.getElementById('btn-back-exercises').addEventListener('click', () => {
 });
 
 document.getElementById('btn-new-exercise').addEventListener('click', openNewExerciseScreen);
+document.getElementById('btn-back-deleted-exercises').addEventListener('click', () => goBack('screen-exercises'));
 document.getElementById('btn-back-training').addEventListener('click', () => goBack('screen-fitness-tracker', () => hasChanges(trackFieldsBaseline, getTrackFieldsSnapshot())));
 document.getElementById('btn-back-new-workout').addEventListener('click', () => goBack('screen-fitness-tracker'));
 document.getElementById('btn-nw-manual').addEventListener('click', openExerciseList);

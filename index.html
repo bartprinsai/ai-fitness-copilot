@@ -297,6 +297,17 @@
   <div class="exercise-list" id="exercise-list"></div>
 </div>
 
+<!-- DELETED EXERCISES SCREEN (Alle oefeningen → Verwijderde oefeningen) -->
+<div id="screen-deleted-exercises" class="screen">
+  <div class="toolbar">
+    <button class="toolbar-btn" id="btn-back-deleted-exercises" aria-label="Terug">
+      <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </button>
+    <span class="toolbar-title">Verwijderde oefeningen</span>
+  </div>
+  <div class="exercise-list" id="deleted-ex-list"></div>
+</div>
+
 <!-- NEW EXERCISE SCREEN -->
 <div id="screen-new-exercise" class="screen">
   <div class="toolbar">
@@ -1136,13 +1147,26 @@
   <div class="overlay-panel">
     <h3 class="delete-ex-title">Oefening verwijderen?</h3>
     <p id="delete-ex-msg" class="cat-delete-msg"></p>
+    <div class="overlay-btns">
+      <button class="btn btn-secondary" id="btn-delete-ex-cancel">Annuleren</button>
+      <button class="btn btn-danger" id="btn-delete-ex-confirm">Verwijderen</button>
+    </div>
+  </div>
+</div>
+
+<!-- PERMANENTLY DELETE EXERCISE OVERLAY (Verwijderde oefeningen, own exercises only).
+     Same build as the delete overlay above, plus the checkbox: it can't be undone. -->
+<div class="overlay" id="purge-exercise-overlay">
+  <div class="overlay-panel">
+    <h3>Permanent verwijderen</h3>
+    <p id="purge-ex-msg" class="cat-delete-msg"></p>
     <label class="delete-ex-check-row">
-      <input type="checkbox" id="delete-ex-confirm-check"/>
+      <input type="checkbox" id="purge-ex-confirm-check"/>
       <span>Ik begrijp dat dit niet ongedaan kan worden gemaakt.</span>
     </label>
     <div class="overlay-btns">
-      <button class="btn btn-secondary" id="btn-delete-ex-cancel">Annuleren</button>
-      <button class="btn btn-danger" id="btn-delete-ex-confirm" disabled>Verwijderen</button>
+      <button class="btn btn-secondary" id="btn-purge-ex-cancel">Annuleren</button>
+      <button class="btn btn-danger" id="btn-purge-ex-confirm" disabled>Verwijderen</button>
     </div>
   </div>
 </div>
