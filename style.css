@@ -215,7 +215,7 @@ button.pill:active { filter: brightness(.92); transform: scale(0.97); }
 
 /* ══ INPUTS ═════════════════════════════════════════════
    One input style everywhere. */
-.input, .overlay-panel input[type="text"], .overlay-panel input[type="number"], .overlay-panel select, .overlay-panel textarea, .new-ex-input, .new-ex-select, .search-bar input, .plate-target-input, .ai-gen-textarea, .field-group input { width: 100%; height: var(--control-height); padding: 0 var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-family: inherit; font-size: var(--fs-heading); font-weight: var(--fw-regular); outline: none; transition: border-color .15s; -moz-appearance: textfield; }
+.input, .overlay-panel input[type="text"], .overlay-panel input[type="number"], .overlay-panel input[type="time"], .overlay-panel select, .overlay-panel textarea, .new-ex-input, .new-ex-select, .search-bar input, .plate-target-input, .ai-gen-textarea, .field-group input { width: 100%; height: var(--control-height); padding: 0 var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-family: inherit; font-size: var(--fs-heading); font-weight: var(--fw-regular); outline: none; transition: border-color .15s; -moz-appearance: textfield; }
 .input:focus, .overlay-panel input:focus, .overlay-panel select:focus, .overlay-panel textarea:focus, .new-ex-input:focus, .new-ex-select:focus, .search-bar input:focus, .plate-target-input:focus, .ai-gen-textarea:focus, .field-group input:focus { border-color: var(--primary); }
 .input::placeholder, input::placeholder, textarea::placeholder { color: var(--text-muted); }
 /* A typed number is always Groot getal (20px/700, like the TRACK fields), in every number field —
@@ -1094,7 +1094,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 /* ══ INZICHT (#screen-insight, period Week) ═══════════════════════════════
    Period buttons (Week · Maand · Jaar) are the Grafiek's .time-filter pills; week navigation
    ‹ Week 43 ›, date + schedule line, the Per dag grid in a card and four figure cards.
-   Nothing is tappable yet besides the periods and the chevrons. */
+   A day column opens the day overview (#screen-insight-day, below); the cards are not tappable yet. */
 .insight-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: var(--screen-top) var(--screen-gutter) calc(var(--ai-bar-space) + var(--space-4)); }
 .insight-periods { display: flex; gap: var(--space-2); }
 .insight-nav { display: flex; align-items: center; justify-content: space-between; margin-top: var(--space-3); }
@@ -1129,6 +1129,33 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .role-row.insight-empty { color: var(--text-muted); } /* wins over .role-row's --text in the role block */
 .insight-danger { color: var(--danger); }
 .insight-success { color: var(--success); }
+/* Per dag: every cell of a day up to today carries data-date, so its whole column opens the day
+   overview; pressed, the whole column takes --bg (the pressed row/card colour). */
+.insight-cell[data-date] { cursor: pointer; }
+.insight-cell.insight-col-pressed { background: var(--bg); }
+
+/* ── Dagoverzicht (#screen-insight-day) ──────────────────────────────────────
+   ‹ Donderdag 22 oktober 2026 › (the week's .insight-nav), then a Label above each card:
+   TRAINING (head + one row per muscle group), VOEDING, SLAAP, GEWICHT. */
+.insight-day-nav { margin-top: 0; }
+/* The 48px nav row already has ±14px air under its text; together that is about a section gap. */
+.insight-day-nav + .insight-label { padding-top: var(--space-3); }
+/* Training: a card without padding, so the row lines run from edge to edge (like a list in a card). */
+.insight-day-card { padding: 0; overflow: hidden; }
+.insight-day-head { padding: var(--card-padding); }
+.insight-day-head .role-sub, .insight-mg-main .role-sub, .overlay-head .role-sub, .insight-empty + .role-sub { margin-top: 2px; }
+.insight-mg-row { display: flex; align-items: baseline; gap: var(--space-3); padding: var(--space-3) var(--card-padding); border-top: 1px solid var(--border); }
+.insight-mg-main { flex: 1; min-width: 0; }
+.insight-mg-figure { flex-shrink: 0; text-align: right; }
+.insight-mg-figure .insight-figure { justify-content: flex-end; }
+.role-sub.insight-muted { color: var(--text-muted); } /* "Gepland: …" — wins over .role-sub's --text-secondary */
+/* Sleep / weight filled in: the whole card is a button that opens its sheet, a 20px pencil on the right. */
+.insight-edit-card { width: 100%; display: flex; align-items: center; gap: var(--space-3); border: none; text-align: left; font-family: inherit; color: inherit; cursor: pointer; }
+.insight-edit-card:active { background: var(--bg); }
+.insight-edit-main { flex: 1; min-width: 0; }
+.insight-edit-icon svg { display: block; width: var(--icon-list); height: var(--icon-list); fill: var(--text-secondary); }
+/* Not filled in: "Nog niet ingevuld", then the full-width fill button (.btn-primary.btn-block). */
+.insight-fill-btn { margin-top: var(--space-3); }
 
 /* ── Typografie per rol ──────────────────────────────────────────────────────────────────────────
    Every text takes the style of its role (see DESIGN_SYSTEM.md, "Typografie per rol"). This block

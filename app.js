@@ -628,6 +628,7 @@ const SCREEN_ON_ENTER = {
   'screen-plan-schedule': () => renderPlanSchedule(),
   'screen-plan-day-edit': () => renderPlanDayEdit(),
   'screen-insight': () => renderInsight(),
+  'screen-insight-day': () => renderInsightDay(),
 };
 
 // Per-screen "does the CURRENTLY ACTIVE screen have unsaved input?" checks,
@@ -2007,18 +2008,17 @@ const INSIGHT_WEEKDAYS_SHORT = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo'];
 
 function hasLoggedSets(date) { return getWorkout(date).some(ex => (ex.sets || []).length > 0); }
 
-// Per day of the week: { date, planned (getPlannedForDate), logged, past, switchHere }.
-// switchHere: another plan id than the day before (isScheduleSwitch), not on Monday.
-function insightWeekDays(weekStart) {
+// One day: { date, planned (getPlannedForDate), logged, past, counted }.
+function insightDay(date) {
   const today = todayStr();
-  return [0, 1, 2, 3, 4, 5, 6].map(i => addDaysToDateStr(weekStart, i)).map((date, i, dates) => {
-    const planned = getPlannedForDate(date);
-    const prev = i > 0 ? getPlannedForDate(dates[i - 1]).version : null;
-    return {
-      date, planned, logged: hasLoggedSets(date), past: date < today, counted: date <= today,
-      switchHere: !!planned.version && isScheduleSwitch(prev, planned.version),
-    };
-  });
+  return { date, planned: getPlannedForDate(date), logged: hasLoggedSets(date), past: date < today, counted: date <= today };
+}
+// Per day of the week: insightDay() plus switchHere: another plan id than the day before
+// (isScheduleSwitch), not on Monday.
+function insightWeekDays(weekStart) {
+  return [0, 1, 2, 3, 4, 5, 6].map(i => insightDay(addDaysToDateStr(weekStart, i))).map((d, i, days) => ({
+    ...d, switchHere: !!d.planned.version && isScheduleSwitch(i > 0 ? days[i - 1].planned.version : null, d.planned.version),
+  }));
 }
 
 // "done" (≥ 1 set logged), "missed" (a planned day of a fixed or Week A/B schedule that is
@@ -2051,6 +2051,13 @@ function insightScheduleText(days) {
   return 'Schema: ' + segments.map((seg, i) => i === 0 ? segText(seg) : `vanaf ${WEEKDAY_FULL_NAMES[seg.weekday].toLowerCase()} ${segText(seg)}`).join(', ');
 }
 
+// What planned and done sets are compared by: the exercise's primary muscle group as it is
+// set now ('mg:chest'), or the exercise id itself when it has none ('ex:<id>').
+function insightCompareKey(id) {
+  const info = getExerciseInfo(id);
+  return info && info.primaryMuscleGroup ? 'mg:' + info.primaryMuscleGroup : 'ex:' + id;
+}
+
 // Training card numbers for a week: planned vs done sets per primary muscle group, over
 // the days that count (the current week: up to and including today).
 //   planned: the sets of the plan days planned on those days (their schedule version);
@@ -2066,10 +2073,7 @@ function insightScheduleText(days) {
 // sequential one — that comparison follows later).
 function insightTrainingStats(days) {
   const counted = days.filter(d => d.counted);
-  const keyOf = id => {
-    const info = getExerciseInfo(id);
-    return info && info.primaryMuscleGroup ? 'mg:' + info.primaryMuscleGroup : 'ex:' + id;
-  };
+  const keyOf = insightCompareKey;
   const planned = {}, done = {};
   const today = todayStr();
   let plannedTrainings = 0, doneTrainings = 0, loggedDays = 0;
@@ -2146,12 +2150,17 @@ const INSIGHT_CHECK_SVG = '<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1
 function insightDaysGridHtml(days) {
   // The first day of another plan gets a dotted line on the left of every cell in its
   // column; the rows have no gap between them, so the line runs over the full grid height.
+  // Every cell of a day up to today carries its date: the whole column opens the day
+  // overview (the rows have no gap, so the column is one unbroken tap area).
   const sw = d => d.switchHere ? ' insight-switch' : '';
-  const cell = (d, content, cls = '') => `<div class="t-small insight-cell${cls}${sw(d)}">${content}</div>`;
+  const tap = d => d.counted ? ` data-date="${d.date}"` : '';
+  const cell = (d, content, cls = '') => `<div class="t-small insight-cell${cls}${sw(d)}"${tap(d)}>${content}</div>`;
   const dash = d => cell(d, '–', ' insight-dash');
   const row = (label, cells) => `<div class="t-small insight-row-label">${label}</div>` + cells.join('');
   let html = '<div class="insight-grid"><div></div>';
-  html += days.map((d, i) => `<div class="t-small insight-cell${sw(d)}">${INSIGHT_WEEKDAYS_SHORT[i]}</div>`).join('');
+  html += days.map((d, i) => d.counted
+    ? `<div class="t-small insight-cell${sw(d)}"${tap(d)} role="button" tabindex="0" aria-label="Dagoverzicht ${formatDateStr(d.date)}">${INSIGHT_WEEKDAYS_SHORT[i]}</div>`
+    : `<div class="t-small insight-cell${sw(d)}">${INSIGHT_WEEKDAYS_SHORT[i]}</div>`).join('');
   html += row('Training', days.map(d => {
     const state = insightTrainingState(d);
     if (state === 'done') return cell(d, `<span class="insight-done" role="img" aria-label="Getraind">${INSIGHT_CHECK_SVG}</span>`);
@@ -2200,6 +2209,309 @@ document.getElementById('insight-next').addEventListener('click', () => {
   if (insightWeekStart >= weekStartOf(todayStr())) return;
   insightWeekStart = addDaysToDateStr(insightWeekStart, 7);
   renderInsight();
+});
+// A tap anywhere in a day's column (Per dag) opens that day; the whole column shows pressed.
+(function setupInsightDayColumns() {
+  const grid = document.getElementById('insight-days');
+  const release = () => grid.querySelectorAll('.insight-col-pressed').forEach(c => c.classList.remove('insight-col-pressed'));
+  grid.addEventListener('pointerdown', e => {
+    const c = e.target.closest('[data-date]');
+    if (c) grid.querySelectorAll(`[data-date="${c.dataset.date}"]`).forEach(x => x.classList.add('insight-col-pressed'));
+  });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => grid.addEventListener(t, release));
+  grid.addEventListener('click', e => {
+    const c = e.target.closest('[data-date]');
+    if (c) openInsightDay(c.dataset.date);
+  });
+  grid.addEventListener('keydown', e => {
+    const c = e.target.closest('[data-date]');
+    if (c && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openInsightDay(c.dataset.date); }
+  });
+})();
+
+// -- Inzicht: the day overview (#screen-insight-day) ------------------------
+// One day, opened from the Per dag grid; up to today. The same rules as the week's Training
+// card (insightTrainingStats, insightCompareKey) applied to that one day, plus entering and
+// clearing that day's sleep and body weight. The back arrow lands on the week of the day
+// shown (insightWeekStart follows the day). Rules: PROJECT_CONTEXT.md, "Inzicht".
+let insightDayDate = null;
+
+function openInsightDay(date) {
+  if (date > todayStr()) return;
+  insightDayDate = date;
+  showScreen('screen-insight-day');
+}
+
+const INSIGHT_PENCIL_SVG = '<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>';
+function weekdayLower(date) { return WEEKDAY_FULL_NAMES[weekdayOfDateStr(date)].toLowerCase(); }
+const insightPlural = (n, one, more) => `${formatCount(n)} ${n === 1 ? one : more}`;
+
+// The day's training as compared with its schedule:
+//   mode 'compare'  fixed / Week A/B day or rest day: planned (plan day) vs done
+//        'pending'  today with a plan day but no set logged yet: only what is planned
+//        'none'     no schedule, no version, no recorded week, or sequential: no comparison
+//   rows: one per primary muscle group planned or trained (MUSCLE_GROUPS order), then one
+//         "Geen spiergroep" row (id '') for exercises without one, compared per exercise.
+//         { id, planned, done, counted (min per comparison key), extra, exercises: logged
+//         [{ exerciseId, sets }], missed: planned exercises without a logged set }
+function insightDayTraining(d) {
+  const st = d.planned.status;
+  const mode = st === 'day' || st === 'rest' ? (st === 'day' && d.date === todayStr() && !d.logged ? 'pending' : 'compare') : 'none';
+  const rowIdOf = id => {
+    const info = getExerciseInfo(id);
+    const mg = info && info.primaryMuscleGroup;
+    return mg && MUSCLE_GROUPS.some(m => m.id === mg) ? mg : '';
+  };
+  const rows = new Map();
+  const rowFor = id => {
+    const rid = rowIdOf(id);
+    if (!rows.has(rid)) rows.set(rid, { id: rid, plannedBy: {}, doneBy: {}, exercises: [], plannedEx: [] });
+    return rows.get(rid);
+  };
+  if (st === 'day') d.planned.day.exercises.filter(ex => ex.sets > 0).forEach(ex => {
+    const r = rowFor(ex.exerciseId), k = insightCompareKey(ex.exerciseId);
+    r.plannedBy[k] = (r.plannedBy[k] || 0) + ex.sets;
+    r.plannedEx.push(ex);
+  });
+  getWorkout(d.date).forEach(ex => {
+    const n = countWorkingSets(ex.sets || []);
+    if (n === 0) return;
+    const r = rowFor(ex.exerciseId), k = insightCompareKey(ex.exerciseId);
+    r.doneBy[k] = (r.doneBy[k] || 0) + n;
+    r.exercises.push({ exerciseId: ex.exerciseId, sets: ex.sets });
+  });
+  const order = [...MUSCLE_GROUPS.map(m => m.id), ''];
+  const list = [...rows.values()].sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id)).map(r => {
+    const keys = new Set([...Object.keys(r.plannedBy), ...Object.keys(r.doneBy)]);
+    let planned = 0, done = 0, counted = 0, extra = 0;
+    keys.forEach(k => {
+      const p = r.plannedBy[k] || 0, n = r.doneBy[k] || 0;
+      planned += p; done += n; counted += Math.min(p, n); extra += Math.max(0, n - p);
+    });
+    const logged = new Set(r.exercises.map(e => e.exerciseId));
+    return { id: r.id, planned, done, counted, extra, exercises: r.exercises, missed: r.plannedEx.filter(ex => !logged.has(ex.exerciseId)) };
+  });
+  const sum = f => list.reduce((a, r) => a + f(r), 0);
+  return { mode, rows: list, planned: sum(r => r.planned), done: sum(r => r.done), counted: sum(r => r.counted), extra: sum(r => r.extra) };
+}
+
+// "Bench press · 4 sets · 2 failure · 1 partial · 1 forced · 1 dropset" — per set, its drops
+// included: a set with drops is one set and one dropset; failure = RPE 10 on the set or one
+// of its drops; partial / forced follow extraType on the set or one of its drops. A 0 is left out.
+function insightExerciseLine(exerciseId, sets) {
+  const groups = workingSetGroups(sets).map(g => g.idxs.map(i => sets[i]));
+  const count = f => groups.filter(g => g.some(f)).length;
+  const hasExtra = s => (parseInt(s.extra) || 0) > 0;
+  const n = countWorkingSets(sets);
+  const parts = [exerciseName(exerciseId), insightPlural(n, 'set', 'sets')];
+  const failure = count(s => parseFloat(s.rpe) === 10);
+  const partial = count(s => hasExtra(s) && s.extraType !== 'forced');
+  const forced = count(s => hasExtra(s) && s.extraType === 'forced');
+  const drops = groups.filter(g => g.length > 1).length;
+  if (failure) parts.push(`${formatCount(failure)} failure`);
+  if (partial) parts.push(`${formatCount(partial)} partial`);
+  if (forced) parts.push(`${formatCount(forced)} forced`);
+  if (drops) parts.push(insightPlural(drops, 'dropset', 'dropsets'));
+  return parts.join(' · ');
+}
+
+// "−1" (red) / "+3 extra" / "op schema" (green); a row compared per exercise can have both.
+function insightCompareText(shortfall, extra) {
+  const parts = [];
+  if (shortfall > 0) parts.push(`<span class="insight-danger">−${formatCount(shortfall)}</span>`);
+  if (extra > 0) parts.push(`+${formatCount(extra)} extra`);
+  return parts.length ? parts.join(' · ') : '<span class="insight-success">op schema</span>';
+}
+
+function insightDayRowHtml(r, mode) {
+  const name = r.id ? muscleGroupName(r.id) : 'Geen spiergroep';
+  const lines = r.exercises.map(e => `<div class="role-sub">${insightExerciseLine(e.exerciseId, e.sets)}</div>`);
+  // A planned group without a logged set lists what was planned; the "Geen spiergroep" row
+  // (compared per exercise) lists every planned exercise without a set.
+  if (r.missed.length && (r.done === 0 || !r.id)) {
+    lines.push(`<div class="role-sub insight-muted">Gepland: ${r.missed.map(ex => exerciseName(ex.exerciseId) || ex.name).join(', ')}</div>`);
+  }
+  let figure;
+  if (mode === 'compare' && r.planned > 0) {
+    figure = insightFigureHtml(formatCount(r.counted), `van ${formatCount(r.planned)}`)
+      + `<div class="role-sub">${insightCompareText(r.planned - r.counted, r.extra)}</div>`;
+  } else if (mode === 'compare') {
+    figure = insightFigureHtml(formatCount(r.done), r.done === 1 ? 'set' : 'sets') + '<div class="role-sub">extra</div>';
+  } else if (mode === 'pending') {
+    figure = insightFigureHtml(formatCount(r.planned), r.planned === 1 ? 'set' : 'sets') + '<div class="role-sub">gepland</div>';
+  } else {
+    figure = insightFigureHtml(formatCount(r.done), r.done === 1 ? 'set' : 'sets');
+  }
+  return `<div class="insight-mg-row"><div class="insight-mg-main"><div class="role-row">${name}</div>${lines.join('')}</div>`
+    + `<div class="insight-mg-figure">${figure}</div></div>`;
+}
+
+function insightDayTrainingHtml(d) {
+  const t = insightDayTraining(d);
+  const st = d.planned.status;
+  const planDays = getWorkoutPlanDays(d.date);
+  let title;
+  if (st === 'day') title = d.planned.day.name;
+  else if (st === 'rest') title = 'Rustdag';
+  else if (planDays.length) title = planDays.map(p => p.dayName).join(' + ');
+  else title = d.logged ? 'Training' : 'Geen training';
+  let summary;
+  if (t.mode === 'pending') summary = `Gepland: ${insightPlural(t.planned, 'set', 'sets')}`;
+  else if (t.mode === 'none') summary = `${insightPlural(t.done, 'set', 'sets')} · geen vergelijking met schema`;
+  else if (st === 'rest') summary = t.done ? `${insightPlural(t.done, 'set', 'sets')} · +${formatCount(t.extra)} extra` : 'Geen sets gepland';
+  else summary = `${formatCount(t.counted)} van ${insightPlural(t.planned, 'set', 'sets')} · ${insightCompareText(t.planned - t.counted, t.extra)}`;
+  return `<div class="insight-day-head"><div class="t-number">${title}</div>`
+    + `<div class="role-sub">${insightScheduleText([d])}</div><div class="role-sub">${summary}</div></div>`
+    + t.rows.map(r => insightDayRowHtml(r, t.mode)).join('');
+}
+
+// "00:20 – 06:50 · nacht van woensdag op donderdag" / "Nacht van woensdag op donderdag".
+function insightNightText(date) {
+  return `Nacht van ${weekdayLower(addDaysToDateStr(date, -1))} op ${weekdayLower(date)}`;
+}
+// "Nacht van woensdag 21 op donderdag 22 oktober 2026" (month and year once, unless they differ).
+function insightNightLongText(date) {
+  const prev = addDaysToDateStr(date, -1);
+  const from = prev.slice(0, 4) !== date.slice(0, 4) ? formatDateStr(prev, 'noWeekday')
+    : prev.slice(0, 7) !== date.slice(0, 7) ? formatDateStr(prev, 'dayMonth') : String(Number(prev.slice(8)));
+  return `Nacht van ${weekdayLower(prev)} ${from} op ${weekdayLower(date)} ${formatDateStr(date, 'noWeekday')}`;
+}
+// "−0,4 kg t.o.v. woensdag": against the last earlier day with a weight; more than 6 days back,
+// its date ("t.o.v. 14 oktober", with the year when that differs). '' without an earlier weight.
+function insightWeightCompareText(date, kg) {
+  const prev = Object.keys(db.bodyWeight || {}).filter(k => k < date).sort().pop();
+  if (!prev) return '';
+  const diff = roundWeight(kg - db.bodyWeight[prev]);
+  const daysBack = Math.round((Date.parse(date + 'T00:00:00Z') - Date.parse(prev + 'T00:00:00Z')) / 86400000);
+  const when = daysBack <= 6 ? weekdayLower(prev) : formatDateStr(prev, prev.slice(0, 4) === date.slice(0, 4) ? 'dayMonth' : 'noWeekday');
+  return `${diff < 0 ? '−' : diff > 0 ? '+' : ''}${formatWeight(Math.abs(diff))} kg t.o.v. ${when}`;
+}
+
+// A filled-in value: the whole card opens the sheet, a pencil on the right.
+function insightEditCardHtml(kind, bodyHtml) {
+  return `<button type="button" class="card insight-edit-card" data-insight-edit="${kind}">`
+    + `<div class="insight-edit-main">${bodyHtml}</div><span class="insight-edit-icon">${INSIGHT_PENCIL_SVG}</span></button>`;
+}
+// Not filled in: "Nog niet ingevuld" with a full-width fill button.
+function insightFillCardHtml(kind, subHtml, label) {
+  return `<div class="card">${insightEmptyHtml('Nog niet ingevuld')}${subHtml}`
+    + `<button type="button" class="btn btn-primary btn-block insight-fill-btn" data-insight-edit="${kind}">${label}</button></div>`;
+}
+
+function insightDaySleepHtml(date) {
+  const s = getSleep(date);
+  if (!s) return insightFillCardHtml('sleep', `<div class="role-sub">${insightNightText(date)}</div>`, 'Slaap invullen');
+  const min = sleepDurationMinutes(s.bedtime, s.wakeTime);
+  return insightEditCardHtml('sleep',
+    `<div class="insight-figure"><span class="set-val${min < SLEEP_SHORT_MINUTES ? ' insight-danger' : ''}">${formatDuration(min)}</span><span class="set-unit">u</span></div>`
+    + `<div class="role-sub">${s.bedtime} – ${s.wakeTime} · ${insightNightText(date).toLowerCase()}</div>`);
+}
+
+function insightDayWeightHtml(date) {
+  const kg = getBodyWeight(date);
+  if (kg === null) return insightFillCardHtml('weight', '', 'Gewicht invullen');
+  const cmp = insightWeightCompareText(date, kg);
+  return insightEditCardHtml('weight', insightFigureHtml(formatWeight(kg), 'kg') + (cmp ? `<div class="role-sub">${cmp}</div>` : ''));
+}
+
+function renderInsightDay() {
+  if (!insightDayDate || insightDayDate > todayStr()) insightDayDate = todayStr();
+  const date = insightDayDate;
+  insightWeekStart = weekStartOf(date); // back (arrow or hardware) lands on this day's week
+  document.getElementById('insight-day-title').textContent = formatDateStr(date);
+  document.getElementById('insight-day-next').disabled = date >= todayStr();
+  document.getElementById('insight-day-training').innerHTML = insightDayTrainingHtml(insightDay(date));
+  document.getElementById('insight-day-sleep').innerHTML = insightDaySleepHtml(date);
+  document.getElementById('insight-day-weight').innerHTML = insightDayWeightHtml(date);
+}
+
+document.getElementById('insight-day-prev').addEventListener('click', () => {
+  insightDayDate = addDaysToDateStr(insightDayDate, -1);
+  renderInsightDay();
+});
+document.getElementById('insight-day-next').addEventListener('click', () => {
+  if (insightDayDate >= todayStr()) return;
+  insightDayDate = addDaysToDateStr(insightDayDate, 1);
+  renderInsightDay();
+});
+document.getElementById('btn-back-insight-day').addEventListener('click', () => goBack('screen-insight'));
+document.getElementById('screen-insight-day').addEventListener('click', e => {
+  const el = e.target.closest('[data-insight-edit]');
+  if (!el) return;
+  if (el.dataset.insightEdit === 'sleep') openInsightSleepSheet();
+  else openInsightWeightSheet();
+});
+
+// Sleep sheet: two time fields (the browser's own time picker); both emptied + Opslaan clears
+// the night, like an emptied note. The total follows while typing, across midnight.
+let insightSleepBaseline = null;
+const insightSleepValues = () => ['insight-sleep-bed', 'insight-sleep-wake'].map(id => document.getElementById(id).value.slice(0, 5));
+function updateInsightSleepTotal() {
+  const [bed, wake] = insightSleepValues();
+  document.getElementById('insight-sleep-total').textContent = SLEEP_TIME_RE.test(bed) && SLEEP_TIME_RE.test(wake)
+    ? `Totaal: ${formatDuration(sleepDurationMinutes(bed, wake))} u` : 'Totaal: –';
+}
+function openInsightSleepSheet() {
+  const s = getSleep(insightDayDate);
+  document.getElementById('insight-sleep-bed').value = s ? s.bedtime : '';
+  document.getElementById('insight-sleep-wake').value = s ? s.wakeTime : '';
+  document.getElementById('insight-sleep-sub').textContent = insightNightLongText(insightDayDate);
+  insightSleepBaseline = insightSleepValues();
+  updateInsightSleepTotal();
+  openOverlay('insight-sleep-overlay');
+}
+['insight-sleep-bed', 'insight-sleep-wake'].forEach(id => document.getElementById(id).addEventListener('input', updateInsightSleepTotal));
+document.getElementById('btn-insight-sleep-cancel').addEventListener('click', () => {
+  confirmDiscardIfChanged(() => hasChanges(insightSleepBaseline, insightSleepValues()), () => closeOverlay('insight-sleep-overlay'));
+});
+document.getElementById('btn-insight-sleep-save').addEventListener('click', () => {
+  const date = insightDayDate;
+  const [bed, wake] = insightSleepValues();
+  if (!bed && !wake) {
+    if (getSleep(date)) { deleteSleep(date); toast('Slaap gewist'); }
+  } else if (!bed || !wake) {
+    toast('Vul beide tijden in', { type: 'error' }); return;
+  } else if (bed === wake) {
+    toast('Naar bed en opgestaan kunnen niet gelijk zijn', { type: 'error' }); return;
+  } else {
+    if (!saveSleep(date, bed, wake)) { toast('Vul een geldige tijd in', { type: 'error' }); return; }
+    toast('Slaap opgeslagen');
+  }
+  closeOverlay('insight-sleep-overlay');
+  renderInsightDay();
+});
+
+// Weight sheet: one decimal field (comma or point, max. 2 decimals, FIELD_DECIMALS), 20 to 400
+// kg; emptied + Opslaan clears the day's weight.
+const INSIGHT_WEIGHT_MIN = 20, INSIGHT_WEIGHT_MAX = 400;
+let insightWeightBaseline = null;
+function openInsightWeightSheet() {
+  const kg = getBodyWeight(insightDayDate);
+  const input = document.getElementById('insight-weight-input');
+  input.value = kg === null ? '' : formatWeight(kg);
+  document.getElementById('insight-weight-sub').textContent = formatDateStr(insightDayDate);
+  insightWeightBaseline = input.value;
+  openOverlay('insight-weight-overlay');
+}
+document.getElementById('insight-weight-input').addEventListener('change', e => {
+  if (e.target.value.trim() && parseDecimal(e.target.value) > 0) e.target.value = formatWeight(parseWeight(e.target.value));
+});
+document.getElementById('btn-insight-weight-cancel').addEventListener('click', () => {
+  confirmDiscardIfChanged(() => hasChanges(insightWeightBaseline, document.getElementById('insight-weight-input').value), () => closeOverlay('insight-weight-overlay'));
+});
+document.getElementById('btn-insight-weight-save').addEventListener('click', () => {
+  const date = insightDayDate;
+  const raw = document.getElementById('insight-weight-input').value.trim();
+  if (!raw) {
+    if (getBodyWeight(date) !== null) { deleteBodyWeight(date); toast('Gewicht gewist'); }
+  } else {
+    const kg = parseWeight(raw);
+    if (!(kg >= INSIGHT_WEIGHT_MIN && kg <= INSIGHT_WEIGHT_MAX)) { toast('Vul een gewicht in van 20 tot en met 400 kg', { type: 'error' }); return; }
+    saveBodyWeight(date, kg);
+    toast('Gewicht opgeslagen');
+  }
+  closeOverlay('insight-weight-overlay');
+  renderInsightDay();
 });
 
 function renderNewWorkoutScreen() {
@@ -3527,12 +3839,13 @@ document.querySelectorAll('.field-btn').forEach(btn => {
 
 // Block invalid characters while typing (also paste, and Android keyboards that
 // show a separator anyway): every decimal field in the app takes digits plus ONE decimal
-// separator (comma or point) — weights (TRACK, Plate/1RM/Warm-up Calculator) with at most
+// separator (comma or point) — weights (TRACK, Plate/1RM/Warm-up Calculator, body weight in Inzicht) with at most
 // 2 digits after it, RPE with at most 1; counts (TRACK reps and extra reps, 1RM reps)
 // take digits only. A rejected keystroke simply doesn't appear; the caret stays where it was.
 const FIELD_DECIMALS = {
   'field-weight': WEIGHT_DECIMALS, 'field-rpe': 1, 'field-reps': 0, 'field-extra': 0,
   'plate-target-weight': WEIGHT_DECIMALS, 'orm-weight': WEIGHT_DECIMALS, 'orm-reps': 0, 'warmup-weight': WEIGHT_DECIMALS,
+  'insight-weight-input': WEIGHT_DECIMALS,
 };
 // Upper limits on top of FIELD_DECIMALS: a typed digit that would exceed it is rejected,
 // a pasted value is clamped to it.
@@ -4879,6 +5192,8 @@ const OVERLAY_CANCEL_BUTTON = {
   'confirm-delete-overlay': 'btn-confirm-delete-cancel',
   'schedule-load-overlay': 'btn-schedule-load-cancel',
   'recap-overlay': 'btn-recap-close',
+  'insight-sleep-overlay': 'btn-insight-sleep-cancel',
+  'insight-weight-overlay': 'btn-insight-weight-cancel',
 };
 
 function openOverlay(id) {

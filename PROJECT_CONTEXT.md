@@ -159,7 +159,7 @@ Alle regels staan op **één plek: bovenaan `exercises.js`** (`EXERCISE_CATEGORI
 - **Migratie (eenmalig, per gebruiker)**: `migrateExerciseIds()` in `app.js` draait vanuit `loadUserData()` zolang `meta/migrations` geen `exerciseIds` heeft, en zet die vlag (de datum) in de laatste schrijfbatch, zodat hij daarna nooit meer draait. Hij zet om: eigen oefeningen krijgen een id (heeft een eigen oefening de naam van een ingebouwde, dan is het die bewerkte ingebouwde en krijgt hij diens id); trainingen en plandagen `{ name }` → `{ exerciseId }`; favorieten, verborgen ingebouwde, exercise_info en records naar id als sleutel. Een naam zonder bijbehorende oefening wordt niet gegokt: in een training of plandag valt zo'n regel weg (zonder id kan de app hem niet openen), als sleutel in favorieten/verborgen/exercise_info/records blijft hij staan (niets zoekt hem op); beide worden gelogd (`console.warn`). Op 26 oktober 2026 is de migratie voor alle drie de accounts gedraaid; er waren geen onbekende namen.
 
 ## Inzicht
-Stap 1 (oktober 2026) legde de opslag aan, stap 2 het hoofdscherm voor een week. De code staat in `app.js` onder "Inzicht: schedule versions and Week A/B per date", "Inzicht: sleep and body weight" en "Inzicht: the screen". Vormgeving: DESIGN_SYSTEM.md, "Inzicht".
+Stap 1 (oktober 2026) legde de opslag aan, stap 2 het hoofdscherm voor een week, stap 3 het dagoverzicht met slaap en gewicht invullen. De code staat in `app.js` onder "Inzicht: schedule versions and Week A/B per date", "Inzicht: sleep and body weight", "Inzicht: the screen" en "Inzicht: the day overview". Vormgeving: DESIGN_SYSTEM.md, "Inzicht".
 
 ### Vaste afspraken
 - **Een week loopt van maandag tot en met zondag** (weekdag 0 = maandag, `weekdayOfDateStr()`).
@@ -216,7 +216,22 @@ Geeft de geldende schemaversie (de laatste ingangsdatum op of vóór die datum) 
 - **Schemaregel** (`insightScheduleText()`, per dag via `getPlannedForDate()`): "Schema: Push Pull Legs · Week A" (de week alleen bij Week A/B; wisselt de week midden in de week, dan "· Week A, vanaf vrijdag Week B"). Een wissel naar een ander plan-id: "Schema: Push Pull Legs, vanaf donderdag Upper Lower" (naar geen plan: "…, vanaf donderdag geen schema"). Alleen dagen zonder actief plan: "Geen schema actief". Geen versie voor die dagen: "Geen schema bekend". Dagen vóór de eerste versie tellen voor deze regel niet mee.
 - **Per dag, Training**: minstens één gelogde set op die datum = gedaan (groen vinkje). **Rode ring (gemist)** alleen als de dag volgens zijn eigen schemaversie een plandag had (vaste dagen of Week A/B), de dag voorbij is (vóór vandaag) en er geen set is gelogd; een geladen training zonder sets telt dus als gemist. Vandaag, dagen die nog komen, rustdagen, dagen zonder schema of zonder vastgelegde week en **doorlopende schema's krijgen nooit een rode ring**, maar een streepje.
 - **Per dag, overige rijen**: Voeding nog overal een streepje; Slaap de duur als u:mm, onder 7:00 rood; Gewicht de waarde met 1 decimaal zonder eenheid. De eerste dag van een ander plan-id krijgt een stippellijn (zie DESIGN_SYSTEM.md).
-- Tikken op een dag of kaart doet nog niets; de detailschermen volgen later.
+- Tikken op een dag (de hele kolom in Per dag) opent het dagoverzicht (stap 3, hieronder); dagen na vandaag openen niet. Tikken op een kaart doet nog niets.
+
+### Het dagoverzicht (stap 3)
+- **Openen en navigeren**: `openInsightDay(datum)` vanuit het raster Per dag, alleen tot en met vandaag. Bovenaan ‹ datum › ("Donderdag 22 oktober 2026"); terugbladeren onbeperkt, vooruit tot en met vandaag. De terugpijl (en de terugknop van de telefoon) brengt je naar het weekoverzicht van de week waarin de getoonde dag valt (`renderInsightDay()` zet `insightWeekStart` mee).
+- **Training, kop**: de naam van de plandag die volgens de schemaversie gepland stond; "Rustdag" als er niets gepland stond; zonder schema met vaste dagen (geen versie, geen plan, doorlopend, geen week vastgelegd) de naam van de geladen plandag(en) uit `planDays` als die er is, anders "Training" (wel sets) of "Geen training". Daaronder de schemaregel (`insightScheduleText()` voor die ene dag) en de samenvatting:
+  - plandag: "13 van 18 sets · −5 · +4 extra" (zelfde regels als de Training-kaart; "op schema" zonder tekort, "+N extra" alleen als N > 0);
+  - vandaag zonder gelogde set: "Gepland: 18 sets" (geen tekort in de ochtend);
+  - rustdag: "N sets · +N extra", zonder training "Geen sets gepland";
+  - geen vergelijking (geen schema, doorlopend, geen week vastgelegd): "N sets · geen vergelijking met schema".
+- **Rijen per spiergroep** (`insightDayTraining()`): één rij per primaire spiergroep die gepland stond of getraind is, in de volgorde van `MUSCLE_GROUPS`, dan één rij "Geen spiergroep" voor oefeningen zonder (bekende) primaire spiergroep. Vergelijken gaat met `insightCompareKey()`, dezelfde sleutel als de Training-kaart: per spiergroep, en zonder spiergroep per oefening. Per rij telt min(gepland, gedaan) als "van N"; daaronder het tekort (rood), "op schema" (groen) of "+N extra"; de rij Geen spiergroep kan zowel een tekort als extra hebben ("−1 · +2 extra"). Een spiergroep die niet gepland stond: "N sets" met "extra". Vandaag vóór de eerste set: "N sets" met "gepland". Zonder vergelijking: alleen "N sets".
+  - Links per gedane oefening "Bench press · 4 sets · 2 failure · 1 partial · 1 forced · 1 dropset" (`insightExerciseLine()`, een kenmerk met 0 vervalt). Van een geplande spiergroep zonder gelogde set staat er "Gepland: [oefeningen]"; in de rij Geen spiergroep staan daar de geplande oefeningen zonder set.
+  - **Telregels per set**: een set met drops (`isDropsetContinuation`, `workingSetGroups()`) is één set en één dropset; failure = RPE 10 op de set of op een van zijn drops; partial en forced volgen `extraType` (met extra reps) op de set of een van zijn drops.
+- **Voeding**: "Nog geen voedingsschema".
+- **Slaap invullen**: de kaart toont de duur ("6:30 u", onder 7:00 rood) met "00:20 – 06:50 · nacht van woensdag op donderdag"; tikken op de kaart opent het invulvenster. Niet ingevuld: "Nog niet ingevuld", "Nacht van woensdag op donderdag" en de knop Slaap invullen. Het venster heeft twee tijdvelden (de app had geen eigen tijdkiezer, dus het tijdveld van de browser) en een live totaal, ook over middernacht. Opslaan: beide velden leeg = de nacht wissen (melding "Slaap gewist", hetzelfde patroon als een leeggemaakte notitie: leeg opslaan = verwijderen); één veld leeg of twee gelijke tijden = foutmelding, het venster blijft open. Annuleren met wijzigingen vraagt eerst "Wijzigingen negeren?".
+- **Gewicht invullen**: de kaart toont "98,4 kg" (max. 2 decimalen) met "−0,4 kg t.o.v. woensdag": het verschil met de laatste eerdere dag met een gewicht (`insightWeightCompareText()`), bewust neutraal. Ligt die dag meer dan 6 dagen terug, dan de datum ("t.o.v. 14 oktober", met jaartal als dat anders is); zonder eerdere waarde vervalt de regel. Het venster heeft één veld (komma of punt, max. 2 decimalen tijdens het typen via `FIELD_DECIMALS`), toegestaan 20 tot en met 400 kg; leeg opslaan wist de waarde ("Gewicht gewist").
+- Na opslaan of wissen is het dagoverzicht direct bijgewerkt; het weekoverzicht tekent bij openen opnieuw (`SCREEN_ON_ENTER`).
 
 ### Rekenregels Training-kaart (`insightTrainingStats()`)
 - **Welke dagen**: alle dagen van de week; **in de lopende week alleen tot en met vandaag**. **Vandaag** telt pas mee zodra er vandaag minstens één set is gelogd: vóór die eerste set tellen de geplande sets en de geplande training van vandaag niet mee (geen tekort in de ochtend). Vanaf morgen telt de dag gewoon mee als voorbije dag, ook zonder set. Dit geldt voor de sets uit je schema, het tekort, de extra sets en de telling van trainingen; de rode ring in Per dag stond vandaag al nooit.
@@ -249,7 +264,7 @@ Geeft de geldende schemaversie (de laatste ingangsdatum op of vóór die datum) 
 ## Volgende stappen
 1. Chat Coach activeren (koppelen aan de globale AI Coach-balk)
 2. Nutrition sectie bouwen
-3. Inzicht verder bouwen (Maand en Jaar, detailschermen, slaap en gewicht invullen, vergelijking voor doorlopende schema's)
+3. Inzicht verder bouwen (Maand en Jaar, detailschermen van de kaarten, vergelijking voor doorlopende schema's)
 
 ---
 
