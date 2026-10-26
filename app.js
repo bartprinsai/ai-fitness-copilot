@@ -926,21 +926,28 @@ function emptyTitleOnlyHtml(title) {
 }
 
 function renderHome() {
-  renderSmartBanner();
   document.getElementById('day-nav-label').textContent = formatDateStr(currentDate, 'nav');
   const exercises = getWorkout(currentDate);
   const container = document.getElementById('home-content');
   const screenEl = document.getElementById('screen-fitness-tracker');
+  // The smart day banner is the first block of the day's content, so it slides along
+  // with it on a day change. Replacing the content below detaches it; it's put back
+  // (same element, listeners intact) before renderSmartBanner() decides on visibility.
+  const banner = document.getElementById('smart-day-banner');
 
   if (exercises.length === 0) {
     screenEl.classList.remove('has-day-actions');
     container.innerHTML = emptyAddStateHtml('btn-start-new', 'Nieuwe workout', 'Nog geen workout gelogd');
+    container.prepend(banner);
+    renderSmartBanner();
     document.getElementById('btn-start-new').addEventListener('click', openNewWorkoutScreen);
     return;
   }
 
   screenEl.classList.add('has-day-actions');
   container.innerHTML = '';
+  container.prepend(banner);
+  renderSmartBanner();
 
   exercises.forEach((ex, idx) => {
     const sets = ex.sets || [];
