@@ -265,6 +265,21 @@ async function persistExerciseInfo() {
   uDoc('meta/exercise_info').set({ data: db.exerciseInfo || {} }).catch(persistFailed);
 }
 function getExerciseInfo(name) { return (db.exerciseInfo || {})[name] || null; }
+// Muscle groups used to be stored as free names (primaryMuscle / secondaryMuscle, from the old
+// MUSCLE_OPTIONS list). They are wiped, not converted: they're chosen again by hand from
+// MUSCLE_GROUPS. Drops an entry that held nothing else. Returns whether anything changed.
+function stripLegacyMuscleFields() {
+  let changed = false;
+  Object.keys(db.exerciseInfo || {}).forEach(name => {
+    const info = db.exerciseInfo[name];
+    if (!('primaryMuscle' in info) && !('secondaryMuscle' in info)) return;
+    delete info.primaryMuscle;
+    delete info.secondaryMuscle;
+    if (Object.keys(info).length === 0) delete db.exerciseInfo[name];
+    changed = true;
+  });
+  return changed;
+}
 async function persistPlateInventory() {
   if (!currentUser) return;
   uDoc('meta/plate_inventory').set({ counts: db.plateInventory || {} }).catch(persistFailed);
@@ -312,6 +327,7 @@ async function loadUserData(userUid) {
       (hiddenBuiltinsSnap.data().names || []).forEach(name => { db.hiddenBuiltins[name] = true; });
     }
     db.exerciseInfo = exerciseInfoSnap.exists ? (exerciseInfoSnap.data().data || {}) : {};
+    if (stripLegacyMuscleFields()) persistExerciseInfo();
     db.plateInventory = plateInventorySnap.exists ? (plateInventorySnap.data().counts || {}) : {};
     db.plateOnBar = plateOnBarSnap.exists ? (plateOnBarSnap.data().counts || {}) : {};
     db.categories = categoriesSnap.exists ? categoriesSnap.data() : {};
@@ -2376,7 +2392,26 @@ function openExerciseRecords() {
 // Exercise-own data, keyed by exercise name (same join key as favorites/
 // hiddenBuiltins) — not tied to any session/set, so it's stored and loaded
 // independently of db.workouts.
-const MUSCLE_OPTIONS = ['Borst', 'Rug', 'Schouders', 'Biceps', 'Triceps', 'Quadriceps', 'Hamstrings', 'Bilspieren', 'Core', 'Kuiten'];
+// Muscle groups come from the fixed MUSCLE_GROUPS list in exercises.js and are stored by id:
+// primaryMuscleGroup (one id, or absent) and secondaryMuscleGroups (a list of ids, or absent).
+function muscleGroupName(id) {
+  const m = MUSCLE_GROUPS.find(m => m.id === id);
+  return m ? m.name : '';
+}
+// Known ids only, in list order (the order Secundair is shown in).
+function sortMuscleGroupIds(ids) { return MUSCLE_GROUPS.map(m => m.id).filter(id => ids.includes(id)); }
+// Picker options grouped per category, a header above each group (category order; Cardio has
+// no muscle groups, so no header).
+function muscleGroupPickerOptions() {
+  const out = [];
+  EXERCISE_CATEGORIES.forEach(c => {
+    const groups = MUSCLE_GROUPS.filter(m => m.category === c.id);
+    if (groups.length === 0) return;
+    out.push({ header: categoryName(c.id) || c.name });
+    groups.forEach(m => out.push({ value: m.id, label: m.name }));
+  });
+  return out;
+}
 
 // Every equipment dropdown shares the same "Not set" first option, both so
 // it's the natural default for a new/empty exercise and so a dropdown opened
@@ -2461,12 +2496,16 @@ function renderExerciseInfoView() {
   const info = getExerciseInfo(currentExercise) || {};
   document.getElementById('exercise-info-view-title').textContent = 'Info ' + currentExercise;
   const sections = [];
-  if (info.primaryMuscle || info.secondaryMuscle) {
-    sections.push(`<div class="section-label">Spiergroep</div><div class="info-two-col">
-      ${info.primaryMuscle ? `<div class="info-view-stat"><span class="section-label">Primair</span><span class="info-view-stat-value">${info.primaryMuscle}</span></div>` : ''}
-      ${info.secondaryMuscle ? `<div class="info-view-stat"><span class="section-label">Secundair</span><span class="info-view-stat-value">${info.secondaryMuscle}</span></div>` : ''}
+  // Spiergroep is always shown; nothing chosen = "Niet ingesteld" in the empty-field style.
+  // Secundair lists each chosen group on its own line, in list order.
+  const primary = muscleGroupName(info.primaryMuscleGroup);
+  const secondary = sortMuscleGroupIds(info.secondaryMuscleGroups || []).map(muscleGroupName);
+  const notSet = '<span class="info-view-stat-value info-view-stat-empty">Niet ingesteld</span>';
+  const value = v => `<span class="info-view-stat-value">${v}</span>`;
+  sections.push(`<div class="section-label">Spiergroep</div><div class="info-two-col">
+      <div class="info-view-stat"><span class="section-label">Primair</span>${primary ? value(primary) : notSet}</div>
+      <div class="info-view-stat"><span class="section-label">Secundair</span>${secondary.length ? secondary.map(value).join('') : notSet}</div>
     </div>`);
-  }
   let equipHtml = '';
   EXERCISE_INFO_EQUIPMENT_PAIRS.forEach(pair => {
     const cells = pair
@@ -2481,17 +2520,26 @@ function renderExerciseInfoView() {
     equipHtml += `<div class="info-view-stat"><span class="section-label">${labelHtml(f.label)}</span><span class="info-view-stat-value">${equipmentFieldViewValue(f, info)}</span></div>`;
   });
   if (equipHtml) sections.push('<div class="section-label">Apparatuur</div>' + equipHtml);
-  const content = document.getElementById('exercise-info-view-content');
-  content.innerHTML = sections.length === 0
-    ? `<div class="exercise-info-empty">Nog geen info toegevoegd</div>`
-    : sections.join('');
+  document.getElementById('exercise-info-view-content').innerHTML = sections.join('');
   document.getElementById('exercise-info-view-mode').classList.remove('hidden');
   document.getElementById('exercise-info-edit-mode').classList.add('hidden');
 }
 
-// Primary and Secondary share one list, "Niet ingesteld" first: an exercise without a muscle group
-// shows that (placeholder colour) and saving an untouched field stores nothing.
-const MUSCLE_FIELD_OPTIONS = [{ value: '', label: 'Niet ingesteld' }, ...MUSCLE_OPTIONS.map(m => ({ value: m, label: m }))];
+// Primair: one group or "Niet ingesteld" (single-choice picker, "Niet ingesteld" on top).
+// Secundair: any number of groups (multiple-choice picker, no "Niet ingesteld": nothing ticked =
+// empty). Its field button holds the ids comma-separated; the label lists the names.
+function setPrimaryMuscleField(id, value) {
+  const name = muscleGroupName(value);
+  setFieldBtnValue(id, name ? value : '', name || 'Niet ingesteld');
+}
+function getSecondaryMuscleField(id) {
+  const v = getFieldBtnValue(id);
+  return v ? v.split(',') : [];
+}
+function setSecondaryMuscleField(id, ids) {
+  const sorted = sortMuscleGroupIds(ids || []);
+  setFieldBtnValue(id, sorted.join(','), sorted.length ? sorted.map(muscleGroupName).join(', ') : 'Niet ingesteld');
+}
 
 // The muscle-group/equipment fields live in two places — the Exercise Info
 // overlay and the New/Edit Exercise screen — and both are built, wired,
@@ -2547,8 +2595,19 @@ function wireExerciseInfoFormPickers(form) {
     const id = `${p}-${f.idSuffix}`;
     document.getElementById(id).addEventListener('click', () => setInfoToggle(id, !getInfoToggle(id)));
   });
-  wire(`${p}-primary-muscle`, 'Primair', MUSCLE_FIELD_OPTIONS);
-  wire(`${p}-secondary-muscle`, 'Secundair', MUSCLE_FIELD_OPTIONS);
+  const primaryId = `${p}-primary-muscle`, secondaryId = `${p}-secondary-muscle`;
+  document.getElementById(primaryId).addEventListener('click', () => {
+    openFieldPicker('Primair', [{ value: '', label: 'Niet ingesteld' }, ...muscleGroupPickerOptions()], getFieldBtnValue(primaryId), value => {
+      setPrimaryMuscleField(primaryId, value);
+      // A group is never both: choosing it as primary takes it out of Secundair.
+      setSecondaryMuscleField(secondaryId, getSecondaryMuscleField(secondaryId).filter(id => id !== value));
+    });
+  });
+  document.getElementById(secondaryId).addEventListener('click', () => {
+    const primary = getFieldBtnValue(primaryId);
+    openFieldPickerMulti('Secundair', muscleGroupPickerOptions(), getSecondaryMuscleField(secondaryId),
+      primary ? { [primary]: 'Primair' } : {}, ids => setSecondaryMuscleField(secondaryId, ids));
+  });
   EXERCISE_INFO_EQUIPMENT_FIELDS.filter(f => f.kind === 'picker').forEach(f => wire(`${p}-${f.idSuffix}`, f.label, f.options));
 }
 
@@ -2570,8 +2629,8 @@ function setExerciseInfoPicker(id, options, val) {
 // Fills every field of a form from an exercise's stored info ({} = nothing set).
 function populateExerciseInfoForm(form, info) {
   const p = form.prefix;
-  setExerciseInfoPicker(`${p}-primary-muscle`, MUSCLE_FIELD_OPTIONS, info.primaryMuscle);
-  setExerciseInfoPicker(`${p}-secondary-muscle`, MUSCLE_FIELD_OPTIONS, info.secondaryMuscle);
+  setPrimaryMuscleField(`${p}-primary-muscle`, info.primaryMuscleGroup);
+  setSecondaryMuscleField(`${p}-secondary-muscle`, info.secondaryMuscleGroups);
   EXERCISE_INFO_EQUIPMENT_FIELDS.forEach(f => {
     const id = `${p}-${f.idSuffix}`;
     const val = info[f.key];
@@ -2587,8 +2646,8 @@ function populateExerciseInfoForm(form, info) {
 function getExerciseInfoFormSnapshot(form) {
   const p = form.prefix;
   const snapshot = {
-    primaryMuscle: getFieldBtnValue(`${p}-primary-muscle`),
-    secondaryMuscle: getFieldBtnValue(`${p}-secondary-muscle`),
+    primaryMuscleGroup: getFieldBtnValue(`${p}-primary-muscle`),
+    secondaryMuscleGroups: getFieldBtnValue(`${p}-secondary-muscle`),
   };
   EXERCISE_INFO_EQUIPMENT_FIELDS.forEach(f => {
     const id = `${p}-${f.idSuffix}`;
@@ -2605,9 +2664,9 @@ function readExerciseInfoForm(form) {
   const p = form.prefix;
   const info = {};
   const primary = getFieldBtnValue(`${p}-primary-muscle`);
-  const secondary = getFieldBtnValue(`${p}-secondary-muscle`);
-  if (primary) info.primaryMuscle = primary;
-  if (secondary) info.secondaryMuscle = secondary;
+  const secondary = getSecondaryMuscleField(`${p}-secondary-muscle`);
+  if (primary) info.primaryMuscleGroup = primary;
+  if (secondary.length) info.secondaryMuscleGroups = secondary;
   EXERCISE_INFO_EQUIPMENT_FIELDS.forEach(f => {
     const id = `${p}-${f.idSuffix}`;
     if (f.kind === 'toggle') {
@@ -3714,21 +3773,57 @@ function setFieldBtnValue(id, value, label) {
 }
 function getFieldBtnValue(id) { return document.getElementById(id).dataset.value || ''; }
 
+// Options are { value, label } rows; a { header } entry starts a group (a Label-style heading,
+// e.g. the categories above the muscle groups). Single choice = radios, the tap picks and closes;
+// multiple choice (openFieldPickerMulti) = checkboxes and a Klaar button.
 let fieldPickerOnSelect = null;
-function openFieldPicker(title, options, selectedValue, onSelect) {
+let fieldPickerMulti = null; // { selected: Set, onChange } while a multiple-choice list is open
+const FIELD_PICKER_RADIO = '<span class="field-picker-radio"><span class="field-picker-radio-dot"></span></span>';
+const FIELD_PICKER_CHECK = '<span class="field-picker-check"><svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg></span>';
+// `disabled`: { value: note } — that row is grey, not tappable, with the note on the right.
+function renderFieldPickerList(title, options, isSelected, mark, disabled = {}) {
   document.getElementById('field-picker-title').textContent = title;
-  document.getElementById('field-picker-list').innerHTML = options.map(o => `
-    <div class="field-picker-row${o.value === selectedValue ? ' selected' : ''}" data-value="${o.value}">
-      <span class="field-picker-radio"><span class="field-picker-radio-dot"></span></span>
+  document.getElementById('field-picker-list').innerHTML = options.map(o => o.header !== undefined
+    ? `<div class="section-label field-picker-group-label">${o.header}</div>`
+    : `
+    <div class="field-picker-row${isSelected(o.value) ? ' selected' : ''}${disabled[o.value] ? ' disabled' : ''}" data-value="${o.value}"${disabled[o.value] ? ' aria-disabled="true"' : ''}>
+      ${mark}
       <span class="field-picker-label">${o.label}</span>
+      ${disabled[o.value] ? `<span class="field-picker-note">${disabled[o.value]}</span>` : ''}
     </div>
   `).join('');
+}
+function openFieldPicker(title, options, selectedValue, onSelect) {
+  renderFieldPickerList(title, options, v => v === selectedValue, FIELD_PICKER_RADIO);
+  document.getElementById('field-picker-btns').classList.add('hidden');
+  fieldPickerMulti = null;
   fieldPickerOnSelect = onSelect;
   openOverlay('field-picker-overlay');
 }
+// Every tick applies at once (onChange gets the new list of values), so closing with Klaar,
+// back or a tap outside the sheet never loses anything.
+function openFieldPickerMulti(title, options, selectedValues, disabled, onChange) {
+  const selected = new Set(selectedValues);
+  renderFieldPickerList(title, options, v => selected.has(v), FIELD_PICKER_CHECK, disabled);
+  document.getElementById('field-picker-btns').classList.remove('hidden');
+  fieldPickerOnSelect = null;
+  fieldPickerMulti = { selected, onChange };
+  openOverlay('field-picker-overlay');
+}
+document.getElementById('btn-field-picker-done').addEventListener('click', () => closeOverlay('field-picker-overlay'));
 document.getElementById('field-picker-list').addEventListener('click', e => {
   const row = e.target.closest('.field-picker-row');
-  if (!row || !fieldPickerOnSelect) return;
+  if (!row || row.classList.contains('disabled')) return;
+  if (fieldPickerMulti) {
+    const { selected, onChange } = fieldPickerMulti;
+    const v = row.dataset.value;
+    if (selected.has(v)) selected.delete(v);
+    else selected.add(v);
+    row.classList.toggle('selected', selected.has(v));
+    onChange([...selected]);
+    return;
+  }
+  if (!fieldPickerOnSelect) return;
   const cb = fieldPickerOnSelect;
   fieldPickerOnSelect = null;
   closeOverlay('field-picker-overlay');

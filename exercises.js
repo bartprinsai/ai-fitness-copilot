@@ -15,29 +15,31 @@ const EXERCISE_CATEGORIES = [
   { id: 'cardio', name: 'Cardio' },
 ];
 
-// Fixed muscle-group list, each under a standard category (Cardio has none). Users can't add,
-// rename or delete these. Deliberately NOT linked to anything yet: no exercise has a muscle
-// group, nothing is derived from exercise names, and nothing reads this list so far. (The
-// Exercise Info Primair/Secundair field still uses its own MUSCLE_OPTIONS in app.js.)
+// Fixed muscle-group list, each under a standard category (Cardio has none), in display order.
+// Users can't add, rename or delete these. This is the ONLY muscle list in the app: the
+// Primair/Secundair fields (Oefeninginfo, Nieuwe oefening / Oefening bewerken) choose from it
+// and store the stable `id` (db.exerciseInfo[name].primaryMuscleGroup: one id,
+// .secondaryMuscleGroups: [ids]). Nothing is derived automatically: muscle groups are only
+// ever set by hand per exercise.
 const MUSCLE_GROUPS = [
-  { name: 'Bovenborst', category: 'chest' },
-  { name: 'Borst', category: 'chest' },
-  { name: 'Lats', category: 'back' },
-  { name: 'Middenrug', category: 'back' },
-  { name: 'Onderrug', category: 'back' },
-  { name: 'Trapezius', category: 'back' },
-  { name: 'Voorste schouders', category: 'shoulders' },
-  { name: 'Zijkant schouders', category: 'shoulders' },
-  { name: 'Achterste schouders', category: 'shoulders' },
-  { name: 'Biceps', category: 'arms' },
-  { name: 'Triceps', category: 'arms' },
-  { name: 'Onderarmen', category: 'arms' },
-  { name: 'Quadriceps', category: 'legs' },
-  { name: 'Hamstrings', category: 'legs' },
-  { name: 'Glutes', category: 'legs' },
-  { name: 'Adductoren', category: 'legs' },
-  { name: 'Kuiten', category: 'legs' },
-  { name: 'Buik', category: 'abs' },
+  { id: 'upper-chest', name: 'Bovenborst', category: 'chest' },
+  { id: 'chest', name: 'Borst', category: 'chest' },
+  { id: 'lats', name: 'Lats', category: 'back' },
+  { id: 'mid-back', name: 'Middenrug', category: 'back' },
+  { id: 'lower-back', name: 'Onderrug', category: 'back' },
+  { id: 'traps', name: 'Trapezius', category: 'back' },
+  { id: 'front-delts', name: 'Voorste schouders', category: 'shoulders' },
+  { id: 'side-delts', name: 'Zijkant schouders', category: 'shoulders' },
+  { id: 'rear-delts', name: 'Achterste schouders', category: 'shoulders' },
+  { id: 'biceps', name: 'Biceps', category: 'arms' },
+  { id: 'triceps', name: 'Triceps', category: 'arms' },
+  { id: 'forearms', name: 'Onderarmen', category: 'arms' },
+  { id: 'quads', name: 'Quadriceps', category: 'legs' },
+  { id: 'hamstrings', name: 'Hamstrings', category: 'legs' },
+  { id: 'glutes', name: 'Glutes', category: 'legs' },
+  { id: 'adductors', name: 'Adductoren', category: 'legs' },
+  { id: 'calves', name: 'Kuiten', category: 'legs' },
+  { id: 'abs', name: 'Buik', category: 'abs' },
 ];
 
 // One-time conversion of category NAMES stored before this indeling (self-added exercises in
@@ -57,7 +59,7 @@ const LEGACY_CATEGORY_MAP = {
 const LEGACY_CATEGORY_FALLBACK = { 'olympisch gewichtheffen': 'legs', 'olympic weightlifting': 'legs' };
 
 // Built-in exercises. The former "Olympisch gewichtheffen" lifts are placed by best fit:
-// presses under Schouders (incl. Turkish get-up), the cleans/snatch/swing under Benen.
+// presses under Schouders, the cleans/snatch/swing under Benen.
 const EXERCISE_DB = [
   { category: "chest", name: "Bench press" },
   { category: "chest", name: "Bench press (dumbbell)" },
@@ -180,5 +182,4 @@ const EXERCISE_DB = [
   { category: "shoulders", name: "Push press" },
   { category: "legs", name: "Kettlebell swing" },
   { category: "legs", name: "Kettlebell clean" },
-  { category: "shoulders", name: "Turkish get-up" },
 ];
