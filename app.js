@@ -106,7 +106,7 @@ function setWorkout(date, exercises) {
   else db.workouts[date] = exercises;
   persistWorkout(date, exercises);
 }
-function getCurrentExerciseData() { return getWorkout(currentDate).find(e => e.name === currentExercise) || null; }
+function getCurrentExerciseData() { return getWorkout(currentDate).find(e => e.exerciseId === currentExerciseId) || null; }
 // Full-width banner under the header (see .toast in style.css). Optional 2nd
 // argument: { type: 'success' | 'error' | 'pr', duration } picks the colour
 // variant; no type = success, so every plain toast('text') call gets the
@@ -129,12 +129,30 @@ function persistFailed(e) {
   console.error(e);
   toast('Opslaan mislukt \u2014 controleer je verbinding', { type: 'error' });
 }
+// -- Exercises ------------------------------------------
+// Every exercise has a fixed `id`; its name is only the text that's shown. Built-ins carry
+// theirs in exercises.js (kebab-case of the original name), self-added ones get
+// newExerciseId() when created. Everything that points at an exercise stores this id: plan
+// days and logged workouts ({ exerciseId, … }), favorites, hiddenBuiltins, exerciseInfo and
+// records. Renaming therefore only changes `name`.
+// db.custom_exercises holds self-added exercises AND edited built-ins: an entry with a
+// built-in's id overrides that built-in. A deleted entry stays as { …, deleted: true } so a
+// plan day that still lists it keeps its name.
+function newExerciseId() { return 'ex-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 function allExercises() {
   const custom = db.custom_exercises || [];
-  const customNames = new Set(custom.map(e => e.name));
+  const customIds = new Set(custom.map(e => e.id));
   const hidden = db.hiddenBuiltins || {};
-  const builtins = EXERCISE_DB.filter(e => !hidden[e.name] && !customNames.has(e.name));
-  return [...builtins, ...custom.map(e => ({ ...e, custom: true }))];
+  const builtins = EXERCISE_DB.filter(e => !hidden[e.id] && !customIds.has(e.id));
+  return [...builtins, ...custom.filter(e => !e.deleted).map(e => ({ ...e, custom: true }))];
+}
+// Any exercise by id, deleted ones included, or null.
+function findExercise(id) {
+  return (db.custom_exercises || []).find(e => e.id === id) || EXERCISE_DB.find(e => e.id === id) || null;
+}
+function exerciseName(id) {
+  const ex = findExercise(id);
+  return ex ? ex.name : '';
 }
 
 // -- Categories -----------------------------------------
@@ -245,37 +263,37 @@ async function persistCustomExercises() {
 }
 async function persistFavorites() {
   if (!currentUser) return;
-  uDoc('meta/favorites').set({ names: Object.keys(db.favoriteExercises || {}) }).catch(persistFailed);
+  uDoc('meta/favorites').set({ ids: Object.keys(db.favoriteExercises || {}) }).catch(persistFailed);
 }
-function isFavoriteExercise(name) { return !!(db.favoriteExercises || {})[name]; }
-function toggleFavoriteExercise(name) {
+function isFavoriteExercise(id) { return !!(db.favoriteExercises || {})[id]; }
+function toggleFavoriteExercise(id) {
   if (!db.favoriteExercises) db.favoriteExercises = {};
-  const next = !db.favoriteExercises[name];
-  if (next) db.favoriteExercises[name] = true;
-  else delete db.favoriteExercises[name];
+  const next = !db.favoriteExercises[id];
+  if (next) db.favoriteExercises[id] = true;
+  else delete db.favoriteExercises[id];
   persistFavorites();
   return next;
 }
 async function persistHiddenBuiltins() {
   if (!currentUser) return;
-  uDoc('meta/hidden_builtins').set({ names: Object.keys(db.hiddenBuiltins || {}) }).catch(persistFailed);
+  uDoc('meta/hidden_builtins').set({ ids: Object.keys(db.hiddenBuiltins || {}) }).catch(persistFailed);
 }
 async function persistExerciseInfo() {
   if (!currentUser) return;
   uDoc('meta/exercise_info').set({ data: db.exerciseInfo || {} }).catch(persistFailed);
 }
-function getExerciseInfo(name) { return (db.exerciseInfo || {})[name] || null; }
+function getExerciseInfo(id) { return (db.exerciseInfo || {})[id] || null; }
 // Muscle groups used to be stored as free names (primaryMuscle / secondaryMuscle, from the old
 // MUSCLE_OPTIONS list). They are wiped, not converted: they're chosen again by hand from
 // MUSCLE_GROUPS. Drops an entry that held nothing else. Returns whether anything changed.
 function stripLegacyMuscleFields() {
   let changed = false;
-  Object.keys(db.exerciseInfo || {}).forEach(name => {
-    const info = db.exerciseInfo[name];
+  Object.keys(db.exerciseInfo || {}).forEach(key => {
+    const info = db.exerciseInfo[key];
     if (!('primaryMuscle' in info) && !('secondaryMuscle' in info)) return;
     delete info.primaryMuscle;
     delete info.secondaryMuscle;
-    if (Object.keys(info).length === 0) delete db.exerciseInfo[name];
+    if (Object.keys(info).length === 0) delete db.exerciseInfo[key];
     changed = true;
   });
   return changed;
@@ -291,8 +309,8 @@ async function persistPlateOnBar() {
 async function loadUserData(userUid) {
   console.log('[Load] loadUserData start, uid:', userUid);
   try {
-    console.log('[Load] firing Promise.all for 11 Firestore reads...');
-    const [workoutsSnap, recordsSnap, customSnap, plansSnap, activePlanSnap, favoritesSnap, hiddenBuiltinsSnap, exerciseInfoSnap, plateInventorySnap, plateOnBarSnap, categoriesSnap] = await Promise.all([
+    console.log('[Load] firing Promise.all for 12 Firestore reads...');
+    const [workoutsSnap, recordsSnap, customSnap, plansSnap, activePlanSnap, favoritesSnap, hiddenBuiltinsSnap, exerciseInfoSnap, plateInventorySnap, plateOnBarSnap, categoriesSnap, migrationsSnap] = await Promise.all([
       fStore.collection('users/' + userUid + '/workouts').get(),
       fStore.doc('users/' + userUid + '/meta/records').get(),
       fStore.doc('users/' + userUid + '/meta/custom_exercises').get(),
@@ -304,6 +322,7 @@ async function loadUserData(userUid) {
       fStore.doc('users/' + userUid + '/meta/plate_inventory').get(),
       fStore.doc('users/' + userUid + '/meta/plate_on_bar').get(),
       fStore.doc('users/' + userUid + '/meta/categories').get(),
+      fStore.doc('users/' + userUid + '/meta/migrations').get(),
     ]);
     console.log('[Load] Promise.all resolved, exerciseInfoSnap.exists:', exerciseInfoSnap.exists);
     db.workouts = {};
@@ -320,11 +339,12 @@ async function loadUserData(userUid) {
     db.activePlan = activePlanSnap.exists ? activePlanSnap.data() : null;
     db.favoriteExercises = {};
     if (favoritesSnap.exists) {
-      (favoritesSnap.data().names || []).forEach(name => { db.favoriteExercises[name] = true; });
+      // `names`: stored before exercises had an id (converted by migrateExerciseIds), same for hidden_builtins
+      (favoritesSnap.data().ids || favoritesSnap.data().names || []).forEach(key => { db.favoriteExercises[key] = true; });
     }
     db.hiddenBuiltins = {};
     if (hiddenBuiltinsSnap.exists) {
-      (hiddenBuiltinsSnap.data().names || []).forEach(name => { db.hiddenBuiltins[name] = true; });
+      (hiddenBuiltinsSnap.data().ids || hiddenBuiltinsSnap.data().names || []).forEach(key => { db.hiddenBuiltins[key] = true; });
     }
     db.exerciseInfo = exerciseInfoSnap.exists ? (exerciseInfoSnap.data().data || {}) : {};
     if (stripLegacyMuscleFields()) persistExerciseInfo();
@@ -333,15 +353,114 @@ async function loadUserData(userUid) {
     db.categories = categoriesSnap.exists ? categoriesSnap.data() : {};
     categoryState();
     if (migrateCustomExerciseCategories()) persistCustomExercises();
+    if (!(migrationsSnap.exists && migrationsSnap.data().exerciseIds)) await migrateExerciseIds(userUid);
     console.log('[Load] loadUserData finished OK');
   } catch(e) {
     console.error('[Load] loadUserData FAILED:', e && e.code, e && e.message, e);
   }
 }
 
+// One-time conversion, per user, of data stored before exercises had a fixed id: everything
+// that pointed at an exercise by NAME now points at its id. Runs from loadUserData() while
+// meta/migrations has no `exerciseIds`, and sets that flag in the same (last) write batch,
+// so it never runs again once it got through. Converts:
+//   - custom_exercises: each entry gets an id — a built-in's own id when it has a built-in's
+//     name (that's how a built-in edited without renaming used to be stored), otherwise a new one
+//   - workouts and plan days: { name, … } → { exerciseId, … }
+//   - favorites, hidden_builtins, exercise_info, records: keyed by id instead of name
+// A name without a matching exercise is not guessed. In a workout or plan day such an entry is
+// dropped (an exercise without an id can't be opened); as a key in favorites/hidden_builtins/
+// exercise_info/records it is left as it is (nothing looks it up). Both are logged.
+// Returns a report of what was converted.
+async function migrateExerciseIds(userUid) {
+  const report = { custom: 0, workouts: 0, plans: 0, favorites: 0, hidden: 0, info: 0, records: 0, unmatched: [] };
+  (db.custom_exercises || []).forEach(ex => {
+    if (ex.id) return;
+    const builtin = EXERCISE_DB.find(b => b.name === ex.name);
+    ex.id = builtin ? builtin.id : newExerciseId();
+    report.custom++;
+  });
+  // Custom entries last: one with a built-in's name is that (edited) built-in.
+  const idByName = new Map([...EXERCISE_DB, ...(db.custom_exercises || [])].map(e => [e.name, e.id]));
+
+  const convertEntries = (entries, where) => {
+    let changed = false;
+    const out = [];
+    entries.forEach(entry => {
+      if (entry.exerciseId) { out.push(entry); return; }
+      changed = true;
+      const { name, ...rest } = entry;
+      const id = idByName.get(name);
+      if (id) out.push({ exerciseId: id, ...rest });
+      else report.unmatched.push(`${where}: ${name}`);
+    });
+    return changed ? out : null;
+  };
+  const changedDates = [];
+  Object.keys(db.workouts).forEach(date => {
+    const out = convertEntries(db.workouts[date], 'workout ' + date);
+    if (!out) return;
+    if (out.length) db.workouts[date] = out; else delete db.workouts[date];
+    changedDates.push(date);
+  });
+  const changedPlans = [];
+  Object.values(db.plans).forEach(plan => {
+    let changed = false;
+    (plan.days || []).forEach(day => {
+      const out = convertEntries(day.exercises || [], `plan "${plan.name}" / ${day.name}`);
+      if (out) { day.exercises = out; changed = true; }
+    });
+    if (changed) changedPlans.push(plan.id);
+  });
+  // Re-keys a { name: value } map; returns how many keys changed.
+  const rekey = (map, where) => {
+    let n = 0;
+    Object.keys(map).forEach(key => {
+      const id = idByName.get(key);
+      if (id === key) return;
+      if (!id) {
+        if (!findExercise(key)) report.unmatched.push(`${where}: ${key}`);
+        return;
+      }
+      map[id] = map[key];
+      delete map[key];
+      n++;
+    });
+    return n;
+  };
+  report.favorites = rekey(db.favoriteExercises, 'favorites');
+  report.hidden = rekey(db.hiddenBuiltins, 'hidden_builtins');
+  report.info = rekey(db.exerciseInfo, 'exercise_info');
+  report.records = rekey(db.records, 'records');
+  report.workouts = changedDates.length;
+  report.plans = changedPlans.length;
+
+  const prefix = 'users/' + userUid + '/';
+  const writes = [
+    ...changedDates.map(date => [prefix + 'workouts/' + date, { exercises: db.workouts[date] || [] }, { merge: true }]),
+    ...changedPlans.map(id => [prefix + 'plans/' + id, db.plans[id]]),
+    ...(report.custom ? [[prefix + 'meta/custom_exercises', { list: db.custom_exercises }]] : []),
+    ...(report.favorites ? [[prefix + 'meta/favorites', { ids: Object.keys(db.favoriteExercises) }]] : []),
+    ...(report.hidden ? [[prefix + 'meta/hidden_builtins', { ids: Object.keys(db.hiddenBuiltins) }]] : []),
+    ...(report.info ? [[prefix + 'meta/exercise_info', { data: db.exerciseInfo }]] : []),
+    ...(report.records ? [[prefix + 'meta/records', { data: db.records }]] : []),
+    [prefix + 'meta/migrations', { exerciseIds: todayStr() }, { merge: true }],
+  ];
+  // Same 400-per-batch chunking as "Alles resetten"; the flag is the very last write.
+  const BATCH_LIMIT = 400;
+  for (let i = 0; i < writes.length; i += BATCH_LIMIT) {
+    const batch = fStore.batch();
+    writes.slice(i, i + BATCH_LIMIT).forEach(([path, data, opts]) => batch.set(fStore.doc(path), data, opts || {}));
+    await batch.commit();
+  }
+  if (report.unmatched.length) console.warn('[Migration] exercise names without a matching exercise:', report.unmatched);
+  console.log('[Migration] exercise ids:', report);
+  return report;
+}
+
 // -- State ----------------------------------------------
 let currentDate = todayStr();
-let currentExercise = null;
+let currentExerciseId = null;
 
 // -- Plan Builder state ---------------------------------
 let currentPlanId = null;
@@ -393,10 +512,10 @@ const pdeSel = createSelectionMode({
 // directly; only committed to the exercise on Opslaan).
 let pdeSrMode = 'uniform';
 let pdeSrPerSetReps = [];
-// Name of the exercise being added via screen-exercises' + per row (plan-add mode)
+// Id of the exercise being added via screen-exercises' + per row (plan-add mode)
 // while #pde-sets-reps-overlay is open in its "<name> toevoegen" variant; null when
 // the popup is instead editing an existing exercise (pendingPdeSetsRepsIndex).
-let pendingPdeSrAddName = null;
+let pendingPdeSrAddId = null;
 
 // -- Screen Navigation ------------------------------------
 // Central place that both switches the visible .screen AND keeps the
@@ -964,7 +1083,7 @@ document.getElementById('btn-reset-confirm').addEventListener('click', async () 
 });
 
 // -- Home Screen ----------------------------------------
-// Returns a Set of "date#setIndex" keys for the sets of `exerciseName` that are a
+// Returns a Set of "date#setIndex" keys for the sets of exercise `exId` that are a
 // personal record under the DOMINANCE rule: a set only counts when no other set of
 // this exercise (any date — an earlier OR later set can beat it) matches or beats it
 // on BOTH weight and reps. So 100x5 loses its trophy once 100x6 exists, 120x5 loses
@@ -978,10 +1097,10 @@ document.getElementById('btn-reset-confirm').addEventListener('click', async () 
 // to low — that rep count's best set is a PR exactly when it is strictly heavier than
 // the best weight at ANY higher rep count. O(sets + distinct rep counts).
 // Derived purely from the logged sets (no stored record table that could drift).
-function getPRSetKeys(exerciseName) {
+function getPRSetKeys(exId) {
   const bestWeight = {}, firstKey = {};
   Object.keys(db.workouts).sort().forEach(date => {
-    const ex = (db.workouts[date] || []).find(e => e.name === exerciseName);
+    const ex = (db.workouts[date] || []).find(e => e.exerciseId === exId);
     if (!ex) return;
     const sets = ex.sets || [];
     sets.forEach((s, i) => {
@@ -1051,7 +1170,7 @@ function renderHome() {
 
   exercises.forEach((ex, idx) => {
     const sets = ex.sets || [];
-    const firstPRKeys = getPRSetKeys(ex.name);
+    const firstPRKeys = getPRSetKeys(ex.exerciseId);
     const card = document.createElement('div');
     card.className = 'exercise-card';
     card.dataset.exIdx = idx;
@@ -1059,7 +1178,7 @@ function renderHome() {
     const header = document.createElement('div');
     header.className = 'exercise-card-header';
     header.innerHTML = `
-      <div class="exercise-card-name">${ex.name}</div>
+      <div class="exercise-card-name">${exerciseName(ex.exerciseId)}</div>
       <div class="exercise-card-drag-handle" aria-label="Sleep om te verplaatsen">
         <svg viewBox="0 0 24 24"><path d="M3 15h18v-2H3v2zm0 4h18v-2H3v2zm0-8h18V9H3v2zm0-6v2h18V5H3z"/></svg>
       </div>`;
@@ -1093,7 +1212,7 @@ function renderHome() {
     const wasLongPress = attachLongPress(card, () => homeSel.enter(card), () => homeSel.active);
     card.addEventListener('click', () => {
       if (wasLongPress()) return;
-      if (!homeSel.active) openTraining(ex.name);
+      if (!homeSel.active) openTraining(ex.exerciseId);
       else homeSel.toggle(card);
     });
     container.appendChild(card);
@@ -1132,7 +1251,7 @@ function openSetCommentPopup(exIdx, setIdx, date = currentDate) {
     renderHome();
     if (document.getElementById('tab-history').classList.contains('active')) renderHistoryTab();
   };
-  const exName = (getWorkout(date)[exIdx] || {}).name;
+  const exName = exerciseName((getWorkout(date)[exIdx] || {}).exerciseId);
   openCommentPopup({
     label: `Notitie bij set ${setIdx + 1} van "${exName}"`,
     getText: () => {
@@ -1244,7 +1363,7 @@ function confirmDeleteHomeSelectedEx() {
   if (homeSel.items.size === 0) return;
   const allCards = [...document.getElementById('home-content').querySelectorAll('.exercise-card')];
   const exercises = getWorkout(currentDate);
-  const names = [...homeSel.items].map(c => exercises[allCards.indexOf(c)]).filter(Boolean).map(e => `"${e.name}"`);
+  const names = [...homeSel.items].map(c => exercises[allCards.indexOf(c)]).filter(Boolean).map(e => `"${exerciseName(e.exerciseId)}"`);
   const n = names.length;
   openConfirmDelete({
     title: n === 1 ? 'Oefening verwijderen?' : 'Oefeningen verwijderen?',
@@ -1334,7 +1453,7 @@ function setupHomeExDragReorder() {
     const cards = [...container.querySelectorAll('.exercise-card')];
     const newExercises = cards.map(card => exercises[parseInt(card.dataset.exIdx)]).filter(Boolean);
 
-    if (JSON.stringify(newExercises.map(e => e.name)) !== JSON.stringify(exercises.map(e => e.name))) {
+    if (JSON.stringify(newExercises.map(e => e.exerciseId)) !== JSON.stringify(exercises.map(e => e.exerciseId))) {
       setWorkout(currentDate, newExercises);
       cards.forEach((card, i) => { card.dataset.exIdx = i; });
       toast('Volgorde opgeslagen');
@@ -1377,7 +1496,7 @@ function endSetDrag() {
 
   if (isReordered) {
     const workout = getWorkout(currentDate);
-    const ex = workout.find(e => e.name === currentExercise);
+    const ex = workout.find(e => e.exerciseId === currentExerciseId);
     if (ex) {
       const newSets = oldIdxOrder.map(idx => ex.sets[idx]);
       if (selectedSetIndex !== null) selectedSetIndex = oldIdxOrder.indexOf(selectedSetIndex);
@@ -1601,9 +1720,9 @@ function loadPlanDayIntoWorkout(day, date) {
   const workout = getWorkout(date);
   let added = 0;
   (day.exercises || []).forEach(ex => {
-    if (workout.find(e => e.name === ex.name)) return;
+    if (workout.find(e => e.exerciseId === ex.exerciseId)) return;
     const target = planExerciseTarget(ex);
-    workout.push({ name: ex.name, sets: [], ...(target && { target }) });
+    workout.push({ exerciseId: ex.exerciseId, sets: [], ...(target && { target }) });
     added++;
   });
   if (added > 0) setWorkout(date, workout);
@@ -1917,7 +2036,7 @@ function renderExercisesInCategory(cat) {
 
 function renderFavoriteExercises() {
   const list = exerciseListCard();
-  const favs = allExercises().filter(e => isFavoriteExercise(e.name));
+  const favs = allExercises().filter(e => isFavoriteExercise(e.id));
   if (favs.length === 0) {
     document.getElementById('exercise-list').innerHTML = `<div class="exercise-empty">Nog geen favorieten</div>`;
     return;
@@ -1950,9 +2069,9 @@ function refreshExerciseList() {
 function renderExerciseItem(list, ex) {
   const item = document.createElement('div');
   const isPlanAddMode = exerciseScreenMode === 'plan-add';
-  const inPlanDay = isPlanAddMode && planDayHasExercise(ex.name);
+  const inPlanDay = isPlanAddMode && planDayHasExercise(ex.id);
   item.className = 'exercise-item list-row' + (ex.custom ? ' exercise-item-custom' : '') + (isPlanAddMode ? ' exercise-item-add' : '');
-  const isFav = isFavoriteExercise(ex.name);
+  const isFav = isFavoriteExercise(ex.id);
   // Plan-add mode: a small stepper-style + directly left of the ⋮ menu, which turns into a
   // filled check once the exercise is in the plan day. Only the + adds; the rest of the row
   // does nothing in this mode.
@@ -1966,9 +2085,9 @@ function renderExerciseItem(list, ex) {
   `;
   if (isPlanAddMode) {
     // Once added the + is a disabled check: a second tap does nothing (as before).
-    if (!inPlanDay) item.querySelector('.ex-add-btn').addEventListener('click', () => openPdeSrAdd(ex.name));
+    if (!inPlanDay) item.querySelector('.ex-add-btn').addEventListener('click', () => openPdeSrAdd(ex.id));
   } else {
-    item.querySelector('.exercise-item-name').addEventListener('click', () => openTraining(ex.name));
+    item.querySelector('.exercise-item-name').addEventListener('click', () => openTraining(ex.id));
   }
   item.querySelector('.exercise-item-dots').addEventListener('click', e => {
     e.stopPropagation();
@@ -1977,7 +2096,7 @@ function renderExerciseItem(list, ex) {
       { label: 'Verwijderen', action: () => openDeleteExerciseConfirm(ex), danger: true },
       {
         label: isFav ? 'Uit favorieten' : 'Favoriet maken',
-        action: () => { toggleFavoriteExercise(ex.name); refreshExerciseList(); }
+        action: () => { toggleFavoriteExercise(ex.id); refreshExerciseList(); }
       }
     ], e.currentTarget);
   });
@@ -2160,12 +2279,12 @@ function effortCellHtml(s) {
   return `<span class="set-effort">${rpeText || extraLine ? rpeText + extraLine : '<span class="set-effort-none">—</span>'}</span>`;
 }
 
-function openTraining(name) {
-  currentExercise = name;
+function openTraining(exId) {
+  currentExerciseId = exId;
   currentTimeRange = 'all'; // Graph tab period starts on "all" every time an exercise is opened
   syncTimeFilterButtons();
   selectedSetIndex = null;
-  document.getElementById('training-title').textContent = name;
+  document.getElementById('training-title').textContent = exerciseName(exId);
   document.getElementById('field-weight').value = 0;
   document.getElementById('field-reps').value = plannedRepsForNextSet() || 0;
   resetEffortFields();
@@ -2207,7 +2326,7 @@ function renderSetList() {
     return;
   }
 
-  const firstPRKeys = getPRSetKeys(currentExercise);
+  const firstPRKeys = getPRSetKeys(currentExerciseId);
   list.innerHTML = '';
 
   sets.forEach((s, i) => {
@@ -2238,7 +2357,7 @@ function openSetNote(i) {
 function saveSetNote() {
   if (noteEditIndex === null) return;
   const workout = getWorkout(currentDate);
-  const ex = workout.find(e => e.name === currentExercise);
+  const ex = workout.find(e => e.exerciseId === currentExerciseId);
   if (!ex || !ex.sets[noteEditIndex]) { closeOverlay('set-note-overlay'); return; }
   const note = document.getElementById('set-note-input').value.trim();
   if (note) ex.sets[noteEditIndex].note = note;
@@ -2265,10 +2384,10 @@ function recordsRepLabel(n) { return n === 1 ? 'One rep max' : n + 'RM'; }
 
 // Every valid set (>= 1 rep, > 0 kg, not a dropset) of an exercise in workout-date
 // order: by day, then by position within the day.
-function getExerciseValidSets(name) {
+function getExerciseValidSets(exId) {
   const out = [];
   Object.keys(db.workouts).sort().forEach(date => {
-    const ex = (db.workouts[date] || []).find(e => e.name === name);
+    const ex = (db.workouts[date] || []).find(e => e.exerciseId === exId);
     if (!ex) return;
     const sets = ex.sets || [];
     sets.forEach((s, i) => {
@@ -2288,10 +2407,10 @@ function getExerciseValidSets(name) {
 // time it becomes strictly heavier than before that is one step. sourceReps is the
 // rep count of the set that did it (the fewest reps >= n on that day at that
 // weight); direct = it had exactly n reps. One pass over the days, O(days * reps).
-function getRepProgressions(name, maxReps) {
+function getRepProgressions(exId, maxReps) {
   const days = [];
   let cur = null, top = maxReps;
-  getExerciseValidSets(name).forEach(s => {
+  getExerciseValidSets(exId).forEach(s => {
     if (!cur || cur.date !== s.date) { cur = { date: s.date, best: {} }; days.push(cur); }
     if (s.weight > (cur.best[s.reps] || 0)) cur.best[s.reps] = s.weight;
     if (s.reps > top) top = s.reps;
@@ -2311,8 +2430,8 @@ function getRepProgressions(name, maxReps) {
 
 // Current leading weight per rep count = the last step of its progression
 // ({ reps, weight, direct, date, viaReps } or null = no data).
-function getRepLeaders(name, maxReps) {
-  const steps = getRepProgressions(name, maxReps);
+function getRepLeaders(exId, maxReps) {
+  const steps = getRepProgressions(exId, maxReps);
   const out = [];
   for (let n = 1; n < steps.length; n++) {
     const last = steps[n][steps[n].length - 1];
@@ -2337,7 +2456,7 @@ function recordsStepRowHtml(weight, date, sourceReps, direct) {
     </div>`;
 }
 function openRecordsHistory(reps) {
-  const steps = getRepProgressions(currentExercise, getExerciseMaxReps(currentExercise))[reps] || [];
+  const steps = getRepProgressions(currentExerciseId, getExerciseMaxReps(currentExerciseId))[reps] || [];
   if (steps.length === 0) return;
   recordsHistoryReps = reps;
   const cur = steps[steps.length - 1];
@@ -2365,9 +2484,9 @@ function recordsValueHtml(rec, noWeekday = false) {
 const CROWN_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 16L3 6l5.5 4L12 4l3.5 6L21 6l-2 10H5zm0 2h14v2H5z"/></svg>';
 
 function openExerciseRecords() {
-  document.getElementById('records-title').textContent = (currentExercise || '');
-  const maxReps = getExerciseMaxReps(currentExercise);
-  const leaders = getRepLeaders(currentExercise, maxReps);
+  document.getElementById('records-title').textContent = exerciseName(currentExerciseId);
+  const maxReps = getExerciseMaxReps(currentExerciseId);
+  const leaders = getRepLeaders(currentExerciseId, maxReps);
   // One Rep Max: its own block on top (same rule as a normal row); the list below starts at 2RM.
   const oneRm = leaders[1];
   const hero = document.getElementById('records-hero');
@@ -2389,7 +2508,7 @@ function openExerciseRecords() {
 }
 
 // -- Exercise info (muscle group / equipment setup) ------
-// Exercise-own data, keyed by exercise name (same join key as favorites/
+// Exercise-own data, keyed by exercise id (same join key as favorites/
 // hiddenBuiltins) — not tied to any session/set, so it's stored and loaded
 // independently of db.workouts.
 // Muscle groups come from the fixed MUSCLE_GROUPS list in exercises.js and are stored by id:
@@ -2493,8 +2612,8 @@ function equipmentFieldViewValue(f, info) {
 }
 
 function renderExerciseInfoView() {
-  const info = getExerciseInfo(currentExercise) || {};
-  document.getElementById('exercise-info-view-title').textContent = 'Info ' + currentExercise;
+  const info = getExerciseInfo(currentExerciseId) || {};
+  document.getElementById('exercise-info-view-title').textContent = 'Info ' + exerciseName(currentExerciseId);
   const sections = [];
   // Spiergroep is always shown; nothing chosen = "Niet ingesteld" in the empty-field style.
   // Secundair lists each chosen group on its own line, in list order.
@@ -2694,8 +2813,8 @@ Object.values(EXERCISE_INFO_FORMS).forEach(form => {
 let exerciseInfoEditBaseline = null;
 
 function showExerciseInfoEdit() {
-  const info = getExerciseInfo(currentExercise) || {};
-  document.getElementById('exercise-info-edit-title').textContent = 'Info ' + currentExercise;
+  const info = getExerciseInfo(currentExerciseId) || {};
+  document.getElementById('exercise-info-edit-title').textContent = 'Info ' + exerciseName(currentExerciseId);
   populateExerciseInfoForm(EXERCISE_INFO_FORMS.overlay, info);
   document.getElementById('exercise-info-edit-mode').classList.remove('hidden');
   document.getElementById('exercise-info-view-mode').classList.add('hidden');
@@ -2709,16 +2828,16 @@ function openExerciseInfo() {
 
 // Stores (or, when empty, removes) one exercise's info. Skips the Firestore
 // write when nothing actually changed.
-function setExerciseInfoFor(name, info) {
+function setExerciseInfoFor(id, info) {
   if (!db.exerciseInfo) db.exerciseInfo = {};
-  const unchanged = JSON.stringify(db.exerciseInfo[name] || {}) === JSON.stringify(info);
-  if (Object.keys(info).length === 0) delete db.exerciseInfo[name];
-  else db.exerciseInfo[name] = info;
+  const unchanged = JSON.stringify(db.exerciseInfo[id] || {}) === JSON.stringify(info);
+  if (Object.keys(info).length === 0) delete db.exerciseInfo[id];
+  else db.exerciseInfo[id] = info;
   if (!unchanged) persistExerciseInfo();
 }
 
 function saveExerciseInfo() {
-  setExerciseInfoFor(currentExercise, readExerciseInfoForm(EXERCISE_INFO_FORMS.overlay));
+  setExerciseInfoFor(currentExerciseId, readExerciseInfoForm(EXERCISE_INFO_FORMS.overlay));
   renderExerciseInfoView();
   toast('Info opgeslagen');
 }
@@ -2734,8 +2853,8 @@ function saveSet() {
   const extraType = extra > 0 ? (getExtraType() || 'partial') : '';
 
   const workout = getWorkout(currentDate);
-  let ex = workout.find(e => e.name === currentExercise);
-  if (!ex) { ex = { name: currentExercise, sets: [] }; workout.push(ex); }
+  let ex = workout.find(e => e.exerciseId === currentExerciseId);
+  if (!ex) { ex = { exerciseId: currentExerciseId, sets: [] }; workout.push(ex); }
 
   // Link to the previous set only when there is one (new set: any saved set today; edited set: not the first).
   const dropset = getDropsetField() && (selectedSetIndex !== null ? selectedSetIndex > 0 : ex.sets.length > 0);
@@ -2755,7 +2874,7 @@ function saveSet() {
   setWorkout(currentDate, workout);
   // A PR replaces the plain confirmation entirely (two consecutive toast()
   // calls would just overwrite each other anyway).
-  const isPR = getPRSetKeys(currentExercise).has(currentDate + '#' + savedIdx);
+  const isPR = getPRSetKeys(currentExerciseId).has(currentDate + '#' + savedIdx);
   if (isPR) toast('\u{1F3C6} Nieuw PR! \u{1F3C6}', { type: 'pr' });
   else toast(savedMsg);
   setDropsetField(false); // linking is per set — the next one starts unlinked again
@@ -2794,7 +2913,7 @@ function clearFields() {
 
 function deleteSet(i) {
   const workout = getWorkout(currentDate);
-  const ex = workout.find(e => e.name === currentExercise);
+  const ex = workout.find(e => e.exerciseId === currentExerciseId);
   if (!ex) return;
   ex.sets.splice(i, 1);
   if (ex.sets.length === 0) workout.splice(workout.indexOf(ex), 1);
@@ -3005,7 +3124,7 @@ function renderHistoryTab() {
   // Only days with at least one logged set: an exercise can sit in a workout with
   // no sets yet (just added, or loaded from a plan day), which isn't history.
   const relevantDates = Object.keys(db.workouts).sort().reverse()
-    .filter(d => db.workouts[d] && db.workouts[d].some(e => e.name === currentExercise && e.sets && e.sets.length > 0))
+    .filter(d => db.workouts[d] && db.workouts[d].some(e => e.exerciseId === currentExerciseId && e.sets && e.sets.length > 0))
     .slice(0, 20);
 
   if (relevantDates.length === 0) {
@@ -3013,10 +3132,10 @@ function renderHistoryTab() {
     return;
   }
 
-  const firstPRKeys = getPRSetKeys(currentExercise);
+  const firstPRKeys = getPRSetKeys(currentExerciseId);
 
   relevantDates.forEach(date => {
-    const exIdx = db.workouts[date].findIndex(e => e.name === currentExercise);
+    const exIdx = db.workouts[date].findIndex(e => e.exerciseId === currentExerciseId);
     const ex = db.workouts[date][exIdx];
     if (!ex || !ex.sets.length) return;
 
@@ -3084,12 +3203,12 @@ function openHistoryGotoDate(dateStr) {
 // the record-history popup. `underOverlayId`: an overlay that is open beneath
 // this popup and must go away together with it on "Go To" (see confirm handler).
 function openHistoryGotoDaySets(dateStr, markReps, markVal, underOverlayId) {
-  const ex = (db.workouts[dateStr] || []).find(e => e.name === currentExercise);
+  const ex = (db.workouts[dateStr] || []).find(e => e.exerciseId === currentExerciseId);
   const body = document.createElement('div');
   body.className = 'cal-detail-ex';
   const nameEl = document.createElement('div');
   nameEl.className = 'cal-detail-ex-name';
-  nameEl.textContent = currentExercise;
+  nameEl.textContent = exerciseName(currentExerciseId);
   body.appendChild(nameEl);
   const sets = (ex && ex.sets) || [];
   sets.forEach((s, i) => {
@@ -3139,11 +3258,11 @@ function graphRepsLabel(n) { return n === 1 ? 'One rep max' : String(n); }
 
 // Per rep count: in how many sessions (dates) it was logged; plus the highest rep count ever.
 // Dropsets don't count (countsForRecords), like everywhere records/progression are derived.
-function getExerciseRepStats(name) {
+function getExerciseRepStats(exId) {
   const sessions = {};
   let highest = 0;
   Object.keys(db.workouts).forEach(date => {
-    const ex = (db.workouts[date] || []).find(e => e.name === name);
+    const ex = (db.workouts[date] || []).find(e => e.exerciseId === exId);
     if (!ex) return;
     const seen = new Set();
     const sets = ex.sets || [];
@@ -3163,7 +3282,7 @@ function getExerciseRepStats(name) {
 // logged in the most sessions (ties: the lower one) so the graph opens on real
 // data, otherwise One Rep Max.
 function resolveGraphReps(stats, maxReps) {
-  const chosen = graphRepsByExercise[currentExercise];
+  const chosen = graphRepsByExercise[currentExerciseId];
   if (chosen && chosen <= maxReps) return chosen;
   let best = 1, bestCount = 0;
   Object.keys(stats.sessions).map(Number).sort((a, b) => a - b).forEach(r => {
@@ -3174,8 +3293,8 @@ function resolveGraphReps(stats, maxReps) {
 
 // Top of the rep range shown for an exercise (Graph dropdown, Records overlay):
 // 1..12, or the highest rep count ever logged for it if that is more.
-function getExerciseMaxReps(name) {
-  return Math.max(GRAPH_MIN_MAX_REPS, getExerciseRepStats(name).highest);
+function getExerciseMaxReps(exId) {
+  return Math.max(GRAPH_MIN_MAX_REPS, getExerciseRepStats(exId).highest);
 }
 
 function graphRepOptions(maxReps) {
@@ -3183,9 +3302,9 @@ function graphRepOptions(maxReps) {
 }
 
 document.getElementById('graph-reps').addEventListener('click', () => {
-  const maxReps = getExerciseMaxReps(currentExercise);
+  const maxReps = getExerciseMaxReps(currentExerciseId);
   openFieldPicker('Reps', graphRepOptions(maxReps), getFieldBtnValue('graph-reps'), value => {
-    graphRepsByExercise[currentExercise] = parseInt(value);
+    graphRepsByExercise[currentExerciseId] = parseInt(value);
     renderGraph();
   });
 });
@@ -3237,10 +3356,10 @@ let graphIncludeDerived = true;
 // points = the heaviest set with exactly `reps` reps per session (reps = that count);
 // derived points (only when asked) = each step of the leading-weight progression that came
 // from a set with more reps (reps = that set's real rep count). Workout-date order.
-function getGraphPoints(name, reps, includeDerived) {
-  const points = getExerciseRepSeries(name, reps).map(p => ({ date: p.date, val: p.val, reps, derived: false }));
+function getGraphPoints(exId, reps, includeDerived) {
+  const points = getExerciseRepSeries(exId, reps).map(p => ({ date: p.date, val: p.val, reps, derived: false }));
   if (includeDerived) {
-    (getRepProgressions(name, getExerciseMaxReps(name))[reps] || []).forEach(st => {
+    (getRepProgressions(exId, getExerciseMaxReps(exId))[reps] || []).forEach(st => {
       if (!st.direct) points.push({ date: st.date, val: st.weight, reps: st.sourceReps, derived: true });
     });
     points.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : (a.derived ? 1 : 0) - (b.derived ? 1 : 0)));
@@ -3257,10 +3376,10 @@ const GRAPH_TAP_RADIUS = 28; // px around a point that counts as a tap on it (fi
 // Per session (date, ascending), the heaviest weight actually logged for exactly
 // `reps` reps, dropsets excluded. A session without such a set gets no entry — never an estimate.
 // Shared by the Graph tab and the Personal Records overlay.
-function getExerciseRepSeries(name, reps) {
+function getExerciseRepSeries(exId, reps) {
   if (!(reps >= 1)) return [];
   return Object.keys(db.workouts).sort().reduce((acc, date) => {
-    const ex = db.workouts[date] && db.workouts[date].find(e => e.name === name);
+    const ex = db.workouts[date] && db.workouts[date].find(e => e.exerciseId === exId);
     if (!ex) return acc;
     const sets = ex.sets || [];
     const weights = sets.filter((s, i) => countsForRecords(sets, i) && parseInt(s.reps) === reps).map(s => parseFloat(s.weight) || 0);
@@ -3277,13 +3396,13 @@ function renderGraph(keepSelection = false) {
   const panel = document.getElementById('graph-selection');
   const legend = document.getElementById('graph-legend');
 
-  const stats = getExerciseRepStats(currentExercise);
-  const maxReps = getExerciseMaxReps(currentExercise);
+  const stats = getExerciseRepStats(currentExerciseId);
+  const maxReps = getExerciseMaxReps(currentExerciseId);
   const reps = resolveGraphReps(stats, maxReps);
   // The narrow select shows the plain rep count ("1", not "One rep max"); the picker list keeps the labels.
   setFieldBtnValue('graph-reps', String(reps), String(reps));
 
-  let data = getGraphPoints(currentExercise, reps, graphIncludeDerived);
+  let data = getGraphPoints(currentExerciseId, reps, graphIncludeDerived);
 
   data = filterDataByRange(data);
   graphSeries = data;
@@ -3712,13 +3831,13 @@ function openWorkoutDetail(dateStr) {
   }
 
   exercises.forEach(ex => {
-    const firstPRKeys = getPRSetKeys(ex.name);
+    const firstPRKeys = getPRSetKeys(ex.exerciseId);
     const exEl = document.createElement('div');
     exEl.className = 'cal-detail-ex';
 
     const nameEl = document.createElement('div');
     nameEl.className = 'cal-detail-ex-name';
-    nameEl.textContent = ex.name;
+    nameEl.textContent = exerciseName(ex.exerciseId);
     exEl.appendChild(nameEl);
 
     ex.sets.forEach((s, i) => {
@@ -3753,7 +3872,7 @@ document.getElementById('cal-detail-goto').addEventListener('click', () => {
   goBack('screen-fitness-tracker');
 });
 
-let pendingEditExerciseOriginalName = null;
+let pendingEditExerciseId = null;
 
 // -- Custom field picker (replaces native <select>/picker for Category/Type) --
 const EX_TYPE_OPTIONS = [
@@ -3867,7 +3986,7 @@ document.getElementById('btn-new-ex-equipment-toggle').addEventListener('click',
 });
 
 function openNewExerciseScreen() {
-  pendingEditExerciseOriginalName = null;
+  pendingEditExerciseId = null;
   document.getElementById('new-ex-title').textContent = 'Nieuwe oefening';
   document.getElementById('new-ex-name').value = '';
   setFieldBtnValue('new-ex-type', 'weight_reps', 'Gewicht en reps');
@@ -3880,65 +3999,40 @@ function openNewExerciseScreen() {
 }
 
 function openEditExerciseScreen(ex) {
-  pendingEditExerciseOriginalName = ex.name;
+  pendingEditExerciseId = ex.id;
   document.getElementById('new-ex-title').textContent = 'Oefening bewerken';
   document.getElementById('new-ex-name').value = ex.name;
   const typeOpt = EX_TYPE_OPTIONS.find(o => o.value === ex.type) || EX_TYPE_OPTIONS[0];
   setFieldBtnValue('new-ex-type', typeOpt.value, typeOpt.label);
   populateNewExCategorySelect(ex.category);
-  populateExerciseInfoForm(EXERCISE_INFO_FORMS.newEx, getExerciseInfo(ex.name) || {});
+  populateExerciseInfoForm(EXERCISE_INFO_FORMS.newEx, getExerciseInfo(ex.id) || {});
   setNewExEquipmentOpen(false);
   newExerciseBaseline = getNewExerciseFormSnapshot();
   showScreen('screen-new-exercise');
 }
 
-// Renames/updates an exercise across every place it's referenced by name: the
-// custom-exercise definition itself, every logged workout, PR records and
-// favorites — name is this app's only stable identifier for an exercise.
-// originalName may belong to a built-in (no db.custom_exercises entry yet) —
-// in that case editing converts it into a custom override and hides the
-// built-in so it doesn't also keep showing up unedited.
-function updateExistingExercise(originalName, updated) {
+// Updates an exercise's name/category/type. Everything else points at its id, so a
+// rename needs nothing else. A built-in's first edit gives it its own db.custom_exercises
+// entry with the same id, which overrides the built-in (see allExercises()).
+function updateExistingExercise(id, updated) {
   if (!db.custom_exercises) db.custom_exercises = [];
-  let entry = db.custom_exercises.find(e => e.name === originalName);
+  let entry = db.custom_exercises.find(e => e.id === id);
   if (!entry) {
-    entry = { category: updated.category, name: updated.name, type: updated.type };
+    entry = { id };
     db.custom_exercises.push(entry);
-    if (!db.hiddenBuiltins) db.hiddenBuiltins = {};
-    db.hiddenBuiltins[originalName] = true;
-    persistHiddenBuiltins();
   }
-  const nameChanged = updated.name !== originalName;
   entry.category = updated.category;
   entry.name = updated.name;
   entry.type = updated.type;
   persistCustomExercises();
-
-  if (nameChanged) {
-    Object.keys(db.workouts).forEach(date => {
-      const workout = db.workouts[date];
-      const idx = workout.findIndex(e => e.name === originalName);
-      if (idx === -1) return;
-      workout[idx] = { ...workout[idx], name: updated.name };
-      setWorkout(date, workout);
-    });
-    if (db.records && db.records[originalName]) {
-      db.records[updated.name] = db.records[originalName];
-      delete db.records[originalName];
-      persistRecords();
-    }
-    if (db.favoriteExercises && db.favoriteExercises[originalName]) {
-      db.favoriteExercises[updated.name] = true;
-      delete db.favoriteExercises[originalName];
-      persistFavorites();
-    }
-    if (db.exerciseInfo && db.exerciseInfo[originalName]) {
-      db.exerciseInfo[updated.name] = db.exerciseInfo[originalName];
-      delete db.exerciseInfo[originalName];
-      persistExerciseInfo();
-    }
-  }
   toast('Oefening bijgewerkt');
+}
+
+// Names stay unique (case-insensitive) among the exercises you can see; `exceptId` is the
+// exercise being edited, which may keep its own name.
+function exerciseNameTaken(name, exceptId) {
+  const n = name.toLowerCase();
+  return allExercises().some(e => e.id !== exceptId && e.name.toLowerCase() === n);
 }
 
 function saveNewExerciseFromScreen() {
@@ -3948,14 +4042,12 @@ function saveNewExerciseFromScreen() {
   if (!name) { toast('Vul een naam in'); return; }
   if (!cat) { toast('Kies een categorie'); return; }
 
-  if (pendingEditExerciseOriginalName) {
-    const nameTaken = name.toLowerCase() !== pendingEditExerciseOriginalName.toLowerCase()
-      && allExercises().find(e => e.name.toLowerCase() === name.toLowerCase());
-    if (nameTaken) { toast('Deze oefening bestaat al'); return; }
-    updateExistingExercise(pendingEditExerciseOriginalName, { category: cat, name, type });
-    // After the rename above has moved any existing info over to the new name.
-    setExerciseInfoFor(name, readExerciseInfoForm(EXERCISE_INFO_FORMS.newEx));
-    pendingEditExerciseOriginalName = null;
+  if (pendingEditExerciseId) {
+    const id = pendingEditExerciseId;
+    if (exerciseNameTaken(name, id)) { toast('Deze oefening bestaat al'); return; }
+    updateExistingExercise(id, { category: cat, name, type });
+    setExerciseInfoFor(id, readExerciseInfoForm(EXERCISE_INFO_FORMS.newEx));
+    pendingEditExerciseId = null;
     exerciseBrowserMode = 'categories';
     currentBrowseCategory = null;
     renderCategoryBrowser();
@@ -3963,11 +4055,12 @@ function saveNewExerciseFromScreen() {
     return;
   }
 
-  if (allExercises().find(e => e.name.toLowerCase() === name.toLowerCase())) { toast('Deze oefening bestaat al'); return; }
+  if (exerciseNameTaken(name)) { toast('Deze oefening bestaat al'); return; }
   if (!db.custom_exercises) db.custom_exercises = [];
-  db.custom_exercises.push({ category: cat, name, type });
+  const id = newExerciseId();
+  db.custom_exercises.push({ id, category: cat, name, type });
   persistCustomExercises();
-  setExerciseInfoFor(name, readExerciseInfoForm(EXERCISE_INFO_FORMS.newEx));
+  setExerciseInfoFor(id, readExerciseInfoForm(EXERCISE_INFO_FORMS.newEx));
   toast('Oefening aangemaakt');
   exerciseBrowserMode = 'categories';
   currentBrowseCategory = null;
@@ -3980,7 +4073,7 @@ let pendingDeleteExercise = null;
 
 function openDeleteExerciseConfirm(ex) {
   pendingDeleteExercise = ex;
-  const workoutCount = Object.values(db.workouts).filter(exercises => exercises.some(e => e.name === ex.name)).length;
+  const workoutCount = Object.values(db.workouts).filter(exercises => exercises.some(e => e.exerciseId === ex.id)).length;
   document.getElementById('delete-ex-msg').innerHTML =
     `Weet je zeker dat je <strong>${ex.name}</strong> wilt verwijderen? De <strong>${workoutCount} workout${workoutCount !== 1 ? 's' : ''}</strong> die voor deze oefening zijn vastgelegd, worden ook permanent verwijderd.`;
   document.getElementById('delete-ex-confirm-check').checked = false;
@@ -3997,23 +4090,27 @@ document.getElementById('btn-delete-ex-cancel').addEventListener('click', () => 
 });
 document.getElementById('btn-delete-ex-confirm').addEventListener('click', () => {
   if (!pendingDeleteExercise) return;
-  const name = pendingDeleteExercise.name;
-  if (pendingDeleteExercise.custom) {
-    db.custom_exercises = (db.custom_exercises || []).filter(e => e.name !== name);
+  const id = pendingDeleteExercise.id;
+  // A self-added (or edited) exercise stays as a deleted entry, so a plan day that still
+  // lists it keeps its name; a built-in is hidden.
+  const entry = (db.custom_exercises || []).find(e => e.id === id);
+  if (entry) {
+    entry.deleted = true;
     persistCustomExercises();
-  } else {
+  }
+  if (EXERCISE_DB.some(b => b.id === id)) {
     if (!db.hiddenBuiltins) db.hiddenBuiltins = {};
-    db.hiddenBuiltins[name] = true;
+    db.hiddenBuiltins[id] = true;
     persistHiddenBuiltins();
   }
   Object.keys(db.workouts).forEach(date => {
     const workout = db.workouts[date];
-    if (!workout.some(e => e.name === name)) return;
-    setWorkout(date, workout.filter(e => e.name !== name));
+    if (!workout.some(e => e.exerciseId === id)) return;
+    setWorkout(date, workout.filter(e => e.exerciseId !== id));
   });
-  if (db.records && db.records[name]) { delete db.records[name]; persistRecords(); }
-  if (db.favoriteExercises && db.favoriteExercises[name]) { delete db.favoriteExercises[name]; persistFavorites(); }
-  if (db.exerciseInfo && db.exerciseInfo[name]) { delete db.exerciseInfo[name]; persistExerciseInfo(); }
+  if (db.records && db.records[id]) { delete db.records[id]; persistRecords(); }
+  if (db.favoriteExercises && db.favoriteExercises[id]) { delete db.favoriteExercises[id]; persistFavorites(); }
+  if (db.exerciseInfo && db.exerciseInfo[id]) { delete db.exerciseInfo[id]; persistExerciseInfo(); }
   pendingDeleteExercise = null;
   closeOverlay('delete-exercise-overlay');
   refreshExerciseList();
@@ -4135,7 +4232,7 @@ document.getElementById('btn-clear').addEventListener('click', () => {
   const i = selectedSetIndex;
   openConfirmDelete({
     title: 'Set verwijderen?',
-    message: `Set ${i + 1} van "${currentExercise}" verwijderen? Dit kan niet ongedaan worden gemaakt.`,
+    message: `Set ${i + 1} van "${exerciseName(currentExerciseId)}" verwijderen? Dit kan niet ongedaan worden gemaakt.`,
     onConfirm: () => deleteSet(i),
   });
 });
@@ -4160,7 +4257,7 @@ document.getElementById('btn-records-history-graph').addEventListener('click', (
   if (overlayStack[overlayStack.length - 1] !== overlayId) return;
   overlayStack.pop();
   document.getElementById(overlayId).classList.remove('open');
-  graphRepsByExercise[currentExercise] = recordsHistoryReps;
+  graphRepsByExercise[currentExerciseId] = recordsHistoryReps;
   currentTimeRange = 'all'; // same period the Graph tab opens on, so no record date is filtered out
   window.addEventListener('popstate', () => switchTab('graph'), { once: true });
   history.go(-2);
@@ -4634,10 +4731,10 @@ function countWorkingSets(sets) {
   return workingSets(sets).length;
 }
 
-// The most recent session BEFORE `date` with logged sets of `name`, or null.
-function previousSessionSets(name, date) {
+// The most recent session BEFORE `date` with logged sets of exercise `exId`, or null.
+function previousSessionSets(exId, date) {
   const prev = Object.keys(db.workouts).filter(d => d < date).sort().reverse()
-    .map(d => db.workouts[d].find(e => e.name === name))
+    .map(d => db.workouts[d].find(e => e.exerciseId === exId))
     .find(e => e && e.sets && e.sets.length > 0);
   return prev ? prev.sets : null;
 }
@@ -4680,7 +4777,7 @@ function workingSetGroups(sets) {
 function recapSetLines(ex, date, prKeys) {
   const groups = workingSetGroups(ex.sets || []);
   if (groups.length === 0) return recapLine('recap-muted', '', 'Nog geen sets gelogd');
-  const prevSessionSets = previousSessionSets(ex.name, date);
+  const prevSessionSets = previousSessionSets(ex.exerciseId, date);
   const prev = prevSessionSets ? workingSets(prevSessionSets) : null;
   const reps = n => `${n} ${n === 1 ? 'rep' : 'reps'}`;
   const blocks = groups.map(({ set: s, idxs }, i) => {
@@ -4723,17 +4820,17 @@ function recapSetLines(ex, date, prKeys) {
   return blocks.join('');
 }
 
-// PR sets logged on `date`, per exercise name — straight from getPRSetKeys(), the
+// PR sets logged on `date`, per exercise id — straight from getPRSetKeys(), the
 // same detection that draws the Track screen's trophies.
 function recapPRKeys(exercises, date) {
-  const byName = {};
+  const byId = {};
   let count = 0;
   exercises.forEach(ex => {
-    const keys = getPRSetKeys(ex.name);
-    byName[ex.name] = keys;
+    const keys = getPRSetKeys(ex.exerciseId);
+    byId[ex.exerciseId] = keys;
     keys.forEach(k => { if (k.startsWith(date + '#')) count++; });
   });
-  return { byName, count };
+  return { byId, count };
 }
 
 function openDayRecap() {
@@ -4753,9 +4850,9 @@ function openDayRecap() {
   } else {
     body.innerHTML = shown.map(ex => `
       <div class="recap-ex">
-        <div class="recap-ex-name">${ex.name}</div>
+        <div class="recap-ex-name">${exerciseName(ex.exerciseId)}</div>
         ${ex.target ? recapSetsLine(ex) : ''}
-        ${recapSetLines(ex, date, prs.byName[ex.name])}
+        ${recapSetLines(ex, date, prs.byId[ex.exerciseId])}
       </div>`).join('');
   }
   openOverlay('recap-overlay');
@@ -5379,7 +5476,7 @@ function buildPlanDayCard(day, idx) {
     ${expanded ? `
     <div class="plan-day-preview">
       ${exCount === 0 ? `<div class="plan-day-preview-empty">Geen oefeningen</div>` : exercises.map(ex => `
-      <div class="plan-day-preview-row"><span class="plan-day-preview-name">${ex.name}</span><span class="plan-day-preview-meta">${formatExerciseSetsReps(ex, 'short')}</span></div>`).join('')}
+      <div class="plan-day-preview-row"><span class="plan-day-preview-name">${exerciseName(ex.exerciseId)}</span><span class="plan-day-preview-meta">${formatExerciseSetsReps(ex, 'short')}</span></div>`).join('')}
     </div>` : ''}
   `;
   // Tapping the head (number, name, exercise count) toggles this card's inline
@@ -5766,7 +5863,7 @@ function renderPlanDayEdit() {
     item.innerHTML = `
       <div class="pde-item-inner">
         <div class="pde-ex-info">
-          <span class="pde-ex-name">${ex.name}</span>
+          <span class="pde-ex-name">${exerciseName(ex.exerciseId)}</span>
           <span class="pde-ex-meta">${formatExerciseSetsReps(ex)}</span>
         </div>
         <svg class="pde-chevron" viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
@@ -5795,16 +5892,16 @@ function openPdeSetsRepsEdit(exIdx) {
   const ex = currentPlanData.days[currentEditDayIndex].exercises[exIdx];
   if (!ex) return;
   pendingPdeSetsRepsIndex = exIdx;
-  pendingPdeSrAddName = null;
+  pendingPdeSrAddId = null;
   openPdeSrPopup(ex, 'Sets & reps aanpassen', 'Opslaan');
 }
 
 // Same popup, opened from screen-exercises' + per row (plan-add mode): nothing is
 // written to the plan day until Toevoegen — see btn-pde-sr-save.
-function openPdeSrAdd(name) {
+function openPdeSrAdd(exId) {
   pendingPdeSetsRepsIndex = null;
-  pendingPdeSrAddName = name;
-  openPdeSrPopup({ sets: 3, reps: 10 }, `${name} toevoegen`, 'Toevoegen');
+  pendingPdeSrAddId = exId;
+  openPdeSrPopup({ sets: 3, reps: 10 }, `${exerciseName(exId)} toevoegen`, 'Toevoegen');
 }
 
 function openPdeSrPopup(ex, title, saveLabel) {
@@ -5890,17 +5987,17 @@ function readPdeSrValues() {
 
 document.getElementById('btn-pde-sr-cancel').addEventListener('click', () => {
   pendingPdeSetsRepsIndex = null;
-  pendingPdeSrAddName = null;
+  pendingPdeSrAddId = null;
   closeOverlay('pde-sets-reps-overlay');
 });
 document.getElementById('btn-pde-sr-save').addEventListener('click', async () => {
-  if (pendingPdeSrAddName !== null) {
+  if (pendingPdeSrAddId !== null) {
     const values = readPdeSrValues();
     if (!values) { toast('Vul geldige sets en reps in'); return; }
-    const name = pendingPdeSrAddName;
-    pendingPdeSrAddName = null;
+    const exId = pendingPdeSrAddId;
+    pendingPdeSrAddId = null;
     closeOverlay('pde-sets-reps-overlay');
-    await addExerciseToPlanDay(name, values);
+    await addExerciseToPlanDay(exId, values);
     return;
   }
   if (pendingPdeSetsRepsIndex === null) return;
@@ -5930,7 +6027,7 @@ function openPdeDeleteSelectedConfirm() {
   const idxs = [...pdeSel.items].map(item => parseInt(item.dataset.exIdx)).filter(i => exercises[i]).sort((a, b) => a - b);
   if (idxs.length === 0) return;
   pendingPdeDeleteIndices = idxs;
-  const names = idxs.map(i => `"${exercises[i].name}"`);
+  const names = idxs.map(i => `"${exerciseName(exercises[i].exerciseId)}"`);
   document.getElementById('delete-pde-exercise-title').textContent = idxs.length === 1 ? 'Oefening verwijderen?' : 'Oefeningen verwijderen?';
   document.getElementById('delete-pde-exercise-msg').textContent = idxs.length === 1
     ? `Weet je zeker dat je ${names[0]} wilt verwijderen uit deze dag?`
@@ -5987,7 +6084,7 @@ function setupPdeDragReorder(list) {
     const newItems = [...list.querySelectorAll('.pde-item')];
     const newExercises = newItems.map(el => oldExercises[parseInt(el.dataset.exIdx)]).filter(Boolean);
 
-    if (JSON.stringify(newExercises.map(e => e.name)) !== JSON.stringify(oldExercises.map(e => e.name))) {
+    if (JSON.stringify(newExercises.map(e => e.exerciseId)) !== JSON.stringify(oldExercises.map(e => e.exerciseId))) {
       await savePlanDayExercises(newExercises);
       newItems.forEach((el, i) => { el.dataset.exIdx = i; });
       toast('Volgorde opgeslagen');
@@ -6091,6 +6188,19 @@ const AI_GEN_DEFAULT_SNAPSHOT = { goal: 'Muscle Growth', level: 'Intermediate', 
 // prompt input is unambiguous; only their labels are Dutch.
 const AI_ENGLISH_TERMS = ['reps', 'sets', 'RPE', 'dropset', 'PR', 'partial', 'forced', 'extra reps', 'warm-up', '1RM', 'xRM (5RM, 8RM)', 'One rep max', 'Workout'];
 function aiExerciseNameList() { return allExercises().map(e => e.name).join('\n'); }
+// The AI answers with exercise names; a plan day stores ids. A name that isn't one of the
+// listed exercises is left out (logged), never guessed.
+function aiPlanDaysToIds(days) {
+  const idByName = new Map(allExercises().map(e => [e.name, e.id]));
+  return days.map(day => ({
+    ...day,
+    exercises: (day.exercises || []).flatMap(({ name, ...rest }) => {
+      const id = idByName.get(name);
+      if (!id) { console.warn('[AI] unknown exercise left out:', name); return []; }
+      return [{ exerciseId: id, ...rest }];
+    }),
+  }));
+}
 
 function openAIGenerate() {
   document.getElementById('ai-gen-form').classList.remove('hidden');
@@ -6140,7 +6250,7 @@ Respond ONLY with a valid JSON object, no markdown, no explanation. Format:
     const raw = await callClaude(userMsg, systemPrompt);
     const plan = JSON.parse(raw);
     if (!plan.name || !Array.isArray(plan.days)) throw new Error('Invalid format');
-    const planId = await createPlan(plan.name, plan.days);
+    const planId = await createPlan(plan.name, aiPlanDaysToIds(plan.days));
     openPlanDetail(planId);
     toast('Plan gemaakt!');
   } catch(e) {
@@ -6166,27 +6276,27 @@ document.querySelectorAll('.chip-group, #chips-days').forEach(group => {
 // ── Presets ───────────────────────────────────────────
 const PLAN_PRESETS = [
   { name: 'Push / Pull / Legs', days: [
-    { name: 'Push', exercises: [{ name:'Bench press', sets:4, reps:8 }, { name:'Military press (barbell)', sets:3, reps:10 }, { name:'Incline bench press (dumbbell)', sets:3, reps:12 }, { name:'Dips (triceps)', sets:3, reps:12 }] },
-    { name: 'Pull', exercises: [{ name:'Deadlift', sets:4, reps:5 }, { name:'Pull-ups', sets:4, reps:8 }, { name:'Bent-over barbell row', sets:3, reps:10 }, { name:'Dumbbell curl', sets:3, reps:12 }] },
-    { name: 'Legs', exercises: [{ name:'Squat', sets:4, reps:8 }, { name:'Romanian deadlift', sets:3, reps:10 }, { name:'Leg press', sets:3, reps:12 }, { name:'Standing calf raise (machine)', sets:4, reps:15 }] },
+    { name: 'Push', exercises: [{ exerciseId:'bench-press', sets:4, reps:8 }, { exerciseId:'military-press-barbell', sets:3, reps:10 }, { exerciseId:'incline-bench-press-dumbbell', sets:3, reps:12 }, { exerciseId:'dips-triceps', sets:3, reps:12 }] },
+    { name: 'Pull', exercises: [{ exerciseId:'deadlift', sets:4, reps:5 }, { exerciseId:'pull-ups', sets:4, reps:8 }, { exerciseId:'bent-over-barbell-row', sets:3, reps:10 }, { exerciseId:'dumbbell-curl', sets:3, reps:12 }] },
+    { name: 'Legs', exercises: [{ exerciseId:'squat', sets:4, reps:8 }, { exerciseId:'romanian-deadlift', sets:3, reps:10 }, { exerciseId:'leg-press', sets:3, reps:12 }, { exerciseId:'standing-calf-raise-machine', sets:4, reps:15 }] },
   ]},
   { name: 'Upper / Lower (4 dagen)', days: [
-    { name: 'Upper A', exercises: [{ name:'Bench press', sets:4, reps:6 }, { name:'Bent-over barbell row', sets:4, reps:6 }, { name:'Military press (barbell)', sets:3, reps:8 }, { name:'Pull-ups', sets:3, reps:8 }] },
-    { name: 'Lower A', exercises: [{ name:'Squat', sets:4, reps:6 }, { name:'Romanian deadlift', sets:3, reps:8 }, { name:'Leg press', sets:3, reps:10 }, { name:'Leg curl (machine)', sets:3, reps:12 }] },
-    { name: 'Upper B', exercises: [{ name:'Incline bench press', sets:4, reps:8 }, { name:'Seated cable row', sets:4, reps:10 }, { name:'Shoulder press (dumbbell)', sets:3, reps:10 }, { name:'Dumbbell curl', sets:3, reps:12 }] },
-    { name: 'Lower B', exercises: [{ name:'Deadlift', sets:4, reps:5 }, { name:'Hack squat', sets:3, reps:10 }, { name:'Lunges (dumbbell)', sets:3, reps:12 }, { name:'Standing calf raise (machine)', sets:4, reps:15 }] },
+    { name: 'Upper A', exercises: [{ exerciseId:'bench-press', sets:4, reps:6 }, { exerciseId:'bent-over-barbell-row', sets:4, reps:6 }, { exerciseId:'military-press-barbell', sets:3, reps:8 }, { exerciseId:'pull-ups', sets:3, reps:8 }] },
+    { name: 'Lower A', exercises: [{ exerciseId:'squat', sets:4, reps:6 }, { exerciseId:'romanian-deadlift', sets:3, reps:8 }, { exerciseId:'leg-press', sets:3, reps:10 }, { exerciseId:'leg-curl-machine', sets:3, reps:12 }] },
+    { name: 'Upper B', exercises: [{ exerciseId:'incline-bench-press', sets:4, reps:8 }, { exerciseId:'seated-cable-row', sets:4, reps:10 }, { exerciseId:'shoulder-press-dumbbell', sets:3, reps:10 }, { exerciseId:'dumbbell-curl', sets:3, reps:12 }] },
+    { name: 'Lower B', exercises: [{ exerciseId:'deadlift', sets:4, reps:5 }, { exerciseId:'hack-squat', sets:3, reps:10 }, { exerciseId:'lunges-dumbbell', sets:3, reps:12 }, { exerciseId:'standing-calf-raise-machine', sets:4, reps:15 }] },
   ]},
   { name: 'Full body (3 dagen)', days: [
-    { name: 'Dag A', exercises: [{ name:'Squat', sets:3, reps:8 }, { name:'Bench press', sets:3, reps:8 }, { name:'Bent-over barbell row', sets:3, reps:8 }, { name:'Military press (barbell)', sets:3, reps:8 }] },
-    { name: 'Dag B', exercises: [{ name:'Deadlift', sets:3, reps:5 }, { name:'Incline bench press', sets:3, reps:10 }, { name:'Pull-ups', sets:3, reps:8 }, { name:'Dumbbell curl', sets:3, reps:12 }] },
-    { name: 'Dag C', exercises: [{ name:'Front squat', sets:3, reps:8 }, { name:'Dips (chest)', sets:3, reps:10 }, { name:'Chin-ups', sets:3, reps:8 }, { name:'Lateral raises (dumbbell)', sets:3, reps:15 }] },
+    { name: 'Dag A', exercises: [{ exerciseId:'squat', sets:3, reps:8 }, { exerciseId:'bench-press', sets:3, reps:8 }, { exerciseId:'bent-over-barbell-row', sets:3, reps:8 }, { exerciseId:'military-press-barbell', sets:3, reps:8 }] },
+    { name: 'Dag B', exercises: [{ exerciseId:'deadlift', sets:3, reps:5 }, { exerciseId:'incline-bench-press', sets:3, reps:10 }, { exerciseId:'pull-ups', sets:3, reps:8 }, { exerciseId:'dumbbell-curl', sets:3, reps:12 }] },
+    { name: 'Dag C', exercises: [{ exerciseId:'front-squat', sets:3, reps:8 }, { exerciseId:'dips-chest', sets:3, reps:10 }, { exerciseId:'chin-ups', sets:3, reps:8 }, { exerciseId:'lateral-raises-dumbbell', sets:3, reps:15 }] },
   ]},
   { name: 'Bro split (5 dagen)', days: [
-    { name: 'Borst', exercises: [{ name:'Bench press', sets:4, reps:8 }, { name:'Incline bench press (dumbbell)', sets:3, reps:10 }, { name:'Flyes (cable)', sets:3, reps:12 }, { name:'Dips (chest)', sets:3, reps:12 }] },
-    { name: 'Rug', exercises: [{ name:'Deadlift', sets:4, reps:5 }, { name:'Pull-ups', sets:4, reps:8 }, { name:'Bent-over barbell row', sets:3, reps:10 }, { name:'Seated cable row', sets:3, reps:12 }] },
-    { name: 'Schouders', exercises: [{ name:'Military press (barbell)', sets:4, reps:8 }, { name:'Lateral raises (dumbbell)', sets:4, reps:15 }, { name:'Front raises (dumbbell)', sets:3, reps:12 }, { name:'Shrugs (barbell)', sets:3, reps:12 }] },
-    { name: 'Armen', exercises: [{ name:'Barbell curl', sets:4, reps:10 }, { name:'Hammer curl', sets:3, reps:12 }, { name:'Skull crushers (barbell)', sets:4, reps:10 }, { name:'Triceps pushdown (cable)', sets:3, reps:12 }] },
-    { name: 'Benen', exercises: [{ name:'Squat', sets:4, reps:8 }, { name:'Romanian deadlift', sets:3, reps:10 }, { name:'Leg press', sets:3, reps:12 }, { name:'Standing calf raise (machine)', sets:5, reps:15 }] },
+    { name: 'Borst', exercises: [{ exerciseId:'bench-press', sets:4, reps:8 }, { exerciseId:'incline-bench-press-dumbbell', sets:3, reps:10 }, { exerciseId:'flyes-cable', sets:3, reps:12 }, { exerciseId:'dips-chest', sets:3, reps:12 }] },
+    { name: 'Rug', exercises: [{ exerciseId:'deadlift', sets:4, reps:5 }, { exerciseId:'pull-ups', sets:4, reps:8 }, { exerciseId:'bent-over-barbell-row', sets:3, reps:10 }, { exerciseId:'seated-cable-row', sets:3, reps:12 }] },
+    { name: 'Schouders', exercises: [{ exerciseId:'military-press-barbell', sets:4, reps:8 }, { exerciseId:'lateral-raises-dumbbell', sets:4, reps:15 }, { exerciseId:'front-raises-dumbbell', sets:3, reps:12 }, { exerciseId:'shrugs-barbell', sets:3, reps:12 }] },
+    { name: 'Armen', exercises: [{ exerciseId:'barbell-curl', sets:4, reps:10 }, { exerciseId:'hammer-curl', sets:3, reps:12 }, { exerciseId:'skull-crushers-barbell', sets:4, reps:10 }, { exerciseId:'triceps-pushdown-cable', sets:3, reps:12 }] },
+    { name: 'Benen', exercises: [{ exerciseId:'squat', sets:4, reps:8 }, { exerciseId:'romanian-deadlift', sets:3, reps:10 }, { exerciseId:'leg-press', sets:3, reps:12 }, { exerciseId:'standing-calf-raise-machine', sets:5, reps:15 }] },
   ]},
 ];
 
@@ -6264,21 +6374,21 @@ function openPlanDayAddExercises(dayIndex) {
   showScreen('screen-exercises');
 }
 
-// Whether `name` is already part of the plan day currently being edited via the
+// Whether exercise `exId` is already part of the plan day currently being edited via the
 // pencil icon — drives the + / check state per row.
-function planDayHasExercise(name) {
+function planDayHasExercise(exId) {
   const day = currentPlanData && currentPlanData.days[currentEditDayIndex];
-  return !!(day && (day.exercises || []).some(e => e.name === name));
+  return !!(day && (day.exercises || []).some(e => e.exerciseId === exId));
 }
 
 // `setsReps` is what the "<name> toevoegen" popup produced (see readPdeSrValues):
 // either {sets, reps} or {repsPerSet: [...]}.
-async function addExerciseToPlanDay(name, setsReps) {
+async function addExerciseToPlanDay(exId, setsReps) {
   const day = currentPlanData && currentPlanData.days[currentEditDayIndex];
   if (!day) return;
   if (!day.exercises) day.exercises = [];
-  if (day.exercises.some(e => e.name === name)) return;
-  day.exercises.push({ name, ...setsReps });
+  if (day.exercises.some(e => e.exerciseId === exId)) return;
+  day.exercises.push({ exerciseId: exId, ...setsReps });
   await persistPlan(currentPlanId, currentPlanData);
   refreshExerciseList();
 }
