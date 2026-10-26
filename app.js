@@ -2024,10 +2024,15 @@ function insightScheduleText(days) {
 
 // Training card numbers for a week: planned vs done sets per primary muscle group, over
 // the days that count (the current week: up to and including today).
-//   planned: the sets of the plan days planned on those days (their schedule version)
+//   planned: the sets of the plan days planned on those days (their schedule version);
+//            today's plan day only counts once a set is logged today (no shortfall in the
+//            morning) — from tomorrow on it counts like any past day
 //   done:    the logged sets; a dropset continuation counts with the set before it
 //   per group: min(planned, done) is "uit je schema", the rest of done is extra
 //   no primary muscle group: compared per exercise id instead
+//   trainings: plannedTrainings = planned days (as above), doneTrainings = those of them with
+//            ≥ 1 logged set; a training on a day without a planned training isn't one of them
+//            (its sets are extra). loggedDays = all days with ≥ 1 logged set (no comparison).
 // compare: false when no counted day had a fixed or Week A/B schedule (no schedule, or a
 // sequential one — that comparison follows later).
 function insightTrainingStats(days) {
@@ -2037,13 +2042,15 @@ function insightTrainingStats(days) {
     return info && info.primaryMuscleGroup ? 'mg:' + info.primaryMuscleGroup : 'ex:' + id;
   };
   const planned = {}, done = {};
-  let plannedTrainings = 0, doneTrainings = 0;
+  const today = todayStr();
+  let plannedTrainings = 0, doneTrainings = 0, loggedDays = 0;
   counted.forEach(d => {
-    if (d.planned.status === 'day') {
+    if (d.planned.status === 'day' && (d.date !== today || d.logged)) {
       plannedTrainings++;
+      if (d.logged) doneTrainings++;
       d.planned.day.exercises.forEach(ex => { const k = keyOf(ex.exerciseId); planned[k] = (planned[k] || 0) + (ex.sets || 0); });
     }
-    if (d.logged) doneTrainings++;
+    if (d.logged) loggedDays++;
     getWorkout(d.date).forEach(ex => {
       const n = countWorkingSets(ex.sets || []);
       if (n > 0) { const k = keyOf(ex.exerciseId); done[k] = (done[k] || 0) + n; }
@@ -2058,7 +2065,7 @@ function insightTrainingStats(days) {
     extra += Math.max(0, n - p);
   });
   const compare = counted.some(d => ['day', 'rest', 'no-week'].includes(d.planned.status));
-  return { compare, plannedSets, doneSets, fromSchedule, shortfall: plannedSets - fromSchedule, extra, plannedTrainings, doneTrainings };
+  return { compare, plannedSets, doneSets, fromSchedule, shortfall: plannedSets - fromSchedule, extra, plannedTrainings, doneTrainings, loggedDays };
 }
 
 function insightAverage(values) { return values.reduce((a, b) => a + b, 0) / values.length; }
@@ -2075,7 +2082,7 @@ function insightTrainingCardHtml(stats) {
   const trainings = n => n === 1 ? 'training' : 'trainingen';
   if (!stats.compare) {
     return insightFigureHtml(formatCount(stats.doneSets), stats.doneSets === 1 ? 'set' : 'sets')
-      + `<div class="role-sub">${formatCount(stats.doneTrainings)} ${trainings(stats.doneTrainings)} · geen vergelijking met schema</div>`;
+      + `<div class="role-sub">${formatCount(stats.loggedDays)} ${trainings(stats.loggedDays)} · geen vergelijking met schema</div>`;
   }
   const parts = [`${formatCount(stats.doneTrainings)} van ${formatCount(stats.plannedTrainings)} ${trainings(stats.plannedTrainings)}`,
     stats.shortfall > 0 ? `<span class="insight-danger">−${formatCount(stats.shortfall)}</span>` : '<span class="insight-success">op schema</span>'];
@@ -2409,7 +2416,8 @@ function exerciseListCard() {
 function renderCategoryBrowser() {
   setExercisesTitle(defaultExercisesTitle());
   const list = exerciseListCard();
-  const hasFavorites = Object.keys(db.favoriteExercises || {}).length > 0;
+  // Visible favorites only: a deleted (hidden) exercise keeps its favorite mark.
+  const hasFavorites = allExercises().some(e => isFavoriteExercise(e.id));
   if (hasFavorites) {
     const item = document.createElement('div');
     item.className = 'category-item category-item-favorites list-row';
@@ -4540,6 +4548,19 @@ function exerciseNameTaken(name, exceptId) {
   const n = name.toLowerCase();
   return allExercises().some(e => e.id !== exceptId && e.name.toLowerCase() === n);
 }
+// A deleted (hidden) exercise keeps its name: its history still shows it, so a new or renamed
+// exercise can't take it.
+function deletedExercises() {
+  const custom = db.custom_exercises || [];
+  const customIds = new Set(custom.map(e => e.id));
+  const hidden = db.hiddenBuiltins || {};
+  return [...custom.filter(e => e.deleted), ...EXERCISE_DB.filter(e => hidden[e.id] && !customIds.has(e.id))];
+}
+function deletedExerciseNameTaken(name) {
+  const n = name.toLowerCase();
+  return deletedExercises().some(e => e.name.toLowerCase() === n);
+}
+const DELETED_NAME_MSG = 'Deze naam hoort bij een verwijderde oefening. Kies een andere naam.';
 
 function saveNewExerciseFromScreen() {
   const name = document.getElementById('new-ex-name').value.trim();
@@ -4551,6 +4572,7 @@ function saveNewExerciseFromScreen() {
   if (pendingEditExerciseId) {
     const id = pendingEditExerciseId;
     if (exerciseNameTaken(name, id)) { toast('Deze oefening bestaat al'); return; }
+    if (deletedExerciseNameTaken(name)) { toast(DELETED_NAME_MSG); return; }
     updateExistingExercise(id, { category: cat, name, type });
     setExerciseInfoFor(id, readExerciseInfoForm(EXERCISE_INFO_FORMS.newEx));
     pendingEditExerciseId = null;
@@ -4562,6 +4584,7 @@ function saveNewExerciseFromScreen() {
   }
 
   if (exerciseNameTaken(name)) { toast('Deze oefening bestaat al'); return; }
+  if (deletedExerciseNameTaken(name)) { toast(DELETED_NAME_MSG); return; }
   if (!db.custom_exercises) db.custom_exercises = [];
   const id = newExerciseId();
   db.custom_exercises.push({ id, category: cat, name, type });
@@ -4579,9 +4602,8 @@ let pendingDeleteExercise = null;
 
 function openDeleteExerciseConfirm(ex) {
   pendingDeleteExercise = ex;
-  const workoutCount = Object.values(db.workouts).filter(exercises => exercises.some(e => e.exerciseId === ex.id)).length;
   document.getElementById('delete-ex-msg').innerHTML =
-    `Weet je zeker dat je <strong>${ex.name}</strong> wilt verwijderen? De <strong>${workoutCount} workout${workoutCount !== 1 ? 's' : ''}</strong> die voor deze oefening zijn vastgelegd, worden ook permanent verwijderd.`;
+    `Weet je zeker dat je <strong>${ex.name}</strong> wilt verwijderen? De oefening verdwijnt uit je lijsten. Je trainingsgeschiedenis blijft bewaard.`;
   document.getElementById('delete-ex-confirm-check').checked = false;
   document.getElementById('btn-delete-ex-confirm').disabled = true;
   openOverlay('delete-exercise-overlay');
@@ -4597,8 +4619,10 @@ document.getElementById('btn-delete-ex-cancel').addEventListener('click', () => 
 document.getElementById('btn-delete-ex-confirm').addEventListener('click', () => {
   if (!pendingDeleteExercise) return;
   const id = pendingDeleteExercise.id;
-  // A self-added (or edited) exercise stays as a deleted entry, so a plan day that still
-  // lists it keeps its name; a built-in is hidden.
+  // Deleting HIDES the exercise: a self-added (or edited) one stays as a deleted entry, a
+  // built-in goes into hiddenBuiltins. Its id and name stay findable (findExercise), so
+  // everything that points at it is kept: logged sets, records, the favorite mark and
+  // Oefeninginfo; history, calendar, Samenvatting, plan days and Inzicht keep showing it.
   const entry = (db.custom_exercises || []).find(e => e.id === id);
   if (entry) {
     entry.deleted = true;
@@ -4609,14 +4633,6 @@ document.getElementById('btn-delete-ex-confirm').addEventListener('click', () =>
     db.hiddenBuiltins[id] = true;
     persistHiddenBuiltins();
   }
-  Object.keys(db.workouts).forEach(date => {
-    const workout = db.workouts[date];
-    if (!workout.some(e => e.exerciseId === id)) return;
-    setWorkout(date, workout.filter(e => e.exerciseId !== id));
-  });
-  if (db.records && db.records[id]) { delete db.records[id]; persistRecords(); }
-  if (db.favoriteExercises && db.favoriteExercises[id]) { delete db.favoriteExercises[id]; persistFavorites(); }
-  if (db.exerciseInfo && db.exerciseInfo[id]) { delete db.exerciseInfo[id]; persistExerciseInfo(); }
   pendingDeleteExercise = null;
   closeOverlay('delete-exercise-overlay');
   refreshExerciseList();
