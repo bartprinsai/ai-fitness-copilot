@@ -18,7 +18,7 @@ const fStore = firebase.firestore();
 let currentUser = null;
 
 // -- In-memory state ------------------------------------
-let db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, favoriteExercises: {}, hiddenBuiltins: {}, exerciseInfo: {}, plateInventory: {}, plateOnBar: {}, categories: { names: {}, custom: [], deleted: [] } };
+let db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, workoutPlanDays: {}, favoriteExercises: {}, hiddenBuiltins: {}, exerciseInfo: {}, plateInventory: {}, plateOnBar: {}, categories: { names: {}, custom: [], deleted: [] }, scheduleVersions: {}, weekCycle: {}, sleep: {}, bodyWeight: {} };
 
 // -- Home selection mode state --------------------------
 // Fitness Tracker's long-press selection mode (see createSelectionMode).
@@ -102,8 +102,10 @@ function changeDate(delta) {
 }
 function getWorkout(date) { return db.workouts[date] || []; }
 function setWorkout(date, exercises) {
-  if (exercises.length === 0) delete db.workouts[date];
-  else db.workouts[date] = exercises;
+  if (exercises.length === 0) {
+    delete db.workouts[date];
+    if (db.workoutPlanDays) delete db.workoutPlanDays[date]; // persistWorkout() deletes the whole document
+  } else db.workouts[date] = exercises;
   persistWorkout(date, exercises);
 }
 function getCurrentExerciseData() { return getWorkout(currentDate).find(e => e.exerciseId === currentExerciseId) || null; }
@@ -309,8 +311,8 @@ async function persistPlateOnBar() {
 async function loadUserData(userUid) {
   console.log('[Load] loadUserData start, uid:', userUid);
   try {
-    console.log('[Load] firing Promise.all for 12 Firestore reads...');
-    const [workoutsSnap, recordsSnap, customSnap, plansSnap, activePlanSnap, favoritesSnap, hiddenBuiltinsSnap, exerciseInfoSnap, plateInventorySnap, plateOnBarSnap, categoriesSnap, migrationsSnap] = await Promise.all([
+    console.log('[Load] firing Promise.all for 16 Firestore reads...');
+    const [workoutsSnap, recordsSnap, customSnap, plansSnap, activePlanSnap, favoritesSnap, hiddenBuiltinsSnap, exerciseInfoSnap, plateInventorySnap, plateOnBarSnap, categoriesSnap, migrationsSnap, scheduleVersionsSnap, weekCycleSnap, sleepSnap, bodyWeightSnap] = await Promise.all([
       fStore.collection('users/' + userUid + '/workouts').get(),
       fStore.doc('users/' + userUid + '/meta/records').get(),
       fStore.doc('users/' + userUid + '/meta/custom_exercises').get(),
@@ -323,15 +325,28 @@ async function loadUserData(userUid) {
       fStore.doc('users/' + userUid + '/meta/plate_on_bar').get(),
       fStore.doc('users/' + userUid + '/meta/categories').get(),
       fStore.doc('users/' + userUid + '/meta/migrations').get(),
+      fStore.collection('users/' + userUid + '/schedule_versions').get(),
+      fStore.collection('users/' + userUid + '/week_cycle').get(),
+      fStore.collection('users/' + userUid + '/sleep').get(),
+      fStore.collection('users/' + userUid + '/body_weight').get(),
     ]);
     console.log('[Load] Promise.all resolved, exerciseInfoSnap.exists:', exerciseInfoSnap.exists);
     db.workouts = {};
     db.sessionNotes = {};
+    db.workoutPlanDays = {};
     workoutsSnap.forEach(doc => {
       const data = doc.data();
       db.workouts[doc.id] = data.exercises || [];
       if (data.sessionNote) db.sessionNotes[doc.id] = data.sessionNote;
+      if (data.planDays && data.planDays.length) db.workoutPlanDays[doc.id] = data.planDays;
     });
+    // Inzicht: all keyed by date (the document id)
+    const byDate = snap => { const out = {}; snap.forEach(doc => { out[doc.id] = doc.data(); }); return out; };
+    db.scheduleVersions = byDate(scheduleVersionsSnap);
+    db.weekCycle = byDate(weekCycleSnap);
+    db.sleep = byDate(sleepSnap);
+    db.bodyWeight = {};
+    bodyWeightSnap.forEach(doc => { db.bodyWeight[doc.id] = doc.data().kg; });
     db.records = recordsSnap.exists ? (recordsSnap.data().data || {}) : {};
     db.custom_exercises = customSnap.exists ? (customSnap.data().list || []) : [];
     db.plans = {};
@@ -353,10 +368,26 @@ async function loadUserData(userUid) {
     db.categories = categoriesSnap.exists ? categoriesSnap.data() : {};
     categoryState();
     if (migrateCustomExerciseCategories()) persistCustomExercises();
-    if (!(migrationsSnap.exists && migrationsSnap.data().exerciseIds)) await migrateExerciseIds(userUid);
+    const migrations = migrationsSnap.exists ? migrationsSnap.data() : {};
+    if (!migrations.exerciseIds) await migrateExerciseIds(userUid);
+    if (!migrations.planDays) await migratePlanDays(userUid);
+    // The first run stores today's schedule (and Week A/B) as the starting point.
+    await syncInsightSchedule();
     console.log('[Load] loadUserData finished OK');
   } catch(e) {
     console.error('[Load] loadUserData FAILED:', e && e.code, e && e.message, e);
+  }
+}
+
+// Writes [path, data, options?] sets in batches — same 400-per-batch chunking as "Alles
+// resetten". A migration puts its meta/migrations flag last, so it's only set once all
+// of its data got through.
+async function commitMigrationWrites(writes) {
+  const BATCH_LIMIT = 400;
+  for (let i = 0; i < writes.length; i += BATCH_LIMIT) {
+    const batch = fStore.batch();
+    writes.slice(i, i + BATCH_LIMIT).forEach(([path, data, opts]) => batch.set(fStore.doc(path), data, opts || {}));
+    await batch.commit();
   }
 }
 
@@ -446,15 +477,38 @@ async function migrateExerciseIds(userUid) {
     ...(report.records ? [[prefix + 'meta/records', { data: db.records }]] : []),
     [prefix + 'meta/migrations', { exerciseIds: todayStr() }, { merge: true }],
   ];
-  // Same 400-per-batch chunking as "Alles resetten"; the flag is the very last write.
-  const BATCH_LIMIT = 400;
-  for (let i = 0; i < writes.length; i += BATCH_LIMIT) {
-    const batch = fStore.batch();
-    writes.slice(i, i + BATCH_LIMIT).forEach(([path, data, opts]) => batch.set(fStore.doc(path), data, opts || {}));
-    await batch.commit();
-  }
+  await commitMigrationWrites(writes);
   if (report.unmatched.length) console.warn('[Migration] exercise names without a matching exercise:', report.unmatched);
   console.log('[Migration] exercise ids:', report);
+  return report;
+}
+
+// One-time step, per user (flag meta/migrations.planDays, set in the last write batch):
+// every plan day gets a fixed id (genPlanDayId), and on a fixed-days plan every day gets
+// its weekday stored in day.weekday — derived one last time from its name the way it used
+// to be (weekdayFromDayName); a day whose name isn't a weekday stays without one.
+// Returns { plans, ids, weekdays } — how many plans changed, ids and weekdays added.
+async function migratePlanDays(userUid) {
+  const report = { plans: 0, ids: 0, weekdays: 0 };
+  const changedPlans = [];
+  Object.values(db.plans).forEach(plan => {
+    let changed = false;
+    (plan.days || []).forEach(day => {
+      if (!day.id) { day.id = genPlanDayId(); report.ids++; changed = true; }
+      if (plan.fixedDays && day.weekday === undefined) {
+        const w = weekdayFromDayName(day);
+        if (w !== undefined) { day.weekday = w; report.weekdays++; changed = true; }
+      }
+    });
+    if (changed) changedPlans.push(plan.id);
+  });
+  report.plans = changedPlans.length;
+  const prefix = 'users/' + userUid + '/';
+  await commitMigrationWrites([
+    ...changedPlans.map(id => [prefix + 'plans/' + id, db.plans[id]]),
+    [prefix + 'meta/migrations', { planDays: todayStr() }, { merge: true }],
+  ]);
+  console.log('[Migration] plan days:', report);
   return report;
 }
 
@@ -892,7 +946,7 @@ async function initAuth() {
       console.log('[Auth] showScreen(screen-home) done');
     } else {
       console.log('[Auth] no user, showing login screen');
-      db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, favoriteExercises: {}, hiddenBuiltins: {} };
+      db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, workoutPlanDays: {}, favoriteExercises: {}, hiddenBuiltins: {}, scheduleVersions: {}, weekCycle: {}, sleep: {}, bodyWeight: {} };
       currentPlanId = null; currentPlanData = null; bannerDismissed = false;
       showScreen('screen-login');
     }
@@ -977,6 +1031,7 @@ document.getElementById('btn-overflow-exercises').addEventListener('click', e =>
 //   - users/{uid}/workouts/*            (every logged workout/date)
 //   - users/{uid}/plans/*                (every Workout Plan Builder plan)
 //   - users/{uid}/coachingPhilosophies/* (if that collection exists)
+//   - users/{uid}/schedule_versions/*, week_cycle/*, sleep/*, body_weight/*  (Inzicht)
 //   - users/{uid}/meta/records           (PR records)
 //   - users/{uid}/meta/custom_exercises  (self-added exercises)
 //   - users/{uid}/meta/activeplan        (active plan pointer)
@@ -1032,16 +1087,11 @@ document.getElementById('btn-reset-confirm').addEventListener('click', async () 
   setResetBusy(true);
 
   try {
-    const [workoutsSnap, plansSnap, philosophiesSnap] = await Promise.all([
-      fStore.collection(userPrefix + 'workouts').get(),
-      fStore.collection(userPrefix + 'plans').get(),
-      fStore.collection(userPrefix + 'coachingPhilosophies').get(),
-    ]);
+    const collections = ['workouts', 'plans', 'coachingPhilosophies', 'schedule_versions', 'week_cycle', 'sleep', 'body_weight'];
+    const snaps = await Promise.all(collections.map(c => fStore.collection(userPrefix + c).get()));
 
     const refs = [
-      ...workoutsSnap.docs.map(d => d.ref),
-      ...plansSnap.docs.map(d => d.ref),
-      ...philosophiesSnap.docs.map(d => d.ref),
+      ...snaps.flatMap(snap => snap.docs.map(d => d.ref)),
       fStore.doc(userPrefix + 'meta/records'),
       fStore.doc(userPrefix + 'meta/custom_exercises'),
       fStore.doc(userPrefix + 'meta/activeplan'),
@@ -1067,9 +1117,10 @@ document.getElementById('btn-reset-confirm').addEventListener('click', async () 
       await batch.commit();
     }
 
-    db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, favoriteExercises: {}, hiddenBuiltins: {} };
+    db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, workoutPlanDays: {}, favoriteExercises: {}, hiddenBuiltins: {}, scheduleVersions: {}, weekCycle: {}, sleep: {}, bodyWeight: {} };
     currentPlanId = null;
     currentPlanData = null;
+    await syncInsightSchedule(); // starts over: "geen schema" from today
 
     closeOverlay('reset-overlay');
     toast('Reset voltooid');
@@ -1600,13 +1651,13 @@ function getTodaysScheduledDay() {
   } else {
     const weekday = weekdayOfDateStr(todayStr());
     if (!planHasWeekSplit(plan)) {
-      dayIndex = plan.days.findIndex(d => inferDayWeekday(d) === weekday);
+      dayIndex = plan.days.findIndex(d => planDayWeekday(d) === weekday);
     } else if (db.activePlan.lastDate === todayStr() && plan.days[db.activePlan.lastDayIndex]) {
       dayIndex = db.activePlan.lastDayIndex;
     } else {
       const { week, done } = planWeekCycle(plan);
       dayIndex = done.includes(weekday) ? -1
-        : plan.days.findIndex(d => d.group === week && inferDayWeekday(d) === weekday);
+        : plan.days.findIndex(d => d.group === week && planDayWeekday(d) === weekday);
     }
     if (dayIndex < 0) return null;
   }
@@ -1621,7 +1672,7 @@ function planHasWeekSplit(plan) {
 
 // The weekdays (0 = Maandag) that `week` ('A'/'B') of a split plan trains on.
 function planWeekWeekdays(plan, week) {
-  return plan.days.filter(d => d.group === week).map(inferDayWeekday).filter(w => w !== undefined);
+  return plan.days.filter(d => d.group === week).map(planDayWeekday).filter(w => w !== undefined);
 }
 
 // 'YYYY-MM-DD' of the Monday that starts dateStr's calendar week (Monday first,
@@ -1652,7 +1703,7 @@ function planWeekCycle(plan) {
   let since = a.weekStart;
   if (week !== 'A' && week !== 'B') {
     week = a.lastGroup || (lastDay && lastDay.group) || 'A';
-    const w = lastDay && lastDay.group === week ? inferDayWeekday(lastDay) : undefined;
+    const w = lastDay && lastDay.group === week ? planDayWeekday(lastDay) : undefined;
     done = w !== undefined ? [w] : [];
     if (planWeekWeekdays(plan, week).every(d => done.includes(d))) { week = other(week); done = []; }
   }
@@ -1675,7 +1726,7 @@ function markScheduledDayLoaded(pick) {
   const plan = pick.plan;
   if (plan.fixedDays && planHasWeekSplit(plan) && a.lastDate !== todayStr()) {
     let { week, done, since } = planWeekCycle(plan);
-    const w = inferDayWeekday(pick.day);
+    const w = planDayWeekday(pick.day);
     if (pick.day.group === week && w !== undefined && !done.includes(w)) done = [...done, w];
     if (planWeekWeekdays(plan, week).every(d => done.includes(d))) {
       week = week === 'A' ? 'B' : 'A';
@@ -1693,6 +1744,211 @@ function markScheduledDayLoaded(pick) {
   delete a.lastGroup; // superseded by activeWeek/doneWeekdays
   bannerDismissed = true;
   return persistActivePlan(a);
+}
+
+// -- Inzicht: schedule versions and Week A/B per date ---------------------
+// Inzicht compares every day with the schedule that was active on THAT day, so every
+// version of the active schedule is kept, apart from the plans themselves (editing or
+// deleting a plan never touches them):
+//   users/{uid}/schedule_versions/{YYYY-MM-DD}  — a full copy, valid from that local date
+//     (Europe/Amsterdam, todayStr()) on, that day included; one per date, the last change
+//     of a day wins. See scheduleSnapshot() for the content; { planId: null } = geen schema.
+//   users/{uid}/week_cycle/{YYYY-MM-DD}  — { effectiveFrom, planId, week: 'A' | 'B' }: the
+//     active week of a Week A/B plan from that date on. Written only when it differs from
+//     the week already in effect on that date; never changed afterwards.
+// Nothing is filled in backwards: the first run stores today's state with today's date.
+
+// 'fixed' (vaste dagen), 'weekAB' (vaste dagen met Week A/B) or 'sequential' (doorlopend,
+// "Geen vaste dagen": the next day after the last loaded one, whatever the date).
+function planScheduleType(plan) {
+  if (!plan.fixedDays) return 'sequential';
+  return planHasWeekSplit(plan) ? 'weekAB' : 'fixed';
+}
+
+// The active schedule as stored in a version:
+//   { planId, planName, type, days: [{ id, name, weekday?, week?, exercises: [{ exerciseId, name, sets }] }],
+//     restWeekdays? (fixed) | restWeekdaysA?, restWeekdaysB? (weekAB) }
+// Days in plan order; weekday (0 = Maandag) on fixed/weekAB plans, week on weekAB plans.
+// `sets` is the planned number of sets (the length of repsPerSet when the plan uses that).
+// The exercise name is kept for when the exercise is deleted later; muscle groups are not
+// stored (Inzicht looks them up by exerciseId). Rest days are the weekdays without a plan
+// day (per week for weekAB); a sequential plan has none — it has no weekdays at all.
+// No active plan (or it no longer exists): { planId: null }.
+function scheduleSnapshot() {
+  const plan = db.activePlan && db.plans[db.activePlan.planId];
+  if (!plan) return { planId: null };
+  const type = planScheduleType(plan);
+  const days = (plan.days || []).map(day => ({
+    id: day.id,
+    name: day.name,
+    ...(type !== 'sequential' && planDayWeekday(day) !== undefined && { weekday: planDayWeekday(day) }),
+    ...(type === 'weekAB' && day.group && { week: day.group }),
+    exercises: (day.exercises || []).map(ex => ({
+      exerciseId: ex.exerciseId,
+      name: exerciseName(ex.exerciseId),
+      sets: Array.isArray(ex.repsPerSet) && ex.repsPerSet.length > 0 ? ex.repsPerSet.length : (ex.sets || 0),
+    })),
+  }));
+  const restWeekdays = week => [0, 1, 2, 3, 4, 5, 6].filter(w => !days.some(d => d.weekday === w && (!week || d.week === week)));
+  return {
+    planId: plan.id, planName: plan.name, type, days,
+    ...(type === 'fixed' && { restWeekdays: restWeekdays() }),
+    ...(type === 'weekAB' && { restWeekdaysA: restWeekdays('A'), restWeekdaysB: restWeekdays('B') }),
+  };
+}
+
+// JSON with sorted keys: Firestore doesn't keep a map's key order.
+function stableStringify(v) {
+  if (Array.isArray(v)) return '[' + v.map(stableStringify).join(',') + ']';
+  if (v && typeof v === 'object') return '{' + Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + stableStringify(v[k])).join(',') + '}';
+  return JSON.stringify(v);
+}
+// Whether two versions describe the same schedule. Exercise names don't count: renaming an
+// exercise isn't a schedule change (the next version just carries the new name).
+function sameSchedule(a, b) {
+  const strip = v => ({ ...v, effectiveFrom: undefined, days: (v.days || []).map(d => ({ ...d, exercises: d.exercises.map(({ name, ...ex }) => ex) })) });
+  return stableStringify(strip(a)) === stableStringify(strip(b));
+}
+
+// The latest entry of a { [date]: entry } map dated on or before `date` (sorted string
+// dates), or null.
+function latestOnOrBefore(map, date, filter = () => true) {
+  const key = Object.keys(map || {}).filter(k => k <= date && filter(map[k])).sort().pop();
+  return key ? map[key] : null;
+}
+function scheduleVersionOn(date) { return latestOnOrBefore(db.scheduleVersions, date); }
+// The week ('A'/'B') of Week A/B plan `planId` that was active on `date`, or null.
+function activeWeekOn(planId, date) {
+  const e = latestOnOrBefore(db.weekCycle, date, e => e.planId === planId);
+  return e ? e.week : null;
+}
+
+// Stores the active schedule as a version from today, unless it equals the latest version.
+async function recordScheduleVersion() {
+  const snapshot = scheduleSnapshot();
+  const latest = latestOnOrBefore(db.scheduleVersions, '9999-12-31');
+  if (latest && sameSchedule(latest, snapshot)) return;
+  const version = { effectiveFrom: todayStr(), ...snapshot };
+  if (!db.scheduleVersions) db.scheduleVersions = {};
+  db.scheduleVersions[version.effectiveFrom] = version;
+  await uDoc('schedule_versions/' + version.effectiveFrom).set(version);
+}
+
+// Week entry from `from` on, unless that week of that plan is already in effect then.
+async function putWeekEntry(from, planId, week) {
+  const cur = latestOnOrBefore(db.weekCycle, from);
+  if (cur && cur.planId === planId && cur.week === week) return;
+  const entry = { effectiveFrom: from, planId, week };
+  if (!db.weekCycle) db.weekCycle = {};
+  db.weekCycle[from] = entry;
+  await uDoc('week_cycle/' + from).set(entry);
+}
+
+// Records the active Week A/B plan's week, by the same rules the app suggests days by
+// (planWeekCycle / getTodaysScheduledDay):
+//   - today's week: that of a split day already loaded today (it stays today's suggestion),
+//     otherwise the cycle's active week. A switch forced by a new calendar week went in on
+//     that week's Monday; any other change goes in today. The first entry for a plan
+//     (first run, or the plan just became active/split) is today's.
+//   - a week completed today: the other week goes in tomorrow.
+async function recordWeekCycle() {
+  const a = db.activePlan;
+  const plan = a && db.plans[a.planId];
+  if (!currentUser || !plan || planScheduleType(plan) !== 'weekAB') return;
+  const today = todayStr();
+  const { week, since } = planWeekCycle(plan);
+  const loadedToday = a.lastDate === today ? plan.days[a.lastDayIndex] : null;
+  const weekToday = loadedToday && loadedToday.group ? loadedToday.group : week;
+  const prev = latestOnOrBefore(db.weekCycle, today);
+  const from = prev && prev.planId === plan.id && since && since <= today && since > prev.effectiveFrom ? since : today;
+  await putWeekEntry(from, plan.id, weekToday);
+  if (week !== weekToday) await putWeekEntry(addDaysToDateStr(today, 1), plan.id, week);
+}
+
+// After any change that may touch the active schedule, and at start-up.
+function syncInsightSchedule() {
+  if (!currentUser) return Promise.resolve();
+  return recordScheduleVersion().then(recordWeekCycle).catch(persistFailed);
+}
+
+// A switch is another plan id; any change within the same plan (its name too) is not.
+// "Geen schema" (planId null) counts as a plan of its own.
+function isScheduleSwitch(prevVersion, version) { return !!prevVersion && prevVersion.planId !== version.planId; }
+
+// THE one answer to "what was planned on `date`?" — for Inzicht:
+//   { status: 'no-version' }                       no version on or before that date
+//   { status: 'no-schedule', version }             no active plan then
+//   { status: 'day', version, day, week? }         fixed / weekAB: the plan day for that weekday
+//                                                  (weekAB: in the week active on that date)
+//   { status: 'rest', version, week? }             fixed / weekAB: no plan day = rest day
+//   { status: 'no-week', version }                 weekAB, but no week recorded for that date
+//   { status: 'sequential', version }              doorlopend: the version itself (days in
+//                                                  order, effectiveFrom); the per-day
+//                                                  calculation follows in a later step
+function getPlannedForDate(date) {
+  const version = scheduleVersionOn(date);
+  if (!version) return { status: 'no-version' };
+  if (!version.planId) return { status: 'no-schedule', version };
+  if (version.type === 'sequential') return { status: 'sequential', version };
+  const weekday = weekdayOfDateStr(date);
+  let week = null;
+  if (version.type === 'weekAB') {
+    week = activeWeekOn(version.planId, date);
+    if (!week) return { status: 'no-week', version };
+  }
+  const day = version.days.find(d => d.weekday === weekday && (!week || d.week === week));
+  return { status: day ? 'day' : 'rest', version, ...(day && { day }), ...(week && { week }) };
+}
+
+// -- Inzicht: sleep and body weight ----------------------------------------
+// Entered in Inzicht later; one document per date, like workouts:
+//   users/{uid}/sleep/{YYYY-MM-DD}        { bedtime: 'HH:MM', wakeTime: 'HH:MM' }
+//   users/{uid}/body_weight/{YYYY-MM-DD}  { kg }  (max. 2 decimals, like every weight)
+// A night belongs to the day you wake up on: Wednesday → Thursday is Thursday's.
+// Saving a date again overwrites it (that's how a day is changed).
+const SLEEP_TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+function timeToMinutes(t) { return parseInt(t.slice(0, 2), 10) * 60 + parseInt(t.slice(3), 10); }
+// Minutes from bedtime to wake time, across midnight when the wake time is earlier.
+function sleepDurationMinutes(bedtime, wakeTime) {
+  return (timeToMinutes(wakeTime) - timeToMinutes(bedtime) + 1440) % 1440;
+}
+function getSleep(date) { return (db.sleep || {})[date] || null; }
+// false (nothing stored) unless both times are a valid HH:MM.
+function saveSleep(date, bedtime, wakeTime) {
+  if (!SLEEP_TIME_RE.test(bedtime) || !SLEEP_TIME_RE.test(wakeTime)) return false;
+  if (!db.sleep) db.sleep = {};
+  db.sleep[date] = { bedtime, wakeTime };
+  if (currentUser) uDoc('sleep/' + date).set(db.sleep[date]).catch(persistFailed);
+  return true;
+}
+function deleteSleep(date) {
+  if (db.sleep) delete db.sleep[date];
+  if (currentUser) uDoc('sleep/' + date).delete().catch(persistFailed);
+}
+// [{ date, bedtime, wakeTime, minutes }] for from..to (both included), by date.
+function getSleepRange(from, to) {
+  return Object.keys(db.sleep || {}).filter(d => d >= from && d <= to).sort()
+    .map(date => ({ date, ...db.sleep[date], minutes: sleepDurationMinutes(db.sleep[date].bedtime, db.sleep[date].wakeTime) }));
+}
+
+function getBodyWeight(date) { return (db.bodyWeight || {})[date] ?? null; }
+// `value`: a number or typed text (comma or point), rounded to 2 decimals like every
+// weight (parseWeight). false (nothing stored) unless it's more than 0 kg.
+function saveBodyWeight(date, value) {
+  const kg = parseWeight(value);
+  if (!(kg > 0)) return false;
+  if (!db.bodyWeight) db.bodyWeight = {};
+  db.bodyWeight[date] = kg;
+  if (currentUser) uDoc('body_weight/' + date).set({ kg }).catch(persistFailed);
+  return true;
+}
+function deleteBodyWeight(date) {
+  if (db.bodyWeight) delete db.bodyWeight[date];
+  if (currentUser) uDoc('body_weight/' + date).delete().catch(persistFailed);
+}
+// [{ date, kg }] for from..to (both included), by date.
+function getBodyWeightRange(from, to) {
+  return Object.keys(db.bodyWeight || {}).filter(d => d >= from && d <= to).sort().map(date => ({ date, kg: db.bodyWeight[date] }));
 }
 
 function renderNewWorkoutScreen() {
@@ -1716,7 +1972,9 @@ function planExerciseTarget(ex) {
 // WRITES the workout of `date`. Exercises already in that workout are kept as-is
 // (no duplicates); new ones start without logged sets and carry the plan's
 // sets/reps as `target` — shown on the exercise card and used to prefill reps.
-function loadPlanDayIntoWorkout(day, date) {
+// The workout also remembers which plan day was loaded (recordWorkoutPlanDay).
+function loadPlanDayIntoWorkout(plan, day, date) {
+  recordWorkoutPlanDay(date, plan, day);
   const workout = getWorkout(date);
   let added = 0;
   (day.exercises || []).forEach(ex => {
@@ -1727,6 +1985,20 @@ function loadPlanDayIntoWorkout(day, date) {
   });
   if (added > 0) setWorkout(date, workout);
   return added;
+}
+
+// The plan days loaded into the workout of `date` (stored on its document as `planDays`,
+// next to `exercises`): [{ planId, dayId, dayName, week? }] — `week` ('A'/'B') only for a
+// Week A/B plan. Every plan day loaded on that date is kept, each once (loading the same day
+// again only refreshes its name). Exercises added without a plan day don't add anything here.
+function getWorkoutPlanDays(date) { return (db.workoutPlanDays || {})[date] || []; }
+function recordWorkoutPlanDay(date, plan, day) {
+  if (!db.workoutPlanDays) db.workoutPlanDays = {};
+  const entry = { planId: plan.id, dayId: day.id, dayName: day.name, ...(planScheduleType(plan) === 'weekAB' && day.group && { week: day.group }) };
+  const list = getWorkoutPlanDays(date).filter(e => !(e.planId === entry.planId && e.dayId === entry.dayId));
+  db.workoutPlanDays[date] = [...list, entry];
+  if (!currentUser) return;
+  uDoc('workouts/' + date).set({ planDays: db.workoutPlanDays[date] }, { merge: true }).catch(persistFailed);
 }
 
 function planDayHasExercises(day) {
@@ -1814,7 +2086,7 @@ function loadPickedScheduleDay(idx) {
   if (!planDayHasExercises(day)) { toast('Deze dag heeft geen oefeningen', { type: 'error' }); return; }
   // Into the day the Tracker was showing when New Workout opened — not forced to today.
   const date = newWorkoutDate || currentDate;
-  loadPlanDayIntoWorkout(day, date);
+  loadPlanDayIntoWorkout(plan, day, date);
   showTrackerAfterLoad(date, 3); // day picker, plan picker, New Workout
 }
 
@@ -1853,7 +2125,7 @@ document.getElementById('btn-schedule-load-confirm').addEventListener('click', a
     if (pick) toast('Deze dag heeft geen oefeningen', { type: 'error' });
     return;
   }
-  loadPlanDayIntoWorkout(pick.day, todayStr());
+  loadPlanDayIntoWorkout(pick.plan, pick.day, todayStr());
   markScheduledDayLoaded(pick);
   // Popup + New Workout in ONE history traversal (two back() calls in a row leave a
   // dead back press behind — see the calendar detail's "go to day").
@@ -2826,10 +3098,29 @@ function openExerciseInfo() {
   openOverlay('exercise-info-overlay');
 }
 
+// Exercise-info fields that are set elsewhere than Oefeninginfo's form (no field there).
+// trackStrength: "Kracht volgen" for Inzicht, true = ja; absent = nee (the default).
+const EXERCISE_INFO_NON_FORM_KEYS = ['trackStrength'];
+function isStrengthTracked(id) { return !!(getExerciseInfo(id) || {}).trackStrength; }
+function setStrengthTracked(id, on) {
+  if (!db.exerciseInfo) db.exerciseInfo = {};
+  const info = { ...(db.exerciseInfo[id] || {}) };
+  if (!!info.trackStrength === !!on) return;
+  if (on) info.trackStrength = true; else delete info.trackStrength;
+  if (Object.keys(info).length === 0) delete db.exerciseInfo[id];
+  else db.exerciseInfo[id] = info;
+  persistExerciseInfo();
+}
+
 // Stores (or, when empty, removes) one exercise's info. Skips the Firestore
 // write when nothing actually changed.
 function setExerciseInfoFor(id, info) {
   if (!db.exerciseInfo) db.exerciseInfo = {};
+  // Fields the form doesn't show are kept as they are.
+  EXERCISE_INFO_NON_FORM_KEYS.forEach(k => {
+    const prev = (db.exerciseInfo[id] || {})[k];
+    if (prev !== undefined && !(k in info)) info = { ...info, [k]: prev };
+  });
   const unchanged = JSON.stringify(db.exerciseInfo[id] || {}) === JSON.stringify(info);
   if (Object.keys(info).length === 0) delete db.exerciseInfo[id];
   else db.exerciseInfo[id] = info;
@@ -5190,26 +5481,34 @@ function activePlanDoc() { return fStore.doc('users/' + currentUser.uid + '/meta
 // Plan writes are awaited by their callers, which previously saw the rejection;
 // keep that (report, then rethrow) so a failed write still stops the flow
 // instead of the caller announcing success right after the error toast.
+// Every one of them ends with syncInsightSchedule(): whatever changed (exercises, sets,
+// days, weekdays, the kind of schedule, which plan is active, a deleted plan), a change
+// to the active schedule is stored as a new schedule version right away.
 async function persistPlan(planId, planData) {
   if (!currentUser) return;
   try { await plansCol().doc(planId).set(planData); } catch (e) { persistFailed(e); throw e; }
+  syncInsightSchedule();
 }
 async function deletePlanDoc(planId) {
   if (!currentUser) return;
   try { await plansCol().doc(planId).delete(); } catch (e) { persistFailed(e); throw e; }
+  syncInsightSchedule();
 }
 async function persistActivePlan(data) {
   if (!currentUser) return;
-  if (!data) { await activePlanDoc().delete().catch(persistFailed); return; }
-  try { await activePlanDoc().set(data); } catch (e) { persistFailed(e); throw e; }
+  if (!data) await activePlanDoc().delete().catch(persistFailed);
+  else try { await activePlanDoc().set(data); } catch (e) { persistFailed(e); throw e; }
+  syncInsightSchedule();
 }
 
 // ── Plan CRUD ─────────────────────────────────────────
 function genPlanId() { return 'plan_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7); }
+// A plan day's fixed id: never changes when the day is moved, renamed or others are added.
+function genPlanDayId() { return 'day-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
 
 async function createPlan(name, days) {
   const planId = genPlanId();
-  const planData = { id: planId, name, days, createdAt: Date.now() };
+  const planData = { id: planId, name, days: days.map(d => ({ id: genPlanDayId(), ...d })), createdAt: Date.now() };
   db.plans[planId] = planData;
   await persistPlan(planId, planData);
   return planId;
@@ -5658,25 +5957,24 @@ function generatePlanDaysFromSchedule(plan) {
   }
   const weekdaysA = [...(plan.weekdaysA || [])].sort((a, b) => a - b);
   if (daysPerWeek <= 7) {
-    return weekdaysA.map(d => ({ name: WEEKDAY_FULL_NAMES[d], exercises: [] }));
+    return weekdaysA.map(d => ({ name: WEEKDAY_FULL_NAMES[d], exercises: [], weekday: d }));
   }
   const weekdaysB = [...(plan.weekdaysB || [])].sort((a, b) => a - b);
   return [
-    ...weekdaysA.map(d => ({ name: `${WEEKDAY_FULL_NAMES[d]} A`, exercises: [], group: 'A' })),
-    ...weekdaysB.map(d => ({ name: `${WEEKDAY_FULL_NAMES[d]} B`, exercises: [], group: 'B' })),
+    ...weekdaysA.map(d => ({ name: `${WEEKDAY_FULL_NAMES[d]} A`, exercises: [], weekday: d, group: 'A' })),
+    ...weekdaysB.map(d => ({ name: `${WEEKDAY_FULL_NAMES[d]} B`, exercises: [], weekday: d, group: 'B' })),
   ];
 }
 
 // ── Plan Detail editable state: add day / add week ────────────────────
-// Days generated by generatePlanDaysFromSchedule() (or a plan created before this
-// editable state existed) don't carry an explicit weekday index — only their
-// rendered Dutch name. This recovers it by parsing that name (after stripping any
-// "A"/"B" suffix), so weekday bookkeeping still works for a day this feature didn't
-// itself create. Returns undefined if the name was hand-edited into something
-// unparseable (e.g. via the rename pencil) — callers degrade gracefully for that.
-function inferDayWeekday(day) {
-  if (day.weekday !== undefined) return day.weekday;
-  let name = day.name;
+// A plan day's weekday (0 = Maandag) on a fixed-days plan: always the stored day.weekday,
+// never derived from its name, so a renamed day keeps it. undefined on other plans.
+function planDayWeekday(day) { return day.weekday; }
+
+// Only for migratePlanDays(): how the weekday used to be derived — the day's Dutch name
+// (after stripping any "A"/"B" suffix). undefined for a name that isn't a weekday.
+function weekdayFromDayName(day) {
+  let name = day.name || '';
   if (day.group) name = name.replace(new RegExp('\\s*' + day.group + '$'), '');
   const idx = WEEKDAY_FULL_NAMES.indexOf(name);
   return idx >= 0 ? idx : undefined;
@@ -5690,8 +5988,8 @@ function syncPlanScheduleFieldsAfterDayChange() {
   const days = currentPlanData.days;
   currentPlanData.daysPerWeek = days.length;
   if (!currentPlanData.fixedDays) return;
-  currentPlanData.weekdaysA = days.filter(d => d.group !== 'B').map(inferDayWeekday).filter(w => w !== undefined);
-  currentPlanData.weekdaysB = days.filter(d => d.group === 'B').map(inferDayWeekday).filter(w => w !== undefined);
+  currentPlanData.weekdaysA = days.filter(d => d.group !== 'B').map(planDayWeekday).filter(w => w !== undefined);
+  currentPlanData.weekdaysB = days.filter(d => d.group === 'B').map(planDayWeekday).filter(w => w !== undefined);
 }
 
 // Week A's "Dag toevoegen" must insert right after Week A's own last day, not at the
@@ -5713,7 +6011,7 @@ async function addPlanDay(group) {
   if (!currentPlanData) return;
   if (!currentPlanData.fixedDays) {
     const name = `Dag ${currentPlanData.days.length + 1}`;
-    insertPlanDay(group ? { name, exercises: [], group } : { name, exercises: [] }, group);
+    insertPlanDay(group ? { id: genPlanDayId(), name, exercises: [], group } : { id: genPlanDayId(), name, exercises: [] }, group);
     syncPlanScheduleFieldsAfterDayChange();
     renderPlanDetail();
     await savePlanSchedule();
@@ -5727,7 +6025,7 @@ function openPlanWeekdayPicker(group) {
   const usedWeekdays = new Set(
     currentPlanData.days
       .filter(d => (d.group || undefined) === (group || undefined))
-      .map(inferDayWeekday)
+      .map(planDayWeekday)
       .filter(w => w !== undefined)
   );
   const grid = document.getElementById('day-picker-grid');
@@ -5746,7 +6044,7 @@ document.getElementById('day-picker-grid').addEventListener('click', async e => 
   const group = pendingAddDayGroup;
   closeOverlay('day-picker-overlay');
   const name = WEEKDAY_FULL_NAMES[weekday] + (group ? ' ' + group : '');
-  const day = { name, exercises: [], weekday };
+  const day = { id: genPlanDayId(), name, exercises: [], weekday };
   if (group) day.group = group;
   insertPlanDay(day, group);
   syncPlanScheduleFieldsAfterDayChange();
@@ -5757,17 +6055,14 @@ document.getElementById('day-picker-grid').addEventListener('click', async e => 
 document.getElementById('btn-day-picker-cancel').addEventListener('click', () => closeOverlay('day-picker-overlay'));
 
 // Converts a single-week plan into Week A + a new, empty Week B: existing days become
-// Week A (fixed-days plans also get their weekday recovered via inferDayWeekday() and
-// an " A" suffix appended, since their name was plain "Maandag" etc. until now).
+// Week A (on a fixed-days plan a day still named after its weekday, plain "Maandag" etc.,
+// gets an " A" suffix; a renamed day keeps its name — its weekday is stored anyway).
 async function addPlanWeek() {
   if (!currentPlanData) return;
   currentPlanData.days.forEach(day => {
-    const w = currentPlanData.fixedDays ? inferDayWeekday(day) : undefined;
+    const w = currentPlanData.fixedDays ? planDayWeekday(day) : undefined;
     day.group = 'A';
-    if (currentPlanData.fixedDays && w !== undefined) {
-      day.weekday = w;
-      day.name = WEEKDAY_FULL_NAMES[w] + ' A';
-    }
+    if (w !== undefined && day.name === WEEKDAY_FULL_NAMES[w]) day.name += ' A';
   });
   currentPlanData.hasWeekB = true;
   syncPlanScheduleFieldsAfterDayChange();
@@ -5777,15 +6072,15 @@ async function addPlanWeek() {
 
 document.getElementById('btn-plan-schedule-continue').addEventListener('click', async () => {
   if (!currentPlanData || !isPlanScheduleValid(currentPlanData)) return;
-  // Best-effort preserve: a regenerated day keeps its old exercises only if a day with
-  // that exact name already existed. Any day whose name isn't reproduced by the new
-  // config (count/weekdays changed since exercises were added) loses its exercises —
-  // there's no reliable way to match it to a "new" day otherwise.
-  const oldExercisesByName = new Map((currentPlanData.days || []).map(d => [d.name, d.exercises || []]));
-  currentPlanData.days = generatePlanDaysFromSchedule(currentPlanData).map(d => ({
-    ...d,
-    exercises: oldExercisesByName.get(d.name) || [],
-  }));
+  // Best-effort preserve: a regenerated day keeps its old id and exercises only if a day
+  // with that exact name already existed. Any day whose name isn't reproduced by the new
+  // config (count/weekdays changed since exercises were added) is a new day (new id, no
+  // exercises) — there's no reliable way to match it to an old one otherwise.
+  const oldDaysByName = new Map((currentPlanData.days || []).map(d => [d.name, d]));
+  currentPlanData.days = generatePlanDaysFromSchedule(currentPlanData).map(d => {
+    const old = oldDaysByName.get(d.name);
+    return { id: old ? old.id : genPlanDayId(), ...d, exercises: old ? (old.exercises || []) : [] };
+  });
   currentPlanData.scheduleConfirmed = true;
   db.plans[currentPlanId] = currentPlanData;
   await persistPlan(currentPlanId, currentPlanData);
@@ -6401,6 +6696,7 @@ async function addExerciseToPlanDay(exId, setsReps) {
 function renderSmartBanner() {
   const banner = document.getElementById('smart-day-banner');
   if (!banner) return;
+  recordWeekCycle().catch(persistFailed);
   const pick = getTodaysScheduledDay();
   bannerSuggestedPick = pick;
   if (bannerDismissed || !pick || currentDate !== todayStr() || getWorkout(todayStr()).length > 0) { banner.classList.add('hidden'); return; }
@@ -6424,7 +6720,7 @@ document.getElementById('btn-banner-load').addEventListener('click', async () =>
   if (!db.activePlan || !pick) return;
   exitHomeSelMode();
   currentDate = todayStr();
-  loadPlanDayIntoWorkout(pick.day, currentDate);
+  loadPlanDayIntoWorkout(pick.plan, pick.day, currentDate);
   await markScheduledDayLoaded(pick);
   renderHome();
   toast('Workout geladen!');
