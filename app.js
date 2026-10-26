@@ -78,12 +78,14 @@ const COMMENT_ICON_SVG = '<svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-
 // Standard everywhere: "Donderdag 22 oktober 2026". Named variants for the exceptions:
 //   'nav'       — tracker day navigation: "Vandaag" / "Gisteren", else the standard
 //   'noWeekday' — the gold One rep max card: "22 oktober 2026"
+//   'dayMonth'  — start of a date range across months (Inzicht): "26 oktober"
 //   'month'     — calendar month headings: "Oktober 2026" (`str` may be any day of the month)
 //   'axis'      — the Graph's x-axis: "6 okt"
 // A label that shows a date in capitals (.section-label, day nav) does that in CSS.
 const NL_DATE_FORMATS = {
   full: new Intl.DateTimeFormat('nl-NL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
   noWeekday: new Intl.DateTimeFormat('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' }),
+  dayMonth: new Intl.DateTimeFormat('nl-NL', { day: 'numeric', month: 'long' }),
   month: new Intl.DateTimeFormat('nl-NL', { month: 'long', year: 'numeric' }),
   axis: new Intl.DateTimeFormat('nl-NL', { day: 'numeric', month: 'short' }),
 };
@@ -596,6 +598,7 @@ const SCREEN_ON_ENTER = {
   'screen-plan-detail': () => renderPlanDetail(),
   'screen-plan-schedule': () => renderPlanSchedule(),
   'screen-plan-day-edit': () => renderPlanDayEdit(),
+  'screen-insight': () => renderInsight(),
 };
 
 // Per-screen "does the CURRENTLY ACTIVE screen have unsaved input?" checks,
@@ -1950,6 +1953,226 @@ function deleteBodyWeight(date) {
 function getBodyWeightRange(from, to) {
   return Object.keys(db.bodyWeight || {}).filter(d => d >= from && d <= to).sort().map(date => ({ date, kg: db.bodyWeight[date] }));
 }
+
+// -- Inzicht: the screen (#screen-insight, period Week) ---------------------
+// One week (Monday..Sunday) at a time; opens on the current week, can't go past it.
+// Every day is judged against the schedule of THAT day (getPlannedForDate). Rules: see
+// PROJECT_CONTEXT.md, "Inzicht"; the Per dag grid: DESIGN_SYSTEM.md, "Inzicht".
+let insightWeekStart = null;
+
+function weekStartOf(date) { return addDaysToDateStr(date, -weekdayOfDateStr(date)); }
+// ISO 8601 week number: the week belongs to the year its Thursday is in.
+function isoWeekOfDateStr(date) {
+  const thursday = addDaysToDateStr(weekStartOf(date), 3);
+  const jan1 = thursday.slice(0, 4) + '-01-01';
+  const dayOfYear = Math.round((Date.parse(thursday + 'T00:00:00Z') - Date.parse(jan1 + 'T00:00:00Z')) / 86400000);
+  return Math.floor(dayOfYear / 7) + 1;
+}
+// "19–25 oktober 2026", "26 oktober – 1 november 2026", "29 december 2025 – 4 januari 2026".
+function formatDateRange(from, to) {
+  if (from.slice(0, 4) !== to.slice(0, 4)) return `${formatDateStr(from, 'noWeekday')} – ${formatDateStr(to, 'noWeekday')}`;
+  if (from.slice(0, 7) !== to.slice(0, 7)) return `${formatDateStr(from, 'dayMonth')} – ${formatDateStr(to, 'noWeekday')}`;
+  return `${Number(from.slice(8))}–${formatDateStr(to, 'noWeekday')}`;
+}
+// Whole numbers with a point between thousands ("1.250"); only for counts in Inzicht —
+// formatNumber() stays without a thousands separator.
+function formatCount(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+// Minutes as "7:10".
+function formatDuration(minutes) { return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')}`; }
+// "−0,3" / "+0,2" / "0" (a real minus sign).
+function formatSignedNumber(n) { return n < 0 ? '−' + formatNumber(-n) : (n > 0 ? '+' : '') + formatNumber(n); }
+const SLEEP_SHORT_MINUTES = 7 * 60;
+const INSIGHT_WEEKDAYS_SHORT = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo'];
+
+function hasLoggedSets(date) { return getWorkout(date).some(ex => (ex.sets || []).length > 0); }
+
+// Per day of the week: { date, planned (getPlannedForDate), logged, past, switchHere }.
+// switchHere: another plan id than the day before (isScheduleSwitch), not on Monday.
+function insightWeekDays(weekStart) {
+  const today = todayStr();
+  return [0, 1, 2, 3, 4, 5, 6].map(i => addDaysToDateStr(weekStart, i)).map((date, i, dates) => {
+    const planned = getPlannedForDate(date);
+    const prev = i > 0 ? getPlannedForDate(dates[i - 1]).version : null;
+    return {
+      date, planned, logged: hasLoggedSets(date), past: date < today, counted: date <= today,
+      switchHere: !!planned.version && isScheduleSwitch(prev, planned.version),
+    };
+  });
+}
+
+// "done" (≥ 1 set logged), "missed" (a planned day of a fixed or Week A/B schedule that is
+// over without a set) or "empty" (rest day, no schedule, sequential, today, still to come).
+function insightTrainingState(d) {
+  if (d.logged) return 'done';
+  if (d.past && d.planned.status === 'day') return 'missed';
+  return 'empty';
+}
+
+// The schedule line: "Schema: Push Pull Legs · Week A", a plan-id switch as
+// ", vanaf donderdag Upper Lower", "Geen schema actief" or "Geen schema bekend".
+function insightScheduleText(days) {
+  const known = days.filter(d => d.planned.version);
+  if (known.length === 0) return 'Geen schema bekend';
+  if (known.every(d => !d.planned.version.planId)) return 'Geen schema actief';
+  // Segments of one plan id, each with its weeks (Week A/B) in order.
+  const segments = [];
+  known.forEach(d => {
+    const v = d.planned.version;
+    let seg = segments[segments.length - 1];
+    if (!seg || seg.planId !== v.planId) {
+      seg = { planId: v.planId, name: v.planId ? v.planName : 'geen schema', weekday: weekdayOfDateStr(d.date), weeks: [] };
+      segments.push(seg);
+    }
+    const w = d.planned.week;
+    if (w && (!seg.weeks.length || seg.weeks[seg.weeks.length - 1].week !== w)) seg.weeks.push({ week: w, weekday: weekdayOfDateStr(d.date) });
+  });
+  const segText = seg => seg.name + seg.weeks.map((w, i) => i === 0 ? ` · Week ${w.week}` : `, vanaf ${WEEKDAY_FULL_NAMES[w.weekday].toLowerCase()} Week ${w.week}`).join('');
+  return 'Schema: ' + segments.map((seg, i) => i === 0 ? segText(seg) : `vanaf ${WEEKDAY_FULL_NAMES[seg.weekday].toLowerCase()} ${segText(seg)}`).join(', ');
+}
+
+// Training card numbers for a week: planned vs done sets per primary muscle group, over
+// the days that count (the current week: up to and including today).
+//   planned: the sets of the plan days planned on those days (their schedule version)
+//   done:    the logged sets; a dropset continuation counts with the set before it
+//   per group: min(planned, done) is "uit je schema", the rest of done is extra
+//   no primary muscle group: compared per exercise id instead
+// compare: false when no counted day had a fixed or Week A/B schedule (no schedule, or a
+// sequential one — that comparison follows later).
+function insightTrainingStats(days) {
+  const counted = days.filter(d => d.counted);
+  const keyOf = id => {
+    const info = getExerciseInfo(id);
+    return info && info.primaryMuscleGroup ? 'mg:' + info.primaryMuscleGroup : 'ex:' + id;
+  };
+  const planned = {}, done = {};
+  let plannedTrainings = 0, doneTrainings = 0;
+  counted.forEach(d => {
+    if (d.planned.status === 'day') {
+      plannedTrainings++;
+      d.planned.day.exercises.forEach(ex => { const k = keyOf(ex.exerciseId); planned[k] = (planned[k] || 0) + (ex.sets || 0); });
+    }
+    if (d.logged) doneTrainings++;
+    getWorkout(d.date).forEach(ex => {
+      const n = countWorkingSets(ex.sets || []);
+      if (n > 0) { const k = keyOf(ex.exerciseId); done[k] = (done[k] || 0) + n; }
+    });
+  });
+  const keys = new Set([...Object.keys(planned), ...Object.keys(done)]);
+  let fromSchedule = 0, extra = 0, plannedSets = 0, doneSets = 0;
+  keys.forEach(k => {
+    const p = planned[k] || 0, n = done[k] || 0;
+    plannedSets += p; doneSets += n;
+    fromSchedule += Math.min(p, n);
+    extra += Math.max(0, n - p);
+  });
+  const compare = counted.some(d => ['day', 'rest', 'no-week'].includes(d.planned.status));
+  return { compare, plannedSets, doneSets, fromSchedule, shortfall: plannedSets - fromSchedule, extra, plannedTrainings, doneTrainings };
+}
+
+function insightAverage(values) { return values.reduce((a, b) => a + b, 0) / values.length; }
+
+function insightCardHtml(label, bodyHtml) {
+  return `<div class="card insight-card"><div class="section-label insight-card-label">${label}</div>${bodyHtml}</div>`;
+}
+function insightFigureHtml(value, unit) {
+  return `<div class="insight-figure"><span class="set-val">${value}</span><span class="set-unit">${unit}</span></div>`;
+}
+function insightEmptyHtml(text) { return `<div class="role-row insight-empty">${text}</div>`; }
+
+function insightTrainingCardHtml(stats) {
+  const trainings = n => n === 1 ? 'training' : 'trainingen';
+  if (!stats.compare) {
+    return insightFigureHtml(formatCount(stats.doneSets), stats.doneSets === 1 ? 'set' : 'sets')
+      + `<div class="role-sub">${formatCount(stats.doneTrainings)} ${trainings(stats.doneTrainings)} · geen vergelijking met schema</div>`;
+  }
+  const parts = [`${formatCount(stats.doneTrainings)} van ${formatCount(stats.plannedTrainings)} ${trainings(stats.plannedTrainings)}`,
+    stats.shortfall > 0 ? `<span class="insight-danger">−${formatCount(stats.shortfall)}</span>` : '<span class="insight-success">op schema</span>'];
+  if (stats.extra > 0) parts.push(`+${formatCount(stats.extra)} extra`);
+  return insightFigureHtml(formatCount(stats.fromSchedule), `van ${formatCount(stats.plannedSets)} sets uit je schema`)
+    + `<div class="role-sub">${parts.join(' · ')}</div>`;
+}
+
+function insightSleepCardHtml(weekStart) {
+  const nights = getSleepRange(weekStart, addDaysToDateStr(weekStart, 6));
+  if (nights.length === 0) return insightEmptyHtml('Nog geen slaap ingevuld');
+  const shortest = nights.reduce((a, b) => b.minutes < a.minutes ? b : a);
+  return insightFigureHtml(formatDuration(Math.round(insightAverage(nights.map(n => n.minutes)))), 'u gemiddeld')
+    + `<div class="role-sub">Kortste nacht: ${WEEKDAY_FULL_NAMES[weekdayOfDateStr(shortest.date)].toLowerCase()}, ${formatDuration(shortest.minutes)} u</div>`;
+}
+
+function insightWeightCardHtml(weekStart) {
+  const weekAvg = start => {
+    const r = getBodyWeightRange(start, addDaysToDateStr(start, 6));
+    return r.length ? round1(insightAverage(r.map(e => e.kg))) : null;
+  };
+  const avg = weekAvg(weekStart);
+  if (avg === null) return insightEmptyHtml('Nog geen gewicht ingevuld');
+  const prevStart = addDaysToDateStr(weekStart, -7);
+  const prev = weekAvg(prevStart);
+  return insightFigureHtml(formatNumber(avg), 'kg gemiddeld')
+    + (prev === null ? '' : `<div class="role-sub">${formatSignedNumber(round1(avg - prev))} kg t.o.v. week ${isoWeekOfDateStr(prevStart)}</div>`);
+}
+
+const INSIGHT_CHECK_SVG = '<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+
+function insightDaysGridHtml(days) {
+  // The first day of another plan gets a dotted line on the left of every cell in its
+  // column; the rows have no gap between them, so the line runs over the full grid height.
+  const sw = d => d.switchHere ? ' insight-switch' : '';
+  const cell = (d, content, cls = '') => `<div class="t-small insight-cell${cls}${sw(d)}">${content}</div>`;
+  const dash = d => cell(d, '–', ' insight-dash');
+  const row = (label, cells) => `<div class="t-small insight-row-label">${label}</div>` + cells.join('');
+  let html = '<div class="insight-grid"><div></div>';
+  html += days.map((d, i) => `<div class="t-small insight-cell${sw(d)}">${INSIGHT_WEEKDAYS_SHORT[i]}</div>`).join('');
+  html += row('Training', days.map(d => {
+    const state = insightTrainingState(d);
+    if (state === 'done') return cell(d, `<span class="insight-done" role="img" aria-label="Getraind">${INSIGHT_CHECK_SVG}</span>`);
+    if (state === 'missed') return cell(d, '<span class="insight-missed" role="img" aria-label="Gemist"></span>');
+    return dash(d);
+  }));
+  html += row('Voeding', days.map(dash));
+  html += row('Slaap', days.map(d => {
+    const s = getSleep(d.date);
+    if (!s) return dash(d);
+    const min = sleepDurationMinutes(s.bedtime, s.wakeTime);
+    return cell(d, formatDuration(min), min < SLEEP_SHORT_MINUTES ? ' insight-danger' : '');
+  }));
+  html += row('Gewicht', days.map(d => {
+    const kg = getBodyWeight(d.date);
+    return kg === null ? dash(d) : cell(d, formatNumber(kg));
+  }));
+  return html + '</div>';
+}
+
+function renderInsight() {
+  if (!insightWeekStart) insightWeekStart = weekStartOf(todayStr());
+  const weekStart = insightWeekStart;
+  const days = insightWeekDays(weekStart);
+  document.getElementById('insight-week-title').textContent = `Week ${isoWeekOfDateStr(weekStart)}`;
+  document.getElementById('insight-next').disabled = weekStart >= weekStartOf(todayStr());
+  document.getElementById('insight-dates').textContent = formatDateRange(weekStart, addDaysToDateStr(weekStart, 6));
+  document.getElementById('insight-schema').textContent = insightScheduleText(days);
+  document.getElementById('insight-days').innerHTML = insightDaysGridHtml(days);
+  document.getElementById('insight-cards').innerHTML =
+    insightCardHtml('Training', insightTrainingCardHtml(insightTrainingStats(days)))
+    + insightCardHtml('Voeding', insightEmptyHtml('Nog geen voedingsschema'))
+    + insightCardHtml('Slaap', insightSleepCardHtml(weekStart))
+    + insightCardHtml('Gewicht', insightWeightCardHtml(weekStart));
+}
+
+function openInsight() {
+  insightWeekStart = weekStartOf(todayStr());
+  showScreen('screen-insight');
+}
+document.getElementById('insight-prev').addEventListener('click', () => {
+  insightWeekStart = addDaysToDateStr(insightWeekStart, -7);
+  renderInsight();
+});
+document.getElementById('insight-next').addEventListener('click', () => {
+  if (insightWeekStart >= weekStartOf(todayStr())) return;
+  insightWeekStart = addDaysToDateStr(insightWeekStart, 7);
+  renderInsight();
+});
 
 function renderNewWorkoutScreen() {
   const pick = getTodaysScheduledDay();
@@ -3604,7 +3827,7 @@ document.getElementById('graph-reps').addEventListener('click', () => {
 // highlighted button is always re-derived from it (syncTimeFilterButtons, run
 // on every render), so what is highlighted can never differ from what is
 // applied. Default is 'all', matching the button marked active in index.html.
-document.querySelectorAll('.time-filter').forEach(t => {
+document.querySelectorAll('.graph-time-filters .time-filter').forEach(t => {
   t.addEventListener('click', () => {
     currentTimeRange = t.dataset.range;
     renderGraph();
@@ -3612,7 +3835,7 @@ document.querySelectorAll('.time-filter').forEach(t => {
 });
 
 function syncTimeFilterButtons() {
-  document.querySelectorAll('.time-filter').forEach(b => b.classList.toggle('active', b.dataset.range === currentTimeRange));
+  document.querySelectorAll('.graph-time-filters .time-filter').forEach(b => b.classList.toggle('active', b.dataset.range === currentTimeRange));
 }
 
 // Pure string maths on YYYY-MM-DD (the format sessions are keyed by), so no
@@ -4657,7 +4880,7 @@ document.getElementById('menu-card-fitness').addEventListener('click', openFitne
 document.getElementById('menu-card-workout').addEventListener('click', openWorkoutPlan);
 document.getElementById('menu-card-calculator').addEventListener('click', () => showScreen('screen-calculator'));
 document.getElementById('menu-card-nutrition').addEventListener('click', () => showScreen('screen-nutrition'));
-document.getElementById('menu-card-insight').addEventListener('click', () => showScreen('screen-insight'));
+document.getElementById('menu-card-insight').addEventListener('click', openInsight);
 
 // -- Theme (light/dark) ---------------------------------
 // The inline script at the top of <head> already set data-theme before first

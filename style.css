@@ -521,7 +521,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .extra-type-btn.active, .pde-sr-mode-btn.active, .ps-num-box.selected, .ps-toggle-option.selected, .chip.active, .ps-day-circle.selected, .plate-bar-option.selected, .time-filter.active { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
 .extra-type-btn, .pde-sr-mode-btn, .ps-num-box, .ps-toggle-option, .plate-bar-option { border-radius: var(--radius-sm); }
 .chip, .time-filter, .ps-day-circle, .day-picker-circle { border-radius: var(--radius-pill); }
-.extra-type-btn:disabled { opacity: .45; cursor: default; }
+.extra-type-btn:disabled, .time-filter:disabled { opacity: .45; cursor: default; }
 .extra-type { display: flex; gap: var(--space-2); margin-top: var(--space-2); }
 /* Dropset under RPE: one button on the Partial/Forced row, exactly one of those buttons wide,
    right-aligned so its right edge lines up with the RPE + button above it. */
@@ -576,7 +576,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .graph-sel-arrow svg { width: var(--icon-toolbar); height: var(--icon-toolbar); fill: var(--text); }
 .graph-sel-arrow:active:not(:disabled) { background: var(--primary-light); }
 .graph-sel-arrow:disabled { cursor: default; }
-.graph-sel-arrow:disabled svg { fill: var(--text-muted); opacity: .45; }
+.graph-sel-arrow:disabled svg, .insight-nav-btn:disabled svg { fill: var(--text-muted); opacity: .45; }
 .graph-sel-info { flex: 1; border: none; background: none; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: var(--space-2) var(--space-1); cursor: pointer; }
 .graph-sel-info:active { background: var(--primary-light); }
 .graph-sel-main { display: flex; align-items: baseline; gap: var(--space-1); font-size: var(--fs-number); font-weight: var(--fw-bold); color: var(--text); }
@@ -1075,6 +1075,45 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    "Gevolgd door dropset": the set rows' dropset arrow (same icon and colour), at the trophy's 1em */
 .recap-drop .drop-arrow { width: 1em; height: 1em; vertical-align: -2px; margin-right: var(--space-1); }
 .recap-empty { padding: var(--space-4) 0; }
+
+/* ══ INZICHT (#screen-insight, period Week) ═══════════════════════════════
+   Period buttons (Week · Maand · Jaar) are the Grafiek's .time-filter pills; week navigation
+   ‹ Week 43 ›, date + schedule line, the Per dag grid in a card and four figure cards.
+   Nothing is tappable yet besides the periods and the chevrons. */
+.insight-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: var(--screen-top) var(--screen-gutter) calc(var(--ai-bar-space) + var(--space-4)); }
+.insight-periods { display: flex; gap: var(--space-2); }
+.insight-nav { display: flex; align-items: center; justify-content: space-between; margin-top: var(--space-3); }
+.insight-nav-title { color: var(--text); }
+/* 20px chevron, 48×48 tap area; the negative margin puts the chevron on the card edge. */
+.insight-nav-btn { width: var(--control-height); height: var(--control-height); margin: 0 calc((var(--icon-list) - var(--control-height)) / 2); border: none; background: none; border-radius: var(--radius-pill); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+.insight-nav-btn svg { width: var(--icon-list); height: var(--icon-list); fill: var(--text); }
+.insight-nav-btn:active:not(:disabled) { background: var(--pressed); }
+.insight-nav-btn:disabled { cursor: default; }
+.insight-meta { text-align: center; color: var(--text-secondary); }
+.insight-meta + .insight-meta { margin-top: 2px; }
+.insight-label { padding: var(--section-gap) 0 var(--space-2); }
+/* Per dag: label column + 7 equal day columns (Ma … Zo). No row gap: the cells carry the
+   vertical space (--space-2 above and below, the grid's negative margin takes the outer
+   8px back), so a schedule-switch line on the cells of one column is unbroken. */
+.insight-grid { display: grid; grid-template-columns: auto repeat(7, minmax(0, 1fr)); align-items: stretch; margin: calc(-1 * var(--space-2)) 0; }
+.insight-cell, .insight-row-label { display: flex; align-items: center; min-height: var(--icon-list); padding: var(--space-2) 0; white-space: nowrap; }
+.insight-cell { justify-content: center; color: var(--text); }
+.insight-row-label { padding-right: var(--space-2); color: var(--text-secondary); }
+/* First day of another plan (plan-id switch): 1px dotted line on its left, full grid height. */
+.insight-cell.insight-switch { border-left: 1px dotted var(--text-muted); }
+.insight-cell.insight-dash { color: var(--text-muted); }
+.insight-done, .insight-missed { width: var(--icon-list); height: var(--icon-list); border-radius: var(--radius-pill); box-sizing: border-box; }
+.insight-done { display: flex; align-items: center; justify-content: center; background: var(--success); }
+.insight-done svg { width: 14px; height: 14px; fill: var(--on-primary); }
+.insight-missed { border: 2px solid var(--danger); }
+.insight-cards { display: flex; flex-direction: column; gap: var(--card-gap); margin-top: var(--card-gap); }
+.insight-card-label { margin-bottom: var(--space-2); }
+/* Big figure on Groot getal (.set-val) with its unit/explanation on Klein (.set-unit), like "80 kg". */
+.insight-figure { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: var(--space-1); }
+.insight-figure + .role-sub { margin-top: 2px; }
+.role-row.insight-empty { color: var(--text-muted); } /* wins over .role-row's --text in the role block */
+.insight-danger { color: var(--danger); }
+.insight-success { color: var(--success); }
 
 /* ── Typografie per rol ──────────────────────────────────────────────────────────────────────────
    Every text takes the style of its role (see DESIGN_SYSTEM.md, "Typografie per rol"). This block

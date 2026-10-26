@@ -121,7 +121,7 @@
         </div>
         <div class="nav-card-body">
           <div class="nav-card-title">Inzicht</div>
-          <div class="nav-card-desc">Houd je lichaamsmaten bij en zie je vooruitgang</div>
+          <div class="nav-card-desc">Training, voeding, slaap en gewicht</div>
         </div>
         <svg class="nav-card-arrow" viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
       </div>
@@ -913,12 +913,26 @@
     </button>
     <span class="toolbar-title">Inzicht</span>
   </div>
-  <div class="placeholder-content">
-    <div class="placeholder-icon">
-      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 9.2h3V19H5V9.2zM10.6 5h2.8v14h-2.8V5zm5.6 8H19v6h-2.8v-6z"/></svg>
+  <div class="insight-scroll" id="insight-scroll">
+    <div class="insight-periods">
+      <button type="button" class="time-filter active" aria-pressed="true">Week</button>
+      <button type="button" class="time-filter" disabled>Maand</button>
+      <button type="button" class="time-filter" disabled>Jaar</button>
     </div>
-    <div class="placeholder-title">Binnenkort beschikbaar</div>
-    <div class="placeholder-desc">Houd je lichaamsmaten bij en zie je vooruitgang</div>
+    <div class="insight-nav">
+      <button type="button" class="insight-nav-btn" id="insight-prev" aria-label="Vorige week">
+        <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+      </button>
+      <span class="t-heading insight-nav-title" id="insight-week-title"></span>
+      <button type="button" class="insight-nav-btn" id="insight-next" aria-label="Volgende week">
+        <svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+      </button>
+    </div>
+    <div class="t-small insight-meta" id="insight-dates"></div>
+    <div class="t-small insight-meta" id="insight-schema"></div>
+    <div class="section-label insight-label">Per dag</div>
+    <div class="card insight-days" id="insight-days"></div>
+    <div class="insight-cards" id="insight-cards"></div>
   </div>
 </div>
 
