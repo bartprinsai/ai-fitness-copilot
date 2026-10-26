@@ -2502,7 +2502,7 @@ function renderExerciseInfoView() {
   const secondary = sortMuscleGroupIds(info.secondaryMuscleGroups || []).map(muscleGroupName);
   const notSet = '<span class="info-view-stat-value info-view-stat-empty">Niet ingesteld</span>';
   const value = v => `<span class="info-view-stat-value">${v}</span>`;
-  sections.push(`<div class="section-label">Spiergroep</div><div class="info-two-col">
+  sections.push(`<div class="section-label section-head">Spiergroep</div><div class="info-two-col">
       <div class="info-view-stat"><span class="section-label">Primair</span>${primary ? value(primary) : notSet}</div>
       <div class="info-view-stat"><span class="section-label">Secundair</span>${secondary.length ? secondary.map(value).join('') : notSet}</div>
     </div>`);
@@ -2519,7 +2519,7 @@ function renderExerciseInfoView() {
     if (!equipmentFieldIsFilled(f, info)) return;
     equipHtml += `<div class="info-view-stat"><span class="section-label">${labelHtml(f.label)}</span><span class="info-view-stat-value">${equipmentFieldViewValue(f, info)}</span></div>`;
   });
-  if (equipHtml) sections.push('<div class="section-label">Apparatuur</div>' + equipHtml);
+  if (equipHtml) sections.push('<div class="section-label section-head">Apparatuur</div>' + equipHtml);
   document.getElementById('exercise-info-view-content').innerHTML = sections.join('');
   document.getElementById('exercise-info-view-mode').classList.remove('hidden');
   document.getElementById('exercise-info-edit-mode').classList.add('hidden');

@@ -152,6 +152,9 @@ html, body { height: 100%; background: var(--bg); font-family: var(--font); font
 /* The one section label (formerly .field-label, .info-section-label, .new-ex-label,
    .plate-section-label, .plate-result-title, .cal-month-header, .history-day-date). */
 .section-label { display: block; font-size: var(--fs-label); line-height: 16px; font-weight: var(--fw-medium); color: var(--text-secondary); text-transform: uppercase; letter-spacing: var(--ls-label); }
+/* Section heading (Sectiekop): a Label in --primary that starts a block of fields (Spiergroep,
+   Apparatuur). The separator line above it (not above the first one) is set per context. */
+.section-label.section-head { color: var(--primary); }
 .t-small { font-size: var(--fs-small); font-weight: var(--fw-regular); }
 .t-body { font-size: var(--fs-body); font-weight: var(--fw-regular); }
 .t-heading { font-size: var(--fs-heading); font-weight: var(--fw-medium); }
@@ -664,8 +667,11 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 /* Wrapper for the generated equipment fields (rendered into both the info overlay and the New/Edit Exercise screen). */
 .info-fields-group { display: flex; flex-direction: column; gap: var(--space-3); }
 .info-field { display: flex; flex-direction: column; gap: var(--space-1); }
-/* Group headers in the Exercise Info edit form: same --space-4 extra above as .new-ex-group. */
-.exercise-info-scroll .info-group-label:not(:first-child) { margin-top: var(--space-4); }
+/* Section headings in Exercise Info (view and edit): the first one sits 20px under the title
+   (the 16px panel gap + --space-1); every next one gets a 1px --border line with 24px above it
+   (the 12px scroll gap + --space-3) and 16px (--space-4) between the line and the heading. */
+.exercise-info-scroll > .section-head:first-child { padding-top: var(--space-1); }
+.exercise-info-scroll > .section-head:not(:first-child) { margin-top: var(--space-3); padding-top: var(--space-4); border-top: 1px solid var(--border); }
 /* Ja/Nee toggle (Powerliftbank): the Partial/Forced button (.extra-type-btn, 36px, 12px text),
    exactly as wide as Partial/Forced in TRACK — a quarter of the screen minus the gutters and the
    8px gaps there: (100vw − 2 × gutter − 4 × --space-2) / 4 — left in its column and vertically
@@ -673,9 +679,8 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .info-toggle { display: flex; align-items: center; height: var(--control-height); }
 .info-toggle .extra-type-btn { flex: 0 0 auto; width: calc((100vw - 2 * var(--screen-gutter) - 4 * var(--space-2)) / 4); }
 .info-view-stat { display: flex; flex-direction: column; gap: 2px; }
-.info-view-stat-value { font-size: var(--fs-heading); font-weight: var(--fw-medium); color: var(--text); }
-/* Nothing chosen: "Niet ingesteld" like an empty select field (placeholder colour, 400). */
-.info-view-stat-value.info-view-stat-empty { font-weight: var(--fw-regular); color: var(--text-muted); }
+/* The values (.info-view-stat-value, empty: .info-view-stat-empty) are the role Veldwaarde, see the
+   "Typografie per rol" block at the bottom. */
 
 /* ══ CALENDAR ═══════════════════════════════════════════ */
 /* Weekday header: styled like the dark bars (calendar footer, Fitness Tracker day navigation) —
@@ -929,10 +934,11 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .new-ex-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: var(--ai-bar-space); }
 /* The form sits on the screen's --bg like the TRACK input block: no white strips, no lines between
    sections; the 16px padding of each section (32px between fields) keeps them apart. Fields, selects
-   and buttons stay white with a border. A group header (Spiergroep, Apparatuur: .new-ex-group) gets
-   --space-4 extra above it, so it reads as the start of a group, not as one more field label. */
+   and buttons stay white with a border. A group (Spiergroep, Apparatuur: .new-ex-group) starts with a
+   section heading (.section-head) under a 1px --border line, 16px in from the screen edges like a
+   card: 24px above the line (the previous section's 16px + --space-2), 16px between line and heading. */
 .new-ex-section { padding: var(--space-4) var(--screen-gutter); }
-.new-ex-group { margin-top: var(--space-4); }
+.new-ex-group { margin: var(--space-2) var(--screen-gutter) 0; padding-left: 0; padding-right: 0; border-top: 1px solid var(--border); }
 .new-ex-section > .section-label { margin-bottom: var(--space-2); }
 .new-ex-field-row { display: flex; align-items: center; gap: var(--space-3); }
 .new-ex-add-cat-btn { width: var(--control-height); height: var(--control-height); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text-secondary); font-family: inherit; font-size: var(--fs-number); line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .1s; }
@@ -1096,6 +1102,10 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .role-choice, .extra-type-btn, .pde-sr-mode-btn, .ps-toggle-option, .chip, .time-filter { font-size: var(--fs-small); font-weight: var(--fw-medium); }
 /* Compacte actieknop — a .btn inside a card or banner, not a screen's/popup's main action: 36px high,
    12px/500, uppercase with the normal .btn letter-spacing (Smart-banner: Overslaan · Ja, laden) */
+/* Veldwaarde — the value under a field label on a view-only screen (Oefeninginfo): 16px/500, --text.
+   Empty ("Niet ingesteld"): 400, --text-muted, like an empty select field. */
+.role-value, .info-view-stat-value { font-size: var(--fs-heading); font-weight: var(--fw-medium); color: var(--text); }
+.role-value.role-value-empty, .info-view-stat-value.info-view-stat-empty { font-weight: var(--fw-regular); color: var(--text-muted); }
 .btn.btn-compact { height: 36px; font-size: var(--fs-small); font-weight: var(--fw-medium); }
 .role-title, .role-row { color: var(--text); }
 .role-sub { color: var(--text-secondary); }
