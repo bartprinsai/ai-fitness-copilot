@@ -178,6 +178,8 @@ html, body { height: 100%; background: var(--bg); font-family: var(--font); font
 .btn-success { background: var(--success); color: var(--on-primary); }
 .btn-ai { background: var(--ai); color: var(--on-primary); }
 .btn-block { flex: none; width: 100%; }
+/* Clear in a fill-in sheet (Wissen): the outlined secondary button with a --danger label. */
+.btn-secondary.btn-danger-text { color: var(--danger); }
 /* Text button: a .btn without a fill, label in --primary (Klaar under a multiple-choice list). */
 /* Two-line label (e.g. "Reset<br>beschikbaar") — same button, the label just wraps. */
 .btn-multiline { height: auto; min-height: var(--control-height); padding: var(--space-1) var(--space-1); font-size: var(--fs-small); white-space: normal; }
@@ -215,7 +217,7 @@ button.pill:active { filter: brightness(.92); transform: scale(0.97); }
 
 /* ══ INPUTS ═════════════════════════════════════════════
    One input style everywhere. */
-.input, .overlay-panel input[type="text"], .overlay-panel input[type="number"], .overlay-panel input[type="time"], .overlay-panel select, .overlay-panel textarea, .new-ex-input, .new-ex-select, .search-bar input, .plate-target-input, .ai-gen-textarea, .field-group input { width: 100%; height: var(--control-height); padding: 0 var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-family: inherit; font-size: var(--fs-heading); font-weight: var(--fw-regular); outline: none; transition: border-color .15s; -moz-appearance: textfield; }
+.input, .overlay-panel input[type="text"], .overlay-panel input[type="number"], .overlay-panel select, .overlay-panel textarea, .new-ex-input, .new-ex-select, .search-bar input, .plate-target-input, .ai-gen-textarea, .field-group input { width: 100%; height: var(--control-height); padding: 0 var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-family: inherit; font-size: var(--fs-heading); font-weight: var(--fw-regular); outline: none; transition: border-color .15s; -moz-appearance: textfield; }
 .input:focus, .overlay-panel input:focus, .overlay-panel select:focus, .overlay-panel textarea:focus, .new-ex-input:focus, .new-ex-select:focus, .search-bar input:focus, .plate-target-input:focus, .ai-gen-textarea:focus, .field-group input:focus { border-color: var(--primary); }
 .input::placeholder, input::placeholder, textarea::placeholder { color: var(--text-muted); }
 /* A typed number is always Groot getal (20px/700, like the TRACK fields), in every number field —
@@ -1156,6 +1158,31 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .insight-edit-icon svg { display: block; width: var(--icon-list); height: var(--icon-list); fill: var(--text-secondary); }
 /* Not filled in: "Nog niet ingevuld", then the full-width fill button (.btn-primary.btn-block). */
 .insight-fill-btn { margin-top: var(--space-3); }
+
+/* ── Slaap invullen: the 24-hour clock (#sleep-clock) ──────────────────────────────────────────
+   Max. 280px wide (scales down with the panel), 0 at the top, clockwise. Ring r=116 in the 280
+   viewBox, 28 thick: --border track, the night (bedtime → wake time) in --primary with round ends.
+   The handles (48×48 tap area, 34px --primary knob with a white icon) are HTML on top of the SVG,
+   placed by app.js in %; touch-action: none so dragging never scrolls the page. */
+.sleep-clock { position: relative; width: 100%; max-width: 280px; aspect-ratio: 1; margin: 0 auto; touch-action: none; user-select: none; -webkit-user-select: none; }
+.sleep-clock-svg { display: block; width: 100%; height: 100%; }
+.sleep-clock-track, .sleep-clock-arc { fill: none; stroke-width: 28; }
+.sleep-clock-track { stroke: var(--border); }
+.sleep-clock-arc { stroke: var(--primary); stroke-linecap: round; }
+.sleep-clock-num { fill: var(--text-secondary); font-size: var(--fs-label); font-weight: var(--fw-regular); text-anchor: middle; dominant-baseline: central; }
+.sleep-clock-handle { position: absolute; width: var(--control-height); height: var(--control-height); margin: calc(var(--control-height) / -2) 0 0 calc(var(--control-height) / -2); display: flex; align-items: center; justify-content: center; border-radius: var(--radius-pill); cursor: grab; outline: none; -webkit-tap-highlight-color: transparent; }
+.sleep-clock-knob { width: 34px; height: 34px; border-radius: var(--radius-pill); background: var(--primary); display: flex; align-items: center; justify-content: center; }
+.sleep-clock-knob svg { width: var(--icon-list); height: var(--icon-list); fill: var(--on-primary); }
+.sleep-clock-handle.is-top { z-index: 1; }
+.sleep-clock-handle:focus-visible .sleep-clock-knob { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--primary); }
+/* Middle: bed icon + bedtime, alarm icon + wake time (Groot getal); a tap swaps the time for a field. */
+.sleep-clock-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
+.sleep-clock-row { display: flex; align-items: center; gap: var(--space-2); height: var(--control-height); pointer-events: auto; }
+.sleep-clock-icon { width: var(--icon-list); height: var(--icon-list); fill: var(--text-secondary); flex-shrink: 0; }
+.sleep-clock-time, .sleep-clock input.sleep-clock-input { width: 76px; height: var(--control-height); padding: 0 var(--space-1); font-family: inherit; font-size: var(--fs-number); font-weight: var(--fw-bold); text-align: center; font-variant-numeric: tabular-nums; }
+.sleep-clock-time { border: none; border-radius: var(--radius-sm); background: none; color: var(--text); cursor: pointer; }
+.sleep-clock-time:active { background: var(--pressed); }
+.sleep-clock-total { text-align: center; }
 
 /* ── Typografie per rol ──────────────────────────────────────────────────────────────────────────
    Every text takes the style of its role (see DESIGN_SYSTEM.md, "Typografie per rol"). This block

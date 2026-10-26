@@ -1154,17 +1154,38 @@
       <h3>Slaap</h3>
       <div class="role-sub" id="insight-sleep-sub"></div>
     </div>
-    <div class="pde-sr-row">
-      <div class="pde-sr-field">
-        <label class="section-label" for="insight-sleep-bed">Naar bed</label>
-        <input type="time" id="insight-sleep-bed"/>
+    <!-- 24-hour clock (app.js "Sleep sheet"): 0 at the top, clockwise. Drag a handle (5-minute
+         steps) or tap a time in the middle to type it; app.js draws the arc and places the handles. -->
+    <div class="sleep-clock" id="sleep-clock">
+      <svg class="sleep-clock-svg" viewBox="0 0 280 280" aria-hidden="true">
+        <circle class="sleep-clock-track" cx="140" cy="140" r="116"/>
+        <path class="sleep-clock-arc" id="sleep-clock-arc"/>
+        <text class="sleep-clock-num" x="140" y="52">0</text>
+        <text class="sleep-clock-num" x="228" y="140">6</text>
+        <text class="sleep-clock-num" x="140" y="228">12</text>
+        <text class="sleep-clock-num" x="52" y="140">18</text>
+      </svg>
+      <div class="sleep-clock-handle" data-which="bed" role="slider" tabindex="0" aria-label="Naar bed">
+        <span class="sleep-clock-knob"><svg viewBox="0 0 24 24"><path d="M7 13c1.66 0 3-1.34 3-3S8.66 7 7 7s-3 1.34-3 3 1.34 3 3 3zm12-6h-8v7H3V5H1v15h2v-3h18v3h2v-9c0-2.21-1.79-4-4-4z"/></svg></span>
       </div>
-      <div class="pde-sr-field">
-        <label class="section-label" for="insight-sleep-wake">Opgestaan</label>
-        <input type="time" id="insight-sleep-wake"/>
+      <div class="sleep-clock-handle" data-which="wake" role="slider" tabindex="0" aria-label="Opgestaan">
+        <span class="sleep-clock-knob"><svg viewBox="0 0 24 24"><path d="M22 5.72l-4.6-3.86-1.29 1.53 4.6 3.86L22 5.72zM7.88 3.39L6.6 1.86 2 5.71l1.29 1.53 4.59-3.85zM12.5 8H11v6l4.75 2.85.75-1.23-4-2.37V8zM12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9c4.97 0 9-4.03 9-9s-4.03-9-9-9zm0 16c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg></span>
+      </div>
+      <div class="sleep-clock-center">
+        <div class="sleep-clock-row">
+          <svg class="sleep-clock-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 13c1.66 0 3-1.34 3-3S8.66 7 7 7s-3 1.34-3 3 1.34 3 3 3zm12-6h-8v7H3V5H1v15h2v-3h18v3h2v-9c0-2.21-1.79-4-4-4z"/></svg>
+          <button type="button" class="sleep-clock-time t-number" data-which="bed" aria-label="Naar bed, tik om te typen"></button>
+          <input type="text" inputmode="numeric" class="sleep-clock-input t-number hidden" data-which="bed" autocomplete="off" aria-label="Naar bed"/>
+        </div>
+        <div class="sleep-clock-row">
+          <svg class="sleep-clock-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 5.72l-4.6-3.86-1.29 1.53 4.6 3.86L22 5.72zM7.88 3.39L6.6 1.86 2 5.71l1.29 1.53 4.59-3.85zM12.5 8H11v6l4.75 2.85.75-1.23-4-2.37V8zM12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9c4.97 0 9-4.03 9-9s-4.03-9-9-9zm0 16c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+          <button type="button" class="sleep-clock-time t-number" data-which="wake" aria-label="Opgestaan, tik om te typen"></button>
+          <input type="text" inputmode="numeric" class="sleep-clock-input t-number hidden" data-which="wake" autocomplete="off" aria-label="Opgestaan"/>
+        </div>
       </div>
     </div>
-    <div class="role-sub" id="insight-sleep-total"></div>
+    <div class="role-sub sleep-clock-total" id="insight-sleep-total"></div>
+    <button class="btn btn-secondary btn-block btn-danger-text hidden" id="btn-insight-sleep-clear">Wissen</button>
     <div class="overlay-btns">
       <button class="btn btn-secondary" id="btn-insight-sleep-cancel">Annuleren</button>
       <button class="btn btn-primary" id="btn-insight-sleep-save">Opslaan</button>
@@ -1183,6 +1204,7 @@
       <label class="section-label" for="insight-weight-input">Gewicht <span class="label-unit">(kg)</span></label>
       <input type="text" inputmode="decimal" id="insight-weight-input" placeholder="bijv. 80" autocomplete="off"/>
     </div>
+    <button class="btn btn-secondary btn-block btn-danger-text hidden" id="btn-insight-weight-clear">Wissen</button>
     <div class="overlay-btns">
       <button class="btn btn-secondary" id="btn-insight-weight-cancel">Annuleren</button>
       <button class="btn btn-primary" id="btn-insight-weight-save">Opslaan</button>

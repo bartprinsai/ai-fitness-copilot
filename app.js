@@ -2442,47 +2442,144 @@ document.getElementById('screen-insight-day').addEventListener('click', e => {
   else openInsightWeightSheet();
 });
 
-// Sleep sheet: two time fields (the browser's own time picker); both emptied + Opslaan clears
-// the night, like an emptied note. The total follows while typing, across midnight.
+// Sleep sheet: an own 24-hour clock (0 at the top, clockwise; DESIGN_SYSTEM.md "24-uursklok").
+// Drag a handle over the ring (5-minute steps, freely across 0) or tap a time in the middle and
+// type it ("2345" → 23:45, "730" → 07:30). The duration always runs from bedtime to wake time,
+// clockwise, across midnight. Starts on the night's own times, else the last earlier night's,
+// else 23:00–07:00. Wissen (only for a night that is filled in) clears the night at once.
+const SLEEP_CLOCK_R = 116, SLEEP_CLOCK_C = 140; // ring radius and centre in the 280 viewBox
+const SLEEP_CLOCK_STEP = 5;
+const SLEEP_DEFAULT = { bedtime: '23:00', wakeTime: '07:00' };
 let insightSleepBaseline = null;
-const insightSleepValues = () => ['insight-sleep-bed', 'insight-sleep-wake'].map(id => document.getElementById(id).value.slice(0, 5));
-function updateInsightSleepTotal() {
-  const [bed, wake] = insightSleepValues();
-  document.getElementById('insight-sleep-total').textContent = SLEEP_TIME_RE.test(bed) && SLEEP_TIME_RE.test(wake)
-    ? `Totaal: ${formatDuration(sleepDurationMinutes(bed, wake))} u` : 'Totaal: –';
+const insightSleepTimes = { bed: SLEEP_DEFAULT.bedtime, wake: SLEEP_DEFAULT.wakeTime };
+const insightSleepValues = () => [insightSleepTimes.bed, insightSleepTimes.wake];
+const sleepClock = document.getElementById('sleep-clock');
+const minutesToTime = m => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+// A point on the ring for a time of day, in viewBox units (0:00 at the top, clockwise).
+function sleepClockPoint(minutes) {
+  const a = minutes / 1440 * 2 * Math.PI;
+  return { x: SLEEP_CLOCK_C + SLEEP_CLOCK_R * Math.sin(a), y: SLEEP_CLOCK_C - SLEEP_CLOCK_R * Math.cos(a) };
+}
+function renderSleepClock() {
+  const dur = sleepDurationMinutes(insightSleepTimes.bed, insightSleepTimes.wake);
+  const p0 = sleepClockPoint(timeToMinutes(insightSleepTimes.bed)), p1 = sleepClockPoint(timeToMinutes(insightSleepTimes.wake));
+  document.getElementById('sleep-clock-arc').setAttribute('d', dur === 0 ? ''
+    : `M${p0.x.toFixed(2)} ${p0.y.toFixed(2)}A${SLEEP_CLOCK_R} ${SLEEP_CLOCK_R} 0 ${dur > 720 ? 1 : 0} 1 ${p1.x.toFixed(2)} ${p1.y.toFixed(2)}`);
+  sleepClock.querySelectorAll('.sleep-clock-handle').forEach(h => {
+    const t = insightSleepTimes[h.dataset.which], p = sleepClockPoint(timeToMinutes(t));
+    h.style.left = `${p.x / (2 * SLEEP_CLOCK_C) * 100}%`;
+    h.style.top = `${p.y / (2 * SLEEP_CLOCK_C) * 100}%`;
+    h.setAttribute('aria-valuetext', t);
+  });
+  sleepClock.querySelectorAll('.sleep-clock-time').forEach(b => { b.textContent = insightSleepTimes[b.dataset.which]; });
+  document.getElementById('insight-sleep-total').textContent = `Totaal: ${formatDuration(dur)} u · tik op een tijd om hem in te typen`;
+}
+// Dragging: the time follows the angle of the pointer around the centre, in 5-minute steps.
+let sleepClockDrag = null;
+sleepClock.querySelectorAll('.sleep-clock-handle').forEach(h => {
+  h.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    sleepClockDrag = { which: h.dataset.which, pointerId: e.pointerId };
+    sleepClock.querySelectorAll('.sleep-clock-handle').forEach(x => x.classList.toggle('is-top', x === h)); // the dragged handle lies on top
+    h.setPointerCapture(e.pointerId);
+  });
+  h.addEventListener('pointermove', e => {
+    if (!sleepClockDrag || sleepClockDrag.pointerId !== e.pointerId) return;
+    const r = sleepClock.getBoundingClientRect();
+    const a = Math.atan2(e.clientX - (r.left + r.width / 2), (r.top + r.height / 2) - e.clientY);
+    const m = (a / (2 * Math.PI) * 1440 + 1440) % 1440;
+    insightSleepTimes[sleepClockDrag.which] = minutesToTime(Math.round(m / SLEEP_CLOCK_STEP) * SLEEP_CLOCK_STEP % 1440);
+    renderSleepClock();
+  });
+  const end = e => { if (sleepClockDrag && sleepClockDrag.pointerId === e.pointerId) sleepClockDrag = null; };
+  h.addEventListener('pointerup', end);
+  h.addEventListener('pointercancel', end);
+  // keyboard: the arrows move 5 minutes
+  h.addEventListener('keydown', e => {
+    const step = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 }[e.key];
+    if (!step) return;
+    e.preventDefault();
+    const m = timeToMinutes(insightSleepTimes[h.dataset.which]);
+    insightSleepTimes[h.dataset.which] = minutesToTime((m + step * SLEEP_CLOCK_STEP + 1440) % 1440);
+    renderSleepClock();
+  });
+});
+// Typing: "2345" → 23:45, "730" → 07:30 (a typed colon is ignored); null when not a valid time.
+function parseTypedTime(str) {
+  const digits = String(str).replace(/\D/g, '');
+  if (digits.length !== 3 && digits.length !== 4) return null;
+  const h = Number(digits.slice(0, -2)), m = Number(digits.slice(-2));
+  return h <= 23 && m <= 59 ? minutesToTime(h * 60 + m) : null;
+}
+const sleepClockEl = (cls, which) => sleepClock.querySelector(`.${cls}[data-which="${which}"]`);
+function closeSleepClockInput(which) {
+  sleepClockEl('sleep-clock-input', which).classList.add('hidden');
+  sleepClockEl('sleep-clock-time', which).classList.remove('hidden');
+}
+// Takes the typed time over (the clock follows); an invalid one gives the red toast and keeps the old time.
+function commitSleepClockInput(which) {
+  const t = parseTypedTime(sleepClockEl('sleep-clock-input', which).value);
+  if (!t) { toast('Vul een geldige tijd in', { type: 'error' }); return false; }
+  insightSleepTimes[which] = t;
+  renderSleepClock();
+  return true;
+}
+sleepClock.querySelectorAll('.sleep-clock-time').forEach(b => b.addEventListener('click', () => {
+  const input = sleepClockEl('sleep-clock-input', b.dataset.which);
+  input.value = insightSleepTimes[b.dataset.which];
+  b.classList.add('hidden');
+  input.classList.remove('hidden');
+  input.focus();
+  input.select();
+}));
+sleepClock.querySelectorAll('.sleep-clock-input').forEach(input => {
+  input.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    if (commitSleepClockInput(input.dataset.which)) input.blur(); else input.select();
+  });
+  input.addEventListener('blur', () => {
+    if (input.classList.contains('hidden')) return;
+    commitSleepClockInput(input.dataset.which);
+    closeSleepClockInput(input.dataset.which);
+  });
+});
+// The night's own times; else those of the last earlier night that is filled in; else 23:00–07:00.
+function insightSleepStart(date) {
+  const prev = Object.keys(db.sleep || {}).filter(d => d < date).sort().pop();
+  return getSleep(date) || (prev ? db.sleep[prev] : SLEEP_DEFAULT);
 }
 function openInsightSleepSheet() {
-  const s = getSleep(insightDayDate);
-  document.getElementById('insight-sleep-bed').value = s ? s.bedtime : '';
-  document.getElementById('insight-sleep-wake').value = s ? s.wakeTime : '';
+  const start = insightSleepStart(insightDayDate);
+  insightSleepTimes.bed = start.bedtime;
+  insightSleepTimes.wake = start.wakeTime;
+  ['bed', 'wake'].forEach(closeSleepClockInput);
   document.getElementById('insight-sleep-sub').textContent = insightNightLongText(insightDayDate);
+  document.getElementById('btn-insight-sleep-clear').classList.toggle('hidden', !getSleep(insightDayDate));
   insightSleepBaseline = insightSleepValues();
-  updateInsightSleepTotal();
+  renderSleepClock();
   openOverlay('insight-sleep-overlay');
 }
-['insight-sleep-bed', 'insight-sleep-wake'].forEach(id => document.getElementById(id).addEventListener('input', updateInsightSleepTotal));
 document.getElementById('btn-insight-sleep-cancel').addEventListener('click', () => {
   confirmDiscardIfChanged(() => hasChanges(insightSleepBaseline, insightSleepValues()), () => closeOverlay('insight-sleep-overlay'));
 });
+document.getElementById('btn-insight-sleep-clear').addEventListener('click', () => {
+  deleteSleep(insightDayDate);
+  toast('Slaap gewist');
+  closeOverlay('insight-sleep-overlay');
+  renderInsightDay();
+});
 document.getElementById('btn-insight-sleep-save').addEventListener('click', () => {
-  const date = insightDayDate;
   const [bed, wake] = insightSleepValues();
-  if (!bed && !wake) {
-    if (getSleep(date)) { deleteSleep(date); toast('Slaap gewist'); }
-  } else if (!bed || !wake) {
-    toast('Vul beide tijden in', { type: 'error' }); return;
-  } else if (bed === wake) {
-    toast('Naar bed en opgestaan kunnen niet gelijk zijn', { type: 'error' }); return;
-  } else {
-    if (!saveSleep(date, bed, wake)) { toast('Vul een geldige tijd in', { type: 'error' }); return; }
-    toast('Slaap opgeslagen');
-  }
+  if (bed === wake) { toast('Naar bed en opgestaan kunnen niet gelijk zijn', { type: 'error' }); return; }
+  if (!saveSleep(insightDayDate, bed, wake)) { toast('Vul een geldige tijd in', { type: 'error' }); return; }
+  toast('Slaap opgeslagen');
   closeOverlay('insight-sleep-overlay');
   renderInsightDay();
 });
 
 // Weight sheet: one decimal field (comma or point, max. 2 decimals, FIELD_DECIMALS), 20 to 400
-// kg; emptied + Opslaan clears the day's weight.
+// kg. Wissen (only for a day that is filled in) clears the weight at once; empty + Opslaan is an error.
 const INSIGHT_WEIGHT_MIN = 20, INSIGHT_WEIGHT_MAX = 400;
 let insightWeightBaseline = null;
 function openInsightWeightSheet() {
@@ -2490,6 +2587,7 @@ function openInsightWeightSheet() {
   const input = document.getElementById('insight-weight-input');
   input.value = kg === null ? '' : formatWeight(kg);
   document.getElementById('insight-weight-sub').textContent = formatDateStr(insightDayDate);
+  document.getElementById('btn-insight-weight-clear').classList.toggle('hidden', kg === null);
   insightWeightBaseline = input.value;
   openOverlay('insight-weight-overlay');
 }
@@ -2499,17 +2597,20 @@ document.getElementById('insight-weight-input').addEventListener('change', e => 
 document.getElementById('btn-insight-weight-cancel').addEventListener('click', () => {
   confirmDiscardIfChanged(() => hasChanges(insightWeightBaseline, document.getElementById('insight-weight-input').value), () => closeOverlay('insight-weight-overlay'));
 });
+document.getElementById('btn-insight-weight-clear').addEventListener('click', () => {
+  deleteBodyWeight(insightDayDate);
+  toast('Gewicht gewist');
+  closeOverlay('insight-weight-overlay');
+  renderInsightDay();
+});
 document.getElementById('btn-insight-weight-save').addEventListener('click', () => {
   const date = insightDayDate;
   const raw = document.getElementById('insight-weight-input').value.trim();
-  if (!raw) {
-    if (getBodyWeight(date) !== null) { deleteBodyWeight(date); toast('Gewicht gewist'); }
-  } else {
-    const kg = parseWeight(raw);
-    if (!(kg >= INSIGHT_WEIGHT_MIN && kg <= INSIGHT_WEIGHT_MAX)) { toast('Vul een gewicht in van 20 tot en met 400 kg', { type: 'error' }); return; }
-    saveBodyWeight(date, kg);
-    toast('Gewicht opgeslagen');
-  }
+  if (!raw) { toast('Vul een gewicht in', { type: 'error' }); return; }
+  const kg = parseWeight(raw);
+  if (!(kg >= INSIGHT_WEIGHT_MIN && kg <= INSIGHT_WEIGHT_MAX)) { toast('Vul een gewicht in van 20 tot en met 400 kg', { type: 'error' }); return; }
+  saveBodyWeight(date, kg);
+  toast('Gewicht opgeslagen');
   closeOverlay('insight-weight-overlay');
   renderInsightDay();
 });
