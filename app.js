@@ -1313,9 +1313,12 @@ function showCommentView(text) {
   document.getElementById('comment-edit-mode').classList.add('hidden');
 }
 
+// Wissen (full width above Annuleren · Opslaan) only when a note is saved, like Slaap and Gewicht.
 function showCommentEdit(text) {
   commentEditBaseline = text;
   document.getElementById('comment-edit-input').value = text;
+  const saved = commentPopupCtx && commentPopupCtx.getText();
+  document.getElementById('btn-comment-delete').classList.toggle('hidden', !(saved && saved.trim()));
   document.getElementById('comment-edit-mode').classList.remove('hidden');
   document.getElementById('comment-view-mode').classList.add('hidden');
 }
@@ -3307,22 +3310,25 @@ function openSetNote(i) {
   noteEditIndex = i;
   setNoteBaseline = ex.sets[i].note || '';
   document.getElementById('set-note-input').value = setNoteBaseline;
+  document.getElementById('btn-set-note-clear').classList.toggle('hidden', !setNoteBaseline.trim());
   openOverlay('set-note-overlay');
 }
 
-function saveSetNote() {
+// Opslaan needs text ("Vul een notitie in"); Wissen (only for a saved note) clears it at once.
+function saveSetNote({ clear = false } = {}) {
   if (noteEditIndex === null) return;
+  const note = clear ? '' : document.getElementById('set-note-input').value.trim();
+  if (!clear && !note) { toast('Vul een notitie in', { type: 'error' }); return; }
   const workout = getWorkout(currentDate);
   const ex = workout.find(e => e.exerciseId === currentExerciseId);
   if (!ex || !ex.sets[noteEditIndex]) { closeOverlay('set-note-overlay'); return; }
-  const note = document.getElementById('set-note-input').value.trim();
   if (note) ex.sets[noteEditIndex].note = note;
   else delete ex.sets[noteEditIndex].note;
   setWorkout(currentDate, workout);
   noteEditIndex = null;
   closeOverlay('set-note-overlay');
   renderSetList();
-  toast(note ? 'Notitie opgeslagen' : 'Notitie verwijderd');
+  toast(note ? 'Notitie opgeslagen' : 'Notitie gewist');
 }
 
 // Personal Records: 1..12 reps, or up to the highest rep count ever logged for
@@ -5404,7 +5410,8 @@ document.getElementById('btn-set-note-cancel').addEventListener('click', () => {
     () => { noteEditIndex = null; closeOverlay('set-note-overlay'); }
   );
 });
-document.getElementById('btn-set-note-save').addEventListener('click', saveSetNote);
+document.getElementById('btn-set-note-save').addEventListener('click', () => saveSetNote());
+document.getElementById('btn-set-note-clear').addEventListener('click', () => saveSetNote({ clear: true }));
 document.getElementById('btn-global-ai-coach').addEventListener('click', () => {
   // TODO: link to the Chat Coach screen once it's built
 });
@@ -5423,28 +5430,19 @@ document.getElementById('btn-comment-cancel').addEventListener('click', () => {
     }
   );
 });
+// Wissen clears the saved note at once (no confirmation), closes and says so — the
+// "Wissen in een invulvenster" pattern. An empty note + Opslaan is an error, not a clear.
 document.getElementById('btn-comment-delete').addEventListener('click', () => {
-  const ctx = commentPopupCtx;
-  const doDelete = () => {
-    if (ctx) ctx.onDelete();
-    closeOverlay('comment-overlay');
-    toast('Notitie verwijderd');
-  };
-  // Nothing saved yet (popup opened straight into edit mode): nothing to lose, just close.
-  const saved = ctx && ctx.getText();
-  if (!saved || !saved.trim()) { doDelete(); return; }
-  openConfirmDelete({
-    title: 'Notitie verwijderen?',
-    message: `${ctx.label} verwijderen? Dit kan niet ongedaan worden gemaakt.`,
-    onConfirm: doDelete,
-  });
+  if (commentPopupCtx) commentPopupCtx.onDelete();
+  closeOverlay('comment-overlay');
+  toast('Notitie gewist');
 });
 document.getElementById('btn-comment-save').addEventListener('click', () => {
   const val = document.getElementById('comment-edit-input').value.trim();
+  if (!val) { toast('Vul een notitie in', { type: 'error' }); return; }
   if (commentPopupCtx) commentPopupCtx.onSave(val);
   closeOverlay('comment-overlay');
-  // Saving an emptied comment removes it, same as Delete.
-  toast(val ? 'Notitie opgeslagen' : 'Notitie verwijderd');
+  toast('Notitie opgeslagen');
 });
 
 document.getElementById('exercise-search').addEventListener('input', e => {
