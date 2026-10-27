@@ -3181,15 +3181,16 @@ function insightStrengthPct(p) {
 const insightRecordsText = n => insightPlural(n, 'record', 'records');
 const insightNoCompareHtml = '<div class="role-sub insight-muted">Geen vergelijking</div>';
 
-// Kracht card: per category the name (with "1 record") and the average change on the right, or
-// "Geen vergelijking"; under it what it is compared with.
+// Kracht card: per category the name on the left; on the right the average change (or "Geen
+// vergelijking") with "1 record" under it — names left, numbers right; under it all what it is
+// compared with.
 function insightStrengthCardHtml(s) {
   if (!s.exercises.length) return insightEmptyHtml(INSIGHT_STRENGTH_EMPTY);
   return s.categories.map(c => {
     const p = c.pct === null ? null : insightStrengthPct(c.pct);
-    return `<div class="insight-strength-row"><div class="insight-mg-main"><div class="role-row">${c.name}</div>`
-      + (c.records ? `<div class="role-sub">${insightRecordsText(c.records)}</div>` : '') + '</div>'
-      + `<div class="insight-mg-figure">${p ? insightPctHtml(p.text, p.cls) : insightNoCompareHtml}</div></div>`;
+    return `<div class="insight-strength-row"><div class="insight-mg-main"><div class="role-row">${c.name}</div></div>`
+      + `<div class="insight-mg-figure">${p ? insightPctHtml(p.text, p.cls) : insightNoCompareHtml}`
+      + (c.records ? `<div class="role-sub">${insightRecordsText(c.records)}</div>` : '') + '</div></div>';
   }).join('') + `<div class="role-sub insight-strength-note">Gemiddelde verandering van de geschatte 1RM t.o.v. ${insightPeriodName(s.prev)}</div>`;
 }
 // "🏆 2 records" on the right of the card's label; nothing at 0.

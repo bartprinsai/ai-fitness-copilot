@@ -1240,10 +1240,12 @@ button.insight-table-row:active { background: var(--bg); }
 /* The PR trophy (icon and --pr-gold of the set rows) at the size of the text it stands in, like the Recap's. */
 .insight-pr { width: 1em; height: 1em; fill: var(--pr-gold); vertical-align: -2px; margin-right: var(--space-1); flex-shrink: 0; }
 .insight-records { display: inline-flex; align-items: center; color: var(--text-secondary); }
-/* Card: a row per category (name left, change right, vertically centred), no lines — a summary, not a list. */
-.insight-strength-row { display: flex; align-items: center; gap: var(--space-3); }
+/* Card: a row per category, no lines — a summary, not a list. Names left, numbers right: the change
+   (or "Geen vergelijking") right-aligned with "1 record" under it. Name and change share the
+   baseline of their first line, so the change sits the same with or without a records line. */
+.insight-strength-row { display: flex; align-items: baseline; gap: var(--space-3); }
 .insight-strength-row + .insight-strength-row { margin-top: var(--space-2); }
-.insight-strength-row .insight-mg-main .role-sub { margin-top: 2px; }
+.insight-strength-row .insight-mg-figure .role-sub { margin-top: 2px; }
 .insight-strength-note { margin-top: var(--space-3); }
 /* Detail list: a sectiekop per category with its change behind it; above every one but the first a
    line from edge to edge (24px above it: the row's 12px + --space-3, 16px between line and head),
