@@ -1151,7 +1151,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .insight-mg-main { flex: 1; min-width: 0; }
 .insight-mg-figure { flex-shrink: 0; text-align: right; }
 .insight-mg-figure .insight-figure { justify-content: flex-end; }
-.role-sub.insight-muted { color: var(--text-muted); } /* "Gepland: …" — wins over .role-sub's --text-secondary */
+.role-sub.insight-muted, .role-row.insight-muted { color: var(--text-muted); } /* "Gepland: …", a planned exercise not done — wins over the role colour */
 /* Sleep / weight filled in: the whole card is a button that opens its sheet, a 20px pencil on the right. */
 .insight-edit-card { width: 100%; display: flex; align-items: center; gap: var(--space-3); border: none; text-align: left; font-family: inherit; color: inherit; cursor: pointer; }
 .insight-edit-card:active { background: var(--bg); }
@@ -1167,7 +1167,9 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    The week's head (insightWeekHeadHtml), then a summary card (three columns), a chart card and a
    Label with a list card (a row per day). */
 .insight-summary { margin-top: var(--section-gap); }
-.insight-summary-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: var(--space-2); text-align: center; }
+/* Equal columns, as many as there are (three for Slaap / Gewicht, five for Training); --space-1 between
+   them, so the five labels (DROPSET is the widest, 55px) each fit their column on 360px. */
+.insight-summary-cols { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); column-gap: var(--space-1); text-align: center; }
 .insight-summary-cols .section-label { margin-bottom: var(--space-1); }
 .insight-summary-cols .insight-figure { justify-content: center; }
 .insight-summary-note { margin-top: var(--space-3); text-align: center; } /* Slaap: "Kortste nacht" and "Langste nacht" each on a line of their own */
@@ -1190,10 +1192,29 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .insight-list .insight-mg-row:first-child { border-top: none; }
 .insight-list-row { width: 100%; border-left: none; border-right: none; border-bottom: none; background: none; text-align: left; font-family: inherit; color: inherit; cursor: pointer; }
 .insight-list-row:active { background: var(--bg); }
-/* Every row as high as a row with two lines (.role-row 18px + 2px + .role-sub 14px), filled in or
-   not; the value on the right sits in the middle of the row. */
-.insight-list-row { align-items: center; }
-.insight-list-row .insight-mg-main { min-height: 34px; }
+/* Every row of a list as high as a row with two lines (.role-row 18px + 2px + .role-sub 14px), with
+   or without a value or Klein line; the value on the right sits in the middle of the row. Also the
+   lists of the training overview and the muscle-group screen (rows there are not all buttons). */
+.insight-list .insight-mg-row { align-items: center; }
+.insight-list .insight-mg-main { min-height: 34px; }
+
+/* ── Training overview (#screen-insight-training) and muscle-group screen (#screen-insight-muscle) ──
+   The week's head and schedule line, a summary card with five columns, then lists. */
+/* A Label with something next to it (the legend) or under it (a Klein note, 2px under it). */
+.insight-label-row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
+.insight-label-note { margin-top: 2px; }
+.insight-legend { display: flex; gap: var(--space-3); color: var(--text-secondary); }
+.insight-legend-item { display: inline-flex; align-items: center; gap: var(--space-1); }
+.insight-dot { width: var(--space-2); height: var(--space-2); border-radius: var(--radius-pill); flex-shrink: 0; }
+.insight-dot-done { background: var(--primary); }
+.insight-dot-planned { background: var(--text-muted); }
+/* PER SPIERGROEP: one grid for all rows (subgrid), so the % column is as wide in every row and the
+   bars of every row share one width, and with it one scale. */
+.insight-mg-list { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; column-gap: var(--space-3); }
+.insight-mg-list > .insight-mg-row { display: grid; grid-template-columns: subgrid; grid-column: 1 / -1; }
+.insight-mg-bars { display: block; margin: var(--space-1) 0 2px; }
+.insight-bar-planned { fill: var(--text-muted); }
+.insight-pct { column-gap: 0; } /* "16%": the % right after the number, no space */
 
 /* ── Slaap invullen: the 24-hour clock (#sleep-clock) ──────────────────────────────────────────
    Max. 280px wide (scales down with the panel), 0 at the top, clockwise. Ring r=116 in the 280

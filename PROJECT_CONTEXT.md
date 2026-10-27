@@ -159,7 +159,7 @@ Alle regels staan op **één plek: bovenaan `exercises.js`** (`EXERCISE_CATEGORI
 - **Migratie (eenmalig, per gebruiker)**: `migrateExerciseIds()` in `app.js` draait vanuit `loadUserData()` zolang `meta/migrations` geen `exerciseIds` heeft, en zet die vlag (de datum) in de laatste schrijfbatch, zodat hij daarna nooit meer draait. Hij zet om: eigen oefeningen krijgen een id (heeft een eigen oefening de naam van een ingebouwde, dan is het die bewerkte ingebouwde en krijgt hij diens id); trainingen en plandagen `{ name }` → `{ exerciseId }`; favorieten, verborgen ingebouwde, exercise_info en records naar id als sleutel. Een naam zonder bijbehorende oefening wordt niet gegokt: in een training of plandag valt zo'n regel weg (zonder id kan de app hem niet openen), als sleutel in favorieten/verborgen/exercise_info/records blijft hij staan (niets zoekt hem op); beide worden gelogd (`console.warn`). Op 26 oktober 2026 is de migratie voor alle drie de accounts gedraaid; er waren geen onbekende namen.
 
 ## Inzicht
-Stap 1 (oktober 2026) legde de opslag aan, stap 2 het hoofdscherm voor een week, stap 3 het dagoverzicht met slaap en gewicht invullen, stap 4 de detailschermen Slaap en Gewicht. De code staat in `app.js` onder "Inzicht: schedule versions and Week A/B per date", "Inzicht: sleep and body weight", "Inzicht: the screen", "Inzicht: the day overview" en "Inzicht: the detail screens Slaap and Gewicht". Vormgeving: DESIGN_SYSTEM.md, "Inzicht".
+Stap 1 (oktober 2026) legde de opslag aan, stap 2 het hoofdscherm voor een week, stap 3 het dagoverzicht met slaap en gewicht invullen, stap 4 de detailschermen Slaap en Gewicht, stap 5 het trainingsoverzicht en het detailscherm per spiergroep. De code staat in `app.js` onder "Inzicht: schedule versions and Week A/B per date", "Inzicht: sleep and body weight", "Inzicht: the screen", "Inzicht: the day overview", "Inzicht: the detail screens Slaap and Gewicht" en "Inzicht: the training overview and the muscle-group screen". Vormgeving: DESIGN_SYSTEM.md, "Inzicht".
 
 ### Vaste afspraken
 - **Een week loopt van maandag tot en met zondag** (weekdag 0 = maandag, `weekdayOfDateStr()`).
@@ -217,8 +217,8 @@ Geeft de geldende schemaversie (de laatste ingangsdatum op of vóór die datum) 
 - **Per dag, Training**: minstens één gelogde set op die datum = gedaan (groen vinkje). **Rode ring (gemist)** alleen als de dag volgens zijn eigen schemaversie een plandag had (vaste dagen of Week A/B), de dag voorbij is (vóór vandaag) en er geen set is gelogd; een geladen training zonder sets telt dus als gemist. Vandaag, dagen die nog komen, rustdagen, dagen zonder schema of zonder vastgelegde week en **doorlopende schema's krijgen nooit een rode ring**, maar een streepje.
 - **Per dag, overige rijen**: Voeding nog overal een streepje; Slaap de duur als u:mm, onder 7:00 rood; Gewicht de waarde met 1 decimaal zonder eenheid. De eerste dag van een ander plan-id krijgt een stippellijn (zie DESIGN_SYSTEM.md).
 - Tikken op een dag (de hele kolom in Per dag) opent het dagoverzicht (stap 3, hieronder); dagen na vandaag openen niet.
-- **Aan te tikken kaarten**: Slaap en Gewicht zijn in hun geheel een knop met rechts een chevron en openen hun detailscherm (stap 4, hieronder) voor dezelfde week. Training en Voeding hebben (nog) geen chevron en doen niets.
-- **De kop** (Week · Maand · Jaar, ‹ Week 43 ›, de datumregel) is één gedeeld component, `insightWeekHeadHtml()`, voor het weekoverzicht en beide detailschermen. Bladeren verschuift `insightWeekStart` en tekent het actieve scherm opnieuw.
+- **Aan te tikken kaarten**: Training, Slaap en Gewicht zijn in hun geheel een knop met rechts een chevron en openen hun detailscherm (Training: het trainingsoverzicht, stap 5; Slaap en Gewicht: stap 4, hieronder) voor dezelfde week. Voeding heeft (nog) geen chevron en doet niets.
+- **De kop** (Week · Maand · Jaar, ‹ Week 43 ›, de datumregel) is één gedeeld component, `insightWeekHeadHtml()`, voor het weekoverzicht, beide detailschermen, het trainingsoverzicht en het detailscherm per spiergroep. Bladeren verschuift `insightWeekStart` en tekent het actieve scherm opnieuw.
 
 ### Het dagoverzicht (stap 3)
 - **Openen en navigeren**: `openInsightDay(datum)` vanuit het raster Per dag, alleen tot en met vandaag. Bovenaan ‹ datum › ("Donderdag 22 oktober 2026"); terugbladeren onbeperkt, vooruit tot en met vandaag. De terugpijl (en de terugknop van de telefoon) brengt je naar het weekoverzicht van de week waarin de getoonde dag valt (`renderInsightDay()` zet `insightWeekStart` mee).
@@ -244,6 +244,31 @@ Geeft de geldende schemaversie (de laatste ingangsdatum op of vóór die datum) 
 - **Grafiek Gewicht**: een lijn langs de ingevulde dagen (dagen zonder gewicht worden overgeslagen), één punt zonder lijn bij één dag. y-as (`insightWeightAxis()`): drie rasterlijnen op een ronde stap (0,5 · 1 · 2 · 2,5 · 5 × 10ⁿ, minstens 0,5 kg) rond een rond midden, de kleinste stap waarbij de buitenste lijnen alle waardes omsluiten; het bereik loopt een halve stap verder, dus geen punt raakt de rand en de as begint niet bij 0 (98,2–98,9 → 98 · 98,5 · 99).
 - Beide grafieken: een stippellijn op het gemiddelde (de afgeronde waarde uit de samenvatting).
 - **Lijst NACHTEN / WEEGMOMENTEN**: een rij per dag van maandag tot en met zondag, zonder dagen na vandaag. Tik op een rij opent het invulvenster (24-uursklok of gewicht) voor die dag; na opslaan of wissen zijn samenvatting, grafiek en lijst direct bijgewerkt.
+
+### Het trainingsoverzicht (stap 5)
+- **Openen en navigeren**: de Training-kaart in het weekoverzicht opent `#screen-insight-training` (`openInsightTraining()`, `renderInsightTraining()`, titel "Training") voor de week in `insightWeekStart`. Bovenaan de gedeelde kop en de schemaregel (`insightScheduleText()`). Bladeren werkt zoals in het weekoverzicht; de terugpijl en de terugknop van de telefoon brengen je naar het weekoverzicht op de week die je hier het laatst bekeek.
+- **Alles komt uit `insightTrainingStats()`** (dezelfde rekenregels als de Training-kaart, vergelijken met `insightCompareKey()`), dat daarvoor ook per vergelijkingssleutel (`planned`, `done`) en per oefening (`plannedEx`, `doneEx`) teruggeeft.
+- **Vijf totalen** (samenvattingskaart), over alle gelogde sets van de getelde dagen (vandaag inbegrepen, ook vóór de eerste set: dan zijn er vandaag gewoon nog geen sets). Per set met zijn drops (`insightSetFeatures()`, dezelfde telregels als het dagoverzicht):
+  - **SETS**: alle gedane sets, ook extra sets; een set met drops is één set (`countWorkingSets()`);
+  - **FAILURE**: sets met RPE 10 op de set zelf of op een van zijn drops;
+  - **PARTIAL** / **FORCED**: volgens `extraType` (met extra reps) op de set of een van zijn drops;
+  - **DROPSET**: sets met minstens één drop.
+- Daaronder dezelfde vergelijking als de Training-kaart (`insightTrainingTexts()`): "21 van 25 sets uit je schema · −4 · +6 extra" en "2 van 2 trainingen"; zonder vergelijking (geen schema, doorlopend) alleen "3 trainingen · geen vergelijking met schema". Alleen de vergelijking volgt de regel voor vandaag (geplande sets van vandaag tellen pas na de eerste set).
+- **Per spiergroep** (`insightMuscleRows()`): een rij voor elk van de achttien spiergroepen uit `MUSCLE_GROUPS`, ook met 0%, en een rij "Geen spiergroep" als er gedane of geplande sets zijn zonder (bekende) primaire spiergroep. Alleen de primaire spiergroep telt (`insightMuscleRowId()`, ook gebruikt door het dagoverzicht).
+  - **Percentage** = gedane sets van de spiergroep ÷ alle gedane sets, afgerond op een heel getal; zonder sets overal 0%. Afronden kan samen iets anders dan 100% geven.
+  - **Sortering**: percentage van hoog naar laag, bij gelijk percentage de volgorde van `MUSCLE_GROUPS`; "Geen spiergroep" altijd als laatste.
+  - **Balkjes**: gedaan en gepland op één schaal, de hoogste waarde van gedaan of gepland over alle rijen.
+  - **Regel 1** (`insightMuscleCompareText()`, de regels van het dagoverzicht): gepland: "8 van 10 · −2" (tekort), anders "· +2 extra", anders "· op schema"; niet gepland maar getraind: "2 sets · extra"; niet gepland en niet getraind: "0 sets · niet in schema"; zonder vergelijking alleen "N sets". Een spiergroep die alleen vandaag gepland staat is vóór de eerste set van vandaag dus "niet in schema".
+  - **Regel 2** (`insightFeaturesText()`): "4 failure · 1 partial · 1 forced · 1 dropset", een kenmerk met 0 vervalt, alles 0: geen regel.
+  - **De rij "Geen spiergroep"** vergelijkt per oefening (zoals het dagoverzicht) en telt die op: "2 van 2 · +2 extra"; hij kan zowel een tekort als extra hebben.
+  - Tik op een rij opent het detailscherm van die spiergroep voor dezelfde week.
+
+### Het detailscherm per spiergroep (stap 5)
+- `#screen-insight-muscle` (`openInsightMuscle(id)`, `''` = "Geen spiergroep"; `renderInsightMuscle()`), titel de naam van de spiergroep. Bladeren schuift de week mee (de spiergroep blijft); terug brengt je naar het trainingsoverzicht van die week.
+- **Samenvatting**: dezelfde vijf totalen, alleen voor deze spiergroep. Daaronder de vergelijking volgens de regels van regel 1, met "sets uit je schema" als hij gepland stond ("4 van 4 sets uit je schema · +2 extra", "0 sets · niet in schema"); zonder vergelijking vervalt die regel. Dan "22% van al je sets".
+- **OEFENINGEN**: elke in de week gedane oefening met deze spiergroep als primaire (zonder spiergroep: de oefeningen zonder), met de kenmerken en rechts het aantal sets; meeste sets eerst (gelijk: op naam). Daaronder de geplande oefeningen van deze spiergroep die niet gedaan zijn (geplande sets volgens dezelfde regels als de vergelijking): "Gepland · 4 sets". Niets: "Geen oefeningen deze week".
+- **MEEGETRAIND** ("Telt niet mee in het percentage"): elke in de week gedane oefening met deze spiergroep als secundaire (en een andere primaire), met "Primair: Borst" of "Primair: niet ingesteld" en het aantal sets; meeste sets eerst. Geen enkele: het hele blok vervalt (bij "Geen spiergroep" altijd).
+- Rijen in deze lijsten zijn niet aan te tikken.
 
 ### Rekenregels Training-kaart (`insightTrainingStats()`)
 - **Welke dagen**: alle dagen van de week; **in de lopende week alleen tot en met vandaag**. **Vandaag** telt pas mee zodra er vandaag minstens één set is gelogd: vóór die eerste set tellen de geplande sets en de geplande training van vandaag niet mee (geen tekort in de ochtend). Vanaf morgen telt de dag gewoon mee als voorbije dag, ook zonder set. Dit geldt voor de sets uit je schema, het tekort, de extra sets en de telling van trainingen; de rode ring in Per dag stond vandaag al nooit.
@@ -276,7 +301,7 @@ Geeft de geldende schemaversie (de laatste ingangsdatum op of vóór die datum) 
 ## Volgende stappen
 1. Chat Coach activeren (koppelen aan de globale AI Coach-balk)
 2. Nutrition sectie bouwen
-3. Inzicht verder bouwen (Maand en Jaar, detailschermen van Training en Voeding, vergelijking voor doorlopende schema's)
+3. Inzicht verder bouwen (Maand en Jaar, detailscherm van Voeding, vergelijking voor doorlopende schema's)
 
 ---
 

@@ -630,6 +630,8 @@ const SCREEN_ON_ENTER = {
   'screen-insight': () => renderInsight(),
   'screen-insight-day': () => renderInsightDay(),
   'screen-insight-metric': () => renderInsightMetric(),
+  'screen-insight-training': () => renderInsightTraining(),
+  'screen-insight-muscle': () => renderInsightMuscle(),
 };
 
 // Per-screen "does the CURRENTLY ACTIVE screen have unsaved input?" checks,
@@ -2076,22 +2078,32 @@ function insightCompareKey(id) {
 //            (its sets are extra). loggedDays = all days with ≥ 1 logged set (no comparison).
 // compare: false when no counted day had a fixed or Week A/B schedule (no schedule, or a
 // sequential one — that comparison follows later).
+// Also per comparison key (planned, done) and per exercise id: plannedEx { sets, name } (as
+// planned above) and doneEx (insightSetFeatures of all its logged sets, summed) — the
+// training overview and the muscle-group screens are built from these.
 function insightTrainingStats(days) {
   const counted = days.filter(d => d.counted);
   const keyOf = insightCompareKey;
-  const planned = {}, done = {};
+  const planned = {}, done = {}, plannedEx = {}, doneEx = {};
   const today = todayStr();
   let plannedTrainings = 0, doneTrainings = 0, loggedDays = 0;
   counted.forEach(d => {
     if (d.planned.status === 'day' && (d.date !== today || d.logged)) {
       plannedTrainings++;
       if (d.logged) doneTrainings++;
-      d.planned.day.exercises.forEach(ex => { const k = keyOf(ex.exerciseId); planned[k] = (planned[k] || 0) + (ex.sets || 0); });
+      d.planned.day.exercises.forEach(ex => {
+        const k = keyOf(ex.exerciseId); planned[k] = (planned[k] || 0) + (ex.sets || 0);
+        if (!(ex.sets > 0)) return;
+        const p = plannedEx[ex.exerciseId] || (plannedEx[ex.exerciseId] = { sets: 0, name: ex.name });
+        p.sets += ex.sets;
+      });
     }
     if (d.logged) loggedDays++;
     getWorkout(d.date).forEach(ex => {
       const n = countWorkingSets(ex.sets || []);
-      if (n > 0) { const k = keyOf(ex.exerciseId); done[k] = (done[k] || 0) + n; }
+      if (n === 0) return;
+      const k = keyOf(ex.exerciseId); done[k] = (done[k] || 0) + n;
+      doneEx[ex.exerciseId] = insightAddFeatures(doneEx[ex.exerciseId], insightSetFeatures(ex.sets));
     });
   });
   const keys = new Set([...Object.keys(planned), ...Object.keys(done)]);
@@ -2103,14 +2115,15 @@ function insightTrainingStats(days) {
     extra += Math.max(0, n - p);
   });
   const compare = counted.some(d => ['day', 'rest', 'no-week'].includes(d.planned.status));
-  return { compare, plannedSets, doneSets, fromSchedule, shortfall: plannedSets - fromSchedule, extra, plannedTrainings, doneTrainings, loggedDays };
+  return { compare, plannedSets, doneSets, fromSchedule, shortfall: plannedSets - fromSchedule, extra, plannedTrainings, doneTrainings, loggedDays,
+    planned, done, plannedEx, doneEx };
 }
 
 function insightAverage(values) { return values.reduce((a, b) => a + b, 0) / values.length; }
 
 const INSIGHT_CHEVRON_SVG = '<svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>';
-// A figure card of the week. With `metric` ('sleep' / 'weight') the whole card is a button that
-// opens that detail screen, with a chevron on the right.
+// A figure card of the week. With `metric` ('training' / 'sleep' / 'weight') the whole card is a
+// button that opens that detail screen, with a chevron on the right.
 function insightCardHtml(label, bodyHtml, metric) {
   const inner = `<div class="section-label insight-card-label">${label}</div>${bodyHtml}`;
   if (!metric) return `<div class="card insight-card">${inner}</div>`;
@@ -2122,17 +2135,23 @@ function insightFigureHtml(value, unit) {
 }
 function insightEmptyHtml(text) { return `<div class="role-row insight-empty">${text}</div>`; }
 
-function insightTrainingCardHtml(stats) {
+// The texts of the week's comparison, shared by the Training card and the training overview:
+//   none       "3 trainingen · geen vergelijking met schema" (no comparison; only this one)
+//   ofPlanned  "van 82 sets uit je schema" (after the number fromSchedule)
+//   diff       "−24 · +6 extra" (shortfall red; none: "op schema" green; "+N extra" only if N > 0)
+//   trainings  "4 van 5 trainingen"
+function insightTrainingTexts(stats) {
   const trainings = n => n === 1 ? 'training' : 'trainingen';
-  if (!stats.compare) {
-    return insightFigureHtml(formatCount(stats.doneSets), stats.doneSets === 1 ? 'set' : 'sets')
-      + `<div class="role-sub">${formatCount(stats.loggedDays)} ${trainings(stats.loggedDays)} · geen vergelijking met schema</div>`;
-  }
-  const parts = [`${formatCount(stats.doneTrainings)} van ${formatCount(stats.plannedTrainings)} ${trainings(stats.plannedTrainings)}`,
-    stats.shortfall > 0 ? `<span class="insight-danger">−${formatCount(stats.shortfall)}</span>` : '<span class="insight-success">op schema</span>'];
-  if (stats.extra > 0) parts.push(`+${formatCount(stats.extra)} extra`);
-  return insightFigureHtml(formatCount(stats.fromSchedule), `van ${formatCount(stats.plannedSets)} sets uit je schema`)
-    + `<div class="role-sub">${parts.join(' · ')}</div>`;
+  if (!stats.compare) return { none: `${formatCount(stats.loggedDays)} ${trainings(stats.loggedDays)} · geen vergelijking met schema` };
+  const diff = [stats.shortfall > 0 ? `<span class="insight-danger">−${formatCount(stats.shortfall)}</span>` : '<span class="insight-success">op schema</span>'];
+  if (stats.extra > 0) diff.push(`+${formatCount(stats.extra)} extra`);
+  return { ofPlanned: `van ${formatCount(stats.plannedSets)} sets uit je schema`, diff: diff.join(' · '),
+    trainings: `${formatCount(stats.doneTrainings)} van ${formatCount(stats.plannedTrainings)} ${trainings(stats.plannedTrainings)}` };
+}
+function insightTrainingCardHtml(stats) {
+  const t = insightTrainingTexts(stats);
+  if (t.none) return insightFigureHtml(formatCount(stats.doneSets), stats.doneSets === 1 ? 'set' : 'sets') + `<div class="role-sub">${t.none}</div>`;
+  return insightFigureHtml(formatCount(stats.fromSchedule), t.ofPlanned) + `<div class="role-sub">${t.trainings} · ${t.diff}</div>`;
 }
 
 // A bedtime on a scale that runs on past midnight: 00:00–11:59 counts as after midnight
@@ -2219,7 +2238,8 @@ function insightDaysGridHtml(days) {
   return html + '</div>';
 }
 
-// The top of every week screen (the week and the Slaap / Gewicht detail screens), one component:
+// The top of every week screen (the week, the Slaap / Gewicht detail screens, the training overview
+// and the muscle-group screen), one component:
 // Week · Maand · Jaar (Maand and Jaar disabled for now), ‹ Week 43 › (right disabled on the
 // current week) and the date line. The arrows step insightWeekStart (see the listener below).
 function insightWeekHeadHtml(weekStart) {
@@ -2244,7 +2264,7 @@ function renderInsight() {
   document.getElementById('insight-schema').textContent = insightScheduleText(days);
   document.getElementById('insight-days').innerHTML = insightDaysGridHtml(days);
   document.getElementById('insight-cards').innerHTML =
-    insightCardHtml('Training', insightTrainingCardHtml(insightTrainingStats(days)))
+    insightCardHtml('Training', insightTrainingCardHtml(insightTrainingStats(days)), 'training')
     + insightCardHtml('Voeding', insightEmptyHtml('Nog geen voedingsschema'))
     + insightCardHtml('Slaap', insightSleepCardHtml(weekStart), 'sleep')
     + insightCardHtml('Gewicht', insightWeightCardHtml(weekStart), 'weight');
@@ -2255,7 +2275,7 @@ function openInsight() {
   showScreen('screen-insight');
 }
 // ‹ › on a week screen: step a week (not past the current one) and redraw that screen.
-['screen-insight', 'screen-insight-metric'].forEach(id => document.getElementById(id).addEventListener('click', e => {
+['screen-insight', 'screen-insight-metric', 'screen-insight-training', 'screen-insight-muscle'].forEach(id => document.getElementById(id).addEventListener('click', e => {
   const b = e.target.closest('[data-insight-step]');
   if (!b || b.disabled) return;
   const next = addDaysToDateStr(insightWeekStart, 7 * Number(b.dataset.insightStep));
@@ -2265,7 +2285,9 @@ function openInsight() {
 }));
 document.getElementById('insight-cards').addEventListener('click', e => {
   const c = e.target.closest('[data-insight-metric]');
-  if (c) openInsightMetric(c.dataset.insightMetric);
+  if (!c) return;
+  if (c.dataset.insightMetric === 'training') openInsightTraining();
+  else openInsightMetric(c.dataset.insightMetric);
 });
 // A tap anywhere in a day's column (Per dag) opens that day; the whole column shows pressed.
 (function setupInsightDayColumns() {
@@ -2311,17 +2333,19 @@ const insightPlural = (n, one, more) => `${formatCount(n)} ${n === 1 ? one : mor
 //         "Geen spiergroep" row (id '') for exercises without one, compared per exercise.
 //         { id, planned, done, counted (min per comparison key), extra, exercises: logged
 //         [{ exerciseId, sets }], missed: planned exercises without a logged set }
+// The muscle-group row an exercise belongs to: its primary muscle group as set now, or ''
+// ("Geen spiergroep") without a (known) one. Day overview and training overview alike.
+function insightMuscleRowId(id) {
+  const info = getExerciseInfo(id);
+  const mg = info && info.primaryMuscleGroup;
+  return mg && MUSCLE_GROUPS.some(m => m.id === mg) ? mg : '';
+}
 function insightDayTraining(d) {
   const st = d.planned.status;
   const mode = st === 'day' || st === 'rest' ? (st === 'day' && d.date === todayStr() && !d.logged ? 'pending' : 'compare') : 'none';
-  const rowIdOf = id => {
-    const info = getExerciseInfo(id);
-    const mg = info && info.primaryMuscleGroup;
-    return mg && MUSCLE_GROUPS.some(m => m.id === mg) ? mg : '';
-  };
   const rows = new Map();
   const rowFor = id => {
-    const rid = rowIdOf(id);
+    const rid = insightMuscleRowId(id);
     if (!rows.has(rid)) rows.set(rid, { id: rid, plannedBy: {}, doneBy: {}, exercises: [], plannedEx: [] });
     return rows.get(rid);
   };
@@ -2352,24 +2376,39 @@ function insightDayTraining(d) {
   return { mode, rows: list, planned: sum(r => r.planned), done: sum(r => r.done), counted: sum(r => r.counted), extra: sum(r => r.extra) };
 }
 
-// "Bench press · 4 sets · 2 failure · 1 partial · 1 forced · 1 dropset" — per set, its drops
-// included: a set with drops is one set and one dropset; failure = RPE 10 on the set or one
-// of its drops; partial / forced follow extraType on the set or one of its drops. A 0 is left out.
-function insightExerciseLine(exerciseId, sets) {
+// The counts of one exercise's logged sets, per set with its drops included: a set with drops
+// is one set and one dropset; failure = RPE 10 on the set or one of its drops; partial /
+// forced follow extraType on the set or one of its drops. { sets, failure, partial, forced, drops }
+function insightSetFeatures(sets) {
   const groups = workingSetGroups(sets).map(g => g.idxs.map(i => sets[i]));
   const count = f => groups.filter(g => g.some(f)).length;
   const hasExtra = s => (parseInt(s.extra) || 0) > 0;
-  const n = countWorkingSets(sets);
-  const parts = [exerciseName(exerciseId), insightPlural(n, 'set', 'sets')];
-  const failure = count(s => parseFloat(s.rpe) === 10);
-  const partial = count(s => hasExtra(s) && s.extraType !== 'forced');
-  const forced = count(s => hasExtra(s) && s.extraType === 'forced');
-  const drops = groups.filter(g => g.length > 1).length;
-  if (failure) parts.push(`${formatCount(failure)} failure`);
-  if (partial) parts.push(`${formatCount(partial)} partial`);
-  if (forced) parts.push(`${formatCount(forced)} forced`);
-  if (drops) parts.push(insightPlural(drops, 'dropset', 'dropsets'));
+  return {
+    sets: countWorkingSets(sets),
+    failure: count(s => parseFloat(s.rpe) === 10),
+    partial: count(s => hasExtra(s) && s.extraType !== 'forced'),
+    forced: count(s => hasExtra(s) && s.extraType === 'forced'),
+    drops: groups.filter(g => g.length > 1).length,
+  };
+}
+const INSIGHT_FEATURES_EMPTY = { sets: 0, failure: 0, partial: 0, forced: 0, drops: 0 };
+function insightAddFeatures(a, b) {
+  a = a || INSIGHT_FEATURES_EMPTY;
+  return { sets: a.sets + b.sets, failure: a.failure + b.failure, partial: a.partial + b.partial, forced: a.forced + b.forced, drops: a.drops + b.drops };
+}
+// "2 failure · 1 partial · 1 forced · 1 dropset"; a 0 is left out ('' when all are 0).
+function insightFeaturesText(f) {
+  const parts = [];
+  if (f.failure) parts.push(`${formatCount(f.failure)} failure`);
+  if (f.partial) parts.push(`${formatCount(f.partial)} partial`);
+  if (f.forced) parts.push(`${formatCount(f.forced)} forced`);
+  if (f.drops) parts.push(insightPlural(f.drops, 'dropset', 'dropsets'));
   return parts.join(' · ');
+}
+// "Bench press · 4 sets · 2 failure · 1 partial · 1 forced · 1 dropset" (insightSetFeatures).
+function insightExerciseLine(exerciseId, sets) {
+  const f = insightSetFeatures(sets);
+  return [exerciseName(exerciseId), insightPlural(f.sets, 'set', 'sets'), insightFeaturesText(f)].filter(Boolean).join(' · ');
 }
 
 // "−1" (red) / "+3 extra" / "op schema" (green); a row compared per exercise can have both.
@@ -2678,6 +2717,150 @@ document.getElementById('insight-metric-body').addEventListener('click', e => {
 window.addEventListener('resize', () => {
   if (document.getElementById('screen-insight-metric').classList.contains('active')) drawInsightChart();
 });
+
+// -- Inzicht: the training overview and the muscle-group screen ----------------------------------
+// #screen-insight-training: the week's training per muscle group, opened from the week's Training
+// card; a row opens #screen-insight-muscle for that group (or "Geen spiergroep"), same week. Both
+// for the week in insightWeekStart: browsing moves it along, so back lands on the week shown last.
+// Everything comes from insightTrainingStats (insightCompareKey), the Training card's numbers.
+// Rules: PROJECT_CONTEXT.md, "Het trainingsoverzicht".
+
+// A row per MUSCLE_GROUPS group, plus '' ("Geen spiergroep") when sets or planned sets have no
+// (known) primary muscle group: { id, planned, done, counted (min per comparison key), extra,
+// features (insightSetFeatures, summed), pct (share of all done sets, whole %) }. The '' row is
+// compared per exercise and adds those up. Sorted on pct (high to low), a tie in MUSCLE_GROUPS
+// order, '' always last.
+function insightMuscleRows(stats) {
+  const rows = new Map();
+  const row = id => {
+    if (!rows.has(id)) rows.set(id, { id, planned: 0, done: 0, counted: 0, extra: 0, features: INSIGHT_FEATURES_EMPTY, pct: 0 });
+    return rows.get(id);
+  };
+  MUSCLE_GROUPS.forEach(m => row(m.id));
+  new Set([...Object.keys(stats.planned), ...Object.keys(stats.done)]).forEach(k => {
+    const p = stats.planned[k] || 0, n = stats.done[k] || 0;
+    if (!p && !n) return;
+    const r = row(k.startsWith('mg:') && rows.has(k.slice(3)) && k.slice(3) ? k.slice(3) : '');
+    r.planned += p; r.done += n; r.counted += Math.min(p, n); r.extra += Math.max(0, n - p);
+  });
+  Object.entries(stats.doneEx).forEach(([id, f]) => { const r = row(insightMuscleRowId(id)); r.features = insightAddFeatures(r.features, f); });
+  const order = [...MUSCLE_GROUPS.map(m => m.id), ''];
+  return [...rows.values()]
+    .map(r => ({ ...r, pct: stats.doneSets ? Math.round(r.done / stats.doneSets * 100) : 0 }))
+    .sort((a, b) => (a.id === '') - (b.id === '') || b.pct - a.pct || order.indexOf(a.id) - order.indexOf(b.id));
+}
+const insightMuscleName = id => id ? muscleGroupName(id) : 'Geen spiergroep';
+
+// A row's comparison (the day overview's rules): "8 van 10 · −2" / "· +2 extra" / "· op schema",
+// not planned "2 sets · extra" or "0 sets · niet in schema"; no comparison: "N sets".
+// `ofPlanned` goes after "van 10" (the muscle-group screen: " sets uit je schema").
+function insightMuscleCompareText(r, compare, ofPlanned = '') {
+  if (!compare) return insightPlural(r.done, 'set', 'sets');
+  if (r.planned > 0) return `${formatCount(r.counted)} van ${formatCount(r.planned)}${ofPlanned} · ${insightCompareText(r.planned - r.counted, r.extra)}`;
+  return r.done ? `${insightPlural(r.done, 'set', 'sets')} · extra` : '0 sets · niet in schema';
+}
+
+// Summary card with five columns: SETS, FAILURE, PARTIAL, FORCED, DROPSET.
+function insightFeaturesSummaryHtml(f, noteHtml) {
+  return insightSummaryHtml([
+    { label: 'Sets', value: formatCount(f.sets) }, { label: 'Failure', value: formatCount(f.failure) },
+    { label: 'Partial', value: formatCount(f.partial) }, { label: 'Forced', value: formatCount(f.forced) },
+    { label: 'Dropset', value: formatCount(f.drops) },
+  ], noteHtml);
+}
+// "16%": the number on Groot getal, the % right after it on Klein (no space).
+const insightPctHtml = pct => `<div class="insight-figure insight-pct"><span class="set-val">${pct}</span><span class="set-unit">%</span></div>`;
+// Done (--primary) above planned (--text-muted), 4px each, on one scale for all rows; a 0 draws
+// nothing but keeps its place. An SVG, so the width needs no inline style.
+function insightMuscleBarsSvg(done, planned, scale) {
+  const bar = (cls, v, y) => v > 0 && scale > 0 ? `<rect class="${cls}" y="${y}" width="${(v / scale * 100).toFixed(2)}%" height="4" rx="2"/>` : '';
+  return `<svg class="insight-mg-bars" width="100%" height="10" aria-hidden="true">${bar('insight-bar', done, 0)}${bar('insight-bar-planned', planned, 6)}</svg>`;
+}
+
+let insightMuscleId = '';
+function openInsightTraining() { showScreen('screen-insight-training'); }
+function openInsightMuscle(id) {
+  insightMuscleId = id;
+  showScreen('screen-insight-muscle');
+}
+
+function renderInsightTraining() {
+  if (!insightWeekStart) insightWeekStart = weekStartOf(todayStr());
+  const weekStart = insightWeekStart;
+  const days = insightWeekDays(weekStart);
+  const stats = insightTrainingStats(days);
+  const rows = insightMuscleRows(stats);
+  const t = insightTrainingTexts(stats);
+  document.getElementById('insight-training-head').innerHTML = insightWeekHeadHtml(weekStart);
+  document.getElementById('insight-training-schema').textContent = insightScheduleText(days);
+  const total = rows.reduce((a, r) => insightAddFeatures(a, r.features), INSIGHT_FEATURES_EMPTY);
+  const note = t.none ? `<div>${t.none}</div>`
+    : `<div>${formatCount(stats.fromSchedule)} ${t.ofPlanned} · ${t.diff}</div><div>${t.trainings}</div>`;
+  const scale = Math.max(0, ...rows.map(r => Math.max(r.done, r.planned)));
+  const list = rows.map(r => {
+    const features = insightFeaturesText(r.features);
+    return `<button type="button" class="insight-mg-row insight-list-row" data-insight-mg="${r.id}">`
+      + `<div class="insight-mg-main"><div class="role-row">${insightMuscleName(r.id)}</div>${insightMuscleBarsSvg(r.done, r.planned, scale)}`
+      + `<div class="role-sub">${insightMuscleCompareText(r, stats.compare)}</div>${features ? `<div class="role-sub">${features}</div>` : ''}</div>`
+      + `<div class="insight-mg-figure">${insightPctHtml(r.pct)}</div>`
+      + `<span class="insight-edit-icon insight-chevron">${INSIGHT_CHEVRON_SVG}</span></button>`;
+  }).join('');
+  document.getElementById('insight-training-body').innerHTML = insightFeaturesSummaryHtml(total, note)
+    + '<div class="insight-label insight-label-row"><span class="section-label">Per spiergroep</span>'
+    + '<span class="t-small insight-legend"><span class="insight-legend-item"><span class="insight-dot insight-dot-done"></span>Gedaan</span>'
+    + '<span class="insight-legend-item"><span class="insight-dot insight-dot-planned"></span>Schema</span></span></div>'
+    + `<div class="card insight-day-card insight-list insight-mg-list">${list}</div>`;
+}
+document.getElementById('btn-back-insight-training').addEventListener('click', () => goBack('screen-insight'));
+document.getElementById('insight-training-body').addEventListener('click', e => {
+  const row = e.target.closest('[data-insight-mg]');
+  if (row) openInsightMuscle(row.dataset.insightMg);
+});
+
+// A row of a list that is only to look at: name (and a Klein line) on the left, the value on the right.
+function insightListRowHtml(mainHtml, figureHtml) {
+  return `<div class="insight-mg-row"><div class="insight-mg-main">${mainHtml}</div>`
+    + (figureHtml ? `<div class="insight-mg-figure">${figureHtml}</div>` : '') + '</div>';
+}
+const insightSetsFigureHtml = n => insightFigureHtml(formatCount(n), n === 1 ? 'set' : 'sets');
+const insightListCardHtml = rows => `<div class="card insight-day-card insight-list">${rows.join('')}</div>`;
+
+function renderInsightMuscle() {
+  if (!insightWeekStart) insightWeekStart = weekStartOf(todayStr());
+  const weekStart = insightWeekStart;
+  const id = insightMuscleId;
+  const stats = insightTrainingStats(insightWeekDays(weekStart));
+  const r = insightMuscleRows(stats).find(x => x.id === id)
+    || { id, planned: 0, done: 0, counted: 0, extra: 0, features: INSIGHT_FEATURES_EMPTY, pct: 0 };
+  document.getElementById('insight-muscle-title').textContent = insightMuscleName(id);
+  document.getElementById('insight-muscle-head').innerHTML = insightWeekHeadHtml(weekStart);
+  const note = (stats.compare ? `<div>${insightMuscleCompareText(r, true, ' sets uit je schema')}</div>` : '')
+    + `<div>${r.pct}% van al je sets</div>`;
+  // OEFENINGEN: done with this group as primary (most sets first), then planned but not done.
+  const bySets = (a, b) => b[1].sets - a[1].sets || exerciseName(a[0]).localeCompare(exerciseName(b[0]), 'nl');
+  const done = Object.entries(stats.doneEx).filter(([ex]) => insightMuscleRowId(ex) === id).sort(bySets);
+  const missed = Object.entries(stats.plannedEx).filter(([ex]) => insightMuscleRowId(ex) === id && !stats.doneEx[ex]).sort(bySets);
+  const exRows = done.map(([ex, f]) => {
+    const features = insightFeaturesText(f);
+    return insightListRowHtml(`<div class="role-row">${exerciseName(ex)}</div>${features ? `<div class="role-sub">${features}</div>` : ''}`, insightSetsFigureHtml(f.sets));
+  }).concat(missed.map(([ex, p]) => insightListRowHtml(
+    `<div class="role-row insight-muted">${exerciseName(ex) || p.name}</div><div class="role-sub">Gepland · ${insightPlural(p.sets, 'set', 'sets')}</div>`)));
+  // MEEGETRAIND: done with this group as a secondary one; left out when there is none.
+  const secondary = id ? Object.entries(stats.doneEx).filter(([ex]) => {
+    const info = getExerciseInfo(ex);
+    return insightMuscleRowId(ex) !== id && ((info && info.secondaryMuscleGroups) || []).includes(id);
+  }).sort(bySets) : [];
+  const secRows = secondary.map(([ex, f]) => {
+    const primary = insightMuscleRowId(ex);
+    return insightListRowHtml(`<div class="role-row">${exerciseName(ex)}</div><div class="role-sub">Primair: ${primary ? muscleGroupName(primary) : 'niet ingesteld'}</div>`, insightSetsFigureHtml(f.sets));
+  });
+  document.getElementById('insight-muscle-body').innerHTML = insightFeaturesSummaryHtml(r.features, note)
+    + '<div class="section-label insight-label">Oefeningen</div>'
+    + (exRows.length ? insightListCardHtml(exRows) : `<div class="card">${insightEmptyHtml('Geen oefeningen deze week')}</div>`)
+    + (secRows.length ? '<div class="insight-label"><div class="section-label">Meegetraind</div>'
+      + '<div class="role-sub insight-label-note">Telt niet mee in het percentage</div></div>' + insightListCardHtml(secRows) : '');
+}
+document.getElementById('btn-back-insight-muscle').addEventListener('click', () => goBack('screen-insight-training'));
 
 // The sheets below fill in insightSheetDate; after Opslaan or Wissen the screen they were opened
 // from (day overview or a detail screen) is redrawn at once.
