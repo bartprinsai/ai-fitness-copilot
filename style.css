@@ -1167,9 +1167,10 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    The week's head (insightWeekHeadHtml), then a summary card (three columns), a chart card and a
    Label with a list card (a row per day). */
 .insight-summary { margin-top: var(--section-gap); }
-/* Equal columns, as many as there are (three for Slaap / Gewicht, five for Training); --space-1 between
-   them, so the five labels (DROPSET is the widest, 55px) each fit their column on 360px. */
-.insight-summary-cols { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); column-gap: var(--space-1); text-align: center; }
+/* Columns as wide as their content (three for Slaap / Gewicht, five for Training), the free space
+   shared out evenly: left of the first, between all and right of the last the same. Measured from
+   the card's edge, so the row runs into the card padding (negative margin). */
+.insight-summary-cols { display: flex; justify-content: space-evenly; margin: 0 calc(-1 * var(--card-padding)); text-align: center; }
 .insight-summary-cols .section-label { margin-bottom: var(--space-1); }
 .insight-summary-cols .insight-figure { justify-content: center; }
 .insight-summary-note { margin-top: var(--space-3); text-align: center; } /* Slaap: "Kortste nacht" and "Langste nacht" each on a line of their own */
@@ -1196,7 +1197,8 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    or without a value or Klein line; the value on the right sits in the middle of the row. Also the
    lists of the training overview and the muscle-group screen (rows there are not all buttons). */
 .insight-list .insight-mg-row { align-items: center; }
-.insight-list .insight-mg-main { min-height: 34px; }
+/* A single line on the left sits in the middle of that height too; two lines fill it as before. */
+.insight-list .insight-mg-main { min-height: 34px; display: flex; flex-direction: column; justify-content: center; }
 
 /* ── Training overview (#screen-insight-training) and muscle-group screen (#screen-insight-muscle) ──
    The week's head and schedule line, a summary card with five columns, then lists. */
