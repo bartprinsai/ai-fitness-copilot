@@ -88,6 +88,8 @@ const NL_DATE_FORMATS = {
   dayMonth: new Intl.DateTimeFormat('nl-NL', { day: 'numeric', month: 'long' }),
   month: new Intl.DateTimeFormat('nl-NL', { month: 'long', year: 'numeric' }),
   axis: new Intl.DateTimeFormat('nl-NL', { day: 'numeric', month: 'short' }),
+  monthName: new Intl.DateTimeFormat('nl-NL', { month: 'long' }),
+  monthShort: new Intl.DateTimeFormat('nl-NL', { month: 'short' }),
 };
 function formatDateStr(str, format = 'full') {
   if (format === 'nav') {
@@ -1983,11 +1985,98 @@ function getBodyWeightRange(from, to) {
   return Object.keys(db.bodyWeight || {}).filter(d => d >= from && d <= to).sort().map(date => ({ date, kg: db.bodyWeight[date] }));
 }
 
-// -- Inzicht: the screen (#screen-insight, period Week) ---------------------
-// One week (Monday..Sunday) at a time; opens on the current week, can't go past it.
+// -- Inzicht: the screen (#screen-insight; period Week, Maand or Jaar) -------------
+// One period at a time; opens on the current week, can't go past the current period.
 // Every day is judged against the schedule of THAT day (getPlannedForDate). Rules: see
-// PROJECT_CONTEXT.md, "Inzicht"; the Per dag grid: DESIGN_SYSTEM.md, "Inzicht".
+// PROJECT_CONTEXT.md, "Inzicht"; the Per dag grid and the table: DESIGN_SYSTEM.md, "Inzicht".
+// The period chosen and the one shown are shared by the main screen and every detail screen:
+// insightPeriod ('week' | 'month' | 'year') with insightWeekStart (a Monday), insightMonthStart
+// ('YYYY-MM-01') and insightYearStart ('YYYY-01-01').
 let insightWeekStart = null;
+let insightPeriod = 'week';
+let insightMonthStart = null;
+let insightYearStart = null;
+const monthStartOf = date => date.slice(0, 7) + '-01';
+const yearStartOf = date => date.slice(0, 4) + '-01-01';
+function addMonthsToMonthStart(monthStart, k) {
+  const m = Number(monthStart.slice(0, 4)) * 12 + Number(monthStart.slice(5, 7)) - 1 + k;
+  return `${Math.floor(m / 12)}-${String(m % 12 + 1).padStart(2, '0')}-01`;
+}
+const monthEndOf = monthStart => addDaysToDateStr(addMonthsToMonthStart(monthStart, 1), -1);
+// "Oktober" / "oktober" (insightMonthName(ms).toLowerCase()) and the axis label "okt".
+const insightMonthName = date => formatDateStr(date, 'monthName');
+const insightMonthShort = date => formatDateStr(date, 'monthShort').toLowerCase();
+// The start of the current week / month / year.
+function insightCurrentStart(period) {
+  const today = todayStr();
+  return period === 'week' ? weekStartOf(today) : period === 'month' ? monthStartOf(today) : yearStartOf(today);
+}
+// The period shown: { period, start, from, to } (from..to inclusive, future days included).
+function insightRange() {
+  if (insightPeriod === 'month') {
+    if (!insightMonthStart) insightMonthStart = insightCurrentStart('month');
+    return { period: 'month', start: insightMonthStart, from: insightMonthStart, to: monthEndOf(insightMonthStart) };
+  }
+  if (insightPeriod === 'year') {
+    if (!insightYearStart) insightYearStart = insightCurrentStart('year');
+    return { period: 'year', start: insightYearStart, from: insightYearStart, to: insightYearStart.slice(0, 4) + '-12-31' };
+  }
+  if (!insightWeekStart) insightWeekStart = insightCurrentStart('week');
+  return { period: 'week', start: insightWeekStart, from: insightWeekStart, to: addDaysToDateStr(insightWeekStart, 6) };
+}
+// Switching period (Week · Maand · Jaar):
+//   Week → Maand: the month the shown week's Monday is in; Week / Maand → Jaar: its year;
+//   Jaar → Maand: January, or the current month in the current year;
+//   Maand → Week: the current week in the current month, else the week with the 1st (Jaar → Week
+//   goes through the Jaar → Maand rule first).
+function insightSwitchPeriod(to) {
+  const from = insightPeriod;
+  if (to === from) return;
+  insightRange(); // the shown period's start is set
+  const yearToMonth = () => insightYearStart === insightCurrentStart('year') ? insightCurrentStart('month') : insightYearStart;
+  if (to === 'month') insightMonthStart = from === 'week' ? monthStartOf(insightWeekStart) : yearToMonth();
+  else if (to === 'year') insightYearStart = yearStartOf(from === 'week' ? insightWeekStart : insightMonthStart);
+  else {
+    const ms = from === 'month' ? insightMonthStart : yearToMonth();
+    insightWeekStart = ms === insightCurrentStart('month') ? insightCurrentStart('week') : weekStartOf(ms);
+  }
+  insightPeriod = to;
+}
+// ‹ ›: one week / month / year back or on, never past the current one.
+function insightStep(dir) {
+  const r = insightRange();
+  const next = r.period === 'week' ? addDaysToDateStr(r.start, 7 * dir)
+    : r.period === 'month' ? addMonthsToMonthStart(r.start, dir) : addMonthsToMonthStart(r.start, 12 * dir);
+  if (next > insightCurrentStart(r.period)) return;
+  if (r.period === 'week') insightWeekStart = next;
+  else if (r.period === 'month') insightMonthStart = next;
+  else insightYearStart = next;
+}
+// A row of the table or a detail list opens that week ('week:<Monday>') or month ('month:<1st>').
+function insightOpenSubPeriod(spec) {
+  const [kind, start] = spec.split(':');
+  insightPeriod = kind;
+  if (kind === 'week') insightWeekStart = start; else insightMonthStart = start;
+}
+// The parts of a month (its ISO weeks, each clipped to the month: "Week 40") or a year (its twelve
+// months: "Januari"): { kind, start, from, to, label, axis ("40" / "jan"), future }.
+function insightSubPeriods(r) {
+  const today = todayStr();
+  const out = [];
+  if (r.period === 'month') {
+    for (let ws = weekStartOf(r.from); ws <= r.to; ws = addDaysToDateStr(ws, 7)) {
+      const from = ws < r.from ? r.from : ws, end = addDaysToDateStr(ws, 6), to = end > r.to ? r.to : end;
+      const n = isoWeekOfDateStr(ws);
+      out.push({ kind: 'week', start: ws, from, to, label: `Week ${n}`, axis: String(n), future: from > today });
+    }
+  } else {
+    for (let i = 0; i < 12; i++) {
+      const ms = addMonthsToMonthStart(r.from, i);
+      out.push({ kind: 'month', start: ms, from: ms, to: monthEndOf(ms), label: insightMonthName(ms), axis: insightMonthShort(ms), future: ms > today });
+    }
+  }
+  return out;
+}
 
 function weekStartOf(date) { return addDaysToDateStr(date, -weekdayOfDateStr(date)); }
 // ISO 8601 week number: the week belongs to the year its Thursday is in.
@@ -2020,6 +2109,12 @@ function insightDay(date) {
   const today = todayStr();
   return { date, planned: getPlannedForDate(date), logged: hasLoggedSets(date), past: date < today, counted: date <= today };
 }
+// insightDay() for every date from..to.
+function insightRangeDays(from, to) {
+  const out = [];
+  for (let d = from; d <= to; d = addDaysToDateStr(d, 1)) out.push(insightDay(d));
+  return out;
+}
 // Per day of the week: insightDay() plus switchHere: another plan id than the day before
 // (isScheduleSwitch), not on Monday.
 function insightWeekDays(weekStart) {
@@ -2036,24 +2131,35 @@ function insightTrainingState(d) {
   return 'empty';
 }
 
-// The schedule line: "Schema: Push Pull Legs · Week A", a plan-id switch as
-// ", vanaf donderdag Upper Lower", "Geen schema actief" or "Geen schema bekend".
-function insightScheduleText(days) {
+// The schedule line: "Geen schema actief" (only days without a plan) or "Geen schema bekend" (no
+// version for any day), else per period:
+//   week   "Schema: Push Pull Legs · Week A", a plan-id switch as ", vanaf donderdag Upper Lower"
+//   month  "Schema: Push Pull Legs · vanaf 15 oktober Upper Lower, vanaf 22 oktober …" (no Week A/B)
+//   year   "Schema's: Push Pull Legs, Upper Lower" (in the order first active; one: "Schema: …")
+function insightScheduleText(days, period = 'week') {
   const known = days.filter(d => d.planned.version);
   if (known.length === 0) return 'Geen schema bekend';
   if (known.every(d => !d.planned.version.planId)) return 'Geen schema actief';
+  if (period === 'year') {
+    const names = new Map(); // planId → its latest name, in the order first active
+    known.forEach(d => { const v = d.planned.version; if (v.planId) names.set(v.planId, v.planName); });
+    return (names.size === 1 ? 'Schema: ' : "Schema's: ") + [...names.values()].join(', ');
+  }
   // Segments of one plan id, each with its weeks (Week A/B) in order.
   const segments = [];
   known.forEach(d => {
     const v = d.planned.version;
     let seg = segments[segments.length - 1];
     if (!seg || seg.planId !== v.planId) {
-      seg = { planId: v.planId, name: v.planId ? v.planName : 'geen schema', weekday: weekdayOfDateStr(d.date), weeks: [] };
+      seg = { planId: v.planId, name: v.planId ? v.planName : 'geen schema', date: d.date, weekday: weekdayOfDateStr(d.date), weeks: [] };
       segments.push(seg);
     }
     const w = d.planned.week;
     if (w && (!seg.weeks.length || seg.weeks[seg.weeks.length - 1].week !== w)) seg.weeks.push({ week: w, weekday: weekdayOfDateStr(d.date) });
   });
+  if (period === 'month') {
+    return 'Schema: ' + segments[0].name + segments.slice(1).map((seg, i) => `${i === 0 ? ' · ' : ', '}vanaf ${formatDateStr(seg.date, 'dayMonth')} ${seg.name}`).join('');
+  }
   const segText = seg => seg.name + seg.weeks.map((w, i) => i === 0 ? ` · Week ${w.week}` : `, vanaf ${WEEKDAY_FULL_NAMES[w.weekday].toLowerCase()} Week ${w.week}`).join('');
   return 'Schema: ' + segments.map((seg, i) => i === 0 ? segText(seg) : `vanaf ${WEEKDAY_FULL_NAMES[seg.weekday].toLowerCase()} ${segText(seg)}`).join(', ');
 }
@@ -2153,20 +2259,33 @@ function insightTrainingTexts(stats) {
   return { ofPlanned: `van ${formatCount(stats.plannedSets)} sets uit je schema`, diff: insightCompareText(stats.shortfall, stats.extra),
     trainings: `${formatCount(stats.doneTrainings)} van ${formatCount(stats.plannedTrainings)} ${trainings(stats.plannedTrainings)}` };
 }
-function insightTrainingCardHtml(stats) {
+// The share of the schedule that was done: "uit je schema" ÷ planned, whole %; null when nothing
+// was planned or there is no comparison (no schedule version, no fixed days).
+function insightSchedulePct(stats) {
+  return stats.compare && stats.plannedSets > 0 ? Math.round(stats.fromSchedule / stats.plannedSets * 100) : null;
+}
+// Week: "58 van 82 sets uit je schema" / "4 van 5 trainingen · −24 · +6 extra". Maand and Jaar:
+// "86% van je schema" / "241 van 280 sets · −39 · +12 extra" / "17 van 19 trainingen". Without a
+// comparison: "N sets" / "M trainingen · geen vergelijking met schema".
+function insightTrainingCardHtml(stats, period = 'week') {
   const t = insightTrainingTexts(stats);
-  if (t.none) return insightFigureHtml(formatCount(stats.doneSets), stats.doneSets === 1 ? 'set' : 'sets') + `<div class="role-sub">${t.none}</div>`;
-  return insightFigureHtml(formatCount(stats.fromSchedule), t.ofPlanned) + `<div class="role-sub">${t.trainings} · ${t.diff}</div>`;
+  const setsFigure = insightFigureHtml(formatCount(stats.doneSets), stats.doneSets === 1 ? 'set' : 'sets');
+  if (t.none) return setsFigure + `<div class="role-sub">${t.none}</div>`;
+  if (period === 'week') return insightFigureHtml(formatCount(stats.fromSchedule), t.ofPlanned) + `<div class="role-sub">${t.trainings} · ${t.diff}</div>`;
+  const pct = insightSchedulePct(stats);
+  if (pct === null) return setsFigure + `<div class="role-sub">Geen sets gepland</div><div class="role-sub">${t.trainings}</div>`;
+  return `<div class="insight-figure">${insightPctHtml(pct)}<span class="set-unit">van je schema</span></div>`
+    + `<div class="role-sub">${formatCount(stats.fromSchedule)} van ${formatCount(stats.plannedSets)} sets · ${t.diff}</div><div class="role-sub">${t.trainings}</div>`;
 }
 
 // A bedtime on a scale that runs on past midnight: 00:00–11:59 counts as after midnight
 // (+24 h), so 23:50 and 00:30 average to 00:10, not 12:10.
 function bedtimeAfterNoonMinutes(t) { const m = timeToMinutes(t); return m < 720 ? m + 1440 : m; }
-// The week's nights: null without any, else { nights, avg (minutes), bedtime, wakeTime, shortest,
+// The nights from..to: null without any, else { nights, avg (minutes), bedtime, wakeTime, shortest,
 // longest }. Average bedtime on the scale above; the average wake time is that bedtime plus the
 // average duration, so the three numbers always add up. Equal nights: the first one.
-function insightSleepWeek(weekStart) {
-  const nights = getSleepRange(weekStart, addDaysToDateStr(weekStart, 6));
+function insightSleepRange(from, to) {
+  const nights = getSleepRange(from, to);
   if (nights.length === 0) return null;
   const avg = Math.round(insightAverage(nights.map(n => n.minutes)));
   const bed = Math.round(insightAverage(nights.map(n => bedtimeAfterNoonMinutes(n.bedtime))));
@@ -2176,34 +2295,48 @@ function insightSleepWeek(weekStart) {
     longest: nights.reduce((a, b) => b.minutes > a.minutes ? b : a),
   };
 }
-const insightNightOf = n => `${weekdayLower(n.date)}, ${formatDuration(n.minutes)} u`;
-
-function insightSleepCardHtml(weekStart) {
-  const s = insightSleepWeek(weekStart);
-  if (!s) return insightEmptyHtml('Nog geen slaap ingevuld');
-  return insightFigureHtml(formatDuration(s.avg), 'u gemiddeld')
-    + `<div class="role-sub">Kortste nacht: ${insightNightOf(s.shortest)}</div>`;
+// "vrijdag, 5:50 u" (Week) / "vrijdag 23 oktober, 5:50 u" (Maand, Jaar).
+function insightNightOf(n, period = 'week') {
+  return `${weekdayLower(n.date)}${period === 'week' ? '' : ' ' + formatDateStr(n.date, 'dayMonth')}, ${formatDuration(n.minutes)} u`;
 }
 
-// The week's weights: null without any, else { days, avg (1 decimal), min, max }.
-function insightWeightWeek(weekStart) {
-  const days = getBodyWeightRange(weekStart, addDaysToDateStr(weekStart, 6));
+function insightSleepCardHtml(r) {
+  const s = insightSleepRange(r.from, r.to);
+  if (!s) return insightEmptyHtml('Nog geen slaap ingevuld');
+  return insightFigureHtml(formatDuration(s.avg), 'u gemiddeld')
+    + `<div class="role-sub">Kortste nacht: ${insightNightOf(s.shortest, r.period)}</div>`;
+}
+
+// The weights from..to: null without any, else { days, avg (1 decimal), min, max }.
+function insightWeightRange(from, to) {
+  const days = getBodyWeightRange(from, to);
   if (days.length === 0) return null;
   const kgs = days.map(e => e.kg);
   return { days, avg: round1(insightAverage(kgs)), min: Math.min(...kgs), max: Math.max(...kgs) };
 }
-// "−0,3 kg t.o.v. week 42": the rounded averages of this and the previous week, neutral;
-// '' when the previous week has no weight.
-function insightWeightWeekCompareText(weekStart, avg) {
-  const prevStart = addDaysToDateStr(weekStart, -7);
-  const prev = insightWeightWeek(prevStart);
-  return prev ? `${formatSignedNumber(round1(avg - prev.avg))} kg t.o.v. week ${isoWeekOfDateStr(prevStart)}` : '';
+// The weight line under an average, always neutral; '' when there is nothing to compare with:
+//   week   "−0,3 kg t.o.v. week 42" (the rounded averages of this and the previous week)
+//   month  "−0,6 kg t.o.v. september" (the same, with the previous month)
+//   year   "Van 101,2 kg in januari naar 98,5 kg in oktober" (the averages of the first and the
+//          last month with a weight; at least two months)
+function insightWeightCompareTextFor(r, avg) {
+  if (r.period === 'year') {
+    const months = insightSubPeriods(r).map(p => ({ p, w: insightWeightRange(p.from, p.to) })).filter(m => m.w);
+    if (months.length < 2) return '';
+    const a = months[0], b = months[months.length - 1];
+    return `Van ${formatNumber(a.w.avg)} kg in ${insightMonthName(a.p.start).toLowerCase()} naar ${formatNumber(b.w.avg)} kg in ${insightMonthName(b.p.start).toLowerCase()}`;
+  }
+  const prevStart = r.period === 'week' ? addDaysToDateStr(r.start, -7) : addMonthsToMonthStart(r.start, -1);
+  const prev = insightWeightRange(prevStart, r.period === 'week' ? addDaysToDateStr(prevStart, 6) : monthEndOf(prevStart));
+  if (!prev) return '';
+  const what = r.period === 'week' ? `week ${isoWeekOfDateStr(prevStart)}` : insightMonthName(prevStart).toLowerCase();
+  return `${formatSignedNumber(round1(avg - prev.avg))} kg t.o.v. ${what}`;
 }
 
-function insightWeightCardHtml(weekStart) {
-  const w = insightWeightWeek(weekStart);
+function insightWeightCardHtml(r) {
+  const w = insightWeightRange(r.from, r.to);
   if (!w) return insightEmptyHtml('Nog geen gewicht ingevuld');
-  const cmp = insightWeightWeekCompareText(weekStart, w.avg);
+  const cmp = insightWeightCompareTextFor(r, w.avg);
   return insightFigureHtml(formatNumber(w.avg), 'kg gemiddeld') + (cmp ? `<div class="role-sub">${cmp}</div>` : '');
 }
 
@@ -2243,49 +2376,79 @@ function insightDaysGridHtml(days) {
   return html + '</div>';
 }
 
-// The top of every week screen (the week, the Slaap / Gewicht detail screens, the training overview
-// and the muscle-group screen), one component:
-// Week · Maand · Jaar (Maand and Jaar disabled for now), ‹ Week 43 › (right disabled on the
-// current week) and the date line. The arrows step insightWeekStart (see the listener below).
-function insightWeekHeadHtml(weekStart) {
-  const atCurrent = weekStart >= weekStartOf(todayStr());
+// The top of every Inzicht screen with a period (the main screen, the Slaap / Gewicht detail
+// screens, the training overview and the muscle-group screen), one component: Week · Maand · Jaar
+// (data-insight-period), ‹ Week 43 › / ‹ Oktober 2026 › / ‹ 2026 › (right disabled on the current
+// period) and, for a week only, the date line. See the listener below.
+const INSIGHT_PERIODS = [['week', 'Week', 'week'], ['month', 'Maand', 'maand'], ['year', 'Jaar', 'jaar']];
+function insightPeriodHeadHtml(r) {
+  const atCurrent = r.start >= insightCurrentStart(r.period);
+  const title = r.period === 'week' ? `Week ${isoWeekOfDateStr(r.start)}` : r.period === 'month' ? formatDateStr(r.start, 'month') : r.start.slice(0, 4);
+  const word = INSIGHT_PERIODS.find(p => p[0] === r.period)[2];
   return '<div class="insight-periods">'
-    + '<button type="button" class="time-filter active" aria-pressed="true">Week</button>'
-    + '<button type="button" class="time-filter" disabled>Maand</button>'
-    + '<button type="button" class="time-filter" disabled>Jaar</button></div>'
-    + '<div class="insight-nav">'
-    + `<button type="button" class="insight-nav-btn" data-insight-step="-1" aria-label="Vorige week">${INSIGHT_CHEVRON_LEFT_SVG}</button>`
-    + `<span class="t-heading insight-nav-title">Week ${isoWeekOfDateStr(weekStart)}</span>`
-    + `<button type="button" class="insight-nav-btn" data-insight-step="1" aria-label="Volgende week"${atCurrent ? ' disabled' : ''}>${INSIGHT_CHEVRON_SVG}</button></div>`
-    + `<div class="t-small insight-meta">${formatDateRange(weekStart, addDaysToDateStr(weekStart, 6))}</div>`;
+    + INSIGHT_PERIODS.map(([id, label]) => `<button type="button" class="time-filter${id === r.period ? ' active' : ''}" data-insight-period="${id}" aria-pressed="${id === r.period}">${label}</button>`).join('')
+    + '</div><div class="insight-nav">'
+    + `<button type="button" class="insight-nav-btn" data-insight-step="-1" aria-label="Vorige ${word}">${INSIGHT_CHEVRON_LEFT_SVG}</button>`
+    + `<span class="t-heading insight-nav-title">${title}</span>`
+    + `<button type="button" class="insight-nav-btn" data-insight-step="1" aria-label="Volgende ${word}"${atCurrent ? ' disabled' : ''}>${INSIGHT_CHEVRON_SVG}</button></div>`
+    + (r.period === 'week' ? `<div class="t-small insight-meta">${formatDateRange(r.from, r.to)}</div>` : '');
+}
+
+// PER WEEK (Maand) / PER MAAND (Jaar): a table in a card, a row per part of the period (see
+// insightSubPeriods), Klein throughout: Training (insightSchedulePct, 100% green), Voeding (–),
+// Slaap (average, under 7:00 red), Gewicht (average, 1 decimal); "–" without a value. A row is a
+// button that opens that week / month on the main screen; a part still to come is grey, all "–",
+// and not a button.
+function insightPeriodTableHtml(r) {
+  const dash = '<span class="insight-table-cell insight-dash">–</span>';
+  const cell = (text, cls = '') => `<span class="insight-table-cell${cls}">${text}</span>`;
+  const head = `<div class="t-small insight-table-row insight-table-head">${[r.period === 'month' ? 'Week' : 'Maand', 'Training', 'Voeding', 'Slaap', 'Gewicht'].map(t => cell(t)).join('')}</div>`;
+  const rows = insightSubPeriods(r).map(p => {
+    if (p.future) return `<div class="t-small insight-table-row is-future">${cell(p.label)}${dash.repeat(4)}</div>`;
+    const pct = insightSchedulePct(insightTrainingStats(insightRangeDays(p.from, p.to)));
+    const s = insightSleepRange(p.from, p.to), w = insightWeightRange(p.from, p.to);
+    return `<button type="button" class="t-small insight-table-row" data-insight-open="${p.kind}:${p.start}" aria-label="${p.label} openen">${cell(p.label)}`
+      + (pct === null ? dash : cell(`${pct}%`, pct === 100 ? ' insight-success' : ''))
+      + dash
+      + (s ? cell(formatDuration(s.avg), s.avg < SLEEP_SHORT_MINUTES ? ' insight-danger' : '') : dash)
+      + (w ? cell(formatNumber(w.avg)) : dash) + '</button>';
+  });
+  return head + rows.join('');
 }
 const INSIGHT_CHEVRON_LEFT_SVG = '<svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>';
 
 function renderInsight() {
-  if (!insightWeekStart) insightWeekStart = weekStartOf(todayStr());
-  const weekStart = insightWeekStart;
-  const days = insightWeekDays(weekStart);
-  document.getElementById('insight-head').innerHTML = insightWeekHeadHtml(weekStart);
-  document.getElementById('insight-schema').textContent = insightScheduleText(days);
-  document.getElementById('insight-days').innerHTML = insightDaysGridHtml(days);
+  const r = insightRange();
+  const days = r.period === 'week' ? insightWeekDays(r.start) : insightRangeDays(r.from, r.to);
+  document.getElementById('insight-head').innerHTML = insightPeriodHeadHtml(r);
+  document.getElementById('insight-schema').textContent = insightScheduleText(days, r.period);
+  document.getElementById('insight-days-label').textContent = r.period === 'week' ? 'Per dag' : r.period === 'month' ? 'Per week' : 'Per maand';
+  const grid = document.getElementById('insight-days');
+  grid.className = r.period === 'week' ? 'card insight-days' : 'card insight-days insight-day-card insight-table';
+  grid.innerHTML = r.period === 'week' ? insightDaysGridHtml(days) : insightPeriodTableHtml(r);
   document.getElementById('insight-cards').innerHTML =
-    insightCardHtml('Training', insightTrainingCardHtml(insightTrainingStats(days)), 'training')
+    insightCardHtml('Training', insightTrainingCardHtml(insightTrainingStats(days), r.period), 'training')
     + insightCardHtml('Voeding', insightEmptyHtml('Nog geen voedingsschema'))
-    + insightCardHtml('Slaap', insightSleepCardHtml(weekStart), 'sleep')
-    + insightCardHtml('Gewicht', insightWeightCardHtml(weekStart), 'weight');
+    + insightCardHtml('Slaap', insightSleepCardHtml(r), 'sleep')
+    + insightCardHtml('Gewicht', insightWeightCardHtml(r), 'weight');
 }
 
 function openInsight() {
+  insightPeriod = 'week';
   insightWeekStart = weekStartOf(todayStr());
   showScreen('screen-insight');
 }
-// ‹ › on a week screen: step a week (not past the current one) and redraw that screen.
+// On every screen with the period head: Week · Maand · Jaar switches period, ‹ › steps one period
+// (not past the current one); then that screen is redrawn. A row with data-insight-open (the
+// table, the Slaap / Gewicht lists) opens that week or month on the same screen.
 ['screen-insight', 'screen-insight-metric', 'screen-insight-training', 'screen-insight-muscle'].forEach(id => document.getElementById(id).addEventListener('click', e => {
+  const p = e.target.closest('[data-insight-period]');
   const b = e.target.closest('[data-insight-step]');
-  if (!b || b.disabled) return;
-  const next = addDaysToDateStr(insightWeekStart, 7 * Number(b.dataset.insightStep));
-  if (next > weekStartOf(todayStr())) return;
-  insightWeekStart = next;
+  const o = e.target.closest('[data-insight-open]');
+  if (p) insightSwitchPeriod(p.dataset.insightPeriod);
+  else if (b && !b.disabled) insightStep(Number(b.dataset.insightStep));
+  else if (o) insightOpenSubPeriod(o.dataset.insightOpen);
+  else return;
   SCREEN_ON_ENTER[id]();
 }));
 document.getElementById('insight-cards').addEventListener('click', e => {
@@ -2520,6 +2683,7 @@ function insightDayWeightHtml(date) {
 function renderInsightDay() {
   if (!insightDayDate || insightDayDate > todayStr()) insightDayDate = todayStr();
   const date = insightDayDate;
+  insightPeriod = 'week';
   insightWeekStart = weekStartOf(date); // back (arrow or hardware) lands on this day's week
   document.getElementById('insight-day-title').textContent = formatDateStr(date);
   document.getElementById('insight-day-next').disabled = date >= todayStr();
@@ -2564,19 +2728,21 @@ function insightSummaryHtml(cols, noteHtml) {
     + `</div>${noteHtml ? `<div class="role-sub insight-summary-note">${noteHtml}</div>` : ''}</div>`;
 }
 
-// Chart over the week (one column per day, Ma … Zo), an SVG drawn at the measured width so the
-// text stays 1:1; colours come from the tokens via CSS classes. y-axis labels on the left
-// (right-aligned, GRAPH_LABEL_GAP from the plot), light gridlines, a dashed line on the average
-// and Ma … Zo under the columns. A point sits in the middle of its day column, so the first
-// and last are half a column away from the axis labels.
-//   values: 7 numbers or null (no value: nothing drawn, the column stays empty)
+// Chart over the period (one column per day Ma … Zo, per week "40" or per month "jan"), an SVG
+// drawn at the measured width so the text stays 1:1; colours come from the tokens via CSS
+// classes. y-axis labels on the left (right-aligned, GRAPH_LABEL_GAP from the plot), light
+// gridlines, a dashed line on the average and the labels under the columns. A point sits in the
+// middle of its column, so the first and last are half a column away from the axis labels.
+//   values: a number or null per column (no value: nothing drawn, the column stays empty)
+//   labels: one per column (default Ma … Zo)
 //   lo, hi: the y range; ticks: [{ v, label }]; base: a gridline without a label (the 0 of bars)
 //   type: 'bars' (danger(v) → --danger) or 'line' (the Grafiek's line: 2.5 wide, 4px points)
 const INSIGHT_CHART_H = 168, INSIGHT_CHART_AXIS_W = 32, INSIGHT_CHART_TOP = 8, INSIGHT_CHART_BOTTOM = 24;
 function insightChartSvg(width, o) {
   const W = Math.max(200, Math.round(width)), H = INSIGHT_CHART_H;
   const x0 = INSIGHT_CHART_AXIS_W + GRAPH_LABEL_GAP, plotB = H - INSIGHT_CHART_BOTTOM;
-  const cw = (W - x0) / 7;
+  const labels = o.labels || INSIGHT_WEEKDAYS_SHORT;
+  const cw = (W - x0) / labels.length;
   const xAt = i => x0 + (i + 0.5) * cw;
   const yAt = v => INSIGHT_CHART_TOP + (1 - (v - o.lo) / (o.hi - o.lo)) * (plotB - INSIGHT_CHART_TOP);
   const crisp = y => Math.round(y) + 0.5;
@@ -2603,24 +2769,21 @@ function insightChartSvg(width, o) {
     if (pts.length > 1) svg += `<polyline class="insight-line" points="${pts.map(p => p.map(n => n.toFixed(1)).join(',')).join(' ')}"/>`;
     pts.forEach(p => { svg += `<circle class="insight-point" cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="4"/>`; });
   }
-  INSIGHT_WEEKDAYS_SHORT.forEach((d, i) => { svg += `<text class="insight-chart-day" x="${xAt(i).toFixed(1)}" y="${H - 6}">${d}</text>`; });
+  labels.forEach((d, i) => { svg += `<text class="insight-chart-day" x="${xAt(i).toFixed(1)}" y="${H - 6}">${d}</text>`; });
   return svg + '</svg>';
 }
 
 // Sleep: y from 0 with gridlines every 3 hours (3 u · 6 u · 9 u). The top label grows in steps of
 // 3 hours: 9 u while the longest night is 9:00 or shorter, else 12 u, 15 u …; the range runs an
 // hour above it, so there is always room above the highest bar.
-function insightSleepChartOptions(weekStart, s) {
-  const values = [0, 1, 2, 3, 4, 5, 6].map(i => {
-    const n = s.nights.find(x => x.date === addDaysToDateStr(weekStart, i));
-    return n ? n.minutes : null;
-  });
-  const top = Math.max(540, Math.ceil(Math.max(...s.nights.map(n => n.minutes)) / 180) * 180);
+// values: minutes per column (a night, or a week's / month's average), labels as in insightChartSvg.
+function insightSleepChartOptions(values, labels, avg, per) {
+  const top = Math.max(540, Math.ceil(Math.max(...values.filter(v => v !== null)) / 180) * 180);
   const hi = top + 60;
   const ticks = [];
   for (let v = 180; v <= top; v += 180) ticks.push({ v, label: `${v / 60} u` });
-  return { type: 'bars', values, lo: 0, hi, base: 0, ticks, avg: s.avg, danger: v => v < SLEEP_SHORT_MINUTES,
-    aria: `Slaap per nacht, gemiddeld ${formatDuration(s.avg)} u` };
+  return { type: 'bars', values, labels, lo: 0, hi, base: 0, ticks, avg, danger: v => v < SLEEP_SHORT_MINUTES,
+    aria: `Slaap ${per}, gemiddeld ${formatDuration(avg)} u` };
 }
 
 // Weight: three gridlines on a round step (0,5 · 1 · 2 · 2,5 · 5 × 10ⁿ, at least 0,5 kg) around a
@@ -2638,11 +2801,12 @@ function insightWeightAxis(min, max) {
   }
   return { lo: min - 1, hi: max + 1, ticks: [min, (min + max) / 2, max] };
 }
-function insightWeightChartOptions(weekStart, w) {
-  const values = [0, 1, 2, 3, 4, 5, 6].map(i => getBodyWeight(addDaysToDateStr(weekStart, i)));
-  const axis = insightWeightAxis(w.min, w.max);
-  return { type: 'line', values, lo: axis.lo, hi: axis.hi, ticks: axis.ticks.map(v => ({ v, label: formatWeight(v) })), avg: w.avg,
-    aria: `Gewicht per dag, gemiddeld ${formatNumber(w.avg)} kg` };
+// values: kg per column (a day, or a week's / month's average); the axis on the values drawn.
+function insightWeightChartOptions(values, labels, avg, per) {
+  const shown = values.filter(v => v !== null);
+  const axis = insightWeightAxis(Math.min(...shown), Math.max(...shown));
+  return { type: 'line', values, labels, lo: axis.lo, hi: axis.hi, ticks: axis.ticks.map(v => ({ v, label: formatWeight(v) })), avg,
+    aria: `Gewicht ${per}, gemiddeld ${formatNumber(avg)} kg` };
 }
 
 // The list: a row per day from Monday up to today (no days still to come), in a card. Left the
@@ -2658,41 +2822,77 @@ function insightDayListHtml(weekStart, rowFor) {
   });
   return `<div class="card insight-day-card insight-list">${rows.join('')}</div>`;
 }
+// Maand / Jaar: a row per week / month up to the current one (none still to come), the same rows
+// as the list per day; a tap opens that week / month on this screen (data-insight-open).
+function insightSubListHtml(r, rowFor) {
+  const rows = insightSubPeriods(r).filter(p => !p.future).map(p => {
+    const v = rowFor(p);
+    return `<button type="button" class="insight-mg-row insight-list-row" data-insight-open="${p.kind}:${p.start}">`
+      + `<div class="insight-mg-main"><div class="role-row">${p.label}</div>`
+      + (v ? (v.sub ? `<div class="role-sub">${v.sub}</div>` : '') : '<div class="role-sub insight-muted">Niet ingevuld</div>')
+      + `</div>${v ? `<div class="insight-mg-figure">${v.figure}</div>` : ''}</button>`;
+  });
+  return `<div class="card insight-day-card insight-list">${rows.join('')}</div>`;
+}
 const insightSleepFigureHtml = min =>
   `<div class="insight-figure"><span class="set-val${min < SLEEP_SHORT_MINUTES ? ' insight-danger' : ''}">${formatDuration(min)}</span><span class="set-unit">u</span></div>`;
 
-function insightSleepDetailHtml(weekStart) {
-  const s = insightSleepWeek(weekStart);
+// Week: a bar per night, the list NACHTEN (a row per day, opens its sheet). Maand / Jaar: a bar per
+// week / month (its average), the list PER WEEK / PER MAAND (opens that week / month).
+function insightSleepDetailHtml(r) {
+  const s = insightSleepRange(r.from, r.to);
   const summary = s
     ? insightSummaryHtml([
       { label: 'Gemiddeld', value: formatDuration(s.avg), unit: 'u' },
       { label: 'Naar bed', value: s.bedtime },
       { label: 'Opgestaan', value: s.wakeTime },
-    ], `<div>Kortste nacht: ${insightNightOf(s.shortest)}</div>`
-      + (s.nights.length > 1 ? `<div>Langste nacht: ${insightNightOf(s.longest)}</div>` : ''))
+    ], `<div>Kortste nacht: ${insightNightOf(s.shortest, r.period)}</div>`
+      + (s.nights.length > 1 ? `<div>Langste nacht: ${insightNightOf(s.longest, r.period)}</div>` : ''))
     : `<div class="card insight-summary">${insightEmptyHtml('Nog geen slaap ingevuld')}</div>`;
-  const list = insightDayListHtml(weekStart, date => {
-    const n = getSleep(date);
-    if (!n) return null;
-    return { sub: `${n.bedtime} – ${n.wakeTime}`, figure: insightSleepFigureHtml(sleepDurationMinutes(n.bedtime, n.wakeTime)) };
+  if (r.period === 'week') {
+    const list = insightDayListHtml(r.start, date => {
+      const n = getSleep(date);
+      if (!n) return null;
+      return { sub: `${n.bedtime} – ${n.wakeTime}`, figure: insightSleepFigureHtml(sleepDurationMinutes(n.bedtime, n.wakeTime)) };
+    });
+    const values = [0, 1, 2, 3, 4, 5, 6].map(i => { const n = s && s.nights.find(x => x.date === addDaysToDateStr(r.start, i)); return n ? n.minutes : null; });
+    return { summary, chart: s && insightSleepChartOptions(values, INSIGHT_WEEKDAYS_SHORT, s.avg, 'per nacht'), label: 'Nachten', list };
+  }
+  const subs = insightSubPeriods(r).map(p => ({ p, s: p.future ? null : insightSleepRange(p.from, p.to) }));
+  const per = r.period === 'month' ? 'per week' : 'per maand';
+  const list = insightSubListHtml(r, p => {
+    const x = subs.find(y => y.p.start === p.start).s;
+    return x ? { sub: `${x.bedtime} – ${x.wakeTime}`, figure: insightSleepFigureHtml(x.avg) } : null;
   });
-  return { summary, chart: s && insightSleepChartOptions(weekStart, s), label: 'Nachten', list };
+  return { summary, chart: s && insightSleepChartOptions(subs.map(x => x.s ? x.s.avg : null), subs.map(x => x.p.axis), s.avg, per), label: per, list };
 }
 
-function insightWeightDetailHtml(weekStart) {
-  const w = insightWeightWeek(weekStart);
+// Week: a point per day, the list WEEGMOMENTEN. Maand / Jaar: a point per week / month (its
+// average), the list PER WEEK / PER MAAND.
+function insightWeightDetailHtml(r) {
+  const w = insightWeightRange(r.from, r.to);
   const summary = w
     ? insightSummaryHtml([
       { label: 'Gemiddeld', value: formatNumber(w.avg), unit: 'kg' },
       { label: 'Laagste', value: formatWeight(w.min), unit: 'kg' },
       { label: 'Hoogste', value: formatWeight(w.max), unit: 'kg' },
-    ], insightWeightWeekCompareText(weekStart, w.avg))
+    ], insightWeightCompareTextFor(r, w.avg))
     : `<div class="card insight-summary">${insightEmptyHtml('Nog geen gewicht ingevuld')}</div>`;
-  const list = insightDayListHtml(weekStart, date => {
-    const kg = getBodyWeight(date);
-    return kg === null ? null : { figure: insightFigureHtml(formatWeight(kg), 'kg') };
+  if (r.period === 'week') {
+    const list = insightDayListHtml(r.start, date => {
+      const kg = getBodyWeight(date);
+      return kg === null ? null : { figure: insightFigureHtml(formatWeight(kg), 'kg') };
+    });
+    const values = [0, 1, 2, 3, 4, 5, 6].map(i => getBodyWeight(addDaysToDateStr(r.start, i)));
+    return { summary, chart: w && insightWeightChartOptions(values, INSIGHT_WEEKDAYS_SHORT, w.avg, 'per dag'), label: 'Weegmomenten', list };
+  }
+  const subs = insightSubPeriods(r).map(p => ({ p, w: p.future ? null : insightWeightRange(p.from, p.to) }));
+  const per = r.period === 'month' ? 'per week' : 'per maand';
+  const list = insightSubListHtml(r, p => {
+    const x = subs.find(y => y.p.start === p.start).w;
+    return x ? { figure: insightFigureHtml(formatNumber(x.avg), 'kg') } : null;
   });
-  return { summary, chart: w && insightWeightChartOptions(weekStart, w), label: 'Weegmomenten', list };
+  return { summary, chart: w && insightWeightChartOptions(subs.map(x => x.w ? x.w.avg : null), subs.map(x => x.p.axis), w.avg, per), label: per, list };
 }
 
 let insightChartOptions = null; // the drawn chart, redrawn at a new width (rotation)
@@ -2701,11 +2901,10 @@ function drawInsightChart() {
   if (el && insightChartOptions) el.innerHTML = insightChartSvg(el.clientWidth || 296, insightChartOptions);
 }
 function renderInsightMetric() {
-  if (!insightWeekStart) insightWeekStart = weekStartOf(todayStr());
-  const weekStart = insightWeekStart;
+  const r = insightRange();
   document.getElementById('insight-metric-title').textContent = insightMetric === 'sleep' ? 'Slaap' : 'Gewicht';
-  document.getElementById('insight-metric-head').innerHTML = insightWeekHeadHtml(weekStart);
-  const d = insightMetric === 'sleep' ? insightSleepDetailHtml(weekStart) : insightWeightDetailHtml(weekStart);
+  document.getElementById('insight-metric-head').innerHTML = insightPeriodHeadHtml(r);
+  const d = insightMetric === 'sleep' ? insightSleepDetailHtml(r) : insightWeightDetailHtml(r);
   insightChartOptions = d.chart;
   // No value at all: only the summary's empty state, no empty chart.
   const chart = d.chart ? '<div class="card insight-chart-card"><div class="insight-chart" id="insight-chart"></div>'
@@ -2798,14 +2997,13 @@ function openInsightMuscle(id) {
 }
 
 function renderInsightTraining() {
-  if (!insightWeekStart) insightWeekStart = weekStartOf(todayStr());
-  const weekStart = insightWeekStart;
-  const days = insightWeekDays(weekStart);
+  const r0 = insightRange();
+  const days = insightRangeDays(r0.from, r0.to);
   const stats = insightTrainingStats(days);
   const rows = insightMuscleRows(stats);
   const t = insightTrainingTexts(stats);
-  document.getElementById('insight-training-head').innerHTML = insightWeekHeadHtml(weekStart);
-  document.getElementById('insight-training-schema').textContent = insightScheduleText(days);
+  document.getElementById('insight-training-head').innerHTML = insightPeriodHeadHtml(r0);
+  document.getElementById('insight-training-schema').textContent = insightScheduleText(days, r0.period);
   const total = rows.reduce((a, r) => insightAddFeatures(a, r.features), INSIGHT_FEATURES_EMPTY);
   const note = t.none ? `<div>${t.none}</div>`
     : `<div>${formatCount(stats.fromSchedule)} ${t.ofPlanned} · ${t.diff}</div><div>${t.trainings}</div>`;
@@ -2839,15 +3037,14 @@ const insightSetsFigureHtml = n => insightFigureHtml(formatCount(n), n === 1 ? '
 const insightListCardHtml = rows => `<div class="card insight-day-card insight-list">${rows.join('')}</div>`;
 
 function renderInsightMuscle() {
-  if (!insightWeekStart) insightWeekStart = weekStartOf(todayStr());
-  const weekStart = insightWeekStart;
+  const range = insightRange();
   const id = insightMuscleId;
-  const days = insightWeekDays(weekStart);
+  const days = insightRangeDays(range.from, range.to);
   const stats = insightTrainingStats(days);
   const r = insightMuscleRows(stats).find(x => x.id === id) || { ...INSIGHT_MUSCLE_ROW_EMPTY, id };
   document.getElementById('insight-muscle-title').textContent = insightMuscleName(id);
-  document.getElementById('insight-muscle-head').innerHTML = insightWeekHeadHtml(weekStart);
-  document.getElementById('insight-muscle-schema').textContent = insightScheduleText(days);
+  document.getElementById('insight-muscle-head').innerHTML = insightPeriodHeadHtml(range);
+  document.getElementById('insight-muscle-schema').textContent = insightScheduleText(days, range.period);
   const note = (stats.compare ? `<div>${insightMuscleCompareText(r, true, ' sets uit je schema')}</div>` : '')
     + `<div>${r.pct}% van al je sets</div>`;
   // OEFENINGEN: done with this group as primary (most sets first), then planned but not done.
@@ -2873,7 +3070,7 @@ function renderInsightMuscle() {
   });
   document.getElementById('insight-muscle-body').innerHTML = insightFeaturesSummaryHtml(r.features, note)
     + '<div class="section-label insight-label">Oefeningen</div>'
-    + (exRows.length ? insightListCardHtml(exRows) : `<div class="card">${insightEmptyHtml('Geen oefeningen deze week')}</div>`)
+    + (exRows.length ? insightListCardHtml(exRows) : `<div class="card">${insightEmptyHtml(`Geen oefeningen ${{ week: 'deze week', month: 'deze maand', year: 'dit jaar' }[range.period]}`)}</div>`)
     + (secRows.length ? '<div class="insight-label"><div class="section-label">Meegetraind</div>'
       + '<div class="role-sub insight-label-note">Telt niet mee in het percentage</div></div>' + insightListCardHtml(secRows) : '');
 }

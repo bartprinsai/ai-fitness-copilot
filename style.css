@@ -1128,10 +1128,25 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .insight-card-label { margin-bottom: var(--space-2); }
 /* Big figure on Groot getal (.set-val) with its unit/explanation on Klein (.set-unit), like "80 kg". */
 .insight-figure { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: var(--space-1); }
-.insight-figure + .role-sub { margin-top: 2px; }
+.insight-figure ~ .role-sub { margin-top: 2px; }
 .role-row.insight-empty { color: var(--text-muted); } /* wins over .role-row's --text in the role block */
 .insight-danger { color: var(--danger); }
 .insight-success { color: var(--success); }
+/* PER WEEK (Maand) / PER MAAND (Jaar): a table in a list card (.insight-day-card: no padding, lines
+   from edge to edge). One grid for all rows (subgrid), so the columns line up: the period on the
+   left, four equal centred value columns. The card padding is a track of its own on both sides
+   (a subgrid's own padding would come off the first and last column only); --space-2 between the
+   columns comes from the cells' padding. Every row is a button of at least 48px (a part still to
+   come is a grey div); a line above every row, also under the column heads, none under the last. */
+.insight-table { display: grid; grid-template-columns: var(--card-padding) auto repeat(4, minmax(0, 1fr)) var(--card-padding); }
+.insight-table-row { display: grid; grid-template-columns: subgrid; grid-column: 1 / -1; align-items: center; min-height: var(--control-height); padding: 0; border: none; border-top: 1px solid var(--border); background: none; font-family: inherit; color: var(--text); text-align: center; white-space: nowrap; }
+.insight-table-cell { padding: 0 var(--space-1); }
+.insight-table-row > :first-child { grid-column-start: 2; padding-left: 0; text-align: left; }
+.insight-table-row > :last-child { padding-right: 0; }
+button.insight-table-row { width: 100%; cursor: pointer; }
+button.insight-table-row:active { background: var(--bg); }
+.insight-table-head { min-height: 0; padding-top: var(--space-3); padding-bottom: var(--space-3); border-top: none; color: var(--text-secondary); }
+.insight-table-row.is-future, .insight-table-cell.insight-dash { color: var(--text-muted); }
 /* Per dag: every cell of a day up to today carries data-date, so its whole column opens the day
    overview; pressed, the whole column takes --bg (the pressed row/card colour). */
 .insight-cell[data-date] { cursor: pointer; }
