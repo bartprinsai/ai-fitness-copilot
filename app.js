@@ -6443,15 +6443,46 @@ document.getElementById('btn-back-calculator-1rm').addEventListener('click', () 
 // Pure logic sits between the markers so it can be unit-tested headless.
 // <warmup-pure>
 const WARMUP_BAR_KG = 20;
+// Bench and Squat follow the gym ladder (warmupGymSteps, warmupRepsFromStart):
+//  ladderStart, then on in steps of ladderIncrement; a ladder step only fits when it is
+//  <= W - ladderGap. When the gap from the last ladder step to W is still > ladderGap, one
+//  extra step: last ladder step + extraStep if that is <= W - extraGap, else the midpoint
+//  rounded up to 2.5 kg, at most W - midGap. Reps: the series from the first loaded step, then 1.
+// Deadlift keeps firstStep/increment with the 87.5–92.5% band (warmupLoadedSteps, warmupReps).
 const WARMUP_EXERCISES = {
-  bench:    { label: 'Bench',    firstStep: WARMUP_BAR_KG + 20, increment: 20, reps: [8, 5, 3, 2, 1] },
-  squat:    { label: 'Squat',    firstStep: WARMUP_BAR_KG + 40, increment: 40, reps: [5, 3, 2, 1] },
-  deadlift: { label: 'Deadlift', firstStep: 70,                 increment: 40, reps: [5, 3, 2, 1] },
+  bench:    { label: 'Bench', ladderStart: [40, 60, 80, 100], ladderIncrement: 10, ladderGap: 10, extraStep: null, extraGap: null, midGap: 5,  reps: [8, 5, 3, 2] },
+  squat:    { label: 'Squat', ladderStart: [60, 80, 100],     ladderIncrement: 20, ladderGap: 20, extraStep: 20,   extraGap: 15,   midGap: 10, reps: [5, 3, 2] },
+  deadlift: { label: 'Deadlift', firstStep: 70, increment: 40, reps: [5, 3, 2, 1] },
 };
 
 const WARMUP_EPS = 1e-9;
 const WARMUP_ROUND_KG = 2.5;
 function floorTo2_5(x) { return Math.floor(x / WARMUP_ROUND_KG + WARMUP_EPS) * WARMUP_ROUND_KG; }
+
+// Gym ladder (Bench, Squat) for work weight workKg: loaded steps in kg, empty bar not included.
+// Computed in whole hundredths of a kg so rounding to 2.5 kg and 2-decimal input stay exact.
+function warmupGymSteps(cfg, workKg) {
+  const c = kg => Math.round(kg * 100);
+  const W = c(workKg), round = c(WARMUP_ROUND_KG), start = cfg.ladderStart;
+  const steps = [];
+  let last = c(WARMUP_BAR_KG);
+  for (let i = 0; ; i++) {
+    const s = c(i < start.length ? start[i] : start[start.length - 1] + (i - start.length + 1) * cfg.ladderIncrement);
+    if (s > W - c(cfg.ladderGap)) break;
+    steps.push(s);
+    last = s;
+  }
+  if (W - last > c(cfg.ladderGap)) {
+    if (cfg.extraStep != null && last + c(cfg.extraStep) <= W - c(cfg.extraGap)) steps.push(last + c(cfg.extraStep));
+    else steps.push(Math.min(Math.ceil((last + W) / (2 * round)) * round, W - c(cfg.midGap)));
+  }
+  return steps.map(s => s / 100);
+}
+
+// The series from the first step on, then 1 rep for every further step.
+function warmupRepsFromStart(n, series) {
+  return series.slice(0, n).concat(new Array(Math.max(0, n - series.length)).fill(1));
+}
 
 // Ladder steps (kg) strictly below 'last': firstStep, firstStep + increment, ...
 function warmupLadder(cfg, last) {
@@ -6469,7 +6500,7 @@ function warmupJumpsDescend(steps, work) {
   return true;
 }
 
-// Loaded steps (kg, empty bar not included; ladder first, last step at the end) for a work weight:
+// Deadlift: loaded steps (kg, empty bar not included; ladder first, last step at the end) for a work weight:
 //  Candidates for the last step are all multiples of 2.5 in [0.875 × W, 0.925 × W], ordered by
 //  distance to exactly 10% below W (0.90 × W), heavier first on a tie.
 //  1. First candidate whose whole schedule (bar -> ladder below it -> candidate -> work set)
@@ -6511,7 +6542,7 @@ function warmupLoadedSteps(exercise, workKg) {
   return lowered.find(r => r.regular) || lowered[0];
 }
 
-// N <= reps.length: last N values of the series; N > length: full series for the
+// Deadlift reps. N <= reps.length: last N values of the series; N > length: full series for the
 // first steps, then 1 rep for every extra step.
 function warmupReps(n, series) {
   if (n <= series.length) return series.slice(series.length - n);
@@ -6532,9 +6563,11 @@ function computeWarmup(exercise, workStr) {
   const work = parseWarmupNumber(workStr);
   if (!isFinite(work) || work <= 0) return { error: 'Werkgewicht moet een getal groter dan 0 zijn.' };
   if (work <= WARMUP_BAR_KG) return { error: 'Werkgewicht moet zwaarder zijn dan de lege stang (' + WARMUP_BAR_KG + ' kg).' };
-  const plan = warmupLoadedSteps(exercise, work);
+  const gym = !!cfg.ladderStart;
+  const plan = gym ? { steps: warmupGymSteps(cfg, work) } : warmupLoadedSteps(exercise, work);
   const steps = plan.steps;
-  const reps = warmupReps(steps.length, cfg.reps);
+  if (gym) plan.regular = warmupJumpsDescend(steps, work);
+  const reps = gym ? warmupRepsFromStart(steps.length, cfg.reps) : warmupReps(steps.length, cfg.reps);
   const rows = [{ bar: true, weight: WARMUP_BAR_KG, reps: 10 }];
   steps.forEach((w, i) => rows.push({ weight: w, reps: reps[i] }));
   rows.push({ weight: work, work: true });
