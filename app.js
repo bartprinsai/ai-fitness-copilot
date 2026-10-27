@@ -6573,8 +6573,14 @@ function computeWarmup(exercise, workStr) {
   rows.push({ weight: work, work: true });
   return { rows, tooLight: steps.length === 0, regular: plan.regular };
 }
+
+// First ladder candidate (kg) of an exercise: the "Start … kg" under its option.
+function warmupStartKg(cfg) { return cfg.ladderStart ? cfg.ladderStart[0] : cfg.firstStep; }
 // </warmup-pure>
 
+document.querySelectorAll('#warmup-ex-options .plate-bar-option').forEach(o => {
+  o.querySelector('.plate-bar-option-weight').textContent = 'Start ' + formatWeight(warmupStartKg(WARMUP_EXERCISES[o.dataset.ex])) + ' kg';
+});
 let warmupExercise = 'bench';
 function openWarmupCalculator() {
   warmupExercise = 'bench';

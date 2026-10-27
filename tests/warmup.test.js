@@ -13,7 +13,7 @@ function loadPure(src) {
   if (!m) throw new Error('warmup-pure markers niet gevonden');
   const ctx = {};
   vm.createContext(ctx);
-  vm.runInContext(m[1] + '\n;globalThis.computeWarmup = computeWarmup; globalThis.WARMUP_EXERCISES = WARMUP_EXERCISES;', ctx);
+  vm.runInContext(m[1] + '\n;globalThis.computeWarmup = computeWarmup; globalThis.WARMUP_EXERCISES = WARMUP_EXERCISES; globalThis.warmupStartKg = typeof warmupStartKg === \'function\' ? warmupStartKg : undefined;', ctx);
   return ctx;
 }
 // A result as the screen lists it, e.g. ["bar×10", "40×8", …, "100 WS"].
@@ -107,8 +107,17 @@ H.run(async () => {
     H.check('Deadlift 0–1200 kg per 0,25 kg identiek aan bd23afc (schema, tooLight, regular)', diff, []);
   } else H.ok(false, 'Deadlift-vergelijking met bd23afc: commit niet gevonden');
 
-  H.section('Scherm: weergave met komma, kg, werkset zonder reps');
+  H.section('Startlabel = eerste geladen stap (uit WARMUP_EXERCISES)');
+  H.check('warmupStartKg per oefening', ['bench', 'squat', 'deadlift'].map(ex => cur.warmupStartKg(cur.WARMUP_EXERCISES[ex])), [40, 60, 70]);
+  H.check('warmupStartKg = eerste geladen stap bij 200 kg', ['bench', 'squat', 'deadlift'].map(ex => cur.warmupStartKg(cur.WARMUP_EXERCISES[ex]) === cur.computeWarmup(ex, '200').rows[1].weight), [true, true, true]);
+
+  H.section('Scherm: startlabels, weergave met komma, kg, werkset zonder reps');
   const { browser, page, errors } = await H.openApp();
+  const labels = () => page.evaluate(() => [...document.querySelectorAll('#warmup-ex-options .plate-bar-option')].map(o => o.dataset.ex + ': ' + o.querySelector('.plate-bar-option-weight').textContent));
+  const want = ['bench: Start 40 kg', 'squat: Start 60 kg', 'deadlift: Start 70 kg'];
+  H.check('Startlabels na het laden', await labels(), want);
+  await page.evaluate(() => { openWarmupCalculator(); document.querySelector('#warmup-ex-options .plate-bar-option[data-ex="squat"]').click(); });
+  H.check('Startlabels na openen en Squat kiezen', await labels(), want);
   const shown = async (ex, w) => page.evaluate(([ex, w]) => {
     openWarmupCalculator();
     document.querySelector(`#warmup-ex-options .plate-bar-option[data-ex="${ex}"]`).click();
