@@ -1233,6 +1233,25 @@ button.insight-table-row:active { background: var(--bg); }
 .insight-bar-planned { fill: var(--text-muted); }
 .insight-pct { column-gap: 0; } /* "16%": the % right after the number, no space */
 
+/* ── Kracht: the card on the main screen and #screen-insight-strength ──────────────────────────────
+   Colour rule: a positive change in --success, zero or less in --text (the details' "0 kg" / "−1 kg"
+   in --text-secondary) — never red. A value that isn't this period's is --text-muted. */
+.insight-figure.insight-muted .set-val, .insight-figure.insight-muted .set-unit { color: var(--text-muted); }
+/* The PR trophy (icon and --pr-gold of the set rows) at the size of the text it stands in, like the Recap's. */
+.insight-pr { width: 1em; height: 1em; fill: var(--pr-gold); vertical-align: -2px; margin-right: var(--space-1); flex-shrink: 0; }
+.insight-records { display: inline-flex; align-items: center; color: var(--text-secondary); }
+/* Card: a row per category (name left, change right, vertically centred), no lines — a summary, not a list. */
+.insight-strength-row { display: flex; align-items: center; gap: var(--space-3); }
+.insight-strength-row + .insight-strength-row { margin-top: var(--space-2); }
+.insight-strength-row .insight-mg-main .role-sub { margin-top: 2px; }
+.insight-strength-note { margin-top: var(--space-3); }
+/* Detail list: a sectiekop per category with its change behind it; above every one but the first a
+   line from edge to edge (24px above it: the row's 12px + --space-3, 16px between line and head),
+   and no line between a head and its first row. */
+.insight-strength-head { display: flex; align-items: baseline; gap: var(--space-2); padding: var(--space-4) var(--card-padding) 0; color: var(--text); }
+.insight-strength-head:not(:first-child) { margin-top: var(--space-3); border-top: 1px solid var(--border); }
+.insight-strength-list .insight-strength-head + .insight-mg-row { border-top: none; }
+
 /* ── Slaap invullen: the 24-hour clock (#sleep-clock) ──────────────────────────────────────────
    Max. 280px wide (scales down with the panel), 0 at the top, clockwise. Ring r=116 in the 280
    viewBox, 28 thick: --border track, the night (bedtime → wake time) in --primary with round ends.

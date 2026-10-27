@@ -634,6 +634,7 @@ const SCREEN_ON_ENTER = {
   'screen-insight-metric': () => renderInsightMetric(),
   'screen-insight-training': () => renderInsightTraining(),
   'screen-insight-muscle': () => renderInsightMuscle(),
+  'screen-insight-strength': () => renderInsightStrength(),
 };
 
 // Per-screen "does the CURRENTLY ACTIVE screen have unsaved input?" checks,
@@ -2054,6 +2055,16 @@ function insightStep(dir) {
   else if (r.period === 'month') insightMonthStart = next;
   else insightYearStart = next;
 }
+// The period before r, of the same kind (previous week, month or year).
+function insightPrevRange(r) {
+  const start = r.period === 'week' ? addDaysToDateStr(r.start, -7) : addMonthsToMonthStart(r.start, r.period === 'month' ? -1 : -12);
+  const to = r.period === 'week' ? addDaysToDateStr(start, 6) : r.period === 'month' ? monthEndOf(start) : start.slice(0, 4) + '-12-31';
+  return { period: r.period, start, from: start, to };
+}
+// A period in a sentence, after "t.o.v.": "week 42", "september", "2025".
+function insightPeriodName(r) {
+  return r.period === 'week' ? `week ${isoWeekOfDateStr(r.start)}` : r.period === 'month' ? insightMonthName(r.start).toLowerCase() : r.start.slice(0, 4);
+}
 // A row of the table or a detail list opens that week ('week:<Monday>') or month ('month:<1st>').
 function insightOpenSubPeriod(spec) {
   const [kind, start] = spec.split(':');
@@ -2254,10 +2265,12 @@ function insightTrainingStats(days) {
 function insightAverage(values) { return values.reduce((a, b) => a + b, 0) / values.length; }
 
 const INSIGHT_CHEVRON_SVG = '<svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>';
-// A figure card of the week. With `metric` ('training' / 'sleep' / 'weight') the whole card is a
-// button that opens that detail screen, with a chevron on the right.
-function insightCardHtml(label, bodyHtml, metric) {
-  const inner = `<div class="section-label insight-card-label">${label}</div>${bodyHtml}`;
+// A figure card of the week. With `metric` ('training' / 'sleep' / 'weight' / 'strength') the whole
+// card is a button that opens that detail screen, with a chevron on the right. `asideHtml` goes on
+// the right of the label, on its baseline (Kracht: the records).
+function insightCardHtml(label, bodyHtml, metric, asideHtml = '') {
+  const inner = (asideHtml ? `<div class="insight-card-label insight-label-row"><span class="section-label">${label}</span>${asideHtml}</div>`
+    : `<div class="section-label insight-card-label">${label}</div>`) + bodyHtml;
   if (!metric) return `<div class="card insight-card">${inner}</div>`;
   return `<button type="button" class="card insight-card insight-edit-card" data-insight-metric="${metric}">`
     + `<div class="insight-edit-main">${inner}</div><span class="insight-edit-icon insight-chevron">${INSIGHT_CHEVRON_SVG}</span></button>`;
@@ -2345,11 +2358,10 @@ function insightWeightCompareTextFor(r, avg) {
     const a = months[0], b = months[months.length - 1];
     return `Van ${formatNumber(a.w.avg)} kg in ${insightMonthName(a.p.start).toLowerCase()} naar ${formatNumber(b.w.avg)} kg in ${insightMonthName(b.p.start).toLowerCase()}`;
   }
-  const prevStart = r.period === 'week' ? addDaysToDateStr(r.start, -7) : addMonthsToMonthStart(r.start, -1);
-  const prev = insightWeightRange(prevStart, r.period === 'week' ? addDaysToDateStr(prevStart, 6) : monthEndOf(prevStart));
+  const p = insightPrevRange(r);
+  const prev = insightWeightRange(p.from, p.to);
   if (!prev) return '';
-  const what = r.period === 'week' ? `week ${isoWeekOfDateStr(prevStart)}` : insightMonthName(prevStart).toLowerCase();
-  return `${formatSignedNumber(round1(avg - prev.avg))} kg t.o.v. ${what}`;
+  return `${formatSignedNumber(round1(avg - prev.avg))} kg t.o.v. ${insightPeriodName(p)}`;
 }
 
 function insightWeightCardHtml(r) {
@@ -2445,11 +2457,13 @@ function renderInsight() {
   const grid = document.getElementById('insight-days');
   grid.className = r.period === 'week' ? 'card insight-days' : 'card insight-days insight-day-card insight-table';
   grid.innerHTML = r.period === 'week' ? insightDaysGridHtml(days) : insightPeriodTableHtml(r);
+  const strength = insightStrengthStats(r);
   document.getElementById('insight-cards').innerHTML =
     insightCardHtml('Training', insightTrainingCardHtml(insightTrainingStats(days), r.period), 'training')
     + insightCardHtml('Voeding', insightEmptyHtml('Nog geen voedingsschema'))
     + insightCardHtml('Slaap', insightSleepCardHtml(r), 'sleep')
-    + insightCardHtml('Gewicht', insightWeightCardHtml(r), 'weight');
+    + insightCardHtml('Gewicht', insightWeightCardHtml(r), 'weight')
+    + insightCardHtml('Kracht', insightStrengthCardHtml(strength), 'strength', insightStrengthAsideHtml(strength));
 }
 
 function openInsight() {
@@ -2460,7 +2474,7 @@ function openInsight() {
 // On every screen with the period head: Week · Maand · Jaar switches period, ‹ › steps one period
 // (not past the current one); then that screen is redrawn. A row with data-insight-open (the
 // table, the Slaap / Gewicht lists) zooms in: that week or month on the same screen, one step back.
-['screen-insight', 'screen-insight-metric', 'screen-insight-training', 'screen-insight-muscle'].forEach(id => document.getElementById(id).addEventListener('click', e => {
+['screen-insight', 'screen-insight-metric', 'screen-insight-training', 'screen-insight-muscle', 'screen-insight-strength'].forEach(id => document.getElementById(id).addEventListener('click', e => {
   const p = e.target.closest('[data-insight-period]');
   const b = e.target.closest('[data-insight-step]');
   const o = e.target.closest('[data-insight-open]');
@@ -2474,6 +2488,7 @@ document.getElementById('insight-cards').addEventListener('click', e => {
   const c = e.target.closest('[data-insight-metric]');
   if (!c) return;
   if (c.dataset.insightMetric === 'training') openInsightTraining();
+  else if (c.dataset.insightMetric === 'strength') openInsightStrength();
   else openInsightMetric(c.dataset.insightMetric);
 });
 // A tap anywhere in a day's column (Per dag) opens that day; the whole column shows pressed.
@@ -2999,8 +3014,9 @@ function insightFeaturesSummaryHtml(f, noteHtml) {
     { label: 'Dropset', value: formatCount(f.drops) },
   ], noteHtml);
 }
-// "16%": the number on Groot getal, the % right after it on Klein (no space).
-const insightPctHtml = pct => `<div class="insight-figure insight-pct"><span class="set-val">${pct}</span><span class="set-unit">%</span></div>`;
+// "16%": the number on Groot getal, the % right after it on Klein (no space); `cls` colours the
+// number (Kracht: ' insight-success').
+const insightPctHtml = (pct, cls = '') => `<div class="insight-figure insight-pct"><span class="set-val${cls}">${pct}</span><span class="set-unit">%</span></div>`;
 // Done (--primary) above planned (--text-muted), 4px each, on one scale for all rows; a 0 draws
 // nothing but keeps its place. An SVG, so the width needs no inline style.
 function insightMuscleBarsSvg(done, planned, scale) {
@@ -3094,6 +3110,139 @@ function renderInsightMuscle() {
       + '<div class="role-sub insight-label-note">Telt niet mee in het percentage</div></div>' + insightListCardHtml(secRows) : '');
 }
 document.getElementById('btn-back-insight-muscle').addEventListener('click', () => goBack('screen-insight-training'));
+
+// -- Inzicht: Kracht (the Kracht card and #screen-insight-strength) ---------------------------------
+// The estimated 1RM of the exercises with Kracht volgen on, per period, against the previous period
+// of the same kind (previous week, month or year). Rules: PROJECT_CONTEXT.md, "Kracht".
+//   a set counts with weight > 0 and ≥ 1 rep, with its full reps only (partial / forced reps are
+//   apart, in `extra`); a drop never counts, the main set of a dropset does (countsForRecords)
+//   per set: estimatedOneRm(), the 1RM Calculator's own function
+//   per exercise: the highest estimated 1RM in the period; the change only when done in both
+//   per category: the average of (this ÷ previous − 1) × 100 over its exercises done in both
+//   records: the PR trophies (getPRSetKeys) of the tracked exercises, set in the period
+const INSIGHT_STRENGTH_EMPTY = 'Zet Kracht volgen aan bij een oefening om je kracht hier te volgen.';
+
+// The highest estimated 1RM of an exercise's counting sets on one day; null without any.
+function dayBestOneRm(exId, date) {
+  const ex = (db.workouts[date] || []).find(e => e.exerciseId === exId);
+  let best = null;
+  ((ex && ex.sets) || []).forEach((s, i, sets) => {
+    if (!countsForRecords(sets, i)) return;
+    const reps = parseInt(s.reps) || 0, weight = parseFloat(s.weight) || 0;
+    if (reps < 1 || weight <= 0) return;
+    const v = estimatedOneRm(weight, reps);
+    if (best === null || v > best) best = v;
+  });
+  return best;
+}
+// The highest of from..to; null when the exercise wasn't done then.
+function bestOneRmIn(exId, from, to) {
+  return Object.keys(db.workouts).filter(d => d >= from && d <= to).map(d => dayBestOneRm(exId, d))
+    .reduce((best, v) => v !== null && (best === null || v > best) ? v : best, null);
+}
+// The last known value before `date`: the highest of the last day before it with a counting set.
+function lastOneRmBefore(exId, date) {
+  const dates = Object.keys(db.workouts).filter(d => d < date).sort();
+  for (let i = dates.length - 1; i >= 0; i--) {
+    const v = dayBestOneRm(exId, dates[i]);
+    if (v !== null) return v;
+  }
+  return null;
+}
+
+// For the period r: { prev (insightPrevRange), records, exercises: [{ id, category, cur, prev, last,
+// records }], categories: [{ id, name, exercises, records, pct (null: none done in both) }] }.
+// cur / prev: the highest estimated 1RM in this / the previous period (null: not done); last: the
+// last known value before this period, when not done in it. Only the visible exercises with Kracht
+// volgen on (never Cardio); categories in the order of Alle oefeningen, only those with one.
+function insightStrengthStats(r) {
+  const prev = insightPrevRange(r);
+  const inPeriod = key => { const d = key.split('#')[0]; return d >= r.from && d <= r.to; };
+  const exercises = allExercises().filter(e => e.category !== 'cardio' && isStrengthTracked(e.id)).map(e => {
+    const cur = bestOneRmIn(e.id, r.from, r.to);
+    return { id: e.id, category: e.category, cur, prev: bestOneRmIn(e.id, prev.from, prev.to),
+      last: cur === null ? lastOneRmBefore(e.id, r.from) : null, records: [...getPRSetKeys(e.id)].filter(inPeriod).length };
+  });
+  const categories = allCategories().map(c => {
+    const ex = exercises.filter(e => e.category === c.id);
+    const both = ex.filter(e => e.cur !== null && e.prev !== null);
+    return { id: c.id, name: c.name, exercises: ex, records: ex.reduce((n, e) => n + e.records, 0),
+      pct: both.length ? insightAverage(both.map(e => (e.cur / e.prev - 1) * 100)) : null };
+  }).filter(c => c.exercises.length);
+  return { prev, exercises, categories, records: exercises.reduce((n, e) => n + e.records, 0) };
+}
+
+// "+2,1%" / "−0,8%" / "0,0%" (always 1 decimal) as { text, cls }: positive in --success, zero or
+// less in --text — no red on purpose: less can be a deload week. The same rule for "+2,5 kg".
+function insightStrengthPct(p) {
+  const v = round1(p);
+  return { text: (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(1).replace('.', ','), cls: v > 0 ? ' insight-success' : '' };
+}
+const insightRecordsText = n => insightPlural(n, 'record', 'records');
+const insightNoCompareHtml = '<div class="role-sub insight-muted">Geen vergelijking</div>';
+
+// Kracht card: per category the name (with "1 record") and the average change on the right, or
+// "Geen vergelijking"; under it what it is compared with.
+function insightStrengthCardHtml(s) {
+  if (!s.exercises.length) return insightEmptyHtml(INSIGHT_STRENGTH_EMPTY);
+  return s.categories.map(c => {
+    const p = c.pct === null ? null : insightStrengthPct(c.pct);
+    return `<div class="insight-strength-row"><div class="insight-mg-main"><div class="role-row">${c.name}</div>`
+      + (c.records ? `<div class="role-sub">${insightRecordsText(c.records)}</div>` : '') + '</div>'
+      + `<div class="insight-mg-figure">${p ? insightPctHtml(p.text, p.cls) : insightNoCompareHtml}</div></div>`;
+  }).join('') + `<div class="role-sub insight-strength-note">Gemiddelde verandering van de geschatte 1RM t.o.v. ${insightPeriodName(s.prev)}</div>`;
+}
+// "🏆 2 records" on the right of the card's label; nothing at 0.
+function insightStrengthAsideHtml(s) {
+  return s.records ? `<span class="t-small insight-records">${prTrophySvg('insight-pr')}${insightRecordsText(s.records)}</span>` : '';
+}
+
+function openInsightStrength() { showScreen('screen-insight-strength'); }
+// The detail screen: a sectiekop per category with its average change, a row per exercise (highest
+// estimated 1RM first) that opens its Grafiek in the Fitness Tracker; back comes here again.
+function renderInsightStrength() {
+  const r = insightRange();
+  const s = insightStrengthStats(r);
+  document.getElementById('insight-strength-head').innerHTML = insightPeriodHeadHtml(r);
+  const label = '<div class="section-label insight-label">Geschatte 1RM per oefening</div>';
+  if (!s.exercises.length) {
+    document.getElementById('insight-strength-body').innerHTML = label + `<div class="card">${insightEmptyHtml(INSIGHT_STRENGTH_EMPTY)}</div>`;
+    return;
+  }
+  const shown = e => e.cur !== null ? e.cur : e.last;
+  const byValue = (a, b) => (shown(b) === null ? -1 : shown(b)) - (shown(a) === null ? -1 : shown(a))
+    || exerciseName(a.id).localeCompare(exerciseName(b.id), 'nl');
+  const html = s.categories.map(c => {
+    const p = c.pct === null ? null : insightStrengthPct(c.pct);
+    const head = `<div class="insight-strength-head"><span class="section-label section-head">${c.name}</span>`
+      + (p ? `<span class="t-small${p.cls}">${p.text}%</span>` : '<span class="role-sub insight-muted">Geen vergelijking</span>') + '</div>';
+    return head + [...c.exercises].sort(byValue).map(e => {
+      let diff;
+      if (e.cur === null) diff = '<div class="role-sub insight-muted">Niet gedaan</div>';
+      else if (e.prev === null) diff = insightNoCompareHtml;
+      else {
+        const d = round1(e.cur - e.prev);
+        diff = `<div class="role-sub">${d > 0 ? `<span class="insight-success">${formatSignedNumber(d)} kg</span>` : `${formatSignedNumber(d)} kg`}</div>`;
+      }
+      const v = shown(e);
+      const figure = v === null ? '<div class="insight-figure insight-muted"><span class="set-val">–</span></div>'
+        : `<div class="insight-figure${e.cur === null ? ' insight-muted' : ''}"><span class="set-val">${formatNumber(v)}</span><span class="set-unit">kg</span></div>`;
+      return `<button type="button" class="insight-mg-row insight-list-row" data-insight-exercise="${e.id}" aria-label="Grafiek ${exerciseName(e.id)}">`
+        + `<div class="insight-mg-main"><div class="role-row">${e.records ? prTrophySvg('insight-pr') : ''}${exerciseName(e.id)}</div>${diff}</div>`
+        + `<div class="insight-mg-figure">${figure}</div><span class="insight-edit-icon insight-chevron">${INSIGHT_CHEVRON_SVG}</span></button>`;
+    }).join('');
+  }).join('');
+  document.getElementById('insight-strength-body').innerHTML = label + `<div class="card insight-day-card insight-list insight-strength-list">${html}</div>`;
+}
+document.getElementById('btn-back-insight-strength').addEventListener('click', () => goBack('screen-insight'));
+// A row zooms in on its exercise: the Grafiek in the Fitness Tracker; back (arrow or Android) lands
+// here again, in the same period (the shared period isn't touched).
+document.getElementById('insight-strength-body').addEventListener('click', e => {
+  const row = e.target.closest('[data-insight-exercise]');
+  if (!row) return;
+  openTraining(row.dataset.insightExercise);
+  switchTab('graph');
+});
 
 // The sheets below fill in insightSheetDate; after Opslaan or Wissen the screen they were opened
 // from (day overview or a detail screen) is redrawn at once.
@@ -4246,6 +4395,10 @@ function renderExerciseInfoView() {
       <div class="info-view-stat"><span class="section-label">Primair</span>${primary ? value(primary) : notSet}</div>
       <div class="info-view-stat"><span class="section-label">Secundair</span>${secondary.length ? secondary.map(value).join('') : notSet}</div>
     </div>`);
+  // Inzicht only when Kracht volgen is on, like an empty equipment field.
+  if (isStrengthTracked(currentExerciseId) && EXERCISE_INFO_FORMS.overlay.category() !== 'cardio') {
+    sections.push(`<div class="section-label section-head">Inzicht</div><div class="info-view-stat"><span class="section-label">Kracht volgen</span>${value('Ja')}</div>`);
+  }
   let equipHtml = '';
   EXERCISE_INFO_EQUIPMENT_PAIRS.forEach(pair => {
     const cells = pair
@@ -4285,10 +4438,14 @@ function setSecondaryMuscleField(id, ids) {
 // overlay and the New/Edit Exercise screen — and both are built, wired,
 // populated and read by the same generic functions below, parameterised by one
 // of these forms (element ids are `<prefix>-<field>`).
+// `category()` is the category the form is about: the exercise's own (Oefeninginfo) or the one
+// chosen in the form (Nieuwe oefening / Oefening bewerken).
 const EXERCISE_INFO_FORMS = {
-  overlay: { prefix: 'info' },
-  newEx: { prefix: 'new-ex-info' },
+  overlay: { prefix: 'info', category: () => (findExercise(currentExerciseId) || {}).category || '' },
+  newEx: { prefix: 'new-ex-info', category: () => getFieldBtnValue('new-ex-category') },
 };
+// Ja/Nee on/off button (Powerliftbank, Kracht volgen).
+const infoToggleHtml = id => `<div class="info-toggle"><button type="button" class="extra-type-btn" id="${id}" aria-pressed="false">Nee</button></div>`;
 
 function renderExerciseInfoFormFields(form) {
   const p = form.prefix;
@@ -4301,7 +4458,7 @@ function renderExerciseInfoFormFields(form) {
     if (f.kind === 'picker') control = pickerBtn(id);
     // Same look as Partial/Forced (.extra-type-btn), but its own element: the Partial/Forced
     // logic only ever looks inside #extra-type, so it never touches this button.
-    else if (f.kind === 'toggle') control = `<div class="info-toggle"><button type="button" class="extra-type-btn" id="${id}" aria-pressed="false">Nee</button></div>`;
+    else if (f.kind === 'toggle') control = infoToggleHtml(id);
     // Chrome keys its "previously entered values" suggestion list by the
     // field's name (falling back to id), so autocomplete="off" alone doesn't
     // suppress it. A fresh random name on every load means it never finds a
@@ -4313,6 +4470,8 @@ function renderExerciseInfoFormFields(form) {
   document.getElementById(`${p}-muscle-fields`).innerHTML =
     field(`${p}-primary-muscle`, 'Primair', pickerBtn(`${p}-primary-muscle`)) +
     field(`${p}-secondary-muscle`, 'Secundair', pickerBtn(`${p}-secondary-muscle`));
+  document.getElementById(`${p}-insight-fields`).innerHTML =
+    field(`${p}-track-strength`, 'Kracht volgen', infoToggleHtml(`${p}-track-strength`) + `<div class="role-sub" id="${p}-track-strength-hint"></div>`);
   document.getElementById(`${p}-equipment-fields`).innerHTML =
     EXERCISE_INFO_EQUIPMENT_PAIRS.map(pair => `<div class="info-two-col">${pair.map(equipmentField).join('')}</div>`).join('') +
     EXERCISE_INFO_FULLWIDTH_KEYS.map(equipmentField).join('');
@@ -4335,6 +4494,8 @@ function wireExerciseInfoFormPickers(form) {
     const id = `${p}-${f.idSuffix}`;
     document.getElementById(id).addEventListener('click', () => setInfoToggle(id, !getInfoToggle(id)));
   });
+  const strengthId = `${p}-track-strength`;
+  document.getElementById(strengthId).addEventListener('click', () => setInfoToggle(strengthId, !getInfoToggle(strengthId)));
   const primaryId = `${p}-primary-muscle`, secondaryId = `${p}-secondary-muscle`;
   document.getElementById(primaryId).addEventListener('click', () => {
     openFieldPicker('Primair', [{ value: '', label: 'Niet ingesteld' }, ...muscleGroupPickerOptions()], getFieldBtnValue(primaryId), value => {
@@ -4351,7 +4512,16 @@ function wireExerciseInfoFormPickers(form) {
   EXERCISE_INFO_EQUIPMENT_FIELDS.filter(f => f.kind === 'picker').forEach(f => wire(`${p}-${f.idSuffix}`, f.label, f.options));
 }
 
-// Ja/Nee on/off button (Powerliftbank): on = .active (--primary filled) with "Ja", off = "Nee".
+// Kracht volgen (section Inzicht) is not there for Cardio; the hint under it names the category the
+// exercise counts under in Inzicht ("Telt mee voor Kracht in Inzicht." while none is chosen yet).
+function syncTrackStrengthField(form) {
+  const p = form.prefix, cat = form.category();
+  [`${p}-insight-head`, `${p}-insight-fields`].forEach(id => document.getElementById(id).classList.toggle('hidden', cat === 'cardio'));
+  const name = categoryName(cat);
+  document.getElementById(`${p}-track-strength-hint`).textContent = `Telt mee voor Kracht in Inzicht${name ? `, bij de categorie ${name}` : ''}.`;
+}
+
+// Ja/Nee on/off button (Powerliftbank, Kracht volgen): on = .active (--primary filled) with "Ja", off = "Nee".
 function getInfoToggle(id) { return document.getElementById(id).classList.contains('active'); }
 function setInfoToggle(id, on) {
   const b = document.getElementById(id);
@@ -4371,6 +4541,8 @@ function populateExerciseInfoForm(form, info) {
   const p = form.prefix;
   setPrimaryMuscleField(`${p}-primary-muscle`, info.primaryMuscleGroup);
   setSecondaryMuscleField(`${p}-secondary-muscle`, info.secondaryMuscleGroups);
+  setInfoToggle(`${p}-track-strength`, !!info.trackStrength);
+  syncTrackStrengthField(form);
   EXERCISE_INFO_EQUIPMENT_FIELDS.forEach(f => {
     const id = `${p}-${f.idSuffix}`;
     const val = info[f.key];
@@ -4388,6 +4560,7 @@ function getExerciseInfoFormSnapshot(form) {
   const snapshot = {
     primaryMuscleGroup: getFieldBtnValue(`${p}-primary-muscle`),
     secondaryMuscleGroups: getFieldBtnValue(`${p}-secondary-muscle`),
+    trackStrength: getInfoToggle(`${p}-track-strength`),
   };
   EXERCISE_INFO_EQUIPMENT_FIELDS.forEach(f => {
     const id = `${p}-${f.idSuffix}`;
@@ -4407,6 +4580,8 @@ function readExerciseInfoForm(form) {
   const secondary = getSecondaryMuscleField(`${p}-secondary-muscle`);
   if (primary) info.primaryMuscleGroup = primary;
   if (secondary.length) info.secondaryMuscleGroups = secondary;
+  // Kracht volgen: true = ja, left out = nee; a Cardio exercise never has it.
+  if (form.category() !== 'cardio' && getInfoToggle(`${p}-track-strength`)) info.trackStrength = true;
   EXERCISE_INFO_EQUIPMENT_FIELDS.forEach(f => {
     const id = `${p}-${f.idSuffix}`;
     if (f.kind === 'toggle') {
@@ -4447,29 +4622,14 @@ function openExerciseInfo() {
   openOverlay('exercise-info-overlay');
 }
 
-// Exercise-info fields that are set elsewhere than Oefeninginfo's form (no field there).
-// trackStrength: "Kracht volgen" for Inzicht, true = ja; absent = nee (the default).
-const EXERCISE_INFO_NON_FORM_KEYS = ['trackStrength'];
+// trackStrength: "Kracht volgen" for Inzicht (the field in the section Inzicht), true = ja;
+// absent = nee (the default).
 function isStrengthTracked(id) { return !!(getExerciseInfo(id) || {}).trackStrength; }
-function setStrengthTracked(id, on) {
-  if (!db.exerciseInfo) db.exerciseInfo = {};
-  const info = { ...(db.exerciseInfo[id] || {}) };
-  if (!!info.trackStrength === !!on) return;
-  if (on) info.trackStrength = true; else delete info.trackStrength;
-  if (Object.keys(info).length === 0) delete db.exerciseInfo[id];
-  else db.exerciseInfo[id] = info;
-  persistExerciseInfo();
-}
 
 // Stores (or, when empty, removes) one exercise's info. Skips the Firestore
 // write when nothing actually changed.
 function setExerciseInfoFor(id, info) {
   if (!db.exerciseInfo) db.exerciseInfo = {};
-  // Fields the form doesn't show are kept as they are.
-  EXERCISE_INFO_NON_FORM_KEYS.forEach(k => {
-    const prev = (db.exerciseInfo[id] || {})[k];
-    if (prev !== undefined && !(k in info)) info = { ...info, [k]: prev };
-  });
   const unchanged = JSON.stringify(db.exerciseInfo[id] || {}) === JSON.stringify(info);
   if (Object.keys(info).length === 0) delete db.exerciseInfo[id];
   else db.exerciseInfo[id] = info;
@@ -5593,6 +5753,7 @@ document.getElementById('field-picker-list').addEventListener('click', e => {
 document.getElementById('new-ex-category').addEventListener('click', () => {
   openFieldPicker('Categorie', allCategories().map(c => ({ value: c.id, label: c.name })), getFieldBtnValue('new-ex-category'), value => {
     setFieldBtnValue('new-ex-category', value, categoryName(value));
+    syncTrackStrengthField(EXERCISE_INFO_FORMS.newEx);
   });
 });
 document.getElementById('new-ex-type').addEventListener('click', () => {
@@ -5926,6 +6087,7 @@ document.getElementById('btn-new-category-save').addEventListener('click', () =>
   if (findCategoryByName(newCat)) { toast('Deze categorie bestaat al'); return; }
   const cat = addCategory(newCat);
   setFieldBtnValue('new-ex-category', cat.id, cat.name);
+  syncTrackStrengthField(EXERCISE_INFO_FORMS.newEx);
   closeOverlay('new-category-overlay');
 });
 
@@ -6205,6 +6367,9 @@ function percentAtReps(reps) { return reps === 1 ? 100 : Math.round(100 / (1 + r
 // equals the shown 1RM. The percentage stays the calculated one. Via the app's one rounding
 // function, roundTo() (which also handles floating-point noise: 118,7499999… → 118,8).
 function roundOrm(weight) { return roundTo(weight, 1); }
+// The estimated 1RM exactly as the calculator shows it (Epley, rounded as above). Kracht in
+// Inzicht uses this same function, so a set there gives the calculator's number.
+function estimatedOneRm(weight, reps) { return roundOrm(epley1rm(weight, reps)); }
 
 
 // Strict parse (Dutch comma allowed); NaN for empty/garbage like "5abc".
@@ -6223,7 +6388,7 @@ function computeOneRm(weightStr, repsStr) {
   if (!isFinite(reps) || reps < 1 || !Number.isInteger(reps)) return { error: 'Reps moet een geheel getal van minimaal 1 zijn.' };
   const oneRm = epley1rm(weight, reps);
   const rows = ORM_TABLE_REPS.map(n => ({ reps: n, weight: roundOrm(weightAtReps(oneRm, n)), percent: percentAtReps(n) }));
-  return { oneRm: roundOrm(oneRm), rows };
+  return { oneRm: estimatedOneRm(weight, reps), rows };
 }
 // </1rm-pure>
 
