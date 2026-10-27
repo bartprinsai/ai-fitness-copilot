@@ -17,7 +17,7 @@ Een fitness tracker PWA (Progressive Web App) waarmee je workouts bijhoudt: sets
 2. Claude stelt verduidelijkende vragen als iets niet duidelijk is
 3. Claude schrijft een duidelijke, complete prompt voor Claude Code
 4. Bart stuurt de prompt naar Claude Code
-5. Claude Code bouwt de feature en pusht naar GitHub
+5. Claude Code bouwt de feature, voegt tests toe of werkt ze bij in `tests/`, draait `npm test` en pusht naar GitHub (zie "Tests")
 6. Bart test op zijn telefoon en rapporteert terug
 7. Als er bugs zijn: Claude schrijft een fix prompt voor Claude Code
 
@@ -65,6 +65,8 @@ ai-fitness-copilot/
 ├── manifest.json            # PWA manifest (start_url/scope: /ai-fitness-copilot/)
 ├── scripts/                  # Eenmalige admin-scripts (niet onderdeel van de live app)
 │   └── cleanup-video-fields.js
+├── tests/                    # Headless tests (niet onderdeel van de app, zie "Tests")
+├── package.json              # Alleen voor de tests: `npm test`, devDependency Playwright
 ├── icon-192.png
 └── icon-512.png
 ```
@@ -352,11 +354,25 @@ Code: `app.js`, "Inzicht: Kracht" (`insightStrengthStats()`). Vormgeving: DESIGN
 ## Deploy workflow
 ```bash
 cd C:\Users\bartp\projecten\ai-fitness-copilot
+npm test                     # alle tests moeten slagen, zie "Tests"
 git add -A
 git commit -m "Beschrijving van wijziging"
 git push origin main
 ```
 GitHub Pages deployt automatisch na elke push.
+
+---
+
+## Tests
+- **Waar**: alle tests staan in `tests/` in de repo, één bestand per onderdeel (`tests/<onderdeel>.test.js`). Nooit meer in een tijdelijke map (scratchpad): daar kan Windows ze opruimen, ze staan niet in Git en ze lopen ongemerkt uit de pas met de app.
+- **Draaien**: `npm test` (= `node tests/run-all.js`) draait alle bestanden na elkaar en geeft per bestand het aantal geslaagde en gefaalde controles, met daaronder wat faalt. Eén onderdeel: `node tests/run-all.js insight` (alle bestanden met "insight" in de naam) of `node tests/<bestand>`; `--verbose` toont elke controle. Exitcode 1 als er iets faalt of een bestand vastloopt.
+- **Eenmalig installeren**: `npm install` (Playwright, devDependency in `package.json`, versie gekoppeld aan de Chromium die Playwright gebruikt). Staat die Chromium nog niet op de pc: `npx playwright install chromium`. `node_modules/` staat in `.gitignore`.
+- **Gezamenlijke basis**: `tests/helpers.js`. Browsertests openen de echte `index.html` headless (`openApp()`), met een nagebootste Firebase en al het netwerkverkeer geblokkeerd, behalve de eigen bestanden en Google Fonts; "vandaag" staat vast op donderdag 22 oktober 2026 (`TODAY`), tenzij een test anders zegt. Data gaat er via `loadData()` in (de vorm van `db`). Opslaglogica zonder browser draait in een Node-vm met een nagebootste Firestore (`runInVm()`, `FakeStore`). Controles via `check()` / `ok()`; `run()` telt ze en meldt het resultaat aan `run-all.js`. **Tests lezen of schrijven nooit de echte Firestore en bevatten geen inloggegevens.**
+- **Uitvoer** (screenshots, logs per bestand): `tests/output/`, staat in `.gitignore`.
+- **De app merkt er niets van**: `index.html` laadt niets uit `tests/` of `node_modules/`, en `package.json` is alleen voor de tests; GitHub Pages publiceert de map `tests/` wel als losse bestanden, maar de app gebruikt ze niet.
+- **Bij elke wijziging**: voeg tests toe of werk ze bij in `tests/` (een nieuw onderdeel krijgt een eigen bestand). Gedrag dat bewust verandert, betekent ook de verwachtingen in de tests bijwerken naar het nieuwe, bedoelde gedrag.
+- **Vóór elke commit draaien alle tests.** Een falende test wordt opgelost: is de verwachting verouderd, dan wordt die bijgewerkt (en gemeld); is het een echte fout in de app, dan wordt die gemeld en niet weggepoetst in de test.
+- **Onderdelen**: Inzicht (`insight-storage`, `insight-week`, `insight-day`, `insight-sleep-weight`, `insight-training`, `insight-periods`, `insight-strength`), `sleep-clock` (24-uursklok), `clear-buttons` (Wissen in pop-ups en invulvensters, placeholders van notities), `exercise-delete` (verwijderen = verbergen, Verwijderde oefeningen, terugzetten, permanent verwijderen), `exercise-ids` (oefening-id's, migratie, hernoemen), `graph` (Grafiek, afgeleide sets, Records "via MRM"), `tracker-empty-state`, `plans` en `plan-lists` (Trainingsplannen, Kies een plan, dag laden), `plan-builder` (Plan schedule, Dag bewerken, toevoegen, slepen), `calculators` (1RM, Schijvencalculator, getalnotatie), `number-fields` (getalvelden), `typography-roles` (typografie per rol), `navigation-back` (terugknop), `confirm-popups` (bevestigingspop-ups, notitie, categorie verwijderen).
 
 ---
 

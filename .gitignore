@@ -3,3 +3,7 @@ scripts/serviceAccountKey.json
 
 # Dependencies for one-off scripts
 scripts/node_modules/
+
+# Tests (tests/): Playwright and other dev dependencies, and test output (screenshots, logs)
+node_modules/
+tests/output/
