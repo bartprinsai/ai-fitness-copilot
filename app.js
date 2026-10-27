@@ -928,6 +928,8 @@ window.addEventListener('popstate', e => {
     });
     return;
   }
+  // Inzicht: back onto the entry a zoom-in started from, on the same screen: that period again.
+  if (e.state && e.state.insight && activeScreen && activeScreen.id === targetId) insightRestoreSnapshot(e.state.insight);
   inPopstateNavigation = true;
   showScreen(targetId);
   inPopstateNavigation = false;
@@ -2058,6 +2060,23 @@ function insightOpenSubPeriod(spec) {
   insightPeriod = kind;
   if (kind === 'week') insightWeekStart = start; else insightMonthStart = start;
 }
+// Zooming in (a row of the table or of a detail list) is a step back: the period shown now is kept
+// in the current history entry, and the zoomed-in period gets an entry of its own on the same
+// screen. Back onto such an entry from that same screen puts the kept period back (see the
+// popstate handler); back from another screen keeps the shared period, as always. Browsing
+// (‹ ›, Week · Maand · Jaar) adds no entry.
+const insightSnapshot = () => ({ period: insightPeriod, week: insightWeekStart, month: insightMonthStart, year: insightYearStart });
+function insightRestoreSnapshot(s) {
+  insightPeriod = s.period; insightWeekStart = s.week; insightMonthStart = s.month; insightYearStart = s.year;
+}
+function insightZoomIn(spec, screenId) {
+  const kept = insightSnapshot();
+  runAfterPendingBack(() => {
+    history.replaceState({ ...history.state, insight: kept }, '', location.hash);
+    history.pushState({ screen: screenId }, '', '#' + screenId);
+  });
+  insightOpenSubPeriod(spec);
+}
 // The parts of a month (its ISO weeks, each clipped to the month: "Week 40") or a year (its twelve
 // months: "Januari"): { kind, start, from, to, label, axis ("40" / "jan"), future }.
 function insightSubPeriods(r) {
@@ -2440,14 +2459,14 @@ function openInsight() {
 }
 // On every screen with the period head: Week · Maand · Jaar switches period, ‹ › steps one period
 // (not past the current one); then that screen is redrawn. A row with data-insight-open (the
-// table, the Slaap / Gewicht lists) opens that week or month on the same screen.
+// table, the Slaap / Gewicht lists) zooms in: that week or month on the same screen, one step back.
 ['screen-insight', 'screen-insight-metric', 'screen-insight-training', 'screen-insight-muscle'].forEach(id => document.getElementById(id).addEventListener('click', e => {
   const p = e.target.closest('[data-insight-period]');
   const b = e.target.closest('[data-insight-step]');
   const o = e.target.closest('[data-insight-open]');
   if (p) insightSwitchPeriod(p.dataset.insightPeriod);
   else if (b && !b.disabled) insightStep(Number(b.dataset.insightStep));
-  else if (o) insightOpenSubPeriod(o.dataset.insightOpen);
+  else if (o) insightZoomIn(o.dataset.insightOpen, id);
   else return;
   SCREEN_ON_ENTER[id]();
 }));
