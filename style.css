@@ -1170,15 +1170,16 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .insight-summary-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: var(--space-2); text-align: center; }
 .insight-summary-cols .section-label { margin-bottom: var(--space-1); }
 .insight-summary-cols .insight-figure { justify-content: center; }
-.insight-summary-note { margin-top: var(--space-3); text-align: center; }
-.insight-summary-note span { white-space: nowrap; } /* "Kortste nacht: …" / "langste: …" only break at the "·" */
+.insight-summary-note { margin-top: var(--space-3); text-align: center; } /* Slaap: "Kortste nacht" and "Langste nacht" each on a line of their own */
 /* Chart: an SVG at the measured width (app.js insightChartSvg); colours from the tokens. */
 .insight-chart-card { margin-top: var(--card-gap); }
 .insight-chart-svg { display: block; }
 .insight-chart-grid { stroke: var(--border); stroke-width: 1; }
 .insight-chart-avg { stroke: var(--text-muted); stroke-width: 1; stroke-dasharray: 4 3; }
-.insight-chart-tick { font-size: var(--fs-label); font-weight: var(--fw-regular); fill: var(--text-secondary); text-anchor: end; dominant-baseline: central; }
-.insight-chart-day { font-size: var(--fs-small); font-weight: var(--fw-regular); fill: var(--text-secondary); text-anchor: middle; }
+/* Axis labels (both axes) as in the Grafiek: 11px/400 in --text-muted. */
+.insight-chart-tick, .insight-chart-day { font-size: var(--fs-label); font-weight: var(--fw-regular); fill: var(--text-muted); }
+.insight-chart-tick { text-anchor: end; dominant-baseline: central; }
+.insight-chart-day { text-anchor: middle; }
 .insight-bar { fill: var(--primary); }
 .insight-bar.is-short { fill: var(--danger); }
 /* The weight line as in the Grafiek: --primary, 2.5 wide, round joins, 4px-radius points. */
@@ -1189,6 +1190,10 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .insight-list .insight-mg-row:first-child { border-top: none; }
 .insight-list-row { width: 100%; border-left: none; border-right: none; border-bottom: none; background: none; text-align: left; font-family: inherit; color: inherit; cursor: pointer; }
 .insight-list-row:active { background: var(--bg); }
+/* Every row as high as a row with two lines (.role-row 18px + 2px + .role-sub 14px), filled in or
+   not; the value on the right sits in the middle of the row. */
+.insight-list-row { align-items: center; }
+.insight-list-row .insight-mg-main { min-height: 34px; }
 
 /* ── Slaap invullen: the 24-hour clock (#sleep-clock) ──────────────────────────────────────────
    Max. 280px wide (scales down with the panel), 0 at the top, clockwise. Ring r=116 in the 280

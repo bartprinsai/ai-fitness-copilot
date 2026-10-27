@@ -2561,15 +2561,18 @@ function insightChartSvg(width, o) {
   return svg + '</svg>';
 }
 
-// Sleep: y from 0 with gridlines every 3 hours (3 u · 6 u · 9 u), at least up to 10 hours.
+// Sleep: y from 0 with gridlines every 3 hours (3 u · 6 u · 9 u). The top label grows in steps of
+// 3 hours: 9 u while the longest night is 9:00 or shorter, else 12 u, 15 u …; the range runs an
+// hour above it, so there is always room above the highest bar.
 function insightSleepChartOptions(weekStart, s) {
   const values = [0, 1, 2, 3, 4, 5, 6].map(i => {
     const n = s.nights.find(x => x.date === addDaysToDateStr(weekStart, i));
     return n ? n.minutes : null;
   });
-  const hi = Math.max(600, Math.ceil(Math.max(...s.nights.map(n => n.minutes)) / 180) * 180 + 60);
+  const top = Math.max(540, Math.ceil(Math.max(...s.nights.map(n => n.minutes)) / 180) * 180);
+  const hi = top + 60;
   const ticks = [];
-  for (let v = 180; v < hi; v += 180) ticks.push({ v, label: `${v / 60} u` });
+  for (let v = 180; v <= top; v += 180) ticks.push({ v, label: `${v / 60} u` });
   return { type: 'bars', values, lo: 0, hi, base: 0, ticks, avg: s.avg, danger: v => v < SLEEP_SHORT_MINUTES,
     aria: `Slaap per nacht, gemiddeld ${formatDuration(s.avg)} u` };
 }
@@ -2619,7 +2622,8 @@ function insightSleepDetailHtml(weekStart) {
       { label: 'Gemiddeld', value: formatDuration(s.avg), unit: 'u' },
       { label: 'Naar bed', value: s.bedtime },
       { label: 'Opgestaan', value: s.wakeTime },
-    ], `<span>Kortste nacht: ${insightNightOf(s.shortest)}</span> · <span>langste: ${insightNightOf(s.longest)}</span>`)
+    ], `<div>Kortste nacht: ${insightNightOf(s.shortest)}</div>`
+      + (s.nights.length > 1 ? `<div>Langste nacht: ${insightNightOf(s.longest)}</div>` : ''))
     : `<div class="card insight-summary">${insightEmptyHtml('Nog geen slaap ingevuld')}</div>`;
   const list = insightDayListHtml(weekStart, date => {
     const n = getSleep(date);
