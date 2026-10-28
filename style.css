@@ -366,15 +366,16 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    a bottom sheet (popups) already sit one gutter in, so they pad by --space-2 left and
    --space-3 right; the TRACK list runs edge to edge and pads by the sums. That puts every
    column on the same x on every screen. */
-.set-row { display: grid; grid-template-columns: 22px var(--icon-list) 24px minmax(0, 1fr) 60px 56px; align-items: center; padding: var(--space-3) var(--space-3) var(--space-3) var(--space-2); border-bottom: 1px solid var(--border); }
+.set-row { display: grid; grid-template-columns: 22px var(--icon-list) 24px minmax(0, 1fr) 60px 56px; align-items: center; padding: var(--space-3) var(--space-3) var(--space-3) var(--space-2); }
 /* TRACK has no frame: each row sits --screen-gutter in from the screen edge (as wide as a card), so
    its line starts and ends 16px from the edge; inside, the normal 8/12 padding keeps every column on
    the same x as in the cards and popups. */
 #set-list .set-row { margin: 0 var(--screen-gutter); cursor: pointer; transition: background 0.08s; }
 /* No zebra: a row takes the colour of whatever it sits on (--bg in TRACK, --surface in cards and
-   popups), with a 1px --border line between rows. The last row of a list keeps its 1px border, but
-   transparent, so every row has the same height and there's no line under the list. */
-.set-row:last-child { border-bottom-color: transparent; }
+   popups); the 1px --border line between rows comes from .divided-list on the list (see DIVIDERS).
+   The last row gets a 1px transparent border at the bottom, so the list is as high as when every
+   row had a line under it (and there is no line under the list). */
+.set-row:last-child { border-bottom: 1px solid transparent; }
 #set-list .set-row:active, .set-row.selected { background: var(--primary-light); }
 .set-row.clickable { cursor: pointer; transition: background 0.08s; }
 .set-row.clickable:active { background: var(--primary-light); }
@@ -452,9 +453,8 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    overflow: hidden keeps the pressed-row background inside the rounded corners. */
 .card.list-card { padding: 0; margin: var(--card-gap) var(--screen-gutter) 0; overflow: hidden; }
 .list-card .list-row { padding-left: var(--card-padding); padding-right: var(--card-padding); }
-.list-card > :last-child { border-bottom: none; }
 
-.category-item, .exercise-item { display: flex; align-items: center; min-height: 56px; padding-top: var(--space-3); padding-bottom: var(--space-3); border-bottom: 1px solid var(--border); font-size: var(--fs-body); color: var(--text); cursor: pointer; background: transparent; transition: background 0.08s; }
+.category-item, .exercise-item { display: flex; align-items: center; min-height: 56px; padding-top: var(--space-3); padding-bottom: var(--space-3); font-size: var(--fs-body); color: var(--text); cursor: pointer; background: transparent; transition: background 0.08s; }
 .category-item:active, .exercise-item:active { background: var(--bg); }
 .category-item-name, .exercise-item-name { flex: 1; }
 .category-item-dots, .exercise-item-dots { width: var(--icon-list); height: var(--icon-list); fill: var(--text-muted); flex-shrink: 0; }
@@ -479,7 +479,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .category-item-deleted .category-item-name { color: var(--text-secondary); }
 .category-item-chevron { width: var(--icon-list); height: var(--icon-list); fill: var(--text-muted); flex-shrink: 0; }
 .deleted-ex-intro { margin: var(--screen-top) var(--screen-gutter) 0; color: var(--text-secondary); line-height: 1.5; }
-.deleted-ex-row { display: flex; align-items: center; gap: var(--space-3); min-height: 56px; padding-top: var(--space-1); padding-bottom: var(--space-1); border-bottom: 1px solid var(--border); }
+.deleted-ex-row { display: flex; align-items: center; gap: var(--space-3); min-height: 56px; padding-top: var(--space-1); padding-bottom: var(--space-1); }
 .deleted-ex-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .deleted-ex-actions { display: flex; flex-shrink: 0; margin-right: calc((var(--icon-list) - var(--control-height)) / 2); }
 .row-icon-btn { width: var(--control-height); height: var(--control-height); padding: 0; border: none; background: none; border-radius: var(--radius-pill); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: background .1s; }
@@ -637,8 +637,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    row; --card-padding left and --space-3 right, so weight and date end 12px from the card edge,
    like the RPE column. overflow: hidden keeps the pressed-row colour inside the rounded corners. */
 .records-list { flex-shrink: 0; display: flex; flex-direction: column; background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--card-shadow); overflow: hidden; }
-.records-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) var(--space-3) var(--space-3) var(--card-padding); border-bottom: 1px solid var(--border); }
-.records-row:last-child { border-bottom: none; }
+.records-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) var(--space-3) var(--space-3) var(--card-padding); }
 /* One Rep Max: its own gold card above the RM list (PR gold), dark text on gold. */
 .records-hero { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); background: var(--pr-gold); color: var(--on-gold); border-radius: var(--radius-lg); padding: var(--card-padding); box-shadow: var(--card-shadow); flex-shrink: 0; }
 .records-hero-clickable { cursor: pointer; }
@@ -657,7 +656,6 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .records-history-body { max-height: 45vh; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; }
 .records-history-body .section-label { padding-left: var(--card-padding); margin-bottom: var(--space-2); }
 .records-history-body .section-label:not(:first-child) { margin-top: calc(var(--space-2) + var(--space-3)); }
-.records-history-body .records-row:last-child, .records-history-body .records-row:has(+ .section-label) { border-bottom: none; }
 /* RM label = the set number (.set-num): Body, 700, --text. */
 .records-row-reps { font-size: var(--fs-body); font-weight: var(--fw-bold); color: var(--text); }
 .records-row-weight { display: flex; align-items: baseline; gap: var(--space-1); font-size: var(--fs-number); font-weight: var(--fw-bold); color: var(--text); }
@@ -685,8 +683,9 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 /* Section headings in Exercise Info (view and edit): the first one sits 20px under the title
    (the 16px panel gap + --space-1); every next one gets a 1px --border line with 24px above it
    (the 12px scroll gap + --space-3) and 16px (--space-4) between the line and the heading. */
-.exercise-info-scroll > .section-head:first-child { padding-top: var(--space-1); }
-.exercise-info-scroll > .section-head:not(:first-child) { margin-top: var(--space-3); padding-top: var(--space-4); border-top: 1px solid var(--border); }
+.exercise-info-scroll > * { display: flex; flex-direction: column; gap: var(--space-3); }
+.exercise-info-scroll > :first-child { padding-top: var(--space-1); }
+.exercise-info-scroll > * + * { margin-top: var(--space-3); padding-top: var(--space-4); }
 /* Ja/Nee toggle (Powerliftbank): the Partial/Forced button (.extra-type-btn, 36px, 12px text),
    exactly as wide as Partial/Forced in TRACK — a quarter of the screen minus the gutters and the
    8px gaps there: (100vw − 2 × gutter − 4 × --space-2) / 4 — left in its column and vertically
@@ -756,8 +755,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .dropdown-menu { position: fixed; inset: 0; z-index: var(--z-dropdown); display: none; }
 .dropdown-menu.open { display: block; }
 .dropdown-panel { position: absolute; background: var(--surface); border-radius: var(--radius-sm); box-shadow: var(--menu-shadow); overflow: hidden; min-width: 180px; }
-.dropdown-item { display: flex; align-items: center; min-height: var(--control-height); padding: 0 var(--space-4); font-size: var(--fs-body); color: var(--text); cursor: pointer; border-bottom: 1px solid var(--border); }
-.dropdown-item:last-child { border-bottom: none; }
+.dropdown-item { display: flex; align-items: center; min-height: var(--control-height); padding: 0 var(--space-4); font-size: var(--fs-body); color: var(--text); cursor: pointer; }
 .dropdown-item:active { background: var(--bg); }
 .dropdown-item-danger { color: var(--danger); }
 
@@ -829,7 +827,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .plan-day-chevron.expanded { transform: rotate(180deg); }
 /* Inline accordion preview (expandedPlanDayIndex) — read-only list of the day's
    exercises, indented to line up under the day name (padding + num + gap). */
-.plan-day-preview { border-top: 1px solid var(--border); padding: var(--space-3) var(--card-padding) var(--card-padding) calc(var(--card-padding) + 28px + var(--space-3)); display: flex; flex-direction: column; gap: var(--space-2); }
+.plan-day-preview { padding: var(--space-3) var(--card-padding) var(--card-padding) calc(var(--card-padding) + 28px + var(--space-3)); display: flex; flex-direction: column; gap: var(--space-2); }
 .plan-day-preview-row { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); }
 .plan-day-preview-name { font-size: var(--fs-body); color: var(--text); }
 .plan-day-preview-meta { font-size: var(--fs-small); color: var(--text-secondary); flex-shrink: 0; }
@@ -955,7 +953,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    section heading (.section-head) under a 1px --border line, 16px in from the screen edges like a
    card: 24px above the line (the previous section's 16px + --space-2), 16px between line and heading. */
 .new-ex-section { padding: var(--space-4) var(--screen-gutter); }
-.new-ex-group { margin: var(--space-2) var(--screen-gutter) 0; padding-left: 0; padding-right: 0; border-top: 1px solid var(--border); }
+.new-ex-group { margin: var(--space-2) var(--screen-gutter) 0; padding-left: 0; padding-right: 0; }
 .new-ex-section > .section-label { margin-bottom: var(--space-2); }
 .new-ex-field-row { display: flex; align-items: center; gap: var(--space-3); }
 .new-ex-add-cat-btn { width: var(--control-height); height: var(--control-height); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text-secondary); font-family: inherit; font-size: var(--fs-number); line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .1s; }
@@ -975,8 +973,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 /* Generic delete confirm: can be opened from within the (base-tier) comment-overlay. */
 #confirm-delete-overlay { z-index: var(--z-overlay-nested); }
 .field-picker-list { display: flex; flex-direction: column; max-height: 60vh; overflow-y: auto; }
-.field-picker-row { display: flex; align-items: center; gap: var(--space-3); min-height: var(--control-height); padding: var(--space-2) var(--space-1); border-bottom: 1px solid var(--border); cursor: pointer; background: var(--surface); transition: background .08s; }
-.field-picker-row:last-child { border-bottom: none; }
+.field-picker-row { display: flex; align-items: center; gap: var(--space-3); min-height: var(--control-height); padding: var(--space-2) var(--space-1); cursor: pointer; background: var(--surface); transition: background .08s; }
 .field-picker-row.selected { background: var(--primary-light); }
 .field-picker-row:active { background: var(--bg); }
 .field-picker-radio { width: 20px; height: 20px; border-radius: var(--radius-pill); border: 2px solid var(--border); flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
@@ -987,7 +984,6 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 /* Grouped list: a Label heading above each group; no line under the last row of a group. */
 .field-picker-group-label { padding: var(--space-4) var(--space-1) var(--space-2); }
 .field-picker-group-label:first-child { padding-top: 0; }
-.field-picker-row:has(+ .field-picker-group-label) { border-bottom: none; }
 /* Multiple choice: a checkbox where the single-choice list has its radio, same size and border, but
    square (--radius-xs) so it never reads as a radio; ticked = --primary filled with a white check. */
 .field-picker-check { width: 20px; height: 20px; border-radius: var(--radius-xs); border: 2px solid var(--border); flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
@@ -1022,8 +1018,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .plate-list-header-name { text-align: left; }
 /* Lines run to the card edge: the card has no side padding, the rows carry --card-padding. */
 .plate-list { display: flex; flex-direction: column; background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--card-shadow); overflow: hidden; }
-.plate-row { display: grid; grid-template-columns: 1fr 100px 100px; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--card-padding); border-bottom: 1px solid var(--border); }
-.plate-row:last-child { border-bottom: none; }
+.plate-row { display: grid; grid-template-columns: 1fr 100px 100px; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--card-padding); }
 .plate-row-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .plate-row-name { font-size: var(--fs-body); font-weight: var(--fw-medium); color: var(--text); }
 .plate-row-meta { font-size: var(--fs-small); color: var(--text-secondary); white-space: nowrap; }
@@ -1060,8 +1055,8 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .orm-pct-box { gap: 0; }
 /* The row for the reps you entered: --primary-light over the full card width. */
 .orm-table-row-own { background: var(--primary-light); }
-/* No zebra: rows on the card's --surface, 1px --border line between them (none under the head). */
-.orm-table-row + .orm-table-row { border-top: 1px solid var(--border); }
+/* No zebra: rows on the card's --surface; the line between them comes from .divided-list on
+   #orm-table-body (the head sits outside it, so there is no line under the head). */
 .orm-table-head { background: var(--primary); color: var(--on-primary); font-size: var(--fs-label); font-weight: var(--fw-medium); text-transform: uppercase; letter-spacing: var(--ls-label); }
 
 /* Warm-up Calculator */
@@ -1070,9 +1065,9 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 
 /* ══ DAY RECAP POPUP ════════════════════════════════════ */
 .recap-body { max-height: 60vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-.recap-ex { padding: var(--space-3) 0; border-bottom: 1px solid var(--border); }
+.recap-ex { padding: var(--space-3) 0; }
 .recap-ex:first-child { padding-top: 0; }
-.recap-ex:last-child { border-bottom: none; padding-bottom: 0; }
+.recap-ex:last-child { padding-bottom: 0; }
 .recap-ex-name { font-size: var(--fs-heading); font-weight: var(--fw-medium); color: var(--text); margin-bottom: var(--space-1); }
 .recap-line { display: flex; align-items: baseline; gap: var(--space-2); font-size: var(--fs-small); color: var(--text-secondary); line-height: 1.45; }
 .recap-icon { width: 14px; flex-shrink: 0; text-align: center; font-weight: var(--fw-bold); }
@@ -1144,13 +1139,13 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    columns comes from the cells' padding. Every row is a button of at least 48px (a part still to
    come is a grey div); a line above every row, also under the column heads, none under the last. */
 .insight-table { display: grid; grid-template-columns: var(--card-padding) auto repeat(4, minmax(0, 1fr)) var(--card-padding); }
-.insight-table-row { display: grid; grid-template-columns: subgrid; grid-column: 1 / -1; align-items: center; min-height: var(--control-height); padding: 0; border: none; border-top: 1px solid var(--border); background: none; font-family: inherit; color: var(--text); text-align: center; white-space: nowrap; }
+.insight-table-row { display: grid; grid-template-columns: subgrid; grid-column: 1 / -1; align-items: center; min-height: var(--control-height); padding: 0; border: none; background: none; font-family: inherit; color: var(--text); text-align: center; white-space: nowrap; }
 .insight-table-cell { padding: 0 var(--space-1); }
 .insight-table-row > :first-child { grid-column-start: 2; padding-left: 0; text-align: left; }
 .insight-table-row > :last-child { padding-right: 0; }
 button.insight-table-row { width: 100%; cursor: pointer; }
 button.insight-table-row:active { background: var(--bg); }
-.insight-table-head { min-height: 0; padding-top: var(--space-3); padding-bottom: var(--space-3); border-top: none; color: var(--text-secondary); }
+.insight-table-head { min-height: 0; padding-top: var(--space-3); padding-bottom: var(--space-3); color: var(--text-secondary); }
 .insight-table-row.is-future, .insight-table-cell.insight-dash { color: var(--text-muted); }
 /* Per dag: every cell of a day up to today carries data-date, so its whole column opens the day
    overview; pressed, the whole column takes --bg (the pressed row/card colour). */
@@ -1168,7 +1163,7 @@ button.insight-table-row:active { background: var(--bg); }
 .insight-day-card { padding: 0; overflow: hidden; }
 .insight-day-head { padding: var(--card-padding); }
 .insight-day-head .role-sub, .insight-mg-main .role-sub, .overlay-head .role-sub, .insight-empty + .role-sub { margin-top: 2px; }
-.insight-mg-row { display: flex; align-items: baseline; gap: var(--space-3); padding: var(--space-3) var(--card-padding); border-top: 1px solid var(--border); }
+.insight-mg-row { display: flex; align-items: baseline; gap: var(--space-3); padding: var(--space-3) var(--card-padding); }
 .insight-mg-main { flex: 1; min-width: 0; }
 .insight-mg-figure { flex-shrink: 0; text-align: right; }
 .insight-mg-figure .insight-figure { justify-content: flex-end; }
@@ -1212,8 +1207,7 @@ button.insight-table-row:active { background: var(--bg); }
 /* A Klein line under a chart: the legend, or a note ("Pas één week getraind"). */
 .insight-chart-legend, .insight-chart-note { margin-top: var(--space-2); text-align: center; }
 /* List: a button per day, the day overview's .insight-mg-row; a line between rows, none above the first. */
-.insight-list .insight-mg-row:first-child { border-top: none; }
-.insight-list-row { width: 100%; border-left: none; border-right: none; border-bottom: none; background: none; text-align: left; font-family: inherit; color: inherit; cursor: pointer; }
+.insight-list-row { width: 100%; border: none; background: none; text-align: left; font-family: inherit; color: inherit; cursor: pointer; }
 .insight-list-row:active { background: var(--bg); }
 /* Every row of a list as high as a row with two lines (.role-row 18px + 2px + .role-sub 14px), with
    or without a value or Klein line; the value on the right sits in the middle of the row. Also the
@@ -1258,7 +1252,6 @@ button.insight-table-row:active { background: var(--bg); }
    the change (or "Geen vergelijking") right-aligned with "1 record" under it. The chevron sits top
    right in the head (insightCardHtml, `rows`). */
 .insight-strength-row { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) 0; }
-.insight-strength-row + .insight-strength-row, .insight-strength-note { border-top: 1px solid var(--border); }
 .insight-strength-row .insight-mg-main, .insight-strength-row .insight-mg-figure { min-height: 40px; display: flex; flex-direction: column; justify-content: center; }
 .insight-strength-row .insight-mg-figure { align-items: flex-end; }
 .insight-strength-row .insight-mg-figure > * + .role-sub { margin-top: 2px; }
@@ -1273,7 +1266,7 @@ button.insight-table-row:active { background: var(--bg); }
 .insight-strength-chart { margin-top: var(--space-3); }
 /* Sterkst / Zwakst under the chart, after a line within the card padding: 16px from the card edges
    (see DIVIDERS). */
-.insight-extremes { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--border); }
+.insight-extremes { margin-top: var(--space-3); padding-top: var(--space-3); }
 .insight-extremes .role-sub + .role-sub { margin-top: 2px; }
 .insight-extreme-label { font-weight: var(--fw-medium); color: var(--text); }
 
@@ -1334,31 +1327,31 @@ button.insight-table-row:active { background: var(--bg); }
 .role-title, .role-row { color: var(--text); }
 .role-sub { color: var(--text-secondary); }
 
-/* ══ DIVIDERS ═══════════════════════════════════════════
-   One rule for every grey line between rows or sections (1px --border): 16px from the edges — of the
-   card or menu it sits in, or of the screen (in a popup or sheet: of the screen, the panel's own
-   --screen-gutter padding) when there is no frame. No line above the first row or under the last.
-   - A line that sits within the padding of its card, sheet or screen (the Kracht card, Sterkst/Zwakst,
-     the TRACK list, the popups, the field picker, Nieuwe oefening) is a plain border: it already
-     starts and ends 16px from the edge.
-   - A row that runs from edge to edge of its card (so its pressed / selected background and its tap
-     area do too) keeps its own 1px border — and so its height and its background under the border —
-     but the line drawn in that border is inset by --card-padding at both ends (border-image: a
-     gradient that is transparent for the first and the last 16px). Rows that stretch from edge to
-     edge are listed here; a new list in a card adds its row here.
+/* ══ DIVIDERS: .divided-list ═════════════════════════════
+   The base class for every list with grey lines between its rows, and the only place in the app
+   that draws such a line (a deliberate addition to the base classes). Put it on the container that
+   holds the rows; every row after the first gets a 1px --border line on top, so there is no line
+   above the first row and none under the last. With .divided-list-under the line sits at the bottom
+   of every row but the last instead: the same lines on the same y, but the 1px belongs to the row
+   above it — for lists whose rows have a min-height (box-sizing: border-box, so the line counts in
+   that height), where the side of the line decides where the content sits. The line stands 16px from
+   the edges:
+   - a list whose rows run from edge to edge of a card or menu (the default): the line is inset by
+     --card-padding at both ends — the rows keep their full width, background, height and tap area,
+     only the line in their top border is shorter (border-image: a gradient that is transparent for
+     the first and the last 16px);
+   - a list that already sits 16px from the edge — in a pop-up or sheet (the panel's own padding),
+     in a card with padding, or in the screen gutter (Loggen, Nieuwe oefening) — runs the line over
+     the full width of its rows (--divider-inset 0).
+   A .section-label in the list starts a group: no line above or under it, and none on the row
+   before it.
+   Never a line of its own on a row: tests/dividers.test.js fails on any grey line outside this rule.
    Not under this rule: the 2px --primary line under the name of an exercise (day overview) or a date
    (History), which belongs to the card head and runs from edge to edge; a full-width row background;
    chart grid lines, the underline of a tab bar and the border of an input or control. */
-.exercise-card .set-row, .history-card .set-row,
-.records-list .records-row,
-.list-card > .list-row,
-.dropdown-item,
-.plan-day-preview,
-.plate-row,
-.orm-table-row,
-.insight-table-row,
-.insight-day-card > .insight-mg-row {
-  border-image: linear-gradient(to right, transparent var(--card-padding), var(--border) var(--card-padding), var(--border) calc(100% - var(--card-padding)), transparent calc(100% - var(--card-padding))) 1 0;
-}
-/* The last set row keeps a transparent 1px border (same height for every row): no line there. */
-.exercise-card .set-row:last-child, .history-card .set-row:last-child { border-image: none; }
+.divided-list { --divider-inset: var(--card-padding); }
+.overlay-panel .divided-list, .card .divided-list, #set-list.divided-list, .new-ex-scroll.divided-list { --divider-inset: 0px; }
+.divided-list:not(.divided-list-under) > * + * { border-top: 1px solid var(--border); border-image: linear-gradient(to right, transparent var(--divider-inset), var(--border) var(--divider-inset), var(--border) calc(100% - var(--divider-inset)), transparent calc(100% - var(--divider-inset))) 1 0; }
+.divided-list-under > :not(:last-child) { border-bottom: 1px solid var(--border); border-image: linear-gradient(to right, transparent var(--divider-inset), var(--border) var(--divider-inset), var(--border) calc(100% - var(--divider-inset)), transparent calc(100% - var(--divider-inset))) 1 0; }
+.divided-list > .section-label, .divided-list:not(.divided-list-under) > .section-label + *, .divided-list-under > :has(+ .section-label) { border-top: none; border-bottom: none; border-image: none; }
+/* ══ end of DIVIDERS */

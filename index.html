@@ -321,7 +321,8 @@
       </button>
     </div>
   </div>
-  <div class="new-ex-scroll">
+  <div class="new-ex-scroll divided-list">
+    <div>
     <div class="new-ex-section">
       <div class="section-label">Naam</div>
       <input type="text" id="new-ex-name" class="new-ex-input" placeholder="Naam oefening" autocomplete="off" autocorrect="off"/>
@@ -336,6 +337,7 @@
     <div class="new-ex-section">
       <div class="section-label">Type</div>
       <button type="button" class="new-ex-select new-ex-select-btn" id="new-ex-type"></button>
+    </div>
     </div>
     <div class="new-ex-section new-ex-group">
       <div class="section-label section-head">Spiergroep</div>
@@ -359,7 +361,7 @@
 <div class="overlay" id="field-picker-overlay">
   <div class="overlay-panel">
     <h3 class="field-picker-title" id="field-picker-title"></h3>
-    <div class="field-picker-list" id="field-picker-list"></div>
+    <div class="field-picker-list divided-list divided-list-under" id="field-picker-list"></div>
     <div class="overlay-btns hidden" id="field-picker-btns">
       <button class="btn btn-primary" id="btn-field-picker-done">Klaar</button>
     </div>
@@ -443,7 +445,7 @@
       <button class="btn btn-success" id="btn-save-set">Opslaan</button>
       <button class="btn btn-primary" id="btn-clear">Wissen</button>
     </div>
-    <div class="set-list" id="set-list"></div>
+    <div class="set-list divided-list divided-list-under" id="set-list"></div>
   </div>
 
   <div class="tab-content" id="tab-history">
@@ -824,7 +826,7 @@
         <div class="plate-list-header-col">Beschikbaar<div class="label-unit">(totaal)</div></div>
         <div class="plate-list-header-col">Op stang<div class="label-unit">(per kant)</div></div>
       </div>
-      <div class="plate-list" id="plate-list"></div>
+      <div class="plate-list divided-list divided-list-under" id="plate-list"></div>
     </div>
     <div class="plate-actions-row">
       <button type="button" class="btn btn-secondary btn-multiline" id="btn-plate-reset">Voorraad<br>resetten</button>
@@ -874,7 +876,7 @@
     <div class="plate-section hidden" id="orm-table-section">
       <div class="orm-table-card">
         <div class="orm-table-row orm-table-head"><div>% van 1RM</div><div>Gewicht</div><div>Reps</div></div>
-        <div id="orm-table-body"></div>
+        <div id="orm-table-body" class="divided-list"></div>
       </div>
     </div>
   </div>
@@ -1029,7 +1031,7 @@
       </button>
     </div>
     <div class="section-label insight-label">Training</div>
-    <div class="card insight-day-card" id="insight-day-training"></div>
+    <div class="card insight-day-card divided-list" id="insight-day-training"></div>
     <div class="section-label insight-label">Voeding</div>
     <div class="card"><div class="role-row insight-empty">Nog geen voedingsschema</div></div>
     <div class="section-label insight-label">Slaap</div>
@@ -1137,7 +1139,7 @@
 <div class="overlay" id="records-history-overlay">
   <div class="overlay-panel">
     <h3 id="records-history-title"></h3>
-    <div class="records-history-body" id="records-history-body"></div>
+    <div class="records-history-body divided-list divided-list-under" id="records-history-body"></div>
     <div class="overlay-btns">
       <button class="btn btn-secondary" id="btn-records-history-graph">Grafiek</button>
       <button class="btn btn-primary" id="btn-records-history-ok">Sluiten</button>
@@ -1180,7 +1182,7 @@
   </div>
   <div class="records-scroll" id="records-scroll">
     <div class="records-hero" id="records-hero"></div>
-    <div class="records-list" id="records-list"></div>
+    <div class="records-list divided-list divided-list-under" id="records-list"></div>
   </div>
 </div>
 
@@ -1189,7 +1191,7 @@
   <div class="overlay-panel">
     <div id="exercise-info-view-mode">
       <h3 id="exercise-info-view-title"></h3>
-      <div class="exercise-info-scroll" id="exercise-info-view-content"></div>
+      <div class="exercise-info-scroll divided-list" id="exercise-info-view-content"></div>
       <div class="overlay-btns">
         <button class="btn btn-secondary" id="btn-exercise-info-close">Sluiten</button>
         <button class="btn btn-primary" id="btn-exercise-info-edit">Bewerken</button>
@@ -1197,13 +1199,19 @@
     </div>
     <div id="exercise-info-edit-mode" class="hidden">
       <h3 id="exercise-info-edit-title"></h3>
-      <div class="exercise-info-scroll">
-        <div class="section-label section-head">Spiergroep</div>
-        <div class="info-two-col" id="info-muscle-fields"></div>
-        <div class="section-label section-head" id="info-insight-head">Inzicht</div>
-        <div class="info-fields-group" id="info-insight-fields"></div>
-        <div class="section-label section-head">Apparatuur</div>
-        <div class="info-fields-group" id="info-equipment-fields"></div>
+      <div class="exercise-info-scroll divided-list">
+        <div>
+          <div class="section-label section-head">Spiergroep</div>
+          <div class="info-two-col" id="info-muscle-fields"></div>
+        </div>
+        <div id="info-insight-head">
+          <div class="section-label section-head">Inzicht</div>
+          <div class="info-fields-group" id="info-insight-fields"></div>
+        </div>
+        <div>
+          <div class="section-label section-head">Apparatuur</div>
+          <div class="info-fields-group" id="info-equipment-fields"></div>
+        </div>
       </div>
       <div class="overlay-btns">
         <button class="btn btn-secondary" id="btn-exercise-info-cancel">Annuleren</button>
@@ -1363,7 +1371,7 @@
 
 <!-- OVERFLOW DROPDOWN MENU -->
 <div class="dropdown-menu" id="overflow-menu">
-  <div class="dropdown-panel" id="overflow-panel"></div>
+  <div class="dropdown-panel divided-list divided-list-under" id="overflow-panel"></div>
 </div>
 
 <!-- TOAST -->
@@ -1435,7 +1443,7 @@
   <div class="overlay-panel">
     <h3 id="recap-title">Samenvatting</h3>
     <div class="pill pill-pr recap-prs hidden" id="recap-prs"></div>
-    <div class="recap-body" id="recap-body"></div>
+    <div class="recap-body divided-list divided-list-under" id="recap-body"></div>
     <div class="overlay-btns">
       <button class="btn btn-primary" id="btn-recap-close">Sluiten</button>
     </div>

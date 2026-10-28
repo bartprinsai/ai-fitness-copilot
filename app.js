@@ -1271,7 +1271,7 @@ function renderHome() {
     card.appendChild(Object.assign(document.createElement('div'), { className: 'exercise-card-divider' }));
 
     const setsDiv = document.createElement('div');
-    setsDiv.className = 'exercise-card-sets';
+    setsDiv.className = 'exercise-card-sets divided-list divided-list-under';
     if (sets.length === 0) {
       // Loaded from a plan day: show the plan's sets/reps until the first set is logged.
       setsDiv.innerHTML = `<div class="exercise-card-empty">${ex.target ? 'Plan: ' + formatExerciseSetsReps(ex.target) : 'Geen sets'}</div>`;
@@ -2466,7 +2466,7 @@ function renderInsight() {
   document.getElementById('insight-schema').textContent = insightScheduleText(days, r.period);
   document.getElementById('insight-days-label').textContent = r.period === 'week' ? 'Per dag' : r.period === 'month' ? 'Per week' : 'Per maand';
   const grid = document.getElementById('insight-days');
-  grid.className = r.period === 'week' ? 'card insight-days' : 'card insight-days insight-day-card insight-table';
+  grid.className = r.period === 'week' ? 'card insight-days' : 'card insight-days insight-day-card insight-table divided-list';
   grid.innerHTML = r.period === 'week' ? insightDaysGridHtml(days) : insightPeriodTableHtml(r);
   const strength = insightStrengthStats(r);
   document.getElementById('insight-cards').innerHTML =
@@ -2865,7 +2865,7 @@ function insightDayListHtml(weekStart, rowFor) {
       + (r ? (r.sub ? `<div class="role-sub">${r.sub}</div>` : '') : '<div class="role-sub insight-muted">Niet ingevuld</div>')
       + `</div>${r ? `<div class="insight-mg-figure">${r.figure}</div>` : ''}</button>`;
   });
-  return `<div class="card insight-day-card insight-list">${rows.join('')}</div>`;
+  return `<div class="card insight-day-card insight-list divided-list">${rows.join('')}</div>`;
 }
 // Maand / Jaar: a row per week / month up to the current one (none still to come), the same rows
 // as the list per day; a tap opens that week / month on this screen (data-insight-open).
@@ -2877,7 +2877,7 @@ function insightSubListHtml(r, rowFor) {
       + (v ? (v.sub ? `<div class="role-sub">${v.sub}</div>` : '') : '<div class="role-sub insight-muted">Niet ingevuld</div>')
       + `</div>${v ? `<div class="insight-mg-figure">${v.figure}</div>` : ''}</button>`;
   });
-  return `<div class="card insight-day-card insight-list">${rows.join('')}</div>`;
+  return `<div class="card insight-day-card insight-list divided-list">${rows.join('')}</div>`;
 }
 const insightSleepFigureHtml = min =>
   `<div class="insight-figure"><span class="set-val${min < SLEEP_SHORT_MINUTES ? ' insight-danger' : ''}">${formatDuration(min)}</span><span class="set-unit">u</span></div>`;
@@ -3062,7 +3062,7 @@ function renderInsightTraining() {
     + '<div class="insight-label insight-label-row"><span class="section-label">Per spiergroep</span>'
     + '<span class="t-small insight-legend"><span class="insight-legend-item"><span class="insight-dot insight-dot-done"></span>Gedaan</span>'
     + '<span class="insight-legend-item"><span class="insight-dot insight-dot-planned"></span>Schema</span></span></div>'
-    + `<div class="card insight-day-card insight-list insight-mg-list">${list}</div>`;
+    + `<div class="card insight-day-card insight-list insight-mg-list divided-list">${list}</div>`;
 }
 document.getElementById('btn-back-insight-training').addEventListener('click', () => goBack('screen-insight'));
 document.getElementById('insight-training-body').addEventListener('click', e => {
@@ -3076,7 +3076,7 @@ function insightListRowHtml(mainHtml, figureHtml) {
     + (figureHtml ? `<div class="insight-mg-figure">${figureHtml}</div>` : '') + '</div>';
 }
 const insightSetsFigureHtml = n => insightFigureHtml(formatCount(n), n === 1 ? 'set' : 'sets');
-const insightListCardHtml = rows => `<div class="card insight-day-card insight-list">${rows.join('')}</div>`;
+const insightListCardHtml = rows => `<div class="card insight-day-card insight-list divided-list">${rows.join('')}</div>`;
 
 function renderInsightMuscle() {
   const range = insightRange();
@@ -3203,12 +3203,12 @@ const insightNoCompareHtml = '<div class="role-sub insight-muted">Geen vergelijk
 // what it is compared with.
 function insightStrengthCardHtml(s) {
   if (!s.exercises.length) return insightEmptyHtml(INSIGHT_STRENGTH_EMPTY);
-  return s.categories.map(c => {
+  return '<div class="divided-list">' + s.categories.map(c => {
     const p = c.pct === null ? null : insightStrengthPct(c.pct);
     return `<div class="insight-strength-row"><div class="insight-mg-main"><div class="role-row">${c.name}</div></div>`
       + `<div class="insight-mg-figure">${p ? insightPctHtml(p.text, p.cls) : insightNoCompareHtml}`
       + (c.records ? `<div class="role-sub">${insightRecordsText(c.records)}</div>` : '') + '</div></div>';
-  }).join('') + `<div class="role-sub insight-strength-note">Gemiddelde verandering van de geschatte 1RM t.o.v. ${insightPeriodName(s.prev)}</div>`;
+  }).join('') + `<div class="role-sub insight-strength-note">Gemiddelde verandering van de geschatte 1RM t.o.v. ${insightPeriodName(s.prev)}</div></div>`;
 }
 // "🏆 2 records" on the right of the card's label; nothing at 0.
 function insightStrengthAsideHtml(s) {
@@ -3372,12 +3372,13 @@ function renderInsightCategory() {
       const x = insightExtremes(series);
       extremes = `<div class="insight-extremes">${insightExtremeHtml('Sterkst', x.strongest)}${insightExtremeHtml('Zwakst', x.weakest)}</div>`;
     }
+    const chart = insightStrengthChartHtml(`insight-category-chart-${e.id}`, insightPctChartOptions(insightCategoryLine([series.map(p => p && p.value)]), labels, `${name}, verandering`),
+      count, `Pas één ${insightStrengthUnit(r)} getraind`);
     return `<div class="card insight-strength-card" data-insight-exercise-card="${e.id}">`
       + `<div class="insight-strength-card-head"><div class="insight-mg-main"><div class="role-row">${e.records ? prTrophySvg('insight-pr') : ''}${name}</div>${vs}</div>`
       + `<div class="insight-mg-figure">${figure}</div></div>`
-      + insightStrengthChartHtml(`insight-category-chart-${e.id}`, insightPctChartOptions(insightCategoryLine([series.map(p => p && p.value)]), labels, `${name}, verandering`),
-        count, `Pas één ${insightStrengthUnit(r)} getraind`)
-      + extremes + '</div>';
+      // With Sterkst/Zwakst: the chart and those two in one .divided-list, for the line between them.
+      + (extremes ? '<div class="divided-list">' + chart + extremes + '</div>' : chart) + '</div>';
   }).join('') + '</div>';
   drawInsightCharts();
 }
@@ -3800,7 +3801,7 @@ function exerciseListCard() {
   const list = document.getElementById('exercise-list');
   list.innerHTML = '';
   const card = document.createElement('div');
-  card.className = 'card list-card';
+  card.className = 'card list-card divided-list divided-list-under';
   list.appendChild(card);
   return card;
 }
@@ -3846,7 +3847,7 @@ function renderCategoryBrowser() {
   const deletedCount = deletedExercises().length;
   if (deletedCount > 0 && exerciseScreenMode !== 'plan-add') {
     const card = document.createElement('div');
-    card.className = 'card list-card';
+    card.className = 'card list-card divided-list divided-list-under';
     card.innerHTML = `
       <div class="category-item category-item-deleted list-row" id="exercises-deleted-row">
         <span class="category-item-name">Verwijderde oefeningen (${deletedCount})</span>
@@ -4530,13 +4531,13 @@ function renderExerciseInfoView() {
   const secondary = sortMuscleGroupIds(info.secondaryMuscleGroups || []).map(muscleGroupName);
   const notSet = '<span class="info-view-stat-value info-view-stat-empty">Niet ingesteld</span>';
   const value = v => `<span class="info-view-stat-value">${v}</span>`;
-  sections.push(`<div class="section-label section-head">Spiergroep</div><div class="info-two-col">
+  sections.push(`<div><div class="section-label section-head">Spiergroep</div><div class="info-two-col">
       <div class="info-view-stat"><span class="section-label">Primair</span>${primary ? value(primary) : notSet}</div>
       <div class="info-view-stat"><span class="section-label">Secundair</span>${secondary.length ? secondary.map(value).join('') : notSet}</div>
-    </div>`);
+    </div></div>`);
   // Inzicht only when Kracht volgen is on, like an empty equipment field.
   if (isStrengthTracked(currentExerciseId) && EXERCISE_INFO_FORMS.overlay.category() !== 'cardio') {
-    sections.push(`<div class="section-label section-head">Inzicht</div><div class="info-view-stat"><span class="section-label">Kracht volgen</span>${value('Ja')}</div>`);
+    sections.push(`<div><div class="section-label section-head">Inzicht</div><div class="info-view-stat"><span class="section-label">Kracht volgen</span>${value('Ja')}</div></div>`);
   }
   let equipHtml = '';
   EXERCISE_INFO_EQUIPMENT_PAIRS.forEach(pair => {
@@ -4551,7 +4552,7 @@ function renderExerciseInfoView() {
     if (!equipmentFieldIsFilled(f, info)) return;
     equipHtml += `<div class="info-view-stat"><span class="section-label">${labelHtml(f.label)}</span><span class="info-view-stat-value">${equipmentFieldViewValue(f, info)}</span></div>`;
   });
-  if (equipHtml) sections.push('<div class="section-label section-head">Apparatuur</div>' + equipHtml);
+  if (equipHtml) sections.push('<div><div class="section-label section-head">Apparatuur</div>' + equipHtml + '</div>');
   document.getElementById('exercise-info-view-content').innerHTML = sections.join('');
   document.getElementById('exercise-info-view-mode').classList.remove('hidden');
   document.getElementById('exercise-info-edit-mode').classList.add('hidden');
@@ -5090,7 +5091,7 @@ function renderHistoryTab() {
     card.appendChild(header);
     card.appendChild(Object.assign(document.createElement('div'), { className: 'history-card-divider' }));
     const setsDiv = document.createElement('div');
-    setsDiv.className = 'history-card-sets';
+    setsDiv.className = 'history-card-sets divided-list divided-list-under';
 
     ex.sets.forEach((s, i) => {
       const isPR = firstPRKeys.has(date + '#' + i);
@@ -5150,13 +5151,14 @@ function openHistoryGotoDaySets(dateStr, markReps, markVal, underOverlayId) {
   nameEl.className = 'cal-detail-ex-name';
   nameEl.textContent = exerciseName(currentExerciseId);
   body.appendChild(nameEl);
+  const list = body.appendChild(Object.assign(document.createElement('div'), { className: 'divided-list divided-list-under' }));
   const sets = (ex && ex.sets) || [];
   sets.forEach((s, i) => {
     const isMarked = countsForRecords(sets, i) && parseInt(s.reps) === markReps && (parseFloat(s.weight) || 0) === markVal;
     const row = document.createElement('div');
     row.className = setRowClass(sets, i) + (isMarked ? ' graph-goto-set-point' : '');
     row.innerHTML = setRowInnerHtml(sets, i, { comment: 'none' });
-    body.appendChild(row);
+    list.appendChild(row);
   });
   openHistoryGoto(formatDateStr(dateStr), () => {
     currentDate = dateStr;
@@ -5779,13 +5781,14 @@ function openWorkoutDetail(dateStr) {
     nameEl.className = 'cal-detail-ex-name';
     nameEl.textContent = exerciseName(ex.exerciseId);
     exEl.appendChild(nameEl);
+    const list = exEl.appendChild(Object.assign(document.createElement('div'), { className: 'divided-list divided-list-under' }));
 
     ex.sets.forEach((s, i) => {
       const isPR = firstPRKeys.has(dateStr + '#' + i);
       const row = document.createElement('div');
       row.className = setRowClass(ex.sets, i);
       row.innerHTML = setRowInnerHtml(ex.sets, i, { comment: 'none', isPR });
-      exEl.appendChild(row);
+      list.appendChild(row);
     });
 
     body.appendChild(exEl);
@@ -6094,7 +6097,7 @@ function renderDeletedExercises() {
   intro.textContent = 'Je trainingsgeschiedenis van deze oefeningen is bewaard. Zet een oefening terug om hem weer in je lijsten te zien.';
   list.appendChild(intro);
   const card = document.createElement('div');
-  card.className = 'card list-card';
+  card.className = 'card list-card divided-list divided-list-under';
   items.forEach(ex => {
     const builtin = isBuiltinExerciseId(ex.id);
     const row = document.createElement('div');
@@ -7586,7 +7589,7 @@ function buildPlanDayCard(day, idx) {
   const subText = planDaySubText(day);
   const expanded = expandedPlanDayIndex === idx;
   const card = document.createElement('div');
-  card.className = 'plan-day-card';
+  card.className = 'plan-day-card divided-list';
   card.innerHTML = `
     <div class="plan-day-head">
       <div class="plan-day-num">${idx + 1}</div>
