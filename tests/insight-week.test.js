@@ -141,11 +141,11 @@ H.run(async () => {
   check('A/B slaap-rij', s.rows[3], ['Slaap', '7:10', '5:50!', '7:15', '–', '–', '–', '–']);
   check('A/B gewicht-rij', s.rows[4], ['Gewicht', '98,4', '–', '98,8', '–', '–', '–', '–']);
   check('A/B voeding-rij', s.rows[2], ['Voeding', '–', '–', '–', '–', '–', '–', '–']);
-  check('A/B training-kaart vóór set op do', s.cards[0], 'TRAINING | 9 van 17 sets uit je schema | 1 van 2 trainingen · −8 · +4 extra');
+  check('A/B training-kaart vóór set op do', s.cards[0], 'TRAINING | 9 van 17 sets uit je schema · −8 · +4 extra | 1 van 2 trainingen');
   const thu = await page.evaluate(() => { db.workouts['2026-10-22'] = [{ exerciseId: 'squat', sets: [{ weight: 100, reps: 5 }] }]; renderInsight();
     const c = document.querySelector('.insight-card'); const r = [...(c.querySelector('.insight-edit-main') || c).children].map(ch => ch.classList.contains('insight-figure') ? [...ch.children].map(x => x.textContent).join(' ') : ch.innerText).join(' | ');
     delete db.workouts['2026-10-22']; renderInsight(); return r; });
-  check('A/B training-kaart na set op do', thu, 'TRAINING | 10 van 22 sets uit je schema | 2 van 3 trainingen · −12 · +4 extra');
+  check('A/B training-kaart na set op do', thu, 'TRAINING | 10 van 22 sets uit je schema · −12 · +4 extra | 2 van 3 trainingen');
   check('voeding-kaart', s.cards[1], 'VOEDING | Nog geen voedingsschema');
   check('A/B slaap-kaart', s.cards[2], 'SLAAP | 6:45 u gemiddeld | Kortste nacht: dinsdag, 5:50 u');
   check('A/B gewicht-kaart', s.cards[3], 'GEWICHT | 98,6 kg gemiddeld | −0,3 kg t.o.v. week 42');
@@ -182,7 +182,7 @@ H.run(async () => {
   check('wissel schema', s.schema, 'Schema: Push Pull Legs, vanaf donderdag Upper Lower');
   check('wissel stippellijn bij do', s.switches, [4]);
   check('wissel training-rij', s.rows[1], ['Training', '✓', '–', '○', '✓', '–', '○', '–']);
-  check('wissel training-kaart', s.cards[0], 'TRAINING | 11 van 25 sets uit je schema | 2 van 4 trainingen · −14');
+  check('wissel training-kaart', s.cards[0], 'TRAINING | 11 van 25 sets uit je schema · −14 | 2 van 4 trainingen');
   const line = await page.evaluate(() => {
     const g = document.querySelector('.insight-grid').getBoundingClientRect();
     const ls = [...document.querySelectorAll('.insight-switch')]; const cs = getComputedStyle(ls[0]);
@@ -220,7 +220,19 @@ H.run(async () => {
   check('doorlopend kaart', s.cards[0], 'TRAINING | 3 sets | 1 training · geen vergelijking met schema');
   await setup(page, 'manySets');
   s = await readScreen(page);
-  check('duizendtallen kaart', s.cards[0], 'TRAINING | 1.100 van 1.250 sets uit je schema | 1 van 1 training · −150 · +1.001 extra');
+  check('duizendtallen kaart', s.cards[0], 'TRAINING | 1.100 van 1.250 sets uit je schema · −150 · +1.001 extra | 1 van 1 training');
+  // Te lang voor één regel op 360px: de zin loopt door naar een volgende regel, die links onder het getal begint
+  const flow = await page.evaluate(() => {
+    const fig = document.querySelector('[data-insight-metric="training"] .insight-figure'), val = fig.querySelector('.set-val'), unit = fig.querySelector('.set-unit');
+    const lines = [...unit.getClientRects()];
+    const f = el => getComputedStyle(el).fontSize + '/' + getComputedStyle(el).fontWeight;
+    return { lines: lines.length, firstAfterNumber: Math.abs(lines[0].left - val.getBoundingClientRect().right - 4) < 1.5,
+      nextAtLeft: lines.length > 1 && Math.abs(lines[1].left - val.getBoundingClientRect().left) < 1, inCard: fig.scrollWidth <= fig.clientWidth,
+      diff: f(unit.querySelector('.insight-danger')), unit: f(unit), danger: getComputedStyle(unit.querySelector('.insight-danger')).color,
+      under: document.querySelector('[data-insight-metric="training"] .insight-figure + .role-sub').textContent };
+  });
+  check('360px: lange regel loopt door (2 regels), eerste regel direct na het getal, volgende links onder het getal, vergelijking 12px/400, −150 rood, daaronder alleen de trainingen', flow,
+    { lines: 2, firstAfterNumber: true, nextAtLeft: true, inCard: true, diff: '12px/400', unit: '12px/400', danger: await H.tokenColor(page, '--danger'), under: '1 van 1 training' });
 
   // Week without shortfall → "op schema"
   await setup(page, 'switch');
@@ -231,7 +243,7 @@ H.run(async () => {
   });
   s = await readScreen(page);
   const okColor = await page.evaluate(() => getComputedStyle(document.querySelector('.insight-success')).color);
-  check('op schema', [s.cards[0], okColor], ['TRAINING | 25 van 25 sets uit je schema | 4 van 4 trainingen · op schema', 'rgb(76, 175, 80)']);
+  check('op schema', [s.cards[0], okColor], ['TRAINING | 25 van 25 sets uit je schema · op schema | 4 van 4 trainingen', 'rgb(76, 175, 80)']);
 
   // Graph period filters still work (handler scoped to the Grafiek)
   const graphScoped = await page.evaluate(() => document.querySelectorAll('.graph-time-filters .time-filter').length);

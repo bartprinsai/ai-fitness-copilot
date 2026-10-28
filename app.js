@@ -2268,13 +2268,19 @@ function insightAverage(values) { return values.reduce((a, b) => a + b, 0) / val
 const INSIGHT_CHEVRON_SVG = '<svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>';
 // A figure card of the week. With `metric` ('training' / 'sleep' / 'weight' / 'strength') the whole
 // card is a button that opens that detail screen, with a chevron on the right. `asideHtml` goes on
-// the right of the label, on its baseline (Kracht: the records).
-function insightCardHtml(label, bodyHtml, metric, asideHtml = '') {
-  const inner = (asideHtml ? `<div class="insight-card-label insight-label-row"><span class="section-label">${label}</span>${asideHtml}</div>`
-    : `<div class="section-label insight-card-label">${label}</div>`) + bodyHtml;
+// the right of the label, on its baseline (Kracht: the records). A card with several rows (`rows`:
+// Kracht) has its chevron top right in the head, after the aside, so it doesn't seem to belong to
+// one of the rows (like the category cards on the screen Kracht).
+function insightCardHtml(label, bodyHtml, metric, asideHtml = '', rows = false) {
+  const chevron = `<span class="insight-edit-icon insight-chevron">${INSIGHT_CHEVRON_SVG}</span>`;
+  const head = rows && metric
+    ? `<div class="insight-card-label insight-label-row"><span class="section-label">${label}</span><span class="insight-card-head-end">${asideHtml}${chevron}</span></div>`
+    : asideHtml ? `<div class="insight-card-label insight-label-row"><span class="section-label">${label}</span>${asideHtml}</div>`
+      : `<div class="section-label insight-card-label">${label}</div>`;
+  const inner = head + bodyHtml;
   if (!metric) return `<div class="card insight-card">${inner}</div>`;
   return `<button type="button" class="card insight-card insight-edit-card" data-insight-metric="${metric}">`
-    + `<div class="insight-edit-main">${inner}</div><span class="insight-edit-icon insight-chevron">${INSIGHT_CHEVRON_SVG}</span></button>`;
+    + `<div class="insight-edit-main">${inner}</div>${rows ? '' : chevron}</button>`;
 }
 function insightFigureHtml(value, unit) {
   return `<div class="insight-figure"><span class="set-val">${value}</span><span class="set-unit">${unit}</span></div>`;
@@ -2297,14 +2303,18 @@ function insightTrainingTexts(stats) {
 function insightSchedulePct(stats) {
   return stats.compare && stats.plannedSets > 0 ? Math.round(stats.fromSchedule / stats.plannedSets * 100) : null;
 }
-// Week: "58 van 82 sets uit je schema" / "4 van 5 trainingen · −24 · +6 extra". Maand and Jaar:
+// Week: "58 van 82 sets uit je schema · −24 · +6 extra" / "4 van 5 trainingen" (the comparison is
+// about sets, so it stays on the sets line; it runs on to a next line under the number). Maand and Jaar:
 // "86% van je schema" / "241 van 280 sets · −39 · +12 extra" / "17 van 19 trainingen". Without a
 // comparison: "N sets" / "M trainingen · geen vergelijking met schema".
 function insightTrainingCardHtml(stats, period = 'week') {
   const t = insightTrainingTexts(stats);
   const setsFigure = insightFigureHtml(formatCount(stats.doneSets), stats.doneSets === 1 ? 'set' : 'sets');
   if (t.none) return setsFigure + `<div class="role-sub">${t.none}</div>`;
-  if (period === 'week') return insightFigureHtml(formatCount(stats.fromSchedule), t.ofPlanned) + `<div class="role-sub">${t.trainings} · ${t.diff}</div>`;
+  if (period === 'week') {
+    return `<div class="insight-figure insight-figure-flow"><span class="set-val">${formatCount(stats.fromSchedule)}</span><span class="set-unit">${t.ofPlanned} · ${t.diff}</span></div>`
+      + `<div class="role-sub">${t.trainings}</div>`;
+  }
   const pct = insightSchedulePct(stats);
   if (pct === null) return setsFigure + `<div class="role-sub">Geen sets gepland</div><div class="role-sub">${t.trainings}</div>`;
   return `<div class="insight-figure">${insightPctHtml(pct)}<span class="set-unit">van je schema</span></div>`
@@ -2464,7 +2474,7 @@ function renderInsight() {
     + insightCardHtml('Voeding', insightEmptyHtml('Nog geen voedingsschema'))
     + insightCardHtml('Slaap', insightSleepCardHtml(r), 'sleep')
     + insightCardHtml('Gewicht', insightWeightCardHtml(r), 'weight')
-    + insightCardHtml('Kracht', insightStrengthCardHtml(strength), 'strength', insightStrengthAsideHtml(strength));
+    + insightCardHtml('Kracht', insightStrengthCardHtml(strength), 'strength', insightStrengthAsideHtml(strength), true);
 }
 
 function openInsight() {
@@ -3187,9 +3197,10 @@ function insightStrengthPct(p) {
 const insightRecordsText = n => insightPlural(n, 'record', 'records');
 const insightNoCompareHtml = '<div class="role-sub insight-muted">Geen vergelijking</div>';
 
-// Kracht card: per category the name on the left; on the right the average change (or "Geen
-// vergelijking") with "1 record" under it — names left, numbers right; under it all what it is
-// compared with.
+// Kracht card: a row per category (a line between the rows and above the note, all rows as high as
+// the rows of the lists in Inzicht): the name on the left, in the middle; on the right the average
+// change (or "Geen vergelijking") with "1 record" under it — names left, numbers right; under it all
+// what it is compared with.
 function insightStrengthCardHtml(s) {
   if (!s.exercises.length) return insightEmptyHtml(INSIGHT_STRENGTH_EMPTY);
   return s.categories.map(c => {

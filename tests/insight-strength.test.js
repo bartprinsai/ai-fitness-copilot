@@ -90,6 +90,12 @@ H.run(async () => {
   await click('#insight-head [data-insight-step="-1"]');
   const y25 = await card();
   check('Jaar 2025: geen records = geen trofee rechtsboven, geen "records"-regel', [y25.label, y25.trophy, y25.rows[0]], ['Kracht', false, 'Borst | Geen vergelijking(grijs)']);
+  check('zonder records: het pijltje staat in de kop rechts naast het label KRACHT, rechts uitgelijnd, midden op het label', await page.evaluate(() => {
+    const card = document.querySelector('[data-insight-metric="strength"]'), head = card.querySelector('.insight-card-label'), chev = head.querySelector('.insight-chevron svg');
+    const label = head.querySelector('.section-label').getBoundingClientRect(), c = chev && chev.getBoundingClientRect(), box = card.querySelector('.insight-edit-main').getBoundingClientRect();
+    return chev && { right: Math.abs(c.right - box.right) < 0.5, middle: Math.abs((c.top + c.bottom) / 2 - (label.top + label.bottom) / 2) < 2, records: !!head.querySelector('.insight-records'), count: card.querySelectorAll('.insight-chevron').length };
+  }), { right: true, middle: true, records: false, count: 1 });
+  check('de hele Kracht-kaart blijft één knop', await page.evaluate(() => document.querySelector('[data-insight-metric="strength"]').tagName), 'BUTTON');
 
   // ── De categorielijn (pure functie): twee oefeningen die op een verschillend punt beginnen
   //   A: 100 · – · 110 · 120 (begint op punt 1), B: – · 50 · 55 · 50 (begint op punt 2)
@@ -402,7 +408,26 @@ H.run(async () => {
     for (const per of ['week', 'year']) {
       await click(`#insight-head [data-insight-period="${per}"]`);
       const cl = await page.evaluate(() => {
-        const rows = [...document.querySelectorAll('[data-insight-metric="strength"] .insight-strength-row')];
+        const card = document.querySelector('[data-insight-metric="strength"]');
+        const rows = [...card.querySelectorAll('.insight-strength-row')];
+        const note = card.querySelector('.insight-strength-note');
+        const box = card.querySelector('.insight-edit-main').getBoundingClientRect(), cr = card.getBoundingClientRect();
+        const bd = el => getComputedStyle(el).borderTopWidth + ' ' + getComputedStyle(el).borderTopStyle;
+        const tok = n => { const d = document.createElement('div'); d.style.borderTop = `1px solid var(${n})`; document.body.appendChild(d); const c = getComputedStyle(d).borderTopColor; d.remove(); return c; };
+        const mid = el => { const r = el.getBoundingClientRect(); return (r.top + r.bottom) / 2; };
+        const lineOk = el => bd(el) === '1px solid' && getComputedStyle(el).borderTopColor === tok('--border')
+          && Math.abs(el.getBoundingClientRect().left - cr.left - 16) < 0.5 && Math.abs(cr.right - el.getBoundingClientRect().right - 16) < 0.5;
+        const head = card.querySelector('.insight-card-label'), chev = card.querySelector('.insight-chevron svg'), label = head.querySelector('.section-label');
+        const rec = head.querySelector('.insight-records');
+        const heights = rows.map(r => Math.round(r.getBoundingClientRect().height - parseFloat(getComputedStyle(r).borderTopWidth)));
+        window.__krachtLayout = {
+          lines: [rows[0] && bd(rows[0]) === '0px none', rows.slice(1).every(lineOk), lineOk(note)],
+          sameHeight: new Set(heights).size === 1, minHeight: Math.min(...heights) >= 58,
+          centred: rows.every(r => Math.abs(mid(r.querySelector('.role-row')) - mid(r)) < 1 && Math.abs(mid(r.querySelector('.insight-mg-figure').firstElementChild.parentElement) - mid(r)) < 1
+            && (r.querySelector('.insight-mg-figure').children.length > 1 || Math.abs(mid(r.querySelector('.insight-mg-figure').firstElementChild) - mid(r)) < 1)),
+          chevron: { inHead: head.contains(chev), right: Math.abs(chev.getBoundingClientRect().right - box.right) < 0.5, afterRecords: rec ? chev.getBoundingClientRect().left > rec.getBoundingClientRect().right : true,
+            middle: Math.abs(mid(chev) - mid(label)) < 2, size: chev.getBoundingClientRect().width, onlyOne: card.querySelectorAll('.insight-chevron').length },
+        };
         const base = el => { const r = document.createRange(); r.selectNodeContents(el); const rc = r.getClientRects()[0]; return rc.bottom; };
         return rows.map(r => {
           const name = r.querySelector('.role-row'), fig = r.querySelector('.insight-mg-figure'), first = fig.firstElementChild, rec = fig.querySelector(':scope > .role-sub:not(.insight-muted)');
@@ -415,9 +440,12 @@ H.run(async () => {
             recStyle: rec ? getComputedStyle(rec).fontSize + '/' + getComputedStyle(rec).fontWeight : '' };
         });
       });
-      const ok = cl.every(c => c.sameBaseline && c.recRightAligned && c.recUnder && (!c.records || c.recStyle === '12px/400'));
-      check(`${tag} ${per}: kaart — met records (${cl.filter(c => c.records).map(c => c.name).join(', ')}) en zonder (${cl.filter(c => !c.records).map(c => c.name).join(', ')}): percentage op de basislijn van de naam, "record" rechts onder het percentage, Klein`, ok, true);
+      const ok = cl.every(c => c.recRightAligned && c.recUnder && (!c.records || c.recStyle === '12px/400'));
+      check(`${tag} ${per}: kaart — met records (${cl.filter(c => c.records).map(c => c.name).join(', ')}) en zonder (${cl.filter(c => !c.records).map(c => c.name).join(', ')}): "record" rechts onder het percentage, Klein`, ok, true);
       if (!ok) console.log(JSON.stringify(cl));
+      check(`${tag} ${per}: Kracht-kaart — geen lijn boven de eerste rij, 1px --border tussen de rijen en boven de uitleg (16px van de kaartranden), rijen even hoog (≥ 58px), naam en waarde in het midden, één chevron van 20px rechtsboven in de kop na de records, midden op het label`,
+        await page.evaluate(() => window.__krachtLayout),
+        { lines: [true, true, true], sameHeight: true, minHeight: true, centred: true, chevron: { inHead: true, right: true, afterRecords: true, middle: true, size: 20, onlyOne: 1 } });
       await page.evaluate(() => document.querySelector('[data-insight-metric="strength"]').scrollIntoView());
       await page.screenshot({ path: path.join(OUT, `card2-${per}-${theme}-${wpx}.png`) });
     }

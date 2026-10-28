@@ -1129,6 +1129,10 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 /* Big figure on Groot getal (.set-val) with its unit/explanation on Klein (.set-unit), like "80 kg". */
 .insight-figure { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: var(--space-1); }
 .insight-figure ~ .role-sub { margin-top: 2px; }
+/* A figure whose explanation is a sentence (Training, Week: "11 van 12 sets uit je schema · −1"): the
+   text runs on after the number and wraps to a next line, instead of moving under it as one block. */
+.insight-figure.insight-figure-flow { display: block; }
+.insight-figure-flow .set-unit { margin-left: var(--space-1); }
 .role-row.insight-empty { color: var(--text-muted); } /* wins over .role-row's --text in the role block */
 .insight-danger { color: var(--danger); }
 .insight-success { color: var(--success); }
@@ -1220,6 +1224,9 @@ button.insight-table-row:active { background: var(--bg); }
    The week's head and schedule line, a summary card with five columns, then lists. */
 /* A Label with something next to it (the legend) or under it (a Klein note, 2px under it). */
 .insight-label-row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
+/* The right end of a card head with a chevron (Kracht): the records, then the 20px chevron, centred on the head text. */
+.insight-card-head-end { display: flex; align-items: center; gap: var(--space-2); }
+.insight-label-row:has(> .insight-card-head-end) { align-items: center; }
 .insight-label-note { margin-top: 2px; }
 .insight-legend { display: flex; gap: var(--space-3); color: var(--text-secondary); }
 .insight-legend-item { display: inline-flex; align-items: center; gap: var(--space-1); }
@@ -1241,13 +1248,19 @@ button.insight-table-row:active { background: var(--bg); }
 /* The PR trophy (icon and --pr-gold of the set rows) at the size of the text it stands in, like the Recap's. */
 .insight-pr { width: 1em; height: 1em; fill: var(--pr-gold); vertical-align: -2px; margin-right: var(--space-1); flex-shrink: 0; }
 .insight-records { display: inline-flex; align-items: center; color: var(--text-secondary); }
-/* Card: a row per category, no lines — a summary, not a list. Names left, numbers right: the change
-   (or "Geen vergelijking") right-aligned with "1 record" under it. Name and change share the
-   baseline of their first line, so the change sits the same with or without a records line. */
-.insight-strength-row { display: flex; align-items: baseline; gap: var(--space-3); }
-.insight-strength-row + .insight-strength-row { margin-top: var(--space-2); }
-.insight-strength-row .insight-mg-figure .role-sub { margin-top: 2px; }
-.insight-strength-note { margin-top: var(--space-3); }
+/* Card: a row per category, with a 1px --border line between the rows and above the note (none above
+   the first row), within the card padding: 16px from the card edges, like the lines of the other
+   lists in Inzicht. Every row is as high as a row with two lines, like the lists in Inzicht (there
+   34px: Rij 18px + 2px + Klein 14px); here the two lines are the change on Groot getal (24px) + 2px +
+   "1 record" on Klein (14px) = 40px, plus --space-3 above and below: with or without a records line. Names left, numbers right: both columns in the middle of the row;
+   the change (or "Geen vergelijking") right-aligned with "1 record" under it. The chevron sits top
+   right in the head (insightCardHtml, `rows`). */
+.insight-strength-row { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) 0; }
+.insight-strength-row + .insight-strength-row, .insight-strength-note { border-top: 1px solid var(--border); }
+.insight-strength-row .insight-mg-main, .insight-strength-row .insight-mg-figure { min-height: 40px; display: flex; flex-direction: column; justify-content: center; }
+.insight-strength-row .insight-mg-figure { align-items: flex-end; }
+.insight-strength-row .insight-mg-figure > * + .role-sub { margin-top: 2px; }
+.insight-strength-note { padding-top: var(--space-3); }
 /* Kracht and a category of Kracht: a card per category / per exercise, each with its own chart (one
    line, --primary). Head: the name with a Klein line under it on the left, the figure on the right
    (a category card: then the chevron), on the baseline of their first line. */

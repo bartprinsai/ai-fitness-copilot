@@ -86,16 +86,15 @@ const SIT = {
   tekortExtra: week([{ exerciseId: 'bench-press', sets: n(2) }, { exerciseId: 'bench-press-dumbbell', sets: n(0) }, { exerciseId: 'my-nogroup', sets: n(1) }, { exerciseId: 'my-other', sets: n(2) }]),
 };
 const EXPECT = {
-  tekort: { card: '2 van 1 trainingen'.replace('2 van 1', '1 van 1') + ' · −2', sum: '5 van 7 sets uit je schema · −2', chest: '2 van 4 · −2', none: '3 van 3 · op schema',
+  tekort: { card: '5 van 7 sets uit je schema · −2 / 1 van 1 training', sum: '5 van 7 sets uit je schema · −2', chest: '2 van 4 · −2', none: '3 van 3 · op schema',
     detail: '2 van 4 sets uit je schema · −2', dayHead: '5 van 7 sets · −2', dayChest: '−2' },
-  opSchema: { card: '1 van 1 training · op schema', sum: '7 van 7 sets uit je schema · op schema', chest: '4 van 4 · op schema', none: '3 van 3 · op schema',
+  opSchema: { card: '7 van 7 sets uit je schema · op schema / 1 van 1 training', sum: '7 van 7 sets uit je schema · op schema', chest: '4 van 4 · op schema', none: '3 van 3 · op schema',
     detail: '4 van 4 sets uit je schema · op schema', dayHead: '7 van 7 sets · op schema', dayChest: 'op schema' },
-  opSchemaExtra: { card: '1 van 1 training · op schema · +2 extra', sum: '7 van 7 sets uit je schema · op schema · +2 extra', chest: '4 van 4 · op schema · +2 extra', none: '3 van 3 · op schema',
+  opSchemaExtra: { card: '7 van 7 sets uit je schema · op schema · +2 extra / 1 van 1 training', sum: '7 van 7 sets uit je schema · op schema · +2 extra', chest: '4 van 4 · op schema · +2 extra', none: '3 van 3 · op schema',
     detail: '4 van 4 sets uit je schema · op schema · +2 extra', dayHead: '7 van 7 sets · op schema · +2 extra', dayChest: 'op schema · +2 extra' },
-  tekortExtra: { card: '1 van 1 training · −4 · +2 extra', sum: '3 van 7 sets uit je schema · −4 · +2 extra', chest: '2 van 4 · −2', none: '1 van 3 · −2 · +2 extra',
+  tekortExtra: { card: '3 van 7 sets uit je schema · −4 · +2 extra / 1 van 1 training', sum: '3 van 7 sets uit je schema · −4 · +2 extra', chest: '2 van 4 · −2', none: '1 van 3 · −2 · +2 extra',
     detail: '1 van 3 sets uit je schema · −2 · +2 extra', dayHead: '3 van 7 sets · −4 · +2 extra', dayChest: '−2', dayNone: '−2 · +2 extra' },
 };
-EXPECT.tekort.card = '1 van 1 training · −2';
 
 async function setup(page, data, theme = 'light') {
   await H.loadData(page, data, theme);
@@ -314,7 +313,8 @@ async function comparisons(page) {
   for (const [k, data] of Object.entries(SIT)) {
     const e = EXPECT[k];
     await setup(page, data);
-    const card = await page.evaluate(() => document.querySelector('[data-insight-metric="training"] .role-sub').textContent);
+    const card = await page.evaluate(() => { const c = document.querySelector('[data-insight-metric="training"]');
+      return c.querySelector('.set-val').textContent + ' ' + c.querySelector('.set-unit').textContent + ' / ' + c.querySelector('.insight-figure + .role-sub').textContent; });
     const cardCol = await colours(page);
     await go(page, 'openInsightTraining');
     const ov = await page.evaluate(() => ({
@@ -332,7 +332,7 @@ async function comparisons(page) {
     }));
     const dayCol = await colours(page);
     const dayRow = name => (day.rows.find(r => r[0] === name) || [])[1];
-    check(`${k}: Training-kaart`, card, e.card);
+    check(`${k}: Training-kaart (vergelijking bij de sets, trainingen eronder)`, card, e.card);
     check(`${k}: samenvatting trainingsoverzicht`, ov.sum, e.sum);
     check(`${k}: spiergroeprij Borst / Geen spiergroep`, [ov.rows.chest, ov.rows['']], [e.chest, e.none]);
     check(`${k}: detailscherm (${k === 'tekortExtra' ? 'Geen spiergroep' : 'Borst'})`, det, e.detail);

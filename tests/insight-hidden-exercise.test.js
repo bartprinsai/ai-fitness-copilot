@@ -46,7 +46,7 @@ H.run(async () => {
   const hidden = await views(DATA);
   check('opzet: beide oefeningen zijn verborgen (niet in Alle oefeningen)', await page.evaluate(() => allExercises().filter(e => ['ex-verborgen', 'leg-press'].includes(e.id)).length), 0);
   check('weekoverzicht: maandag en dinsdag gedaan in Per dag', hidden.week.done, ['2026-10-19', '2026-10-20']);
-  check('weekoverzicht: Training-kaart telt de 3 sets uit het schema en de 2 extra sets', hidden.week.training, 'TRAINING 3 van 3 sets uit je schema 1 van 1 training · op schema · +2 extra');
+  check('weekoverzicht: Training-kaart telt de 3 sets uit het schema en de 2 extra sets', hidden.week.training, 'TRAINING 3van 3 sets uit je schema · op schema · +2 extra 1 van 1 training');
   check('dagoverzicht maandag: Verborgen press telt mee (Borst, 3 sets)', hidden.monday.some(t => /Borst/.test(t) && /Verborgen press/.test(t) && /3/.test(t)), true);
   check('dagoverzicht dinsdag: Leg press telt mee (Quadriceps, 2 sets)', hidden.tuesday.some(t => /Leg press/.test(t) && /2/.test(t)), true);
   check('trainingsoverzicht: 5 sets in totaal', /^SETS 5\b/.test(hidden.overview.summary), true);
