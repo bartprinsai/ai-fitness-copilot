@@ -156,8 +156,8 @@ H.run(async () => {
   const cats = () => page.evaluate(() => {
     const mark = e => e.textContent.replace(/\s+/g, ' ').trim() + (e.querySelector('.insight-success') || e.classList.contains('insight-success') ? '(groen)' : '') + (e.classList.contains('insight-muted') || e.querySelector('.insight-muted') ? '(grijs)' : '');
     return [...document.querySelectorAll('#insight-strength-body .insight-strength-card')].map(c => ({
-      tag: c.tagName, cat: c.dataset.insightCategory, title: c.querySelector('.role-title').textContent, sub: c.querySelector('.insight-mg-main .role-sub').textContent,
-      trophy: !!c.querySelector('.insight-mg-main .role-sub .insight-pr'), figure: mark(c.querySelector('.insight-mg-figure')), chevron: !!c.querySelector('.insight-chevron'),
+      tag: c.tagName, cat: c.dataset.insightCategory, title: c.querySelector('.role-title').textContent, sub: c.querySelector('.insight-strength-card-head > .role-sub').textContent,
+      trophy: !!c.querySelector('.insight-strength-card-head > .role-sub .insight-pr'), figure: mark(c.querySelector('.insight-mg-figure')), chevron: !!c.querySelector('.insight-chevron'),
       points: c.querySelectorAll('.insight-point').length, line: c.querySelectorAll('.insight-line').length,
       ticks: [...c.querySelectorAll('.insight-chart-tick')].map(t => t.textContent).join(' '),
       note: (c.querySelector('.insight-chart-note') || {}).textContent || '', empty: (c.querySelector('.insight-empty') || {}).textContent || '' }));
@@ -181,7 +181,7 @@ H.run(async () => {
   await setup();
   await click('[data-insight-metric="strength"]');
   const exCards = () => page.evaluate(() => [...document.querySelectorAll('#insight-category-body .insight-strength-card')].map(c => {
-    const sub = c.querySelector('.insight-mg-main .role-sub'), fig = c.querySelector('.insight-mg-figure');
+    const sub = c.querySelector('.insight-strength-card-head > .role-sub'), fig = c.querySelector('.insight-mg-figure');
     return { tag: c.tagName, name: (c.querySelector('.insight-pr') ? '🏆 ' : '') + c.querySelector('.role-row').textContent,
       sub: sub.textContent + (sub.querySelector('.insight-success') ? '(groen)' : '') + (sub.classList.contains('insight-muted') ? '(grijs)' : ''),
       figure: fig.textContent + (fig.querySelector('.insight-success') ? '(groen)' : '') + (fig.querySelector('.insight-muted') ? '(grijs)' : ''), chevron: !!c.querySelector('.insight-chevron'),
@@ -451,7 +451,25 @@ H.run(async () => {
     }
     // Kracht en een categorie: rollen, kleuren, grafieken, niets afgekapt
     await click('#insight-head [data-insight-period="week"]');
+    // Het pijltje op de bovenste regel: in de categoriekaarten (met een percentage en met "Geen
+    // vergelijking") op dezelfde hoogte als de naam en het percentage, en even ver van de bovenkant van
+    // de kaart als op de Kracht-kaart van het hoofdscherm.
+    const mainChev = await page.evaluate(() => { const c = document.querySelector('[data-insight-metric="strength"]'); return c.querySelector('.insight-chevron svg').getBoundingClientRect().top - c.getBoundingClientRect().top; });
     await click('[data-insight-metric="strength"]');
+    const heads = await page.evaluate(mainChev => [...document.querySelectorAll('#insight-strength-body [data-insight-category]')].map(c => {
+      const r = el => el.getBoundingClientRect(), mid = el => (r(el).top + r(el).bottom) / 2;
+      const name = c.querySelector('.role-title'), fig = c.querySelector('.insight-mg-figure').firstElementChild, chev = c.querySelector('.insight-chevron svg');
+      const sub = c.querySelector('.insight-strength-card-head > .role-sub'), line = c.querySelector('.insight-strength-card-head > .insight-label-row');
+      const cs = getComputedStyle(c);
+      return { name: name.textContent, figure: fig.classList.contains('insight-pct') ? 'percentage' : fig.textContent,
+        chevronOnName: Math.abs(mid(chev) - mid(name)) < 0.5, figureOnName: Math.abs(mid(fig) - mid(name)) < 0.5,
+        chevronTop: Math.abs(r(chev).top - r(c).top - mainChev) < 0.5, topRight: Math.abs(r(c).right - parseFloat(cs.paddingRight) - r(chev).right) < 0.5,
+        subUnderLeft: r(sub).top >= r(line).bottom - 0.5 && Math.abs(r(sub).left - r(name).left) < 0.5, oneChevron: c.querySelectorAll('.insight-chevron').length, button: c.tagName };
+    }), mainChev);
+    const HEAD = { chevronOnName: true, figureOnName: true, chevronTop: true, topRight: true, subUnderLeft: true, oneChevron: 1, button: 'BUTTON' };
+    check(`${tag} Kracht: pijltje op de bovenste regel van elke categoriekaart — midden op de naam en het percentage of "Geen vergelijking", ${Math.round(mainChev)}px van de bovenkant zoals op de Kracht-kaart, rechtsboven; "t.o.v." links eronder`,
+      heads, heads.map(h => ({ name: h.name, figure: h.figure, ...HEAD })));
+    check(`${tag} Kracht: gemeten met een percentage én met "Geen vergelijking"`, ['percentage', 'Geen vergelijking'].every(x => heads.some(h => h.figure === x)), true);
     const style = () => page.evaluate(() => {
       const tok = n => { const d = document.createElement('div'); d.style.color = `var(${n})`; document.body.appendChild(d); const c = getComputedStyle(d).color; d.remove(); return c; };
       const f = el => el ? `${getComputedStyle(el).fontSize}/${getComputedStyle(el).fontWeight}` : null;
@@ -473,7 +491,7 @@ H.run(async () => {
         noAvg: !body.querySelector('.insight-chart-avg'),
         tick: f(body.querySelector('.insight-chart-tick')) + ' ' + (getComputedStyle(body.querySelector('.insight-chart-tick')).fill === tok('--text-muted')),
         title: f(card.querySelector('.role-title, .role-row')) + ' ' + (col(card.querySelector('.role-title, .role-row')) === tok('--text')),
-        sub: f(card.querySelector('.insight-mg-main .role-sub')),
+        sub: f(card.querySelector('.insight-strength-card-head > .role-sub')),
         figure: f(card.querySelector('.set-val')), unit: f(card.querySelector('.set-unit')),
         green: col(body.querySelector('.insight-success')) === tok('--success'),
         muted: [...body.querySelectorAll('.insight-muted')].every(e => col(e.matches('.insight-figure') ? e.querySelector('.set-val') : e) === tok('--text-muted')),
@@ -492,6 +510,12 @@ H.run(async () => {
     }
     await click('#insight-strength-head [data-insight-period="week"]');
     await click('[data-insight-category="chest"]');
+    // De oefeningkaarten hebben dezelfde kop, zonder pijltje: naam en percentage op één regel, in het midden.
+    check(`${tag} Borst: kop van elke oefeningkaart — naam en percentage / "Geen vergelijking" / "Niet gedaan" midden op elkaar, geen pijltje`, await page.evaluate(() =>
+      [...document.querySelectorAll('#insight-category-body .insight-strength-card')].every(c => {
+        const mid = el => { const b = el.getBoundingClientRect(); return (b.top + b.bottom) / 2; };
+        return Math.abs(mid(c.querySelector('.insight-label-row .role-row')) - mid(c.querySelector('.insight-mg-figure').firstElementChild)) < 0.5 && !c.querySelector('.insight-chevron');
+      })), true);
     for (const per of ['week', 'month', 'year']) {
       await click(`#insight-category-head [data-insight-period="${per}"]`);
       check(`${tag} Borst ${per}: Rij in een lijst / Klein / Groot getal, Sterkst 12px/500 --text, lijn 1px --border 16px van de kaartranden, geen chevron`, await style(),

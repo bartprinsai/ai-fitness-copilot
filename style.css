@@ -1222,7 +1222,14 @@ button.insight-table-row:active { background: var(--bg); }
 .insight-label-row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
 /* The right end of a card head with a chevron (Kracht): the records, then the 20px chevron, centred on the head text. */
 .insight-card-head-end { display: flex; align-items: center; gap: var(--space-2); }
-.insight-label-row:has(> .insight-card-head-end) { align-items: center; }
+/* The top line of a card with several rows or a chart (insightTopLineHtml: the Kracht card, the
+   category and exercise cards of Kracht): name, figure and chevron centred on each other, the line as
+   high as the chevron (--icon-list), so the chevron sits --card-padding from the top of every such
+   card. A figure on it (Groot getal) takes line-height 1, so it doesn't make the line taller. */
+.insight-label-row:has(> .insight-card-head-end) { align-items: center; min-height: var(--icon-list); }
+.insight-top-line-name { min-width: 0; }
+.insight-card-head-end { flex-shrink: 0; }
+.insight-card-head-end .insight-figure > * { line-height: 1; }
 .insight-label-note { margin-top: 2px; }
 .insight-legend { display: flex; gap: var(--space-3); color: var(--text-secondary); }
 .insight-legend-item { display: inline-flex; align-items: center; gap: var(--space-1); }
@@ -1257,12 +1264,11 @@ button.insight-table-row:active { background: var(--bg); }
 .insight-strength-row .insight-mg-figure > * + .role-sub { margin-top: 2px; }
 .insight-strength-note { padding-top: var(--space-3); }
 /* Kracht and a category of Kracht: a card per category / per exercise, each with its own chart (one
-   line, --primary). Head: the name with a Klein line under it on the left, the figure on the right
-   (a category card: then the chevron), on the baseline of their first line. */
+   line, --primary). Head (insightStrengthHeadHtml): the top line of insightTopLineHtml — name left,
+   figure right (a category card: then the chevron), centred on each other — with a Klein line under it. */
 .insight-strength-cards { display: flex; flex-direction: column; gap: var(--card-gap); margin-top: var(--section-gap); }
 .insight-strength-card.insight-edit-card { display: block; }
-.insight-strength-card-head { display: flex; align-items: baseline; gap: var(--space-3); }
-.insight-strength-card-head .insight-chevron { align-self: center; }
+.insight-strength-card-head > .role-sub { margin-top: 2px; }
 .insight-strength-chart { margin-top: var(--space-3); }
 /* Sterkst / Zwakst under the chart, after a line within the card padding: 16px from the card edges
    (see DIVIDERS). */

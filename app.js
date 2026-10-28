@@ -2271,10 +2271,19 @@ const INSIGHT_CHEVRON_SVG = '<svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 1
 // the right of the label, on its baseline (Kracht: the records). A card with several rows (`rows`:
 // Kracht) has its chevron top right in the head, after the aside, so it doesn't seem to belong to
 // one of the rows (like the category cards on the screen Kracht).
+const INSIGHT_CHEVRON_HTML = `<span class="insight-edit-icon insight-chevron">${INSIGHT_CHEVRON_SVG}</span>`;
+// The top line of a card with several rows or a chart (the Kracht card, the category and exercise
+// cards of Kracht): on the left the label or name, on the right the figure / records and, on a card
+// you can tap, the chevron — all centred on each other, on a line as high as the chevron (20px), so
+// the chevron sits top right, --card-padding from the top of the card, on every such card.
+function insightTopLineHtml(leftHtml, endHtml, chevron, cls = '') {
+  return `<div class="${cls ? cls + ' ' : ''}insight-label-row"><span class="insight-top-line-name">${leftHtml}</span>`
+    + `<span class="insight-card-head-end">${endHtml}${chevron ? INSIGHT_CHEVRON_HTML : ''}</span></div>`;
+}
 function insightCardHtml(label, bodyHtml, metric, asideHtml = '', rows = false) {
-  const chevron = `<span class="insight-edit-icon insight-chevron">${INSIGHT_CHEVRON_SVG}</span>`;
+  const chevron = INSIGHT_CHEVRON_HTML;
   const head = rows && metric
-    ? `<div class="insight-card-label insight-label-row"><span class="section-label">${label}</span><span class="insight-card-head-end">${asideHtml}${chevron}</span></div>`
+    ? insightTopLineHtml(`<span class="section-label">${label}</span>`, asideHtml, true, 'insight-card-label')
     : asideHtml ? `<div class="insight-card-label insight-label-row"><span class="section-label">${label}</span>${asideHtml}</div>`
       : `<div class="section-label insight-card-label">${label}</div>`;
   const inner = head + bodyHtml;
@@ -3277,6 +3286,12 @@ function insightStrengthChartHtml(id, options, count, oneText) {
 }
 const insightStrengthUnit = r => r.period === 'week' ? 'week' : 'maand';
 
+// The head of a card on Kracht (a category, with the chevron) or on a category (an exercise, without):
+// the top line (insightTopLineHtml, like the Kracht card) with the name and the change, and under it,
+// on the left, "t.o.v. week 43" (with the records).
+function insightStrengthHeadHtml(nameHtml, figureHtml, subHtml, chevron) {
+  return `<div class="insight-strength-card-head">${insightTopLineHtml(nameHtml, `<div class="insight-mg-figure">${figureHtml}</div>`, chevron)}${subHtml}</div>`;
+}
 function openInsightStrength() { showScreen('screen-insight-strength'); }
 // Kracht: a card per category with Kracht volgen (in the order of the categories), each with the
 // line of its average change. A tap zooms in on that category (#screen-insight-category, same
@@ -3298,10 +3313,7 @@ function renderInsightStrength() {
     const p = c.pct === null ? null : insightStrengthPct(c.pct);
     const sub = `t.o.v. ${insightPeriodName(s.prev)}` + (c.records ? ` · <span class="insight-records">${prTrophySvg('insight-pr')}${insightRecordsText(c.records)}</span>` : '');
     return `<button type="button" class="card insight-strength-card insight-edit-card" data-insight-category="${c.id}">`
-      + '<div class="insight-strength-card-head">'
-      + `<div class="insight-mg-main"><div class="role-title">${c.name}</div><div class="role-sub">${sub}</div></div>`
-      + `<div class="insight-mg-figure">${p ? insightPctHtml(p.text, p.cls) : insightNoCompareHtml}</div>`
-      + `<span class="insight-edit-icon insight-chevron">${INSIGHT_CHEVRON_SVG}</span></div>`
+      + insightStrengthHeadHtml(`<div class="role-title">${c.name}</div>`, p ? insightPctHtml(p.text, p.cls) : insightNoCompareHtml, `<div class="role-sub">${sub}</div>`, true)
       + insightStrengthChartHtml(`insight-strength-chart-${c.id}`, insightPctChartOptions(line, labels, `${c.name}, gemiddelde verandering`),
         line.filter(v => v !== null).length, `Na nog een ${insightStrengthUnit(r)} trainen verschijnt hier een lijn`)
       + '</button>';
@@ -3375,8 +3387,7 @@ function renderInsightCategory() {
     const chart = insightStrengthChartHtml(`insight-category-chart-${e.id}`, insightPctChartOptions(insightCategoryLine([series.map(p => p && p.value)]), labels, `${name}, verandering`),
       count, `Pas één ${insightStrengthUnit(r)} getraind`);
     return `<div class="card insight-strength-card" data-insight-exercise-card="${e.id}">`
-      + `<div class="insight-strength-card-head"><div class="insight-mg-main"><div class="role-row">${e.records ? prTrophySvg('insight-pr') : ''}${name}</div>${vs}</div>`
-      + `<div class="insight-mg-figure">${figure}</div></div>`
+      + insightStrengthHeadHtml(`<div class="role-row">${e.records ? prTrophySvg('insight-pr') : ''}${name}</div>`, figure, vs, false)
       // With Sterkst/Zwakst: the chart and those two in one .divided-list, for the line between them.
       + (extremes ? '<div class="divided-list">' + chart + extremes + '</div>' : chart) + '</div>';
   }).join('') + '</div>';
