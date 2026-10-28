@@ -99,7 +99,7 @@ H.run(async () => {
     two: insightCategoryLine([[100, null, 110, 120], [null, 50, 55, 50]]).map(v => v === null ? null : Math.round(v * 1e6) / 1e6),
     gap: insightCategoryLine([[null, 80, null, 88], [null, null, null, null]]).map(v => v === null ? null : Math.round(v * 1e6) / 1e6),
     none: insightCategoryLine([[null, null], [null, null]]),
-    axis: [insightCategoryChartOptions([0, 0, 10, 10], ['a', 'b', 'c', 'd'], 'x'), insightCategoryChartOptions([0, -2, -1.5], ['a', 'b', 'c'], 'x'), insightCategoryChartOptions([0], ['a'], 'x')]
+    axis: [insightPctChartOptions([0, 0, 10, 10], ['a', 'b', 'c', 'd'], 'x'), insightPctChartOptions([0, -2, -1.5], ['a', 'b', 'c'], 'x'), insightPctChartOptions([0], ['a'], 'x')]
       .map(o => [o.lo, o.hi, o.ticks.map(t => t.label).join(' ')]),
   }));
   check('categorielijn: punt 1 en 2 zijn 0% (elk zijn eigen begin), punt 3 +10%, punt 4 +10%', line.two, [0, 0, 10, 10]);
@@ -175,10 +175,10 @@ H.run(async () => {
   await setup();
   await click('[data-insight-metric="strength"]');
   const exCards = () => page.evaluate(() => [...document.querySelectorAll('#insight-category-body .insight-strength-card')].map(c => {
-    const sub = c.querySelector('.insight-mg-main .role-sub'), fig = c.querySelector('.insight-figure');
+    const sub = c.querySelector('.insight-mg-main .role-sub'), fig = c.querySelector('.insight-mg-figure');
     return { tag: c.tagName, name: (c.querySelector('.insight-pr') ? '🏆 ' : '') + c.querySelector('.role-row').textContent,
       sub: sub.textContent + (sub.querySelector('.insight-success') ? '(groen)' : '') + (sub.classList.contains('insight-muted') ? '(grijs)' : ''),
-      figure: fig.textContent + (fig.classList.contains('insight-muted') ? '(grijs)' : ''), chevron: !!c.querySelector('.insight-chevron'),
+      figure: fig.textContent + (fig.querySelector('.insight-success') ? '(groen)' : '') + (fig.querySelector('.insight-muted') ? '(grijs)' : ''), chevron: !!c.querySelector('.insight-chevron'),
       points: c.querySelectorAll('.insight-point').length, ticks: [...c.querySelectorAll('.insight-chart-tick')].map(t => t.textContent).join(' '),
       extremes: [...c.querySelectorAll('.insight-extremes .role-sub')].map(e => e.textContent),
       note: (c.querySelector('.insight-chart-note') || {}).textContent || '', empty: (c.querySelector('.insight-empty') || {}).textContent || '' };
@@ -201,11 +201,21 @@ H.run(async () => {
   await setup();
   await page.evaluate(() => openInsightStrength()); await page.waitForTimeout(80);
   await click('[data-insight-category="chest"]');
-  check('Borst Week 43: kaarten (hoogste 1RM eerst), niet aan te tikken, geen chevron', await exCards(), [
-    { tag: 'DIV', name: '🏆 Bench press', sub: '+2,9 kg t.o.v. week 42(groen)', figure: '119,6kg', chevron: false, points: 3, ticks: '110 115 120',
-      extremes: ['Sterkst 119,6 kg · maandag 19 oktober 2026', 'Zwakst 110,8 kg · dinsdag 15 september 2026'], note: '', empty: '' },
-    { tag: 'DIV', name: '🏆 Incline bench press', sub: 'Geen vergelijking(grijs)', figure: '101,3kg', chevron: false, points: 2, ticks: '95 100 105',
-      extremes: ['Sterkst 101,3 kg · maandag 19 oktober 2026', 'Zwakst 95 kg · dinsdag 6 oktober 2026'], note: '', empty: '' }]);
+  // Bench press: 119,6 ÷ 116,7 − 1 = +2,5% (de geschatte 1RM van week 43 t.o.v. week 42, alleen op de achtergrond).
+  // Grafiek: 110,8 · 116,7 · 119,6 → 0% · +5,3% · +7,9%. Sterkst / Zwakst: de echte sets 102,5 × 5 en 95 × 5.
+  check('Borst Week 43: kaarten (hoogste 1RM eerst) met alleen procenten, niet aan te tikken, geen chevron', await exCards(), [
+    { tag: 'DIV', name: '🏆 Bench press', sub: 't.o.v. week 42', figure: '+2,5%(groen)', chevron: false, points: 3, ticks: '0% +5% +10%',
+      extremes: ['Sterkst 102,5 kg × 5 · maandag 19 oktober 2026', 'Zwakst 95 kg × 5 · dinsdag 15 september 2026'], note: '', empty: '' },
+    { tag: 'DIV', name: '🏆 Incline bench press', sub: 't.o.v. week 42', figure: 'Geen vergelijking(grijs)', chevron: false, points: 2, ticks: '0% +5% +10%',
+      extremes: ['Sterkst 80 kg × 8 · maandag 19 oktober 2026', 'Zwakst 75 kg × 8 · dinsdag 6 oktober 2026'], note: '', empty: '' }]);
+  const first0 = await page.evaluate(() => [...document.querySelectorAll('#insight-category-body .insight-chart-svg')].map(svg => {
+    const zero = [...svg.querySelectorAll('.insight-chart-tick')].find(t => t.textContent === '0%');
+    return !!zero && Math.abs(Number(svg.querySelector('.insight-point').getAttribute('cy')) - Number(zero.getAttribute('y'))) < 0.11;
+  }));
+  check('grafiek in procenten: het eerste punt ligt op 0%', first0, [true, true]);
+  check('grafiek van één oefening = de categorielijn voor die ene oefening: (waarde ÷ eerste punt − 1) × 100', await page.evaluate(() =>
+    insightCategoryLine([insightStrengthSeries('bench-press', insightStrengthPoints(insightRange())).map(p => p && p.value)]).map(v => v === null ? null : Math.round(v * 100) / 100)),
+    [null, null, 0, null, null, null, 5.32, 7.94]);
   const tap = await page.evaluate(() => {
     const c = document.querySelector('#insight-category-body .insight-strength-card');
     c.click();
@@ -215,17 +225,19 @@ H.run(async () => {
   check('oefeningkaart: tikken doet niets, geen knoppen in de kaarten', tap, { screen: 'screen-insight-category', buttons: 0, cursor: 'auto' });
   await page.goBack(); await page.waitForTimeout(200);
   await click('[data-insight-category="back"]');
-  check('Rug Week 43: Deadlift niet gedaan (laatst bekend 198 grijs), één punt: "Pas één week getraind", geen Sterkst/Zwakst', await exCards(), [
-    { tag: 'DIV', name: 'Deadlift', sub: 'Niet gedaan(grijs)', figure: '198kg(grijs)', chevron: false, points: 1, ticks: '197,5 198 198,5', extremes: [], note: 'Pas één week getraind', empty: '' }]);
+  check('Rug Week 43: Deadlift niet gedaan ("Niet gedaan" grijs, geen kg), één punt: "Pas één week getraind", geen Sterkst/Zwakst', await exCards(), [
+    { tag: 'DIV', name: 'Deadlift', sub: 't.o.v. week 42', figure: 'Niet gedaan(grijs)', chevron: false, points: 1, ticks: '−0,5% 0% +0,5%', extremes: [], note: 'Pas één week getraind', empty: '' }]);
   await click('#insight-category-head [data-insight-period="month"]');
   check('Rug Oktober: "Pas één maand getraind"', (await exCards())[0].note, 'Pas één maand getraind');
   await page.goBack(); await page.waitForTimeout(200);
   await click('[data-insight-category="arms"]');
-  check('Armen: Barbell curl nooit gedaan: "–" grijs, lege staat zonder grafiek', await exCards(), [
-    { tag: 'DIV', name: 'Barbell curl', sub: 'Niet gedaan(grijs)', figure: '–(grijs)', chevron: false, points: 0, ticks: '', extremes: [], note: '', empty: 'Nog niet getraind in deze periode' }]);
+  check('Armen (Oktober): Barbell curl nooit gedaan: "Niet gedaan" grijs, lege staat zonder grafiek', await exCards(), [
+    { tag: 'DIV', name: 'Barbell curl', sub: 't.o.v. september', figure: 'Niet gedaan(grijs)', chevron: false, points: 0, ticks: '', extremes: [], note: '', empty: 'Nog niet getraind in deze periode' }]);
   await page.goBack(); await page.waitForTimeout(200);
   await click('[data-insight-category="legs"]');
-  check('Benen Oktober (de periode bleef Maand): −11,7 kg in de secundaire kleur, niet groen', (await exCards())[0].sub, '−11,7 kg t.o.v. september');
+  // Squat: 163,3 (oktober) ÷ 175 (september) − 1 = −6,7%
+  check('Benen Oktober (de periode bleef Maand): −6,7%, t.o.v. september', await exCards().then(c => [c[0].figure, c[0].sub]), ['−6,7%', 't.o.v. september']);
+  check('negatief percentage in --text (niet groen, niet rood)', await page.evaluate(() => getComputedStyle(document.querySelector('#insight-category-body .insight-pct .set-val')).color), await H.tokenColor(page, '--text'));
 
   // Volgorde: gedaan in de periode op 1RM, niet gedaan achteraan (ook als de laatst bekende hoger is)
   const ORD = JSON.parse(JSON.stringify(DATA));
@@ -233,8 +245,27 @@ H.run(async () => {
   ORD.workouts['2026-10-05'] = [{ exerciseId: 'bench-press-dumbbell', sets: [S(150, 5)] }]; // week 41: 175, niet in week 43
   await setup(ORD);
   await page.evaluate(() => openInsightCategory('chest')); await page.waitForTimeout(100);
-  check('volgorde: Bench press 119,6 · Incline 101,3 · daarna niet gedaan (Bench press (dumbbell), laatst 175)', (await exCards()).map(c => c.name + ' ' + c.figure),
-    ['🏆 Bench press 119,6kg', '🏆 Incline bench press 101,3kg', 'Bench press (dumbbell) 175kg(grijs)']);
+  check('volgorde op geschatte 1RM: Bench press (119,6) · Incline (101,3) · daarna niet gedaan (Bench press (dumbbell), laatst 175)', (await exCards()).map(c => c.name + ' ' + c.figure),
+    ['🏆 Bench press +2,5%(groen)', '🏆 Incline bench press Geen vergelijking(grijs)', 'Bench press (dumbbell) Niet gedaan(grijs)']);
+  // Allemaal niet gedaan in week 43: onderling op de laatst bekende geschatte 1RM (175 · 116,7 · 95)
+  const ORD2 = JSON.parse(JSON.stringify(ORD));
+  delete ORD2.workouts['2026-10-19'];
+  await setup(ORD2);
+  await page.evaluate(() => openInsightCategory('chest')); await page.waitForTimeout(100);
+  check('niet gedaan: onderling op de laatst bekende geschatte 1RM', (await exCards()).map(c => c.name + ' ' + c.figure),
+    ['Bench press (dumbbell) Niet gedaan(grijs)', 'Bench press Niet gedaan(grijs)', 'Incline bench press Niet gedaan(grijs)']);
+
+  // ── Sterkst en Zwakst tonen de echte set: gewicht met decimalen, reps zonder extra reps
+  const XR = { custom_exercises: [], scheduleVersions: {}, weekCycle: {}, sleep: {}, bodyWeight: {}, exerciseInfo: { squat: { trackStrength: true } },
+    workouts: {
+      '2026-10-13': [{ exerciseId: 'squat', sets: [S(100, 5)] }],                                                    // 116,7
+      '2026-10-20': [{ exerciseId: 'squat', sets: [S(142.25, 5, { extra: '3', extraType: 'forced' }), S(140, 5)] }], // 166 (met de extra reps 179,9)
+    } };
+  await setup(XR);
+  await page.evaluate(() => openInsightCategory('legs')); await page.waitForTimeout(100);
+  const xr = (await exCards())[0];
+  check('echte set "142,25 kg × 5" (extra reps niet in de weergave); percentage 166 ÷ 116,7 − 1 = +42,2%', [xr.figure, xr.extremes],
+    ['+42,2%(groen)', ['Sterkst 142,25 kg × 5 · dinsdag 20 oktober 2026', 'Zwakst 100 kg × 5 · dinsdag 13 oktober 2026']]);
 
   // ── Sterkst en Zwakst: gelijke waarden → de meest recente; één punt → geen
   const EQ = { custom_exercises: [], scheduleVersions: {}, weekCycle: {}, sleep: {}, bodyWeight: {}, exerciseInfo: { squat: { trackStrength: true } },
@@ -249,13 +280,38 @@ H.run(async () => {
   await setup(EQ);
   const eq = await page.evaluate(() => insightExtremes(insightStrengthSeries('squat', insightStrengthPoints(insightRange()))));
   check('gelijke waarden: Sterkst = de meest recente 120 (vrijdag 9 oktober), Zwakst = de meest recente 100 (15 september)', eq,
-    { strongest: { value: 120, date: '2026-10-09' }, weakest: { value: 100, date: '2026-09-15' } });
+    { strongest: { value: 120, weight: 120, reps: 1, date: '2026-10-09' }, weakest: { value: 100, weight: 100, reps: 1, date: '2026-09-15' } });
   await page.evaluate(() => openInsightCategory('legs')); await page.waitForTimeout(100);
-  check('gelijke waarden op het scherm', (await exCards())[0].extremes, ['Sterkst 120 kg · vrijdag 9 oktober 2026', 'Zwakst 100 kg · dinsdag 15 september 2026']);
+  check('gelijke waarden op het scherm', (await exCards())[0].extremes, ['Sterkst 120 kg × 1 · vrijdag 9 oktober 2026', 'Zwakst 100 kg × 1 · dinsdag 15 september 2026']);
+  // Gelijke geschatte 1RM op één dag (100 × 1 = 100 en 75 × 10 = 100): de latere set geldt
+  const SAMEDAY = { ...EQ, workouts: { '2026-10-13': [{ exerciseId: 'squat', sets: [S(80, 1)] }], '2026-10-20': [{ exerciseId: 'squat', sets: [S(100, 1), S(75, 10)] }] } };
+  await setup(SAMEDAY);
+  await page.evaluate(() => openInsightCategory('legs')); await page.waitForTimeout(100);
+  check('gelijke waarden op één dag: de latere set (75 kg × 10)', (await exCards())[0].extremes[0], 'Sterkst 75 kg × 10 · dinsdag 20 oktober 2026');
   const ALLEQ = { ...EQ, workouts: { '2026-09-01': EQ.workouts['2026-09-01'], '2026-09-15': EQ.workouts['2026-09-15'] } };
   await setup(ALLEQ);
   await page.evaluate(() => openInsightCategory('legs')); await page.waitForTimeout(100);
-  check('alle punten gelijk: Sterkst en Zwakst zijn allebei het meest recente punt', (await exCards())[0].extremes, ['Sterkst 100 kg · dinsdag 15 september 2026', 'Zwakst 100 kg · dinsdag 15 september 2026']);
+  check('alle punten gelijk: Sterkst en Zwakst zijn allebei het meest recente punt', (await exCards())[0].extremes, ['Sterkst 100 kg × 1 · dinsdag 15 september 2026', 'Zwakst 100 kg × 1 · dinsdag 15 september 2026']);
+
+  // ── Nergens in Inzicht een geschatte 1RM in kg (alleen de echte sets bij Sterkst en Zwakst)
+  const kgFound = [];
+  for (const per of ['week', 'month', 'year']) {
+    await setup();
+    const grab = sel => page.evaluate(sel => [...document.querySelectorAll(sel)].map(el => { const c = el.cloneNode(true); c.querySelectorAll('.insight-extremes').forEach(x => x.remove()); return c.textContent; }).join(' '), sel);
+    await page.evaluate(p => { insightSwitchPeriod(p); renderInsight(); }, per);
+    const texts = [await grab('[data-insight-metric="strength"]')];
+    await page.evaluate(() => openInsightStrength()); await page.waitForTimeout(80);
+    texts.push(await grab('#insight-strength-body'));
+    for (const cat of ['chest', 'back', 'arms', 'legs']) {
+      await page.evaluate(c => openInsightCategory(c), cat); await page.waitForTimeout(60);
+      texts.push(await grab('#insight-category-body'));
+      const ext = await page.evaluate(() => [...document.querySelectorAll('.insight-extremes .role-sub')].every(e => /^(Sterkst|Zwakst) \d+(,\d{1,2})? kg × \d+ · /.test(e.textContent)));
+      if (!ext) kgFound.push(per + ' ' + cat + ': Sterkst/Zwakst niet als echte set');
+      await page.goBack(); await page.waitForTimeout(150);
+    }
+    texts.forEach((t, i) => { if (/kg/.test(t)) kgFound.push(per + ' #' + i + ': ' + t.slice(0, 80)); });
+  }
+  check('nergens kg op de Kracht-kaart, de categoriekaarten en de oefeningkaarten (Week, Maand, Jaar); Sterkst/Zwakst altijd "gewicht kg × reps"', kgFound, []);
 
   // ── Nergens meer een koppeling naar de Fitness Tracker
   const fs = require('fs');

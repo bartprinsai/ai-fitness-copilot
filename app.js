@@ -3120,7 +3120,9 @@ document.getElementById('btn-back-insight-muscle').addEventListener('click', () 
 const INSIGHT_STRENGTH_EMPTY = 'Zet Kracht volgen aan bij een oefening om je kracht hier te volgen.';
 
 // The highest estimated 1RM of an exercise's counting sets on one day; null without any.
-function dayBestOneRm(exId, date) {
+// The set behind it as { value, weight, reps } (the logged weight and full reps; equal: the later
+// set); dayBestOneRm: only the value.
+function dayBestOneRmSet(exId, date) {
   const ex = (db.workouts[date] || []).find(e => e.exerciseId === exId);
   let best = null;
   ((ex && ex.sets) || []).forEach((s, i, sets) => {
@@ -3128,17 +3130,18 @@ function dayBestOneRm(exId, date) {
     const reps = parseInt(s.reps) || 0, weight = parseFloat(s.weight) || 0;
     if (reps < 1 || weight <= 0) return;
     const v = estimatedOneRm(weight, reps);
-    if (best === null || v > best) best = v;
+    if (best === null || v >= best.value) best = { value: v, weight, reps };
   });
   return best;
 }
-// The highest of from..to with the day it was set on, { value, date } (equal: the latest day); null
-// when the exercise wasn't done then. bestOneRmIn: only the value.
+function dayBestOneRm(exId, date) { const b = dayBestOneRmSet(exId, date); return b ? b.value : null; }
+// The highest of from..to with the set behind it, { value, date, weight, reps } (equal: the latest
+// set); null when the exercise wasn't done then. bestOneRmIn: only the value.
 function bestOneRmPointIn(exId, from, to) {
   let best = null;
   Object.keys(db.workouts).filter(d => d >= from && d <= to).forEach(date => {
-    const v = dayBestOneRm(exId, date);
-    if (v !== null && (best === null || v > best.value || (v === best.value && date > best.date))) best = { value: v, date };
+    const b = dayBestOneRmSet(exId, date);
+    if (b && (best === null || b.value > best.value || (b.value === best.value && date > best.date))) best = { ...b, date };
   });
   return best;
 }
@@ -3176,7 +3179,7 @@ function insightStrengthStats(r) {
 }
 
 // "+2,1%" / "−0,8%" / "0,0%" (always 1 decimal) as { text, cls }: positive in --success, zero or
-// less in --text — no red on purpose: less can be a deload week. The same rule for "+2,5 kg".
+// less in --text — no red on purpose: less can be a deload week. Per category and per exercise.
 function insightStrengthPct(p) {
   const v = round1(p);
   return { text: (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(1).replace('.', ','), cls: v > 0 ? ' insight-success' : '' };
@@ -3236,19 +3239,13 @@ function insightCategoryLine(series) {
 }
 // "+3%", "0%", "−2,5%": the y-axis of a category line.
 const insightSignedPct = v => formatSignedNumber(v) + '%';
-// A category line: the round steps of the Gewicht axis (insightWeightAxis), with 0% always on it.
-function insightCategoryChartOptions(values, labels, name) {
+// A line in % (a category, or one exercise): the round steps of the Gewicht axis (insightWeightAxis),
+// with 0% always on it. Kracht never shows an estimated 1RM in kg: it only compares sets.
+function insightPctChartOptions(values, labels, aria) {
   const shown = values.filter(v => v !== null);
   const axis = insightWeightAxis(Math.min(0, ...shown), Math.max(0, ...shown));
   return { type: 'line', values, labels, lo: axis.lo, hi: axis.hi, ticks: axis.ticks.map(v => ({ v, label: insightSignedPct(v) })), avg: null,
-    aria: `${name}, gemiddelde verandering van de geschatte 1RM` };
-}
-// An exercise: the axis in kg, fitted to its values, like Gewicht.
-function insightOneRmChartOptions(values, labels, name) {
-  const shown = values.filter(v => v !== null);
-  const axis = insightWeightAxis(Math.min(...shown), Math.max(...shown));
-  return { type: 'line', values, labels, lo: axis.lo, hi: axis.hi, ticks: axis.ticks.map(v => ({ v, label: formatWeight(v) })), avg: null,
-    aria: `${name}, geschatte 1RM` };
+    aria };
 }
 // The charts of the screen shown, per element id: drawn at their measured width, and again at a
 // new width (rotation). Also the chart of Slaap / Gewicht.
@@ -3294,7 +3291,7 @@ function renderInsightStrength() {
       + `<div class="insight-mg-main"><div class="role-title">${c.name}</div><div class="role-sub">${sub}</div></div>`
       + `<div class="insight-mg-figure">${p ? insightPctHtml(p.text, p.cls) : insightNoCompareHtml}</div>`
       + `<span class="insight-edit-icon insight-chevron">${INSIGHT_CHEVRON_SVG}</span></div>`
-      + insightStrengthChartHtml(`insight-strength-chart-${c.id}`, insightCategoryChartOptions(line, labels, c.name),
+      + insightStrengthChartHtml(`insight-strength-chart-${c.id}`, insightPctChartOptions(line, labels, `${c.name}, gemiddelde verandering`),
         line.filter(v => v !== null).length, `Na nog een ${insightStrengthUnit(r)} trainen verschijnt hier een lijn`)
       + '</button>';
   }).join('') + '</div>';
@@ -3324,10 +3321,11 @@ function insightExtremes(series) {
   const pick = better => pts.reduce((a, b) => better(b.value, a.value) || b.value === a.value ? b : a);
   return { strongest: pick((x, y) => x > y), weakest: pick((x, y) => x < y) };
 }
-// "Sterkst 20 kg · maandag 26 oktober 2026" (the label 12px/500 in --text).
+// The real set: "Sterkst 160 kg × 10 · dinsdag 20 oktober 2026" (the weight as in the Fitness
+// Tracker, the full reps without extra reps; the label 12px/500 in --text).
 function insightExtremeHtml(label, p) {
   const day = formatDateStr(p.date);
-  return `<div class="role-sub"><span class="insight-extreme-label">${label}</span> ${formatNumber(p.value)} kg · ${day.charAt(0).toLowerCase()}${day.slice(1)}</div>`;
+  return `<div class="role-sub"><span class="insight-extreme-label">${label}</span> ${formatWeight(p.weight)} kg × ${p.reps} · ${day.charAt(0).toLowerCase()}${day.slice(1)}</div>`;
 }
 function renderInsightCategory() {
   const r = insightRange();
@@ -3344,24 +3342,17 @@ function renderInsightCategory() {
   }
   const points = insightStrengthPoints(r);
   const labels = points.map(p => p.label);
-  const vs = `t.o.v. ${insightPeriodName(s.prev)}`;
-  // The 1RM of the period, high to low; not done in it at the back (on the last known value, then
+  const vs = `<div class="role-sub">t.o.v. ${insightPeriodName(s.prev)}</div>`;
+  // Only %: the estimated 1RM sets the order and compares sets, it is never shown. The 1RM of the period, high to low; not done in it at the back (on the last known value, then
   // on name).
   const orNone = v => v === null ? -1 : v;
   const byValue = (a, b) => (a.cur === null) - (b.cur === null) || orNone(b.cur) - orNone(a.cur)
     || orNone(b.last) - orNone(a.last) || exerciseName(a.id).localeCompare(exerciseName(b.id), 'nl');
   body.innerHTML = '<div class="insight-strength-cards">' + [...c.exercises].sort(byValue).map(e => {
-    let diff;
-    if (e.cur === null) diff = '<div class="role-sub insight-muted">Niet gedaan</div>';
-    else if (e.prev === null) diff = insightNoCompareHtml;
-    else {
-      const d = round1(e.cur - e.prev);
-      const t = `${formatSignedNumber(d)} kg ${vs}`;
-      diff = `<div class="role-sub">${d > 0 ? `<span class="insight-success">${t}</span>` : t}</div>`;
-    }
-    const v = e.cur !== null ? e.cur : e.last;
-    const figure = v === null ? '<div class="insight-figure insight-muted"><span class="set-val">–</span></div>'
-      : `<div class="insight-figure${e.cur === null ? ' insight-muted' : ''}"><span class="set-val">${formatNumber(v)}</span><span class="set-unit">kg</span></div>`;
+    let figure;
+    if (e.cur === null) figure = '<div class="role-sub insight-muted">Niet gedaan</div>';
+    else if (e.prev === null) figure = insightNoCompareHtml;
+    else { const p = insightStrengthPct((e.cur / e.prev - 1) * 100); figure = insightPctHtml(p.text, p.cls); }
     const series = insightStrengthSeries(e.id, points);
     const count = series.filter(Boolean).length;
     const name = exerciseName(e.id);
@@ -3371,9 +3362,9 @@ function renderInsightCategory() {
       extremes = `<div class="insight-extremes">${insightExtremeHtml('Sterkst', x.strongest)}${insightExtremeHtml('Zwakst', x.weakest)}</div>`;
     }
     return `<div class="card insight-strength-card" data-insight-exercise-card="${e.id}">`
-      + `<div class="insight-strength-card-head"><div class="insight-mg-main"><div class="role-row">${e.records ? prTrophySvg('insight-pr') : ''}${name}</div>${diff}</div>`
+      + `<div class="insight-strength-card-head"><div class="insight-mg-main"><div class="role-row">${e.records ? prTrophySvg('insight-pr') : ''}${name}</div>${vs}</div>`
       + `<div class="insight-mg-figure">${figure}</div></div>`
-      + insightStrengthChartHtml(`insight-category-chart-${e.id}`, insightOneRmChartOptions(series.map(p => p && p.value), labels, name),
+      + insightStrengthChartHtml(`insight-category-chart-${e.id}`, insightPctChartOptions(insightCategoryLine([series.map(p => p && p.value)]), labels, `${name}, verandering`),
         count, `Pas één ${insightStrengthUnit(r)} getraind`)
       + extremes + '</div>';
   }).join('') + '</div>';
