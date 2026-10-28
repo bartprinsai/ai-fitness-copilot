@@ -480,7 +480,7 @@ H.run(async () => {
         chevron: (() => { const c = body.querySelector('.insight-chevron svg'); return c ? `${c.getBoundingClientRect().width} ${getComputedStyle(c).fill === tok('--text-muted')}` : 'geen'; })(),
         ext: ext ? { label: f(ext.querySelector('.insight-extreme-label')) + ' ' + (col(ext.querySelector('.insight-extreme-label')) === tok('--text')), text: f(ext.querySelector('.role-sub')),
           border: getComputedStyle(ext).borderTopWidth + ' ' + (getComputedStyle(ext).borderTopColor === getComputedStyle(document.querySelector('.insight-strength-card')).getPropertyValue('--border').trim() || getComputedStyle(ext).borderTopColor === (() => { const d = document.createElement('div'); d.style.borderTopColor = 'var(--border)'; d.style.borderTopStyle = 'solid'; document.body.appendChild(d); const c = getComputedStyle(d).borderTopColor; d.remove(); return c; })()),
-          edge: Math.abs(ext.getBoundingClientRect().left - ext.closest('.card').getBoundingClientRect().left) < 0.5 && Math.abs(ext.getBoundingClientRect().right - ext.closest('.card').getBoundingClientRect().right) < 0.5 } : null,
+          inset: Math.abs(ext.getBoundingClientRect().left - ext.closest('.card').getBoundingClientRect().left - 16) < 0.5 && Math.abs(ext.closest('.card').getBoundingClientRect().right - ext.getBoundingClientRect().right - 16) < 0.5 } : null,
       };
     });
     const STRENGTH = { clipped: [], ticksIn: true, xApart: true, overflow: false, svgFits: true, line: true, point: true, noAvg: true, tick: '11px/400 true',
@@ -494,8 +494,8 @@ H.run(async () => {
     await click('[data-insight-category="chest"]');
     for (const per of ['week', 'month', 'year']) {
       await click(`#insight-category-head [data-insight-period="${per}"]`);
-      check(`${tag} Borst ${per}: Rij in een lijst / Klein / Groot getal, Sterkst 12px/500 --text, lijn 1px --border van rand tot rand, geen chevron`, await style(),
-        { ...STRENGTH, title: '15px/400 true', chevron: 'geen', ext: { label: '12px/500 true', text: '12px/400', border: '1px true', edge: true } });
+      check(`${tag} Borst ${per}: Rij in een lijst / Klein / Groot getal, Sterkst 12px/500 --text, lijn 1px --border 16px van de kaartranden, geen chevron`, await style(),
+        { ...STRENGTH, title: '15px/400 true', chevron: 'geen', ext: { label: '12px/500 true', text: '12px/400', border: '1px true', inset: true } });
       await page.screenshot({ path: path.join(OUT, `category-${per}-${theme}-${wpx}.png`), fullPage: true });
     }
   }

@@ -383,7 +383,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    chosen option in the field picker) is as wide as its line and gets --radius-sm corners. The colour
    is a rounded ::before behind the content rather than the row's own background, so the row's
    bottom line stays straight (a radius on the row itself would curl the line up at both ends).
-   Highlighted rows in a card keep the full card width (no change there). */
+   Highlighted rows in a card keep the full card width; their line stays 16px in (see DIVIDERS). */
 #set-list .set-row, .history-goto-body .set-row, .field-picker-row { position: relative; isolation: isolate; }
 #set-list .set-row:active, #set-list .set-row.selected, .history-goto-body .set-row.graph-goto-set-point, .field-picker-list .field-picker-row.selected, .field-picker-list .field-picker-row:active { background: transparent; }
 #set-list .set-row:active::before, #set-list .set-row.selected::before, .history-goto-body .set-row.graph-goto-set-point::before, .field-picker-list .field-picker-row.selected::before, .field-picker-list .field-picker-row:active::before { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: var(--radius-sm); background: var(--primary-light); }
@@ -447,7 +447,8 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .exercise-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; background: var(--bg); padding-bottom: calc(var(--ai-bar-space) + var(--space-4)); }
 /* Every list on this screen (categories, a category, search results, Favorieten) is one .card on
    --bg — same margin, radius and shadow as .history-card / .exercise-card. Rows take the card's
-   white, --card-padding inside, a 1px --border line between rows and none after the last one;
+   white, --card-padding inside, a 1px --border line between rows (16px from the card edges, see
+   DIVIDERS) and none after the last one;
    overflow: hidden keeps the pressed-row background inside the rounded corners. */
 .card.list-card { padding: 0; margin: var(--card-gap) var(--screen-gutter) 0; overflow: hidden; }
 .list-card .list-row { padding-left: var(--card-padding); padding-right: var(--card-padding); }
@@ -1049,7 +1050,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .orm-table-card { background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--card-shadow); overflow: hidden; }
 /* Rep max table: three equal, centred columns (head and rows alike), rows in set-row style (same
    vertical padding, every value on Groot getal with its unit — kg, % — apart on Klein), 1px --border
-   lines edge to edge of the card. minmax(0, 1fr) keeps the thirds equal whatever the content. */
+   lines between the rows, 16px from the card edges (see DIVIDERS). minmax(0, 1fr) keeps the thirds equal whatever the content. */
 .orm-table-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: center; padding: var(--space-3) var(--space-2); color: var(--text); }
 .orm-table-row > div { display: flex; align-items: baseline; justify-content: center; gap: var(--space-1); }
 /* % and weight columns: number + unit right-aligned in a box as wide as the longest value of the
@@ -1136,8 +1137,8 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .role-row.insight-empty { color: var(--text-muted); } /* wins over .role-row's --text in the role block */
 .insight-danger { color: var(--danger); }
 .insight-success { color: var(--success); }
-/* PER WEEK (Maand) / PER MAAND (Jaar): a table in a list card (.insight-day-card: no padding, lines
-   from edge to edge). One grid for all rows (subgrid), so the columns line up: the period on the
+/* PER WEEK (Maand) / PER MAAND (Jaar): a table in a list card (.insight-day-card: no padding, rows
+   from edge to edge, their lines 16px from the card edges, see DIVIDERS). One grid for all rows (subgrid), so the columns line up: the period on the
    left, four equal centred value columns. The card padding is a track of its own on both sides
    (a subgrid's own padding would come off the first and last column only); --space-2 between the
    columns comes from the cells' padding. Every row is a button of at least 48px (a part still to
@@ -1162,7 +1163,8 @@ button.insight-table-row:active { background: var(--bg); }
 .insight-day-nav { margin-top: 0; }
 /* The 48px nav row already has ±14px air under its text; together that is about a section gap. */
 .insight-day-nav + .insight-label { padding-top: var(--space-3); }
-/* Training: a card without padding, so the row lines run from edge to edge (like a list in a card). */
+/* Training: a card without padding, so the rows run from edge to edge (like a list in a card); their
+   lines stay 16px from the card edges (see DIVIDERS). */
 .insight-day-card { padding: 0; overflow: hidden; }
 .insight-day-head { padding: var(--card-padding); }
 .insight-day-head .role-sub, .insight-mg-main .role-sub, .overlay-head .role-sub, .insight-empty + .role-sub { margin-top: 2px; }
@@ -1269,8 +1271,9 @@ button.insight-table-row:active { background: var(--bg); }
 .insight-strength-card-head { display: flex; align-items: baseline; gap: var(--space-3); }
 .insight-strength-card-head .insight-chevron { align-self: center; }
 .insight-strength-chart { margin-top: var(--space-3); }
-/* Sterkst / Zwakst under the chart, after a line from edge to edge of the card. */
-.insight-extremes { margin: var(--space-3) calc(-1 * var(--card-padding)) 0; padding: var(--space-3) var(--card-padding) 0; border-top: 1px solid var(--border); }
+/* Sterkst / Zwakst under the chart, after a line within the card padding: 16px from the card edges
+   (see DIVIDERS). */
+.insight-extremes { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--border); }
 .insight-extremes .role-sub + .role-sub { margin-top: 2px; }
 .insight-extreme-label { font-weight: var(--fw-medium); color: var(--text); }
 
@@ -1330,3 +1333,32 @@ button.insight-table-row:active { background: var(--bg); }
 .btn.btn-compact { height: 36px; font-size: var(--fs-small); font-weight: var(--fw-medium); }
 .role-title, .role-row { color: var(--text); }
 .role-sub { color: var(--text-secondary); }
+
+/* ══ DIVIDERS ═══════════════════════════════════════════
+   One rule for every grey line between rows or sections (1px --border): 16px from the edges — of the
+   card or menu it sits in, or of the screen (in a popup or sheet: of the screen, the panel's own
+   --screen-gutter padding) when there is no frame. No line above the first row or under the last.
+   - A line that sits within the padding of its card, sheet or screen (the Kracht card, Sterkst/Zwakst,
+     the TRACK list, the popups, the field picker, Nieuwe oefening) is a plain border: it already
+     starts and ends 16px from the edge.
+   - A row that runs from edge to edge of its card (so its pressed / selected background and its tap
+     area do too) keeps its own 1px border — and so its height and its background under the border —
+     but the line drawn in that border is inset by --card-padding at both ends (border-image: a
+     gradient that is transparent for the first and the last 16px). Rows that stretch from edge to
+     edge are listed here; a new list in a card adds its row here.
+   Not under this rule: the 2px --primary line under the name of an exercise (day overview) or a date
+   (History), which belongs to the card head and runs from edge to edge; a full-width row background;
+   chart grid lines, the underline of a tab bar and the border of an input or control. */
+.exercise-card .set-row, .history-card .set-row,
+.records-list .records-row,
+.list-card > .list-row,
+.dropdown-item,
+.plan-day-preview,
+.plate-row,
+.orm-table-row,
+.insight-table-row,
+.insight-day-card > .insight-mg-row {
+  border-image: linear-gradient(to right, transparent var(--card-padding), var(--border) var(--card-padding), var(--border) calc(100% - var(--card-padding)), transparent calc(100% - var(--card-padding))) 1 0;
+}
+/* The last set row keeps a transparent 1px border (same height for every row): no line there. */
+.exercise-card .set-row:last-child, .history-card .set-row:last-child { border-image: none; }
