@@ -635,6 +635,7 @@ const SCREEN_ON_ENTER = {
   'screen-insight-training': () => renderInsightTraining(),
   'screen-insight-muscle': () => renderInsightMuscle(),
   'screen-insight-strength': () => renderInsightStrength(),
+  'screen-insight-category': () => renderInsightCategory(),
 };
 
 // Per-screen "does the CURRENTLY ACTIVE screen have unsaved input?" checks,
@@ -2474,7 +2475,7 @@ function openInsight() {
 // On every screen with the period head: Week · Maand · Jaar switches period, ‹ › steps one period
 // (not past the current one); then that screen is redrawn. A row with data-insight-open (the
 // table, the Slaap / Gewicht lists) zooms in: that week or month on the same screen, one step back.
-['screen-insight', 'screen-insight-metric', 'screen-insight-training', 'screen-insight-muscle', 'screen-insight-strength'].forEach(id => document.getElementById(id).addEventListener('click', e => {
+['screen-insight', 'screen-insight-metric', 'screen-insight-training', 'screen-insight-muscle', 'screen-insight-strength', 'screen-insight-category'].forEach(id => document.getElementById(id).addEventListener('click', e => {
   const p = e.target.closest('[data-insight-period]');
   const b = e.target.closest('[data-insight-step]');
   const o = e.target.closest('[data-insight-open]');
@@ -2929,23 +2930,19 @@ function insightWeightDetailHtml(r) {
   return { summary, chart: w && insightWeightChartOptions(subs.map(x => x.w ? x.w.avg : null), subs.map(x => x.p.axis), w.avg, per), label: per, list };
 }
 
-let insightChartOptions = null; // the drawn chart, redrawn at a new width (rotation)
-function drawInsightChart() {
-  const el = document.getElementById('insight-chart');
-  if (el && insightChartOptions) el.innerHTML = insightChartSvg(el.clientWidth || 296, insightChartOptions);
-}
 function renderInsightMetric() {
   const r = insightRange();
   document.getElementById('insight-metric-title').textContent = insightMetric === 'sleep' ? 'Slaap' : 'Gewicht';
   document.getElementById('insight-metric-head').innerHTML = insightPeriodHeadHtml(r);
   const d = insightMetric === 'sleep' ? insightSleepDetailHtml(r) : insightWeightDetailHtml(r);
-  insightChartOptions = d.chart;
+  insightCharts.clear();
+  if (d.chart) insightCharts.set('insight-chart', d.chart);
   // No value at all: only the summary's empty state, no empty chart.
   const chart = d.chart ? '<div class="card insight-chart-card"><div class="insight-chart" id="insight-chart"></div>'
     + '<div class="role-sub insight-chart-legend">- - - gemiddeld</div></div>' : '';
   document.getElementById('insight-metric-body').innerHTML = d.summary + chart
     + `<div class="section-label insight-label">${d.label}</div>` + d.list;
-  drawInsightChart();
+  drawInsightCharts();
 }
 document.getElementById('btn-back-insight-metric').addEventListener('click', () => goBack('screen-insight'));
 document.getElementById('insight-metric-body').addEventListener('click', e => {
@@ -2955,7 +2952,7 @@ document.getElementById('insight-metric-body').addEventListener('click', e => {
   else openInsightWeightSheet(row.dataset.insightFill);
 });
 window.addEventListener('resize', () => {
-  if (document.getElementById('screen-insight-metric').classList.contains('active')) drawInsightChart();
+  if (['screen-insight-metric', 'screen-insight-strength', 'screen-insight-category'].some(id => document.getElementById(id).classList.contains('active'))) drawInsightCharts();
 });
 
 // -- Inzicht: the training overview and the muscle-group screen ----------------------------------
@@ -3111,7 +3108,7 @@ function renderInsightMuscle() {
 }
 document.getElementById('btn-back-insight-muscle').addEventListener('click', () => goBack('screen-insight-training'));
 
-// -- Inzicht: Kracht (the Kracht card and #screen-insight-strength) ---------------------------------
+// -- Inzicht: Kracht (the Kracht card; the screens below) -------------------------------------------
 // The estimated 1RM of the exercises with Kracht volgen on, per period, against the previous period
 // of the same kind (previous week, month or year). Rules: PROJECT_CONTEXT.md, "Kracht".
 //   a set counts with weight > 0 and ≥ 1 rep, with its full reps only (partial / forced reps are
@@ -3135,11 +3132,17 @@ function dayBestOneRm(exId, date) {
   });
   return best;
 }
-// The highest of from..to; null when the exercise wasn't done then.
-function bestOneRmIn(exId, from, to) {
-  return Object.keys(db.workouts).filter(d => d >= from && d <= to).map(d => dayBestOneRm(exId, d))
-    .reduce((best, v) => v !== null && (best === null || v > best) ? v : best, null);
+// The highest of from..to with the day it was set on, { value, date } (equal: the latest day); null
+// when the exercise wasn't done then. bestOneRmIn: only the value.
+function bestOneRmPointIn(exId, from, to) {
+  let best = null;
+  Object.keys(db.workouts).filter(d => d >= from && d <= to).forEach(date => {
+    const v = dayBestOneRm(exId, date);
+    if (v !== null && (best === null || v > best.value || (v === best.value && date > best.date))) best = { value: v, date };
+  });
+  return best;
 }
+function bestOneRmIn(exId, from, to) { const p = bestOneRmPointIn(exId, from, to); return p ? p.value : null; }
 // The last known value before `date`: the highest of the last day before it with a counting set.
 function lastOneRmBefore(exId, date) {
   const dates = Object.keys(db.workouts).filter(d => d < date).sort();
@@ -3198,52 +3201,185 @@ function insightStrengthAsideHtml(s) {
   return s.records ? `<span class="t-small insight-records">${prTrophySvg('insight-pr')}${insightRecordsText(s.records)}</span>` : '';
 }
 
+// -- The charts of Kracht (#screen-insight-strength and #screen-insight-category) ------------------
+// A point per week or month, up to and including the period shown: Week the last 8 weeks, Maand the
+// last 6 months, Jaar January to December of that year (months still to come stay on the axis
+// without a point). The value of an exercise per point is its highest estimated 1RM then
+// (bestOneRmPointIn). One line per chart, in --primary: the Gewicht chart (insightChartSvg).
+// [{ from, to, label ("44" / "okt"), future }]
+function insightStrengthPoints(r) {
+  const today = todayStr();
+  if (r.period === 'week') {
+    return [7, 6, 5, 4, 3, 2, 1, 0].map(k => {
+      const ws = addDaysToDateStr(r.start, -7 * k);
+      return { from: ws, to: addDaysToDateStr(ws, 6), label: String(isoWeekOfDateStr(ws)), future: ws > today };
+    });
+  }
+  const months = r.period === 'month' ? [-5, -4, -3, -2, -1, 0] : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+  return months.map(k => addMonthsToMonthStart(r.start, k))
+    .map(ms => ({ from: ms, to: monthEndOf(ms), label: insightMonthShort(ms), future: ms > today }));
+}
+// Per point { value, date } (the day of the set behind it), or null: no value then.
+function insightStrengthSeries(exId, points) {
+  return points.map(p => p.future ? null : bestOneRmPointIn(exId, p.from, p.to));
+}
+// The line of a category: per point the average change in % since the start, every exercise
+// weighing the same. An exercise starts at its own first point in the chart; at every point where
+// it has a value: (value ÷ start − 1) × 100. So the first point is always 0%.
+// series: per exercise an array of values (null: none); null where no exercise has a value.
+function insightCategoryLine(series) {
+  const starts = series.map(s => s.find(v => v !== null));
+  return (series[0] || []).map((_, i) => {
+    const pcts = series.map((s, j) => s[i] === null ? null : (s[i] / starts[j] - 1) * 100).filter(v => v !== null);
+    return pcts.length ? insightAverage(pcts) : null;
+  });
+}
+// "+3%", "0%", "−2,5%": the y-axis of a category line.
+const insightSignedPct = v => formatSignedNumber(v) + '%';
+// A category line: the round steps of the Gewicht axis (insightWeightAxis), with 0% always on it.
+function insightCategoryChartOptions(values, labels, name) {
+  const shown = values.filter(v => v !== null);
+  const axis = insightWeightAxis(Math.min(0, ...shown), Math.max(0, ...shown));
+  return { type: 'line', values, labels, lo: axis.lo, hi: axis.hi, ticks: axis.ticks.map(v => ({ v, label: insightSignedPct(v) })), avg: null,
+    aria: `${name}, gemiddelde verandering van de geschatte 1RM` };
+}
+// An exercise: the axis in kg, fitted to its values, like Gewicht.
+function insightOneRmChartOptions(values, labels, name) {
+  const shown = values.filter(v => v !== null);
+  const axis = insightWeightAxis(Math.min(...shown), Math.max(...shown));
+  return { type: 'line', values, labels, lo: axis.lo, hi: axis.hi, ticks: axis.ticks.map(v => ({ v, label: formatWeight(v) })), avg: null,
+    aria: `${name}, geschatte 1RM` };
+}
+// The charts of the screen shown, per element id: drawn at their measured width, and again at a
+// new width (rotation). Also the chart of Slaap / Gewicht.
+const insightCharts = new Map();
+function drawInsightCharts() {
+  insightCharts.forEach((o, id) => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = insightChartSvg(el.clientWidth || 296, o);
+  });
+}
+// The chart part of a Kracht card: the chart, with one point a Klein line under it; without any
+// point only the empty text.
+function insightStrengthChartHtml(id, options, count, oneText) {
+  if (!count) return `<div class="insight-strength-chart">${insightEmptyHtml('Nog niet getraind in deze periode')}</div>`;
+  insightCharts.set(id, options);
+  return `<div class="insight-strength-chart" id="${id}"></div>`
+    + (count === 1 ? `<div class="role-sub insight-muted insight-chart-note">${oneText}</div>` : '');
+}
+const insightStrengthUnit = r => r.period === 'week' ? 'week' : 'maand';
+
 function openInsightStrength() { showScreen('screen-insight-strength'); }
-// The detail screen: a sectiekop per category with its average change, a row per exercise (highest
-// estimated 1RM first) that opens its Grafiek in the Fitness Tracker; back comes here again.
+// Kracht: a card per category with Kracht volgen (in the order of the categories), each with the
+// line of its average change. A tap zooms in on that category (#screen-insight-category, same
+// period); back comes here again.
 function renderInsightStrength() {
   const r = insightRange();
   const s = insightStrengthStats(r);
+  insightCharts.clear();
   document.getElementById('insight-strength-head').innerHTML = insightPeriodHeadHtml(r);
-  const label = '<div class="section-label insight-label">Geschatte 1RM per oefening</div>';
+  const body = document.getElementById('insight-strength-body');
   if (!s.exercises.length) {
-    document.getElementById('insight-strength-body').innerHTML = label + `<div class="card">${insightEmptyHtml(INSIGHT_STRENGTH_EMPTY)}</div>`;
+    body.innerHTML = `<div class="card insight-strength-cards">${insightEmptyHtml(INSIGHT_STRENGTH_EMPTY)}</div>`;
     return;
   }
-  const shown = e => e.cur !== null ? e.cur : e.last;
-  const byValue = (a, b) => (shown(b) === null ? -1 : shown(b)) - (shown(a) === null ? -1 : shown(a))
-    || exerciseName(a.id).localeCompare(exerciseName(b.id), 'nl');
-  const html = s.categories.map(c => {
+  const points = insightStrengthPoints(r);
+  const labels = points.map(p => p.label);
+  body.innerHTML = '<div class="insight-strength-cards">' + s.categories.map(c => {
+    const line = insightCategoryLine(c.exercises.map(e => insightStrengthSeries(e.id, points).map(p => p && p.value)));
     const p = c.pct === null ? null : insightStrengthPct(c.pct);
-    const head = `<div class="insight-strength-head"><span class="section-label section-head">${c.name}</span>`
-      + (p ? `<span class="t-small${p.cls}">${p.text}%</span>` : '<span class="role-sub insight-muted">Geen vergelijking</span>') + '</div>';
-    return head + [...c.exercises].sort(byValue).map(e => {
-      let diff;
-      if (e.cur === null) diff = '<div class="role-sub insight-muted">Niet gedaan</div>';
-      else if (e.prev === null) diff = insightNoCompareHtml;
-      else {
-        const d = round1(e.cur - e.prev);
-        diff = `<div class="role-sub">${d > 0 ? `<span class="insight-success">${formatSignedNumber(d)} kg</span>` : `${formatSignedNumber(d)} kg`}</div>`;
-      }
-      const v = shown(e);
-      const figure = v === null ? '<div class="insight-figure insight-muted"><span class="set-val">–</span></div>'
-        : `<div class="insight-figure${e.cur === null ? ' insight-muted' : ''}"><span class="set-val">${formatNumber(v)}</span><span class="set-unit">kg</span></div>`;
-      return `<button type="button" class="insight-mg-row insight-list-row" data-insight-exercise="${e.id}" aria-label="Grafiek ${exerciseName(e.id)}">`
-        + `<div class="insight-mg-main"><div class="role-row">${e.records ? prTrophySvg('insight-pr') : ''}${exerciseName(e.id)}</div>${diff}</div>`
-        + `<div class="insight-mg-figure">${figure}</div><span class="insight-edit-icon insight-chevron">${INSIGHT_CHEVRON_SVG}</span></button>`;
-    }).join('');
-  }).join('');
-  document.getElementById('insight-strength-body').innerHTML = label + `<div class="card insight-day-card insight-list insight-strength-list">${html}</div>`;
+    const sub = `t.o.v. ${insightPeriodName(s.prev)}` + (c.records ? ` · <span class="insight-records">${prTrophySvg('insight-pr')}${insightRecordsText(c.records)}</span>` : '');
+    return `<button type="button" class="card insight-strength-card insight-edit-card" data-insight-category="${c.id}">`
+      + '<div class="insight-strength-card-head">'
+      + `<div class="insight-mg-main"><div class="role-title">${c.name}</div><div class="role-sub">${sub}</div></div>`
+      + `<div class="insight-mg-figure">${p ? insightPctHtml(p.text, p.cls) : insightNoCompareHtml}</div>`
+      + `<span class="insight-edit-icon insight-chevron">${INSIGHT_CHEVRON_SVG}</span></div>`
+      + insightStrengthChartHtml(`insight-strength-chart-${c.id}`, insightCategoryChartOptions(line, labels, c.name),
+        line.filter(v => v !== null).length, `Na nog een ${insightStrengthUnit(r)} trainen verschijnt hier een lijn`)
+      + '</button>';
+  }).join('') + '</div>';
+  drawInsightCharts();
 }
 document.getElementById('btn-back-insight-strength').addEventListener('click', () => goBack('screen-insight'));
-// A row zooms in on its exercise: the Grafiek in the Fitness Tracker; back (arrow or Android) lands
-// here again, in the same period (the shared period isn't touched).
+// A category card zooms in on that category, in the same (shared) period; back (arrow or Android)
+// lands here again.
 document.getElementById('insight-strength-body').addEventListener('click', e => {
-  const row = e.target.closest('[data-insight-exercise]');
-  if (!row) return;
-  openTraining(row.dataset.insightExercise);
-  switchTab('graph');
+  const card = e.target.closest('[data-insight-category]');
+  if (card) openInsightCategory(card.dataset.insightCategory);
 });
+
+// -- Inzicht: a category of Kracht (#screen-insight-category) ------------------------------------
+// A card per exercise with Kracht volgen in the category, the highest estimated 1RM of the period
+// first (not done in it: at the back). Each card has its own chart with Sterkst and Zwakst under
+// it. The cards open nothing.
+let insightCategoryId = '';
+function openInsightCategory(id) {
+  insightCategoryId = id;
+  showScreen('screen-insight-category');
+}
+// Sterkst / Zwakst: the highest and the lowest point of the chart (equal values: the latest), each
+// { value, date } with the day of the set behind it. series: insightStrengthSeries.
+function insightExtremes(series) {
+  const pts = series.filter(Boolean);
+  const pick = better => pts.reduce((a, b) => better(b.value, a.value) || b.value === a.value ? b : a);
+  return { strongest: pick((x, y) => x > y), weakest: pick((x, y) => x < y) };
+}
+// "Sterkst 20 kg · maandag 26 oktober 2026" (the label 12px/500 in --text).
+function insightExtremeHtml(label, p) {
+  const day = formatDateStr(p.date);
+  return `<div class="role-sub"><span class="insight-extreme-label">${label}</span> ${formatNumber(p.value)} kg · ${day.charAt(0).toLowerCase()}${day.slice(1)}</div>`;
+}
+function renderInsightCategory() {
+  const r = insightRange();
+  const s = insightStrengthStats(r);
+  const c = s.categories.find(x => x.id === insightCategoryId);
+  const cat = allCategories().find(x => x.id === insightCategoryId);
+  insightCharts.clear();
+  document.getElementById('insight-category-title').textContent = cat ? cat.name : '';
+  document.getElementById('insight-category-head').innerHTML = insightPeriodHeadHtml(r);
+  const body = document.getElementById('insight-category-body');
+  if (!c) {
+    body.innerHTML = `<div class="card insight-strength-cards">${insightEmptyHtml(INSIGHT_STRENGTH_EMPTY)}</div>`;
+    return;
+  }
+  const points = insightStrengthPoints(r);
+  const labels = points.map(p => p.label);
+  const vs = `t.o.v. ${insightPeriodName(s.prev)}`;
+  // The 1RM of the period, high to low; not done in it at the back (on the last known value, then
+  // on name).
+  const orNone = v => v === null ? -1 : v;
+  const byValue = (a, b) => (a.cur === null) - (b.cur === null) || orNone(b.cur) - orNone(a.cur)
+    || orNone(b.last) - orNone(a.last) || exerciseName(a.id).localeCompare(exerciseName(b.id), 'nl');
+  body.innerHTML = '<div class="insight-strength-cards">' + [...c.exercises].sort(byValue).map(e => {
+    let diff;
+    if (e.cur === null) diff = '<div class="role-sub insight-muted">Niet gedaan</div>';
+    else if (e.prev === null) diff = insightNoCompareHtml;
+    else {
+      const d = round1(e.cur - e.prev);
+      const t = `${formatSignedNumber(d)} kg ${vs}`;
+      diff = `<div class="role-sub">${d > 0 ? `<span class="insight-success">${t}</span>` : t}</div>`;
+    }
+    const v = e.cur !== null ? e.cur : e.last;
+    const figure = v === null ? '<div class="insight-figure insight-muted"><span class="set-val">–</span></div>'
+      : `<div class="insight-figure${e.cur === null ? ' insight-muted' : ''}"><span class="set-val">${formatNumber(v)}</span><span class="set-unit">kg</span></div>`;
+    const series = insightStrengthSeries(e.id, points);
+    const count = series.filter(Boolean).length;
+    const name = exerciseName(e.id);
+    let extremes = '';
+    if (count > 1) {
+      const x = insightExtremes(series);
+      extremes = `<div class="insight-extremes">${insightExtremeHtml('Sterkst', x.strongest)}${insightExtremeHtml('Zwakst', x.weakest)}</div>`;
+    }
+    return `<div class="card insight-strength-card" data-insight-exercise-card="${e.id}">`
+      + `<div class="insight-strength-card-head"><div class="insight-mg-main"><div class="role-row">${e.records ? prTrophySvg('insight-pr') : ''}${name}</div>${diff}</div>`
+      + `<div class="insight-mg-figure">${figure}</div></div>`
+      + insightStrengthChartHtml(`insight-category-chart-${e.id}`, insightOneRmChartOptions(series.map(p => p && p.value), labels, name),
+        count, `Pas één ${insightStrengthUnit(r)} getraind`)
+      + extremes + '</div>';
+  }).join('') + '</div>';
+  drawInsightCharts();
+}
+document.getElementById('btn-back-insight-category').addEventListener('click', () => goBack('screen-insight-strength'));
 
 // The sheets below fill in insightSheetDate; after Opslaan or Wissen the screen they were opened
 // from (day overview or a detail screen) is redrawn at once.

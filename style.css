@@ -1203,7 +1203,8 @@ button.insight-table-row:active { background: var(--bg); }
 /* The weight line as in the Grafiek: --primary, 2.5 wide, round joins, 4px-radius points. */
 .insight-line { fill: none; stroke: var(--primary); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
 .insight-point { fill: var(--primary); }
-.insight-chart-legend { margin-top: var(--space-2); text-align: center; }
+/* A Klein line under a chart: the legend, or a note ("Pas één week getraind"). */
+.insight-chart-legend, .insight-chart-note { margin-top: var(--space-2); text-align: center; }
 /* List: a button per day, the day overview's .insight-mg-row; a line between rows, none above the first. */
 .insight-list .insight-mg-row:first-child { border-top: none; }
 .insight-list-row { width: 100%; border-left: none; border-right: none; border-bottom: none; background: none; text-align: left; font-family: inherit; color: inherit; cursor: pointer; }
@@ -1233,7 +1234,7 @@ button.insight-table-row:active { background: var(--bg); }
 .insight-bar-planned { fill: var(--text-muted); }
 .insight-pct { column-gap: 0; } /* "16%": the % right after the number, no space */
 
-/* ── Kracht: the card on the main screen and #screen-insight-strength ──────────────────────────────
+/* ── Kracht: the card on the main screen, #screen-insight-strength and #screen-insight-category ──────────────────────────────
    Colour rule: a positive change in --success, zero or less in --text (the details' "0 kg" / "−1 kg"
    in --text-secondary) — never red. A value that isn't this period's is --text-muted. */
 .insight-figure.insight-muted .set-val, .insight-figure.insight-muted .set-unit { color: var(--text-muted); }
@@ -1247,12 +1248,18 @@ button.insight-table-row:active { background: var(--bg); }
 .insight-strength-row + .insight-strength-row { margin-top: var(--space-2); }
 .insight-strength-row .insight-mg-figure .role-sub { margin-top: 2px; }
 .insight-strength-note { margin-top: var(--space-3); }
-/* Detail list: a sectiekop per category with its change behind it; above every one but the first a
-   line from edge to edge (24px above it: the row's 12px + --space-3, 16px between line and head),
-   and no line between a head and its first row. */
-.insight-strength-head { display: flex; align-items: baseline; gap: var(--space-2); padding: var(--space-4) var(--card-padding) 0; color: var(--text); }
-.insight-strength-head:not(:first-child) { margin-top: var(--space-3); border-top: 1px solid var(--border); }
-.insight-strength-list .insight-strength-head + .insight-mg-row { border-top: none; }
+/* Kracht and a category of Kracht: a card per category / per exercise, each with its own chart (one
+   line, --primary). Head: the name with a Klein line under it on the left, the figure on the right
+   (a category card: then the chevron), on the baseline of their first line. */
+.insight-strength-cards { display: flex; flex-direction: column; gap: var(--card-gap); margin-top: var(--section-gap); }
+.insight-strength-card.insight-edit-card { display: block; }
+.insight-strength-card-head { display: flex; align-items: baseline; gap: var(--space-3); }
+.insight-strength-card-head .insight-chevron { align-self: center; }
+.insight-strength-chart { margin-top: var(--space-3); }
+/* Sterkst / Zwakst under the chart, after a line from edge to edge of the card. */
+.insight-extremes { margin: var(--space-3) calc(-1 * var(--card-padding)) 0; padding: var(--space-3) var(--card-padding) 0; border-top: 1px solid var(--border); }
+.insight-extremes .role-sub + .role-sub { margin-top: 2px; }
+.insight-extreme-label { font-weight: var(--fw-medium); color: var(--text); }
 
 /* ── Slaap invullen: the 24-hour clock (#sleep-clock) ──────────────────────────────────────────
    Max. 280px wide (scales down with the panel), 0 at the top, clockwise. Ring r=116 in the 280
