@@ -19,7 +19,7 @@ const TEXT = ['#exercise-search', '#new-ex-name', '#new-plan-name', '#plan-renam
 H.run(async () => {
   const out = H.outDir(__filename);
   const allErrors = [];
-  for (const theme of ['light', 'dark']) for (const w of [360, 390]) {
+  for (const theme of H.THEMES) for (const w of H.WIDTHS) {
     const tag = `${theme} ${w}`;
     H.section(tag);
     const { browser, page, errors } = await H.openApp({ width: w, theme });
@@ -35,7 +35,7 @@ H.run(async () => {
           document.getElementById('pde-sets-reps-overlay').classList.add('open');
         }
       }, c);
-      await page.waitForTimeout(350);
+      await H.settle(page);
       const r = await page.evaluate(({ sel, long }) => {
         const el = document.querySelector(sel);
         const realPh = el.hasAttribute('placeholder'); if (!realPh) el.setAttribute('placeholder', '8');

@@ -6,7 +6,7 @@ const H = require('./helpers');
 H.run(async () => {
   const { browser, ctx, page, errors } = await H.openApp({ width: 390, height: 844, touch: true });
   const cdp = await ctx.newCDPSession(page);
-  const settle = (ms = 450) => page.waitForTimeout(ms);
+  const settle = () => H.settle(page);
   const back = async () => { await page.evaluate(() => history.back()); await settle(); };
   const state = () => page.evaluate(() => ({
     screen: document.querySelector('.screen.active').id,
@@ -19,7 +19,7 @@ H.run(async () => {
     const box = await page.locator('#home-content .exercise-card').nth(idx).locator('.exercise-card-name').boundingBox();
     const x = box.x + 20, y = box.y + box.height / 2;
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
-    await page.waitForTimeout(800);
+    await H.settle(page); // held until the 500ms long-press timer has fired
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] }); // a real Android long-press release fires no click
     await settle();
   };

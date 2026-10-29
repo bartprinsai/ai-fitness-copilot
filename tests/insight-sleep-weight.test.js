@@ -36,7 +36,7 @@ Object.assign(DATA_AXIS.sleep, {
 async function setup(page, theme = 'light', data = DATA) {
   await H.loadData(page, data, theme);
   await page.evaluate(() => { showScreen('screen-home'); openInsight(); });
-  await page.waitForTimeout(80);
+  await H.settle(page);
 }
 const active = page => page.evaluate(() => document.querySelector('.screen.active').id);
 const headOf = (page, scr) => page.evaluate(scr => {
@@ -74,7 +74,7 @@ const colours = page => page.evaluate(() => {
   P.fillText = orig; shown.forEach(([e, d]) => { e.style.display = d; });
   return { muted: toRgb(root.getPropertyValue('--text-muted').trim()), grafiek: [...new Set(seen)] };
 });
-const openWeek = (page, kind, weekStart) => page.evaluate(([k, w]) => { insightWeekStart = w; openInsightMetric(k); }, [kind, weekStart]).then(() => page.waitForTimeout(120));
+const openWeek = (page, kind, weekStart) => page.evaluate(([k, w]) => { insightWeekStart = w; openInsightMetric(k); }, [kind, weekStart]).then(() => H.settle(page));
 const axis = page => page.evaluate(() => {
   const svg = document.querySelector('#insight-chart svg');
   const st = sel => [...svg.querySelectorAll(sel)].map(e => { const cs = getComputedStyle(e); return [cs.fill, cs.fontSize, cs.fontWeight].join(' / '); });
@@ -115,7 +115,7 @@ H.run(async () => {
   console.log('     chevron:', chev);
 
   // --- Sleep detail, week 43
-  await page.click('#insight-cards [data-insight-metric="sleep"]'); await page.waitForTimeout(100);
+  await page.click('#insight-cards [data-insight-metric="sleep"]'); await H.settle(page);
   check('slaap opent', [await active(page), await page.textContent('#insight-metric-title')], ['screen-insight-metric', 'Slaap']);
   check('slaap kop', await headOf(page, 'screen-insight-metric'), ['Week 43', '19–25 oktober 2026', true]);
   check('periodeknoppen', await page.evaluate(() => [...document.querySelectorAll('#insight-metric-head .time-filter')].map(b => [b.textContent, b.disabled])), [['Week', false], ['Maand', false], ['Jaar', false]]); // sinds stap 6 alle drie aan
@@ -135,45 +135,45 @@ H.run(async () => {
   check('staven in kolom ma, di, do, vr', barX, [0, 1, 3, 4]);
 
   // fill in Wednesday from the list
-  await page.click('[data-insight-fill="2026-10-21"]'); await page.waitForTimeout(350);
+  await page.click('[data-insight-fill="2026-10-21"]'); await H.settle(page);
   check('invulvenster slaap open voor woensdag', [await page.evaluate(() => document.getElementById('insight-sleep-overlay').classList.contains('open')), await page.textContent('#insight-sleep-sub'),
     await page.isVisible('#btn-insight-sleep-clear')], [true, 'Nacht van dinsdag 20 op woensdag 21 oktober 2026', false]);
   await page.evaluate(() => { insightSleepTimes.bed = '22:30'; insightSleepTimes.wake = '06:45'; renderSleepClock(); });
-  await page.click('#btn-insight-sleep-save'); await page.waitForTimeout(350);
+  await page.click('#btn-insight-sleep-save'); await H.settle(page);
   check('opgeslagen: lijst, grafiek en samenvatting direct bij', [await toastMsg(page), (await list(page))[2], (await chart(page)).bars.length, (await summary(page)).cols[0]],
     ['Slaap opgeslagen', 'Woensdag 21 oktober 2026 22:30 – 06:45 8:15 u', 5, 'GEMIDDELD 7:08 u']);
   // change it
-  await page.click('[data-insight-fill="2026-10-21"]'); await page.waitForTimeout(350);
+  await page.click('[data-insight-fill="2026-10-21"]'); await H.settle(page);
   check('wijzigen: start op de eigen tijden, Wissen zichtbaar', [await page.evaluate(() => insightSleepValues()), await page.isVisible('#btn-insight-sleep-clear')], [['22:30', '06:45'], true]);
   await page.evaluate(() => { insightSleepTimes.wake = '04:30'; renderSleepClock(); });
-  await page.click('#btn-insight-sleep-save'); await page.waitForTimeout(350);
+  await page.click('#btn-insight-sleep-save'); await H.settle(page);
   check('gewijzigd: 6:00 rood', [(await list(page))[2], (await chart(page)).bars], ['Woensdag 21 oktober 2026 22:30 – 04:30 6:00 u', ['blauw', 'rood', 'rood', 'rood', 'blauw']]);
   // clear it
-  await page.click('[data-insight-fill="2026-10-21"]'); await page.waitForTimeout(350);
-  await page.click('#btn-insight-sleep-clear'); await page.waitForTimeout(350);
+  await page.click('[data-insight-fill="2026-10-21"]'); await H.settle(page);
+  await page.click('#btn-insight-sleep-clear'); await H.settle(page);
   check('gewist: direct bij', [await toastMsg(page), (await list(page))[2], (await chart(page)).bars.length, (await summary(page)).cols[0]],
     ['Slaap gewist', 'Woensdag 21 oktober 2026 Niet ingevuld', 4, 'GEMIDDELD 6:51 u']);
 
   // browse: back two weeks (week 41: 23:50 + 00:30), then week 40 (empty)
-  await page.click('#insight-metric-head [data-insight-step="-1"]'); await page.waitForTimeout(80);
+  await page.click('#insight-metric-head [data-insight-step="-1"]'); await H.settle(page);
   check('week 42 (geen nachten): lege staat, geen grafiek, rechts aan', [await headOf(page, 'screen-insight-metric'), (await summary(page)).empty, await chart(page), (await list(page)).length],
     [['Week 42', '12–18 oktober 2026', false], 'Nog geen slaap ingevuld', null, 7]);
-  await page.click('#insight-metric-head [data-insight-step="-1"]'); await page.waitForTimeout(80);
+  await page.click('#insight-metric-head [data-insight-step="-1"]'); await H.settle(page);
   check('week 41: bedtijd over middernacht', (await summary(page)).cols, ['GEMIDDELD 6:55 u', 'NAAR BED 00:10', 'OPGESTAAN 07:05']);
   // back arrow → week overview on week 41
-  await page.click('#btn-back-insight-metric'); await page.waitForTimeout(200);
+  await page.click('#btn-back-insight-metric'); await H.settle(page);
   check('terugpijl: weekoverzicht op week 41', [await active(page), (await headOf(page, 'screen-insight'))[0]], ['screen-insight', 'Week 41']);
   // hardware back: open Gewicht on week 41, browse to 43, back
-  await page.click('#insight-cards [data-insight-metric="weight"]'); await page.waitForTimeout(100);
+  await page.click('#insight-cards [data-insight-metric="weight"]'); await H.settle(page);
   check('gewicht opent op dezelfde week', [await page.textContent('#insight-metric-title'), (await headOf(page, 'screen-insight-metric'))[0]], ['Gewicht', 'Week 41']);
   check('week 41: één punt, geen lijn, geen t.o.v. (week 40 leeg)', [await chart(page).then(c => [c.points, c.line, c.ticks]), (await summary(page))],
     [[1, false, ['80', '80,5', '81']], { cols: ['GEMIDDELD 80,3 kg', 'LAAGSTE 80,25 kg', 'HOOGSTE 80,25 kg'], note: null, empty: null }]);
-  await page.click('#insight-metric-head [data-insight-step="-1"]'); await page.waitForTimeout(80);
+  await page.click('#insight-metric-head [data-insight-step="-1"]'); await H.settle(page);
   check('week 40: geen gewicht', [(await summary(page)).empty, await chart(page)], ['Nog geen gewicht ingevuld', null]);
   await page.click('#insight-metric-head [data-insight-step="1"]'); await page.click('#insight-metric-head [data-insight-step="1"]'); await page.click('#insight-metric-head [data-insight-step="1"]');
-  await page.waitForTimeout(80);
+  await H.settle(page);
   check('week 43 gewicht, rechts uit', await headOf(page, 'screen-insight-metric'), ['Week 43', '19–25 oktober 2026', true]);
-  await page.click('#insight-metric-head [data-insight-step="1"]', { force: true }); await page.waitForTimeout(50);
+  await page.click('#insight-metric-head [data-insight-step="1"]', { force: true }); await H.settle(page);
   check('niet voorbij de huidige week', (await headOf(page, 'screen-insight-metric'))[0], 'Week 43');
   check('gewicht samenvatting week 43', await summary(page), { cols: ['GEMIDDELD 98,6 kg', 'LAAGSTE 98,2 kg', 'HOOGSTE 98,9 kg'], note: '−0,3 kg t.o.v. week 42', empty: null });
   check('gewicht grafiek: gaten overgeslagen', await chart(page), { bars: [], ticks: ['98', '98,5', '99'], days: ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo'], line: true, points: 3, avg: true });
@@ -191,39 +191,39 @@ H.run(async () => {
   check('weegmomenten', await list(page), ['Maandag 19 oktober 2026 98,9 kg', 'Dinsdag 20 oktober 2026 Niet ingevuld', 'Woensdag 21 oktober 2026 98,2 kg',
     'Donderdag 22 oktober 2026 Niet ingevuld', 'Vrijdag 23 oktober 2026 98,6 kg']);
   // fill Tuesday
-  await page.click('[data-insight-fill="2026-10-20"]'); await page.waitForTimeout(350);
+  await page.click('[data-insight-fill="2026-10-20"]'); await H.settle(page);
   check('invulvenster gewicht voor dinsdag', [await page.textContent('#insight-weight-sub'), await page.inputValue('#insight-weight-input')], ['Dinsdag 20 oktober 2026', '']);
   await page.fill('#insight-weight-input', '98,45');
-  await page.click('#btn-insight-weight-save'); await page.waitForTimeout(350);
+  await page.click('#btn-insight-weight-save'); await H.settle(page);
   check('gewicht opgeslagen: direct bij', [await toastMsg(page), (await list(page))[1], (await chart(page)).points, (await summary(page)).cols[0]],
     ['Gewicht opgeslagen', 'Dinsdag 20 oktober 2026 98,45 kg', 4, 'GEMIDDELD 98,5 kg']);
-  await page.click('[data-insight-fill="2026-10-20"]'); await page.waitForTimeout(350);
+  await page.click('[data-insight-fill="2026-10-20"]'); await H.settle(page);
   check('wijzigen: veld gevuld', await page.inputValue('#insight-weight-input'), '98,45');
   await page.fill('#insight-weight-input', '99.5');
-  await page.click('#btn-insight-weight-save'); await page.waitForTimeout(350);
+  await page.click('#btn-insight-weight-save'); await H.settle(page);
   check('gewijzigd → hoogste 99,5, as schuift mee', [(await list(page))[1], (await summary(page)).cols[2], (await chart(page)).ticks], ['Dinsdag 20 oktober 2026 99,5 kg', 'HOOGSTE 99,5 kg', ['98', '99', '100']]);
-  await page.click('[data-insight-fill="2026-10-20"]'); await page.waitForTimeout(350);
-  await page.click('#btn-insight-weight-clear'); await page.waitForTimeout(350);
+  await page.click('[data-insight-fill="2026-10-20"]'); await H.settle(page);
+  await page.click('#btn-insight-weight-clear'); await H.settle(page);
   check('gewist: direct bij', [await toastMsg(page), (await list(page))[1], (await chart(page)).points], ['Gewicht gewist', 'Dinsdag 20 oktober 2026 Niet ingevuld', 3]);
   // hardware back → week overview on week 43
-  await page.goBack(); await page.waitForTimeout(300);
+  await page.goBack(); await H.settle(page);
   check('terugknop telefoon: weekoverzicht op week 43', [await active(page), (await headOf(page, 'screen-insight'))[0]], ['screen-insight', 'Week 43']);
   // t.o.v.: with no weight in the previous week on the week card too
   await page.evaluate(() => { insightWeekStart = '2026-10-05'; renderInsight(); });
   check('weekkaart week 41 zonder t.o.v.', await page.evaluate(() => document.querySelector('[data-insight-metric="weight"]').innerText.replace(/\s+/g, ' ').trim()), 'GEWICHT 80,3 kg gemiddeld');
   // day overview still works with the sheets
-  await page.evaluate(() => openInsightDay('2026-10-22')); await page.waitForTimeout(100);
-  await page.click('#insight-day-weight [data-insight-edit]'); await page.waitForTimeout(350);
-  await page.fill('#insight-weight-input', '97'); await page.click('#btn-insight-weight-save'); await page.waitForTimeout(350);
+  await page.evaluate(() => openInsightDay('2026-10-22')); await H.settle(page);
+  await page.click('#insight-day-weight [data-insight-edit]'); await H.settle(page);
+  await page.fill('#insight-weight-input', '97'); await page.click('#btn-insight-weight-save'); await H.settle(page);
   check('dagoverzicht: invullen werkt nog, wordt bijgewerkt', await page.evaluate(() => document.getElementById('insight-day-weight').innerText.replace(/\s+/g, ' ').trim()), '97 kg −1,2 kg t.o.v. woensdag');
   await page.evaluate(() => deleteBodyWeight('2026-10-22'));
 
   // --- Light / dark × 360 / 390: no horizontal overflow, colours from the tokens
-  for (const w of [360, 390]) for (const theme of ['light', 'dark']) {
+  for (const w of H.WIDTHS) for (const theme of H.THEMES) {
     await page.setViewportSize({ width: w, height: 1400 });
     for (const kind of ['sleep', 'weight']) {
       await setup(page, theme);
-      await page.evaluate(k => openInsightMetric(k), kind); await page.waitForTimeout(150);
+      await page.evaluate(k => openInsightMetric(k), kind); await H.settle(page);
       const m = await page.evaluate(() => {
         const sc = document.getElementById('insight-metric-scroll');
         const svg = document.querySelector('#insight-chart svg');
@@ -246,7 +246,7 @@ H.run(async () => {
   }
 
   H.section('Aslabels, rijhoogtes, kortste/langste nacht');
-  for (const w of [360, 390]) for (const theme of ['light', 'dark']) {
+  for (const w of H.WIDTHS) for (const theme of H.THEMES) {
     const tag = `${theme} ${w}px`;
     await page.setViewportSize({ width: w, height: 1400 });
     await setup(page, theme, DATA_AXIS);

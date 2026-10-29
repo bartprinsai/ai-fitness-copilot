@@ -29,16 +29,16 @@ H.run(async () => {
   const views = async data => {
     await H.loadData(page, data);
     await page.evaluate(() => { showScreen('screen-home'); openInsight(); });
-    await page.waitForTimeout(80);
+    await H.settle(page);
     const week = {
       done: await page.evaluate(() => [...document.querySelectorAll('#insight-days .insight-done')].map(e => e.closest('[data-date]').dataset.date)),
       training: (await text('[data-insight-metric="training"]'))[0],
     };
-    await page.evaluate(() => openInsightDay('2026-10-19')); await page.waitForTimeout(80);
+    await page.evaluate(() => openInsightDay('2026-10-19')); await H.settle(page);
     const monday = await text('#insight-day-training .insight-mg-row, #insight-day-training .insight-day-head');
-    await page.evaluate(() => openInsightDay('2026-10-20')); await page.waitForTimeout(80);
+    await page.evaluate(() => openInsightDay('2026-10-20')); await H.settle(page);
     const tuesday = await text('#insight-day-training .insight-mg-row, #insight-day-training .insight-day-head');
-    await page.evaluate(() => { showScreen('screen-insight'); openInsightTraining(); }); await page.waitForTimeout(80);
+    await page.evaluate(() => { showScreen('screen-insight'); openInsightTraining(); }); await H.settle(page);
     const overview = { summary: (await text('#insight-training-body .insight-summary'))[0], rows: await text('#insight-training-body .insight-mg-row') };
     return { week, monday, tuesday, overview };
   };

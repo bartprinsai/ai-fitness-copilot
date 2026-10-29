@@ -8,7 +8,7 @@ const H = require('./helpers');
 
 H.run(async () => {
   const out = H.outDir(__filename);
-  for (const theme of ['light', 'dark']) for (const width of [360, 390]) {
+  for (const theme of H.THEMES) for (const width of H.WIDTHS) {
     const tag = `[${theme} ${width}px]`;
     H.section(`Grafiek ${tag}`);
     const { browser, page, errors } = await H.openApp({ width, height: 780, theme, scale: 2 });

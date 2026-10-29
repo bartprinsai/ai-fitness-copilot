@@ -76,7 +76,7 @@ function pageState(screenId) {
 
 H.run(async () => {
   const out = H.outDir(__filename);
-  for (const theme of ['light', 'dark']) for (const width of [360, 390]) {
+  for (const theme of H.THEMES) for (const width of H.WIDTHS) {
     const tag = `[${theme} ${width}px]`;
     const { browser, page, errors } = await H.openApp({ width, height: 780, theme, scale: 2 });
     await page.addScriptTag({ content: `window.__state = ${pageState.toString()};` });
@@ -87,7 +87,7 @@ H.run(async () => {
     H.section(`Trainingsplannen ${tag}`);
     await H.loadData(page, { plans: PLANS, activePlan: ACTIVE_P2 }, theme);
     await page.evaluate(() => openWorkoutPlan());
-    await page.waitForTimeout(200);
+    await H.settle(page);
     let s = await page.evaluate(() => __state('screen-workout-plan'));
     const ref = s; // referentie voor Kies een plan (zelfde data)
     await page.screenshot({ path: path.join(out, `plans-${theme}-${width}.png`) });
@@ -103,7 +103,7 @@ H.run(async () => {
     const clickMenu = async (sel, label) => {
       await page.click(sel);
       await page.evaluate(label => [...document.querySelectorAll('#overflow-panel .dropdown-item')].find(e => e.textContent.trim() === label).click(), label);
-      await page.waitForTimeout(150);
+      await H.settle(page);
     };
     await clickMenu('#plan-list-scroll .plan-item:nth-child(1) .plan-item-dots', 'Actief maken');
     s = await page.evaluate(() => __state('screen-workout-plan'));
@@ -120,13 +120,13 @@ H.run(async () => {
 
     // Tikken op een kaart opent het plan
     await page.click('#plan-list-active-slot .plan-item-info');
-    await page.waitForTimeout(150);
+    await H.settle(page);
     let o = await activeScreen();
     H.check(`${tag} tik op actieve kaart opent het plan`, [o.screen, o.planTitle], ['screen-plan-detail', 'Upper Lower']);
     await page.evaluate(p3 => { db.plans.p3 = p3; openWorkoutPlan(); }, PLANS.p3);
-    await page.waitForTimeout(150);
+    await H.settle(page);
     await page.click('#plan-list-scroll .plan-item .plan-item-info');
-    await page.waitForTimeout(150);
+    await H.settle(page);
     o = await activeScreen();
     H.check(`${tag} tik op gewone kaart opent het plan`, [o.screen, o.planTitle], ['screen-plan-detail', 'Full body']);
 
@@ -139,7 +139,7 @@ H.run(async () => {
     H.section(`Kies een plan ${tag}`);
     await H.loadData(page, { plans: PLANS, activePlan: ACTIVE_P2 }, theme);
     await page.evaluate(() => { showScreen('screen-training'); openNewWorkoutScreen(); openSchedulePickPlan(); });
-    await page.waitForTimeout(200);
+    await H.settle(page);
     s = await page.evaluate(() => __state('screen-schedule-pick-plan'));
     await page.screenshot({ path: path.join(out, `pick-${theme}-${width}.png`) });
     H.ok(s.activeVisible && s.activeLabel.toUpperCase() === 'ACTIEF PLAN' && s.activeName === 'Upper Lower' && s.listLabelVisible, `${tag} opbouw ACTIEF PLAN (Upper Lower) → MIJN PLANNEN`, s);
@@ -167,22 +167,22 @@ H.run(async () => {
     H.section(`Dag laden ${tag}`);
     await H.loadData(page, { plans: PLANS, activePlan: { planId: 'p2' } }, theme);
     await page.evaluate(() => { currentDate = '2026-10-25'; showScreen('screen-training'); openNewWorkoutScreen(); openSchedulePickPlan(); });
-    await page.waitForTimeout(150);
+    await H.settle(page);
     await page.click('#schedule-pick-plan-active-slot .plan-item');
-    await page.waitForTimeout(150);
+    await H.settle(page);
     o = await activeScreen();
     H.check(`${tag} tik actieve kaart → Kies een dag`, [o.screen, o.dayTitle], ['screen-schedule-pick-day', 'Upper Lower — kies een dag']);
     await page.click('#schedule-pick-day-scroll .plan-day-card:nth-child(1)');
-    await page.waitForTimeout(400);
+    await H.settle(page);
     const loaded = await page.evaluate(() => ({ w: db.workouts['2026-10-25'] || [], planDays: getWorkoutPlanDays('2026-10-25'), screen: document.querySelector('.screen.active')?.id, date: currentDate }));
     H.check(`${tag} dag laden: oefeningen in de training`, loaded.w, [{ exerciseId: 'squat', sets: [], target: { sets: 3, reps: 8 } }]);
     H.check(`${tag} dag laden: training onthoudt de plandag`, loaded.planDays, [{ planId: 'p2', dayId: 'day-p2-1', dayName: 'Dag 1' }]);
     H.check(`${tag} dag laden: terug in de Fitness Tracker op die dag`, [loaded.screen, loaded.date], ['screen-training', '2026-10-25']);
     // Tik een gewone kaart
     await page.evaluate(() => { showScreen('screen-schedule-pick-plan'); renderSchedulePickPlan(); });
-    await page.waitForTimeout(150);
+    await H.settle(page);
     await page.click('#schedule-pick-plan-scroll .plan-item:nth-child(2)');
-    await page.waitForTimeout(150);
+    await H.settle(page);
     o = await activeScreen();
     H.check(`${tag} tik gewone kaart → Kies een dag`, [o.screen, o.dayTitle], ['screen-schedule-pick-day', 'Full body — kies een dag']);
 

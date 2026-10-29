@@ -10,10 +10,10 @@ const BASE = { scheduleVersions: {}, weekCycle: {}, workouts: {}, sleep: {}, bod
 async function setup(page, data, date, theme = 'light') {
   await H.loadData(page, data, theme);
   await page.evaluate(date => { insightDayDate = date; showScreen('screen-insight-day'); renderInsightDay(); }, date);
-  await page.waitForTimeout(50);
+  await H.settle(page);
 }
-const openSleep = async page => { await page.click('#insight-day-sleep button'); await page.waitForTimeout(350); };
-const openWeight = async page => { await page.click('#insight-day-weight button'); await page.waitForTimeout(350); };
+const openSleep = async page => { await page.click('#insight-day-sleep button'); await H.settle(page); };
+const openWeight = async page => { await page.click('#insight-day-weight button'); await H.settle(page); };
 const state = page => page.evaluate(() => ({
   times: insightSleepValues(),
   shown: [...document.querySelectorAll('.sleep-clock-time')].map(b => b.textContent),
@@ -46,7 +46,7 @@ H.run(async () => {
   st = await state(page);
   check('startstand: laatste eerdere nacht', [st.times, st.total], [['00:20', '06:50'], 'Totaal: 6:30 u · tik op een tijd om hem in te typen']);
   check('Wissen verborgen (nacht zelf leeg)', await page.isVisible('#btn-insight-sleep-clear'), false);
-  await page.click('#btn-insight-sleep-cancel'); await page.waitForTimeout(100);
+  await page.click('#btn-insight-sleep-cancel'); await H.settle(page);
   check('Annuleren zonder wijziging sluit', await isOpen(page, 'insight-sleep-overlay'), false);
   await setup(page, { ...BASE, sleep: { '2026-10-20': { bedtime: '00:20', wakeTime: '06:50' }, '2026-10-22': { bedtime: '23:35', wakeTime: '06:10' } } }, '2026-10-22');
   await openSleep(page);
@@ -142,21 +142,21 @@ H.run(async () => {
     await page.click('#insight-sleep-sub'); // leave: invalid again → old time stays
     check(`ongeldig "${bad}" → rode melding, tijd blijft`, [t, still, (await state(page)).times[0]], [['Vul een geldige tijd in', true], true, '23:45']);
   }
-  await page.click('#btn-insight-sleep-cancel'); await page.waitForTimeout(100);
+  await page.click('#btn-insight-sleep-cancel'); await H.settle(page);
   check('Annuleren met wijziging vraagt', await isOpen(page, 'discard-changes-overlay'), true);
   await page.evaluate(() => { document.getElementById('discard-changes-overlay').classList.remove('open'); });
-  await page.click('#btn-insight-sleep-save'); await page.waitForTimeout(350);
+  await page.click('#btn-insight-sleep-save'); await H.settle(page);
   check('Opslaan', [await page.evaluate(() => db.sleep['2026-10-22']), (await toastState(page))[0], await isOpen(page, 'insight-sleep-overlay')],
     [{ bedtime: '23:45', wakeTime: '07:33' }, 'Slaap opgeslagen', false]);
   // equal times
   await openSleep(page);
   await page.click('.sleep-clock-time[data-which="wake"]'); await page.keyboard.type('2345'); await page.keyboard.press('Enter');
   check('gelijke tijden: totaal 0, geen boog', [(await state(page)).total, await page.getAttribute('#sleep-clock-arc', 'd')], ['Totaal: 0:00 u · tik op een tijd om hem in te typen', '']);
-  await page.click('#btn-insight-sleep-save'); await page.waitForTimeout(100);
+  await page.click('#btn-insight-sleep-save'); await H.settle(page);
   check('gelijke tijden → bestaande fout, venster blijft', [await toastState(page), await isOpen(page, 'insight-sleep-overlay')], [['Naar bed en opgestaan kunnen niet gelijk zijn', true], true]);
   // Wissen sleep
   check('Wissen zichtbaar', await page.isVisible('#btn-insight-sleep-clear'), true);
-  await page.click('#btn-insight-sleep-clear'); await page.waitForTimeout(350);
+  await page.click('#btn-insight-sleep-clear'); await H.settle(page);
   check('Wissen slaap: gewist, melding, dicht, kaart leeg', [await page.evaluate(() => db.sleep['2026-10-22'] || null), await toastState(page), await isOpen(page, 'insight-sleep-overlay'),
     await page.evaluate(() => document.getElementById('insight-day-sleep').innerText.includes('Nog niet ingevuld'))], [null, ['Slaap gewist', false], false, true]);
 
@@ -164,17 +164,17 @@ H.run(async () => {
   await setup(page, BASE, '2026-10-22');
   await openWeight(page);
   check('gewicht: Wissen verborgen bij lege dag', await page.isVisible('#btn-insight-weight-clear'), false);
-  await page.click('#btn-insight-weight-save'); await page.waitForTimeout(100);
+  await page.click('#btn-insight-weight-save'); await H.settle(page);
   check('leeg + Opslaan → "Vul een gewicht in", blijft open', [await toastState(page), await isOpen(page, 'insight-weight-overlay')], [['Vul een gewicht in', true], true]);
   await page.type('#insight-weight-input', '98,4');
-  await page.click('#btn-insight-weight-save'); await page.waitForTimeout(350);
+  await page.click('#btn-insight-weight-save'); await H.settle(page);
   check('Gewicht opgeslagen', [await page.evaluate(() => db.bodyWeight['2026-10-22']), (await toastState(page))[0]], [98.4, 'Gewicht opgeslagen']);
   await openWeight(page);
   check('gewicht: Wissen zichtbaar bij ingevulde dag', await page.isVisible('#btn-insight-weight-clear'), true);
   await page.fill('#insight-weight-input', '');
-  await page.click('#btn-insight-weight-save'); await page.waitForTimeout(100);
+  await page.click('#btn-insight-weight-save'); await H.settle(page);
   check('leeggemaakt + Opslaan wist niet meer', [await page.evaluate(() => db.bodyWeight['2026-10-22']), await toastState(page), await isOpen(page, 'insight-weight-overlay')], [98.4, ['Vul een gewicht in', true], true]);
-  await page.click('#btn-insight-weight-clear'); await page.waitForTimeout(350);
+  await page.click('#btn-insight-weight-clear'); await H.settle(page);
   check('Wissen gewicht: gewist, melding, dicht', [await page.evaluate(() => db.bodyWeight['2026-10-22'] ?? null), await toastState(page), await isOpen(page, 'insight-weight-overlay')], [null, ['Gewicht gewist', false], false]);
   const btnStyle = await page.evaluate(() => {
     const w = getComputedStyle(document.getElementById('btn-insight-weight-clear')), c = getComputedStyle(document.getElementById('btn-insight-weight-cancel'));
@@ -186,7 +186,7 @@ H.run(async () => {
 
   // --- Layout: light/dark × 360/390
   const shots = [];
-  for (const theme of ['light', 'dark']) for (const w of [360, 390]) {
+  for (const theme of H.THEMES) for (const w of H.WIDTHS) {
     await page.setViewportSize({ width: w, height: 760 });
     // handles at the extremes: 18:00 (left) and 06:00 (right); then 00:00 (top) and 12:00 (bottom)
     for (const [bed, wake, tag] of [['18:00', '06:00', 'lr'], ['00:00', '12:00', 'tb'], ['23:10', '06:40', '']]) {
@@ -223,7 +223,7 @@ H.run(async () => {
     // editing state screenshot
     await page.click('.sleep-clock-time[data-which="bed"]');
     const f2 = `sheet-sleep-typing-${theme}-${w}.png`; await page.screenshot({ path: path.join(OUT, f2) }); shots.push(f2);
-    await page.evaluate(() => closeOverlay('insight-sleep-overlay')); await page.waitForTimeout(300);
+    await page.evaluate(() => closeOverlay('insight-sleep-overlay')); await H.settle(page);
     // weight sheet with Wissen
     await setup(page, { ...BASE, bodyWeight: { '2026-10-22': 98.4 } }, '2026-10-22', theme);
     await openWeight(page);

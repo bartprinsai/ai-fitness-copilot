@@ -15,7 +15,7 @@ const data = (note, sessionNote) => ({
 async function setup(page, d, theme = 'light') {
   await H.loadData(page, d, theme);
   await page.evaluate(DATE => { currentDate = DATE; showScreen('screen-fitness-tracker'); renderHome(); }, DATE);
-  await page.waitForTimeout(80);
+  await H.settle(page);
 }
 const vis = (page, sel) => page.isVisible(sel);
 const isOpen = (page, id) => page.evaluate(id => document.getElementById(id).classList.contains('open'), id);
@@ -32,47 +32,47 @@ async function clearButtons(page) {
 
   // --- Session note (Notitie pill): new → edit mode without Wissen
   await setup(page, data());
-  await page.evaluate(() => openSessionCommentPopup()); await page.waitForTimeout(350);
+  await page.evaluate(() => openSessionCommentPopup()); await H.settle(page);
   check('nieuwe sessienotitie: geen Wissen', [await vis(page, '#btn-comment-delete'), (await buttons(page, '#comment-edit-mode')).map(b => b.t)], [false, ['Annuleren', 'Opslaan']]);
-  await page.click('#btn-comment-save'); await page.waitForTimeout(100);
+  await page.click('#btn-comment-save'); await H.settle(page);
   check('leeg opslaan → "Vul een notitie in", blijft open', [await toastState(page), await isOpen(page, 'comment-overlay')], [['Vul een notitie in', true], true]);
   await page.fill('#comment-edit-input', 'Goede sessie');
-  await page.click('#btn-comment-save'); await page.waitForTimeout(350);
+  await page.click('#btn-comment-save'); await H.settle(page);
   check('opgeslagen', [await page.evaluate(d => getSessionNote(d), DATE), (await toastState(page))[0], await isOpen(page, 'comment-overlay')], ['Goede sessie', 'Notitie opgeslagen', false]);
   // existing: view mode → Bewerken → Wissen on top
-  await page.evaluate(() => openSessionCommentPopup()); await page.waitForTimeout(350);
+  await page.evaluate(() => openSessionCommentPopup()); await H.settle(page);
   check('bestaand: view-modus Sluiten · Bewerken', (await buttons(page, '#comment-view-mode')).map(b => b.t), ['Sluiten', 'Bewerken']);
   await page.click('#btn-comment-edit');
   const eb = await buttons(page, '#comment-edit-mode');
   check('bestaand: Wissen volle breedte boven Annuleren · Opslaan', [eb.map(b => b.t), eb[0].top < eb[1].top, eb[1].top === eb[2].top, eb[0].w === eb[2].r - eb[1].l], [['Wissen', 'Annuleren', 'Opslaan'], true, true, true]);
-  await page.click('#btn-comment-delete'); await page.waitForTimeout(350);
+  await page.click('#btn-comment-delete'); await H.settle(page);
   check('Wissen sessienotitie: meteen, dicht, melding, geen bevestiging', [await page.evaluate(d => getSessionNote(d) || '', DATE), await toastState(page), await isOpen(page, 'comment-overlay'), await isOpen(page, 'confirm-delete-overlay')],
     ['', ['Notitie gewist', false], false, false]);
 
   // --- Set note via the comment popup (Fitness Tracker day overview)
   await setup(page, data('Zwaar'));
-  await page.click('#home-content .set-comment.has-note'); await page.waitForTimeout(350);
+  await page.click('#home-content .set-comment.has-note'); await H.settle(page);
   await page.click('#btn-comment-edit');
   check('setnotitie (dagoverzicht): Wissen zichtbaar', await vis(page, '#btn-comment-delete'), true);
   await page.fill('#comment-edit-input', '');
-  await page.click('#btn-comment-save'); await page.waitForTimeout(100);
+  await page.click('#btn-comment-save'); await H.settle(page);
   check('leeggemaakt + Opslaan wist niet', [await page.evaluate(d => db.workouts[d][0].sets[0].note, DATE), await toastState(page)], ['Zwaar', ['Vul een notitie in', true]]);
-  await page.click('#btn-comment-delete'); await page.waitForTimeout(350);
+  await page.click('#btn-comment-delete'); await H.settle(page);
   check('Wissen setnotitie', [await page.evaluate(d => db.workouts[d][0].sets[0].note ?? null, DATE), (await toastState(page))[0], await isOpen(page, 'comment-overlay')], [null, 'Notitie gewist', false]);
   check('comment-icoon weg na wissen', await page.evaluate(() => document.querySelectorAll('#home-content .set-comment.has-note').length), 0);
 
   // --- Set note in Loggen (#set-note-overlay)
   await setup(page, data('Techniek'));
-  await page.evaluate(() => openTraining('bench')); await page.waitForTimeout(200);
-  await page.evaluate(() => openSetNote(1)); await page.waitForTimeout(350);
+  await page.evaluate(() => openTraining('bench')); await H.settle(page);
+  await page.evaluate(() => openSetNote(1)); await H.settle(page);
   check('Loggen-setnotitie nieuw: geen Wissen', [(await buttons(page, '#set-note-overlay')).map(b => b.t)], [['Annuleren', 'Opslaan']]);
-  await page.click('#btn-set-note-save'); await page.waitForTimeout(100);
+  await page.click('#btn-set-note-save'); await H.settle(page);
   check('Loggen leeg opslaan → fout', [await toastState(page), await isOpen(page, 'set-note-overlay')], [['Vul een notitie in', true], true]);
-  await page.evaluate(() => closeOverlay('set-note-overlay')); await page.waitForTimeout(300);
-  await page.evaluate(() => openSetNote(0)); await page.waitForTimeout(350);
+  await page.evaluate(() => closeOverlay('set-note-overlay')); await H.settle(page);
+  await page.evaluate(() => openSetNote(0)); await H.settle(page);
   const lb = await buttons(page, '#set-note-overlay');
   check('Loggen-setnotitie bestaand: Wissen boven', [lb.map(b => b.t), lb[0].top < lb[1].top], [['Wissen', 'Annuleren', 'Opslaan'], true]);
-  await page.click('#btn-set-note-clear'); await page.waitForTimeout(350);
+  await page.click('#btn-set-note-clear'); await H.settle(page);
   check('Wissen Loggen-setnotitie', [await page.evaluate(d => db.workouts[d][0].sets[0].note ?? null, DATE), await toastState(page), await isOpen(page, 'set-note-overlay')], [null, ['Notitie gewist', false], false]);
   // Wissen in Loggen (#btn-clear) unchanged
   const clr = await page.evaluate(() => { const b = document.getElementById('btn-clear'), s = getComputedStyle(b), r = getComputedStyle(document.documentElement);
@@ -94,34 +94,34 @@ async function clearButtons(page) {
     return bs.every(b => { const r = b.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight; })
       && document.documentElement.scrollWidth === document.documentElement.clientWidth;
   }, sel);
-  for (const theme of ['light', 'dark']) for (const w of [360, 390]) {
+  for (const theme of H.THEMES) for (const w of H.WIDTHS) {
     await page.setViewportSize({ width: w, height: 760 });
     const st = {};
     // comment popup new + existing
     await setup(page, data(null, null), theme);
-    await page.evaluate(() => openSessionCommentPopup()); await page.waitForTimeout(350);
+    await page.evaluate(() => openSessionCommentPopup()); await H.settle(page);
     st.newNote = await fits('#comment-overlay');
     let f = `note-new-${theme}-${w}.png`; await page.screenshot({ path: path.join(OUT, f) }); shots.push(f);
     await setup(page, data('Zwaar, laatste rep ging traag', 'Goede sessie'), theme);
-    await page.evaluate(() => openSessionCommentPopup()); await page.waitForTimeout(350);
+    await page.evaluate(() => openSessionCommentPopup()); await H.settle(page);
     await page.click('#btn-comment-edit');
     st.existingNote = await fits('#comment-overlay');
     f = `note-existing-${theme}-${w}.png`; await page.screenshot({ path: path.join(OUT, f) }); shots.push(f);
     st.styleComment = await style(page, 'btn-comment-delete');
-    await page.evaluate(() => closeOverlay('comment-overlay')); await page.waitForTimeout(300);
+    await page.evaluate(() => closeOverlay('comment-overlay')); await H.settle(page);
     // Loggen set note + the Loggen Wissen button
-    await page.evaluate(() => openTraining('bench')); await page.waitForTimeout(200);
+    await page.evaluate(() => openTraining('bench')); await H.settle(page);
     f = `loggen-${theme}-${w}.png`; await page.screenshot({ path: path.join(OUT, f) }); shots.push(f);
-    await page.evaluate(() => openSetNote(0)); await page.waitForTimeout(350);
+    await page.evaluate(() => openSetNote(0)); await H.settle(page);
     st.setNote = await fits('#set-note-overlay');
     st.styleSetNote = await style(page, 'btn-set-note-clear');
     f = `setnote-${theme}-${w}.png`; await page.screenshot({ path: path.join(OUT, f) }); shots.push(f);
-    await page.evaluate(() => closeOverlay('set-note-overlay')); await page.waitForTimeout(300);
+    await page.evaluate(() => closeOverlay('set-note-overlay')); await H.settle(page);
     // Inzicht sheets
     await page.evaluate(({ DATE }) => { db.sleep = { [DATE]: { bedtime: '23:00', wakeTime: '07:00' } }; db.bodyWeight = { [DATE]: 80 }; insightDayDate = DATE; showScreen('screen-insight-day'); renderInsightDay(); openInsightSleepSheet(DATE); }, { DATE });
-    await page.waitForTimeout(350);
+    await H.settle(page);
     st.sleep = await fits('#insight-sleep-overlay'); st.styleSleep = await style(page, 'btn-insight-sleep-clear');
-    await page.evaluate(DATE => { closeOverlay('insight-sleep-overlay'); openInsightWeightSheet(DATE); }, DATE); await page.waitForTimeout(350);
+    await page.evaluate(DATE => { closeOverlay('insight-sleep-overlay'); openInsightWeightSheet(DATE); }, DATE); await H.settle(page);
     st.weight = await fits('#insight-weight-overlay'); st.styleWeight = await style(page, 'btn-insight-weight-clear');
     await page.evaluate(() => closeOverlay('insight-weight-overlay'));
     const same = [st.styleComment, st.styleSetNote, st.styleSleep, st.styleWeight].every(s => JSON.stringify(s) === JSON.stringify(st.styleComment));
@@ -142,8 +142,8 @@ async function placeholder(page) {
     const s = getComputedStyle(document.getElementById('set-note-input'), '::placeholder');
     return { all, color: s.color };
   }, DATE);
-  await page.waitForTimeout(350);
-  for (const theme of ['light', 'dark']) {
+  await H.settle(page);
+  for (const theme of H.THEMES) {
     await page.evaluate(t => { document.documentElement.dataset.theme = t; }, theme);
     await page.screenshot({ path: path.join(OUT, `setnote-placeholder-${theme}.png`) });
   }

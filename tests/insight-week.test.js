@@ -163,7 +163,7 @@ H.run(async () => {
   check('kleuren', [colors.done, colors.missed, colors.short], ['rgb(76, 175, 80)', 'rgb(198, 40, 40)', 'rgb(198, 40, 40)']);
   check('typografie', [colors.rowLabelSize, colors.head, colors.title, colors.big, colors.unit, colors.label, colors.period, colors.chevron],
     ['12px', '12px', '16px/500', '20px/700', '12px/400', '11px', '12px/500/999px', '20px']);
-  for (const theme of ['light', 'dark']) for (const w of [360, 390]) {
+  for (const theme of H.THEMES) for (const w of H.WIDTHS) {
     await page.setViewportSize({ width: w, height: 1100 });
     await setup(page, 'weekAB', theme);
     const overflow = await page.evaluate(() => {
@@ -196,7 +196,7 @@ H.run(async () => {
   check('leeg gewicht', s.cards[3], 'GEWICHT | Nog geen gewicht ingevuld');
   const emptyStyle = await page.evaluate(() => { const c = getComputedStyle(document.querySelector('.insight-empty')); return c.fontSize + '/' + c.fontWeight + '/' + c.color; });
   check('lege staat stijl', emptyStyle, '15px/400/rgb(158, 158, 158)');
-  for (const theme of ['light', 'dark']) for (const w of [360, 390]) {
+  for (const theme of H.THEMES) for (const w of H.WIDTHS) {
     await page.setViewportSize({ width: w, height: 1000 });
     await setup(page, 'switch', theme);
     await page.screenshot({ path: path.join(OUT, `insight-switch-${theme}-${w}.png`), fullPage: true });

@@ -3,7 +3,8 @@
   "private": true,
   "description": "AI Fitness Co-Pilot: a static web app (index.html, app.js, style.css, exercises.js). This file is only for the headless tests in tests/; the app itself needs no build or install.",
   "scripts": {
-    "test": "node tests/run-all.js"
+    "test": "node tests/run-all.js",
+    "test:full": "node tests/run-all.js --full"
   },
   "devDependencies": {
     "playwright": "1.63.0"

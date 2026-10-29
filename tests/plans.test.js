@@ -16,7 +16,7 @@ const closeAll = page => page.evaluate(() => document.querySelectorAll('.overlay
 
 H.run(async () => {
   const out = H.outDir(__filename);
-  for (const theme of ['light', 'dark']) for (const width of [360, 390]) {
+  for (const theme of H.THEMES) for (const width of H.WIDTHS) {
     const tag = `${theme} ${width}`;
     H.section(tag);
     const { browser, page, errors } = await H.openApp({ width, theme, scale: 2 });

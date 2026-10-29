@@ -104,7 +104,7 @@ function measureAll() {
 H.run(async () => {
   const out = H.outDir(__filename);
   const allErrors = [];
-  for (const theme of ['light', 'dark']) for (const w of [360, 390]) {
+  for (const theme of H.THEMES) for (const w of H.WIDTHS) {
     H.section(`${theme} ${w}`);
     const { browser, page, errors } = await H.openApp({ width: w, height: 780, theme });
     await page.evaluate(() => { const st = document.createElement('style'); st.textContent = '*{transition:none!important}'; document.head.appendChild(st); });

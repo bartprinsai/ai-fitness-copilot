@@ -187,7 +187,7 @@ async function setup(page, theme, code) {
   await H.loadData(page, DATA, theme);
   await page.evaluate(() => document.querySelectorAll('.dropdown-menu.open').forEach(m => m.classList.remove('open')));
   await page.evaluate(code);
-  await page.waitForTimeout(120);
+  await H.settle(page);
 }
 
 module.exports = { STATES, DATA, lineCandidates, measureLines, decode, pixels, guardLines, ownLinesInSource };
@@ -195,7 +195,7 @@ if (require.main === module) H.run(async () => {
   const allErrors = [];
   H.section('bron');
   check('geen grijze lijn (border-top/-bottom in --border) buiten het blok DIVIDERS in style.css, app.js en index.html', ownLinesInSource(path.join(__dirname, '..')), []);
-  for (const theme of ['light', 'dark']) for (const w of [360, 390]) {
+  for (const theme of H.THEMES) for (const w of H.WIDTHS) {
     H.section(`${theme} ${w}`);
     // Tall, so every list fits on one screenshot (the screens are fixed to the viewport).
     const { browser, page, errors } = await H.openApp({ width: w, height: 1800, theme });
@@ -261,7 +261,7 @@ if (require.main === module) H.run(async () => {
     g = await page.evaluate(() => { const row = document.querySelectorAll('.list-card .category-item')[1], r = row.getBoundingClientRect(), c = row.closest('.list-card').getBoundingClientRect();
       return { x: r.left + r.width / 2, y: (r.top + r.bottom) / 2, line: Math.round(r.bottom - 1), l: c.left, r: c.right - 1 }; });
     await page.mouse.move(g.x, g.y); await page.mouse.down();
-    await page.waitForTimeout(50);
+    await H.settle(page);
     px = await pixelsAt(page, [[g.l, g.y], [g.r, g.y], [g.l + 8, g.line], [g.r - 8, g.line], [g.l + 16, g.line], [g.r - 16, g.line]]);
     await page.mouse.move(1, 1); await page.mouse.up();
     const bg = await tok('--bg'), bd = await tok('--border');

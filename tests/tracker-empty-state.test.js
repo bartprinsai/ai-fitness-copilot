@@ -8,7 +8,7 @@ const DATE = '2026-10-25';
 
 H.run(async () => {
   const out = H.outDir(__filename);
-  for (const theme of ['light', 'dark']) for (const width of [360, 390]) {
+  for (const theme of H.THEMES) for (const width of H.WIDTHS) {
     const tag = `[${theme} ${width}px]`;
     H.section(`Lege setlijst ${tag}`);
     const { browser, page, errors } = await H.openApp({ width, height: 780, theme, scale: 2 });
@@ -36,7 +36,7 @@ H.run(async () => {
       for (const [id, v] of [['field-weight', '100'], ['field-reps', '5']]) { const f = document.getElementById(id); f.value = v; f.dispatchEvent(new Event('input', { bubbles: true })); }
     });
     await page.click('#btn-save-set');
-    await page.waitForTimeout(300);
+    await H.settle(page);
     const after = await page.evaluate(date => ({ empty: !!document.querySelector('#set-list .set-list-empty'), sets: ((db.workouts[date] || []).find(e => e.exerciseId === 'bench-press') || {}).sets }), DATE);
     await page.screenshot({ path: path.join(out, `track-saved-${theme}-${width}.png`) });
     H.check(`${tag} na opslaan: lege staat weg`, after.empty, false);

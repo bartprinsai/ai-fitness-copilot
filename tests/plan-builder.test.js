@@ -46,7 +46,7 @@ H.run(async () => {
   const allErrors = [];
 
   // ── 1. Plan schedule, day picker, AI form, calendar, graph filters ─────────────
-  for (const theme of ['light', 'dark']) for (const w of [360, 390]) {
+  for (const theme of H.THEMES) for (const w of H.WIDTHS) {
     const tag = `${theme} ${w}`;
     H.section(`Plan schedule en keuzerasters ${tag}`);
     const { browser, page, errors } = await H.openApp({ width: w, theme });
@@ -58,7 +58,7 @@ H.run(async () => {
     const LOOK = { font: '15px/500', color: true, bg: true, border: true, fits: true, square: true };
 
     await page.evaluate(() => { currentPlanId = 'p'; currentPlanData = db.plans.p; openPlanSchedule('p'); });
-    await page.waitForTimeout(150);
+    await H.settle(page);
     const ps = await page.evaluate(() => ({
       nums: [...document.querySelectorAll('#ps-day-count-grid .ps-num-box')].map(b => ({ t: b.textContent, sel: b.classList.contains('selected'), ...__st(b) })),
       days: [...document.querySelectorAll('.ps-weekday-row[data-week="a"] .ps-day-circle')].map(b => ({ t: b.textContent, sel: b.classList.contains('selected'), ...__st(b) })),
@@ -85,25 +85,25 @@ H.run(async () => {
     const sw = await page.evaluate(() => ({ order: [...document.getElementById('ps-weekdays-section').children].filter(c => c.offsetParent).map(c => c.className.split(' ')[0]), c: document.getElementById('ps-weekdays-counter').textContent, sel: [...document.querySelectorAll('#ps-day-count-grid .selected')].map(b => b.textContent) }));
     H.ok(sw.sel.join() === '10' && sw.order.join() === 'section-label,ps-week-block,ps-week-block,ps-weekdays-counter' && /\/ 10 dagen/.test(sw.c), `${tag}: 10 dagen → week A + B, teller eronder`, sw);
     await page.click('#ps-day-count-grid .ps-num-box[data-days="5"]');
-    await page.waitForTimeout(100);
+    await H.settle(page);
     for (const d of [0, 1, 2, 3, 4]) {
       const sel = await page.evaluate(d => document.querySelector(`.ps-weekday-row[data-week="a"] .ps-day-circle[data-day="${d}"]`).classList.contains('selected'), d);
       if (!sel) await page.click(`.ps-weekday-row[data-week="a"] .ps-day-circle[data-day="${d}"]`);
     }
-    await page.click('#btn-plan-schedule-continue'); await page.waitForTimeout(300);
+    await page.click('#btn-plan-schedule-continue'); await H.settle(page);
     const after = await page.evaluate(() => ({ screen: document.querySelector('.screen.active').id, days: currentPlanData.days.length }));
     H.check(`${tag}: Doorgaan → Plan detail met 5 dagen`, after, { screen: 'screen-plan-detail', days: 5 });
-    if (w === 360) { await page.evaluate(() => openPlanSchedule('p')); await page.waitForTimeout(150); await page.screenshot({ path: path.join(out, `schedule-${theme}.png`) }); }
+    if (w === 360) { await page.evaluate(() => openPlanSchedule('p')); await H.settle(page); await page.screenshot({ path: path.join(out, `schedule-${theme}.png`) }); }
 
     // Day picker (Dag toevoegen with fixed days)
-    await page.evaluate(() => openPlanWeekdayPicker(undefined)); await page.waitForTimeout(150);
+    await page.evaluate(() => openPlanWeekdayPicker(undefined)); await H.settle(page);
     const dp = await page.evaluate(() => [...document.querySelectorAll('.day-picker-circle')].map(b => ({ dis: b.disabled, ...__st(b) })));
     const free = dp.filter(d => !d.dis), taken = dp.filter(d => d.dis);
     H.check(`${tag}: dagkiezer rond, zelfde maat; bezette dagen grijs`, [free.length > 0, free.every(s => shape(s) === 'rond' && JSON.stringify(look(s, false)) === JSON.stringify(LOOK)), dp[0].w === d0.w, taken.every(d => d.color !== T['--text'])], [true, true, true, true]);
     await page.evaluate(() => closeOverlay('day-picker-overlay'));
 
     // AI form: Dagen per week = same squares as AANTAL DAGEN
-    await page.evaluate(() => openAIGenerate()); await page.waitForTimeout(150);
+    await page.evaluate(() => openAIGenerate()); await H.settle(page);
     const ai = await page.evaluate(() => ({ boxes: [...document.querySelectorAll('#chips-days button')].map(b => ({ t: b.textContent, cls: b.className, sel: b.classList.contains('selected'), ...__st(b) })), snap: getAiGenFormSnapshot().days }));
     const a0 = ai.boxes[0];
     H.check(`${tag}: AI "Dagen per week" = vierkantjes van AANTAL DAGEN`, [ai.boxes.every(b => b.cls.startsWith('ps-num-box') && shape(b) === 'vierkant 8px' && JSON.stringify(look(b, b.sel)) === JSON.stringify(LOOK)), a0.w, a0.h, ai.snap], [true, n0.w, n0.h, '4']);
@@ -116,10 +116,10 @@ H.run(async () => {
 
     // Calendar days round, graph period filters pills
     await page.evaluate(() => { db.workouts['2026-10-20'] = [{ exerciseId: 'bench-press', sets: [{ weight: 80, reps: 5 }] }]; openCalendar(); });
-    await page.waitForTimeout(200);
+    await H.settle(page);
     const cal = await page.evaluate(() => __st([...document.querySelectorAll('.cal-day:not(.empty)')][5]));
     H.check(`${tag}: kalenderdag rond`, [shape(cal), Math.abs(cal.w - cal.h) < 0.6], ['rond', true]);
-    await page.evaluate(() => { openTraining('bench-press'); switchTab('graph'); }); await page.waitForTimeout(150);
+    await page.evaluate(() => { openTraining('bench-press'); switchTab('graph'); }); await H.settle(page);
     const tf = await page.evaluate(() => [...document.querySelectorAll('.time-filter')].map(__st));
     H.ok(tf.length > 0 && tf.every(t => t.radius >= t.h / 2 && t.w > t.h), `${tag}: periodefilters in de Grafiek zijn pillen`, tf[0]);
     allErrors.push(...errors);
@@ -127,7 +127,7 @@ H.run(async () => {
   }
 
   // ── 2. Trainingsplannen, empty states, Plan detail, Dag bewerken ───────────────
-  for (const theme of ['light', 'dark']) for (const w of [360, 390]) {
+  for (const theme of H.THEMES) for (const w of H.WIDTHS) {
     const tag = `${theme} ${w}`;
     H.section(`Trainingsplannen en Dag bewerken ${tag}`);
     const { browser, page, errors } = await H.openApp({ width: w, height: 780, theme, touch: true });
@@ -173,9 +173,9 @@ H.run(async () => {
     H.check(`${tag}: zonder plannen geen labels ACTIEF PLAN / MIJN PLANNEN`, e.labelsHidden, true);
     H.ok(e.tileGap >= 24, `${tag}: titel ruim onder de tegels (niets overlapt)`, e.tileGap);
     if (w === 360) await page.screenshot({ path: path.join(out, `plans-empty-${theme}.png`) });
-    await page.tap('#btn-plan-empty-add'); await page.waitForTimeout(200);
+    await page.tap('#btn-plan-empty-add'); await H.settle(page);
     H.check(`${tag}: plusje "Nieuw plan" opent hetzelfde als Zelf samenstellen`, await page.evaluate(() => [...document.querySelectorAll('.overlay.open')].map(o => o.id)), ['new-plan-overlay']);
-    await page.click('#btn-new-plan-cancel'); await page.waitForTimeout(200);
+    await page.click('#btn-new-plan-cancel'); await H.settle(page);
     const cycle = await page.evaluate(() => {
       db.plans.n = { name: 'Nieuw plan', days: [], createdAt: 2 }; renderPlanList();
       const withPlan = { empty: !document.getElementById('plan-list-empty-state').classList.contains('hidden'), items: document.querySelectorAll('.plan-item').length, label: !document.getElementById('plan-list-label').classList.contains('hidden') };
@@ -187,10 +187,10 @@ H.run(async () => {
     // Dag bewerken: empty-state + and toolbar + both open the add flow for this day
     await page.evaluate(() => { db.plans = { p: { name: 'P', createdAt: 1, scheduleConfirmed: true, days: [{ name: 'Maandag A', exercises: [] }, { name: 'Dinsdag', exercises: [] }] } }; currentPlanId = 'p'; currentPlanData = db.plans.p; openPlanDayEdit(0); });
     const addState = () => page.evaluate(() => ({ screen: document.querySelector('.screen.active').id, mode: exerciseScreenMode, day: currentEditDayIndex }));
-    await page.tap('#btn-pde-empty-add'); await page.waitForTimeout(200);
+    await page.tap('#btn-pde-empty-add'); await H.settle(page);
     const viaPlus = await addState();
     await page.evaluate(() => { exerciseScreenMode = 'browse'; showScreen('screen-plan-day-edit'); });
-    await page.tap('#btn-pde-add-exercise'); await page.waitForTimeout(200);
+    await page.tap('#btn-pde-add-exercise'); await H.settle(page);
     H.check(`${tag}: plusje in de lege staat = toolbar-+`, [viaPlus, await addState()], [{ screen: 'screen-exercises', mode: 'plan-add', day: 0 }, { screen: 'screen-exercises', mode: 'plan-add', day: 0 }]);
     H.check(`${tag}: geen uitleghint op Dag bewerken`, await page.evaluate(() => /Houd ≡|Houd een oefening/.test(document.getElementById('screen-plan-day-edit').innerText)), false);
 
@@ -259,14 +259,14 @@ H.run(async () => {
       return { active: pdeSel.active, one, two: document.getElementById('pde-sel-count').textContent, same };
     });
     H.check(`${tag}: selecteren — lang drukken, tik erbij; stijl = geselecteerde trackerkaart`, sel, { active: true, one: '1 oefening', two: '2 oefeningen', same: true });
-    await page.click('#btn-pde-sel-delete'); await page.waitForTimeout(250);
+    await page.click('#btn-pde-sel-delete'); await H.settle(page);
     H.check(`${tag}: prullenbak vraagt bevestiging met de namen`, await page.evaluate(() => [document.getElementById('delete-pde-exercise-title').textContent, document.getElementById('delete-pde-exercise-msg').textContent]),
       ['Oefeningen verwijderen?', 'Weet je zeker dat je 2 oefeningen ("Squat", "Bench press") wilt verwijderen uit deze dag?']);
-    await page.click('#btn-delete-pde-exercise-confirm'); await page.waitForTimeout(300);
+    await page.click('#btn-delete-pde-exercise-confirm'); await H.settle(page);
     H.check(`${tag}: na verwijderen één oefening over`, await page.evaluate(() => currentPlanData.days[0].exercises.map(e => e.exerciseId)), ['deadlift']);
     await page.evaluate(async () => { await __longPress(document.querySelectorAll('#pde-list .pde-item-inner')[0]); });
-    await page.click('#btn-pde-sel-delete'); await page.waitForTimeout(250);
-    await page.click('#btn-delete-pde-exercise-confirm'); await page.waitForTimeout(300);
+    await page.click('#btn-pde-sel-delete'); await H.settle(page);
+    await page.click('#btn-delete-pde-exercise-confirm'); await H.settle(page);
     const back = await page.evaluate(() => { const b = document.querySelector('#pde-list .home-empty-action'); const r = b && b.getBoundingClientRect(); return { empty: document.getElementById('pde-list').classList.contains('is-empty'), btn: r && [r.left, r.top, r.width, r.height].map(v => Math.round(v * 10) / 10) }; });
     H.check(`${tag}: laatste oefening weg → lege staat terug op dezelfde plek`, back, { empty: true, btn: e.pde.act.btn });
     if (w === 360) { await measure(3); await page.screenshot({ path: path.join(out, `day-edit-${theme}.png`), clip: { x: 0, y: 0, width: w, height: 420 } }); }
@@ -275,14 +275,14 @@ H.run(async () => {
   }
 
   // ── 3. Adding exercises from a plan day (plan-add mode) ───────────────────────
-  for (const theme of ['light', 'dark']) for (const w of [360, 390]) {
+  for (const theme of H.THEMES) for (const w of H.WIDTHS) {
     const tag = `${theme} ${w}`;
     H.section(`Oefening toevoegen aan een plandag ${tag}`);
     const { browser, page, errors } = await H.openApp({ width: w, height: 780, theme, touch: true });
     await page.evaluate(NO_TRANSITIONS);
     await page.evaluate(() => { db.plans = { test: { name: 'Test', createdAt: 1, days: [{ name: 'Dag 3', exercises: [] }] } }; currentPlanId = 'test'; currentPlanData = db.plans.test; });
     const openArms = () => page.evaluate(() => { openPlanDayEdit(0); openPlanDayAddExercises(0); exerciseBrowserMode = 'exercises'; currentBrowseCategory = 'arms'; renderExercisesInCategory('arms'); });
-    await openArms(); await page.waitForTimeout(200);
+    await openArms(); await H.settle(page);
     const row = name => `#exercise-list .exercise-item:has(.exercise-item-name:text-is("${name}"))`;
     // Rows within the viewport (elementFromPoint only sees those).
     const geo = await page.evaluate(() => [...document.querySelectorAll('#exercise-list .exercise-item')].filter(r => r.getBoundingClientRect().bottom < window.innerHeight - 80).map(r => {
@@ -303,10 +303,10 @@ H.run(async () => {
     H.ok(['Preacher curl (dumbbell)', 'Preacher curl (barbell)', 'Incline dumbbell curl'].every(n => (geo.find(x => x.name === n) || {}).lines === 1), `${tag}: lange curl-namen op één regel naast plusje en ⋮`);
 
     // ⋮ menu also works in add mode
-    await page.tap(row('Hammer curl') + ' .exercise-item-dots'); await page.waitForTimeout(200);
+    await page.tap(row('Hammer curl') + ' .exercise-item-dots'); await H.settle(page);
     const menu = await page.evaluate(() => [...document.querySelectorAll('.dropdown-item')].filter(e => e.offsetParent).map(e => e.textContent.trim()));
     H.check(`${tag}: ⋮-menu in toevoegmodus`, menu, ['Bewerken', 'Verwijderen', 'Favoriet maken']);
-    await page.tap('.dropdown-item:has-text("Favoriet maken")'); await page.waitForTimeout(200);
+    await page.tap('.dropdown-item:has-text("Favoriet maken")'); await H.settle(page);
     H.check(`${tag}: menu-actie "Favoriet maken" uitgevoerd`, await page.evaluate(() => isFavoriteExercise('hammer-curl')), true);
     await page.evaluate(() => { toggleFavoriteExercise('hammer-curl'); refreshExerciseList(); });
 
@@ -315,50 +315,50 @@ H.run(async () => {
       ['de naam', () => page.tap(row('Preacher curl (dumbbell)') + ' .exercise-item-name')],
       ['de lege ruimte van de rij', async () => { const b = await page.locator(row('Barbell curl') + ' .ex-add-btn').boundingBox(); const n = await page.locator(row('Barbell curl') + ' .exercise-item-name').boundingBox(); await page.touchscreen.tap(n.x + n.width - 20, b.y + b.height / 2); }],
     ]) {
-      await fn(); await page.waitForTimeout(250);
+      await fn(); await H.settle(page);
       H.check(`${tag}: tik op ${desc}: niets gebeurt`, await page.evaluate(() => [document.getElementById('pde-sets-reps-overlay').classList.contains('open'), document.querySelector('.screen.active').id, currentPlanData.days[0].exercises.length]), [false, 'screen-exercises', 0]);
     }
 
     const popupState = () => page.evaluate(() => ({ open: document.getElementById('pde-sets-reps-overlay').classList.contains('open'), title: document.getElementById('pde-sr-title').textContent, save: document.getElementById('btn-pde-sr-save').textContent, uniform: document.getElementById('pde-sr-mode-uniform').classList.contains('active'), sets: document.getElementById('pde-sr-sets').value, reps: document.getElementById('pde-sr-reps').value }));
     const day = () => page.evaluate(() => JSON.parse(JSON.stringify(currentPlanData.days[0].exercises)));
     // + → popup, Annuleren adds nothing
-    await page.tap(row('Preacher curl (dumbbell)') + ' .ex-add-btn'); await page.waitForTimeout(300);
+    await page.tap(row('Preacher curl (dumbbell)') + ' .ex-add-btn'); await H.settle(page);
     H.check(`${tag}: plusje opent "<naam> toevoegen", voorgevuld 3 × 10`, await popupState(), { open: true, title: 'Preacher curl (dumbbell) toevoegen', save: 'Toevoegen', uniform: true, sets: '3', reps: '10' });
-    await page.click('#btn-pde-sr-cancel'); await page.waitForTimeout(250);
+    await page.click('#btn-pde-sr-cancel'); await H.settle(page);
     H.check(`${tag}: Annuleren voegt niets toe, plusje blijft`, [await day(), await page.evaluate(() => document.querySelector('.ex-add-btn-done') === null)], [[], true]);
     // Uniform add with own values
-    await page.tap(row('Preacher curl (dumbbell)') + ' .ex-add-btn'); await page.waitForTimeout(300);
+    await page.tap(row('Preacher curl (dumbbell)') + ' .ex-add-btn'); await H.settle(page);
     await page.fill('#pde-sr-sets', '4'); await page.fill('#pde-sr-reps', '8');
-    await page.click('#btn-pde-sr-save'); await page.waitForTimeout(300);
+    await page.click('#btn-pde-sr-save'); await H.settle(page);
     const added = await page.evaluate(() => { const r = [...document.querySelectorAll('#exercise-list .exercise-item')].find(x => x.querySelector('.exercise-item-name').textContent === 'Preacher curl (dumbbell)'); const b = r.querySelector('.ex-add-btn'); return { done: b.classList.contains('ex-add-btn-done'), bg: getComputedStyle(b).backgroundColor, fill: getComputedStyle(b.querySelector('svg')).fill, size: b.getBoundingClientRect().width, dots: !!r.querySelector('.exercise-item-dots') }; });
     const primary = await H.tokenColor(page, '--primary');
     H.check(`${tag}: toegevoegd als { exerciseId, sets, reps }`, await day(), [{ exerciseId: 'preacher-curl-dumbbell', sets: 4, reps: 8 }]);
     H.check(`${tag}: plusje wordt blauw vinkje (36px, wit vinkje), ⋮ blijft`, added, { done: true, bg: primary, fill: 'rgb(255, 255, 255)', size: 36, dots: true });
-    await page.tap(row('Preacher curl (dumbbell)') + ' .ex-add-btn', { force: true }); await page.waitForTimeout(250);
+    await page.tap(row('Preacher curl (dumbbell)') + ' .ex-add-btn', { force: true }); await H.settle(page);
     H.check(`${tag}: tweede tik op het vinkje: niets gebeurt`, [(await popupState()).open, (await day()).length], [false, 1]);
     // Per-set add
-    await page.tap(row('Incline dumbbell curl') + ' .ex-add-btn'); await page.waitForTimeout(300);
+    await page.tap(row('Incline dumbbell curl') + ' .ex-add-btn'); await H.settle(page);
     H.check(`${tag}: nieuwe popup weer op 3 × 10`, [(await popupState()).sets, (await popupState()).reps], ['3', '10']);
     await page.click('#pde-sr-mode-persets');
     H.check(`${tag}: Andere reps per set: 3 rijen`, await page.locator('.pde-sr-set-row').count(), 3);
     const inputs = page.locator('.pde-sr-set-reps-input');
     await inputs.nth(0).fill('12'); await inputs.nth(1).fill('10'); await inputs.nth(2).fill('8');
     await page.click('#pde-sr-add-set'); await inputs.nth(3).fill('6');
-    await page.click('#btn-pde-sr-save'); await page.waitForTimeout(300);
+    await page.click('#btn-pde-sr-save'); await H.settle(page);
     H.check(`${tag}: per set opgeslagen als { exerciseId, repsPerSet }`, (await day())[1], { exerciseId: 'incline-dumbbell-curl', repsPerSet: [12, 10, 8, 6] });
     // Invalid input keeps the popup open
-    await page.tap(row('Spider curl') + ' .ex-add-btn'); await page.waitForTimeout(300);
-    await page.fill('#pde-sr-sets', '0'); await page.click('#btn-pde-sr-save'); await page.waitForTimeout(200);
+    await page.tap(row('Spider curl') + ' .ex-add-btn'); await H.settle(page);
+    await page.fill('#pde-sr-sets', '0'); await page.click('#btn-pde-sr-save'); await H.settle(page);
     H.check(`${tag}: ongeldige waarde: popup blijft open, niets toegevoegd`, [(await popupState()).open, (await day()).length], [true, 2]);
-    await page.click('#btn-pde-sr-cancel'); await page.waitForTimeout(200);
+    await page.click('#btn-pde-sr-cancel'); await H.settle(page);
     if (w === 360) await page.screenshot({ path: path.join(out, `add-${theme}.png`), clip: { x: 0, y: 120, width: w, height: 400 } });
     // Back on Dag bewerken: both exercises, edit popup keeps its own title
-    await page.evaluate(() => goBack('screen-plan-day-edit')); await page.waitForTimeout(250);
+    await page.evaluate(() => goBack('screen-plan-day-edit')); await H.settle(page);
     H.check(`${tag}: terug op Dag bewerken staan beide oefeningen`, await page.evaluate(() => [...document.querySelectorAll('#pde-list .pde-ex-name')].map(e => e.textContent)), ['Preacher curl (dumbbell)', 'Incline dumbbell curl']);
-    await page.evaluate(() => openPdeSetsRepsEdit(0)); await page.waitForTimeout(250);
+    await page.evaluate(() => openPdeSetsRepsEdit(0)); await H.settle(page);
     const ed = await popupState();
     H.check(`${tag}: bewerkpopup "Sets & reps aanpassen" / "Opslaan" met 4 × 8`, [ed.title, ed.save, ed.sets, ed.reps], ['Sets & reps aanpassen', 'Opslaan', '4', '8']);
-    await page.fill('#pde-sr-reps', '5'); await page.click('#btn-pde-sr-save'); await page.waitForTimeout(250);
+    await page.fill('#pde-sr-reps', '5'); await page.click('#btn-pde-sr-save'); await H.settle(page);
     H.check(`${tag}: Opslaan past de bestaande oefening aan`, (await day())[0], { exerciseId: 'preacher-curl-dumbbell', sets: 4, reps: 5 });
     allErrors.push(...errors);
     await browser.close();
@@ -382,7 +382,7 @@ H.run(async () => {
     await page.click('#ps-fixed-toggle [data-fixed="1"]');
     H.check('Vaste dagen toont WEEKDAGEN', await page.isVisible('#ps-weekdays-section'), true);
     await page.click('#ps-fixed-toggle [data-fixed="0"]');
-    await cont.click(); await page.waitForTimeout(300);
+    await cont.click(); await H.settle(page);
     H.check('Doorgaan → Plan detail met 3 dagen', [await active(), await page.evaluate(() => db.plans.p1.days.length)], ['screen-plan-detail', 3]);
     await page.evaluate(() => { showScreen('screen-workout-plan'); renderPlanList(); });
     await page.locator('.plan-item', { hasText: 'Beta' }).locator('.plan-item-info').click();

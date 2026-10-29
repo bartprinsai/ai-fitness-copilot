@@ -72,7 +72,7 @@ H.run(async () => {
   }
 
   // ── 2. 1RM calculator screen ───────────────────────────────────────────────────
-  for (const theme of ['light', 'dark']) for (const w of [360, 390]) {
+  for (const theme of H.THEMES) for (const w of H.WIDTHS) {
     const tag = `${theme} ${w}`;
     H.section(`1RM-calculator ${tag}`);
     const { browser, page, errors } = await H.openApp({ width: w, height: 1100, theme });
@@ -95,7 +95,7 @@ H.run(async () => {
     H.check(`${tag}: hulpregel tijdens typen (alleen bij meer dan 5 reps)`, seq, [['leeg', false], ['5', false], ['6', true], ['1', false], ['12', true], ['1', false], ['8', true]]);
     H.check(`${tag}: hulpregel 11px/400 --text-secondary, gewone schrijfwijze`, [h8.s, h8.color === T['--text-secondary'], h8.tt], ['11px/400', true, 'none']);
 
-    const calc = async (wt, reps) => { await page.fill('#orm-weight', wt); await page.fill('#orm-reps', reps); await page.dispatchEvent('#orm-reps', 'input'); await page.click('#btn-orm-calculate'); await page.waitForTimeout(80); };
+    const calc = async (wt, reps) => { await page.fill('#orm-weight', wt); await page.fill('#orm-reps', reps); await page.dispatchEvent('#orm-reps', 'input'); await page.click('#btn-orm-calculate'); await H.settle(page); };
     for (const [wt, reps] of [['142,5', '5'], ['60', '11'], ['163,75', '1']]) {
       await calc(wt, reps);
       const r = await page.evaluate(() => {
@@ -172,7 +172,7 @@ H.run(async () => {
   }
 
   // ── 3. Plate Calculator ────────────────────────────────────────────────────────
-  for (const theme of ['light', 'dark']) for (const w of [360, 390]) {
+  for (const theme of H.THEMES) for (const w of H.WIDTHS) {
     const tag = `${theme} ${w}`;
     H.section(`Schijvencalculator ${tag}`);
     const { browser, page, errors } = await H.openApp({ width: w, height: 1400, theme });

@@ -14,7 +14,7 @@ const H = require('./helpers');
 H.run(async () => {
   const out = H.outDir(__filename);
   const { browser, page, errors } = await H.openApp({ width: 390, height: 844 });
-  const settle = (ms = 350) => page.waitForTimeout(ms);
+  const settle = () => H.settle(page);
   const isOpen = id => page.evaluate(id => document.getElementById(id).classList.contains('open'), id);
   const openOverlays = () => page.evaluate(() => [...document.querySelectorAll('.overlay.open')].map(o => o.id));
   const text = sel => page.evaluate(sel => document.querySelector(sel).textContent.trim(), sel);
@@ -181,13 +181,13 @@ H.run(async () => {
   ];
   for (const p of popups) {
     await page.evaluate(p.screen); await settle();
-    await page.evaluate(p.open); await settle(450);
+    await page.evaluate(p.open); await settle();
     const opened = (await openOverlays()).length;
     for (const sel of p.close) {
       if (sel === 'BACKDROP') await page.mouse.click(195, 60);
       else if (sel === 'BACK') await page.evaluate(() => history.back());
       else await page.click(sel);
-      await settle(450);
+      await settle();
     }
     const left = await page.evaluate(() => ({
       open: [...document.querySelectorAll('.overlay.open')].map(o => o.id),

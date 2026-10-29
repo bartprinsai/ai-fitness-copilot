@@ -58,7 +58,7 @@ delete DATA.sleep['2026-10-23'];
 async function setup(page, data = DATA, theme = 'light') {
   await H.loadData(page, data, theme);
   await page.evaluate(() => { showScreen('screen-home'); openInsight(); });
-  await page.waitForTimeout(60);
+  await H.settle(page);
 }
 const main = page => page.evaluate(() => ({
   periods: [...document.querySelectorAll('#insight-head .time-filter')].map(b => (b.classList.contains('active') ? '*' : '') + b.textContent + (b.disabled ? '(uit)' : '')),
@@ -70,7 +70,7 @@ const main = page => page.evaluate(() => ({
   table: [...document.querySelectorAll('#insight-days .insight-table-row')].map(r => [...r.children].map(c => c.textContent).join(' | ') + (r.tagName === 'BUTTON' ? '' : r.classList.contains('is-future') ? '  (grijs, niet tikbaar)' : '')),
   cards: [...document.querySelectorAll('#insight-cards .insight-card')].map(c => [...c.querySelectorAll('.insight-figure, .role-sub, .insight-empty')].map(e => e.textContent).join(' / ')),
 }));
-const click = async (page, sel) => { await page.click(sel); await page.waitForTimeout(80); };
+const click = async (page, sel) => { await page.click(sel); await H.settle(page); };
 const active = page => page.evaluate(() => document.querySelector('.screen.active').id);
 const headOf = (page, screen) => page.evaluate(s => document.querySelector(`#${s} .insight-nav-title`).textContent, screen);
 const show = o => console.log(JSON.stringify(o, null, 2).split('\n').map(l => '     ' + l).join('\n'));
@@ -173,7 +173,7 @@ async function monthAndYear(page) {
   await click(page, '#insight-days [data-insight-open="month:2026-09-01"]');
   check('tik op September → Maand september', [(await main(page)).periods[1], (await main(page)).title], ['*Maand', 'September 2026']);
   await click(page, '#insight-head [data-insight-period="year"]');
-  await page.click('#insight-days .is-future'); await page.waitForTimeout(60);
+  await page.click('#insight-days .is-future'); await H.settle(page);
   check('tik op een toekomstige maand doet niets', (await main(page)).title, '2026');
 
   // ── Detail screens in Maand and Jaar, and back
@@ -202,10 +202,10 @@ async function monthAndYear(page) {
   // Oktober → (inzoomen) Week 42 → (bladeren) Jaar: terug gaat eerst naar de periode op het moment
   // van inzoomen (Oktober, op Slaap), en pas daarna naar het hoofdscherm, in de periode die je het
   // laatst bekeek (gedeeld: Oktober).
-  await page.goBack(); await page.waitForTimeout(250);
+  await page.goBack(); await H.settle(page);
   const metricPeriod = () => page.evaluate(() => document.querySelector('#insight-metric-head .time-filter.active').textContent);
   check('terug uit Slaap (jaar, na inzoomen) → Slaap in Oktober 2026', [await active(page), await headOf(page, 'screen-insight-metric'), await metricPeriod()], ['screen-insight-metric', 'Oktober 2026', 'Maand']);
-  await page.goBack(); await page.waitForTimeout(250);
+  await page.goBack(); await H.settle(page);
   check('nog eens terug → hoofdscherm in Oktober 2026', [await active(page), (await main(page)).title, (await main(page)).periods[1]], ['screen-insight', 'Oktober 2026', '*Maand']);
   await click(page, '#insight-head [data-insight-period="year"]');
   await click(page, '[data-insight-metric="weight"]');
@@ -218,7 +218,7 @@ async function monthAndYear(page) {
   check('Gewicht jaar: 3 punten (jan, sep, okt), as rond 100', [wy.points, wy.rows], [3, ['Januari | 101,2 | kg', 'September | 99,1 | kg', 'Oktober | 98,5 | kg']]);
   await click(page, '#insight-metric-head [data-insight-period="month"]');
   check('Gewicht: Jaar → Maand = oktober, regel t.o.v. september', [await headOf(page, 'screen-insight-metric'), await page.evaluate(() => document.querySelector('#insight-metric-body .insight-summary-note').textContent)], ['Oktober 2026', '−0,6 kg t.o.v. september']);
-  await click(page, '#btn-back-insight-metric'); await page.waitForTimeout(200);
+  await click(page, '#btn-back-insight-metric'); await H.settle(page);
   check('terugpijl → hoofdscherm in Maand oktober', [(await main(page)).periods[1], (await main(page)).title], ['*Maand', 'Oktober 2026']);
   // Training and muscle group in Maand
   await click(page, '[data-insight-metric="training"]');
@@ -239,13 +239,13 @@ async function monthAndYear(page) {
     note: [...document.querySelectorAll('#insight-muscle-body .insight-summary-note div')].map(d => d.textContent),
     rows: [...document.querySelectorAll('#insight-muscle-body .insight-mg-row')].map(r => r.innerText.replace(/\n/g, ' | ')) }));
   console.log('     LATS, 2026:'); show(latY);
-  await page.goBack(); await page.waitForTimeout(250);
+  await page.goBack(); await H.settle(page);
   check('terug uit spiergroep → trainingsoverzicht in Jaar 2026', [await active(page), await headOf(page, 'screen-insight-training')], ['screen-insight-training', '2026']);
-  await page.goBack(); await page.waitForTimeout(250);
+  await page.goBack(); await H.settle(page);
   check('terug → hoofdscherm in Jaar 2026', [await active(page), (await main(page)).title], ['screen-insight', '2026']);
 
   // ── Layout, light/dark, 360/390
-  for (const wpx of [360, 390]) for (const theme of ['light', 'dark']) {
+  for (const wpx of H.WIDTHS) for (const theme of H.THEMES) {
     const tag = `${theme} ${wpx}px`;
     await page.setViewportSize({ width: wpx, height: 1400 });
     await setup(page, DATA, theme);
@@ -266,7 +266,7 @@ async function monthAndYear(page) {
         return t.slice(1).every((b, i) => b.x >= t[i].x + t[i].width + 1); });
       check(`${tag} ${per}: x-aslabels Slaap overlappen niet`, ax, true);
       await page.screenshot({ path: path.join(OUT, `v3-sleep-${per}-${theme}-${wpx}.png`), fullPage: true });
-      await page.goBack(); await page.waitForTimeout(200);
+      await page.goBack(); await H.settle(page);
     }
   }
 }
@@ -280,17 +280,17 @@ async function backChain(page) {
     const t = s.querySelector('.insight-nav-title');
     return s.id.replace('screen-', '') + (t ? ' · ' + t.textContent : '');
   });
-  const click = async sel => { await page.click(sel); await page.waitForTimeout(80); };
+  const click = async sel => { await page.click(sel); await H.settle(page); };
   // back: 'arrow' = the toolbar's back arrow, 'browser' = history.back (= Android back)
   const back = async how => {
     if (how === 'arrow') await page.evaluate(() => document.querySelector('.screen.active .toolbar-btn').click());
     else await page.goBack();
-    await page.waitForTimeout(250);
+    await H.settle(page);
     return where();
   };
   const start = async () => {
-    await page.evaluate(() => { showScreen('screen-home'); }); await page.waitForTimeout(50);
-    await page.evaluate(() => document.getElementById('menu-card-insight').click()); await page.waitForTimeout(80);
+    await page.evaluate(() => { showScreen('screen-home'); }); await H.settle(page);
+    await page.evaluate(() => document.getElementById('menu-card-insight').click()); await H.settle(page);
   };
 
   for (const how of ['browser', 'arrow']) {

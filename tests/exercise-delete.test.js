@@ -28,7 +28,7 @@ H.run(async () => {
   const out = H.outDir(__filename);
   const shot = (page, name) => page.screenshot({ path: path.join(out, name + '.png') });
 
-  for (const theme of ['light', 'dark']) for (const width of [360, 390]) {
+  for (const theme of H.THEMES) for (const width of H.WIDTHS) {
     const tag = `${theme}-${width}`;
     const full = theme === 'light' && width === 360;
     H.section(tag);
@@ -52,7 +52,7 @@ H.run(async () => {
 
     // ── 1. Verwijderpop-up: geen vinkje, Verwijderen direct aan te tikken
     await page.evaluate(() => openDeleteExerciseConfirm(allExercises().find(e => e.id === 'bench-press')));
-    await page.waitForTimeout(350);
+    await H.settle(page);
     const pop = await page.evaluate(() => {
       const p = document.querySelector('#delete-exercise-overlay .overlay-panel');
       return {
@@ -67,10 +67,10 @@ H.run(async () => {
     await shot(page, `delete-popup-${tag}`);
     H.check(`${tag} verwijderpop-up`, pop, { title: 'Oefening verwijderen?', msg: 'Weet je zeker dat je Bench press wilt verwijderen? De oefening verdwijnt uit je lijsten. Je trainingsgeschiedenis blijft bewaard, en je kunt hem terugzetten via Verwijderde oefeningen.',
       bold: 'Bench press', checkbox: false, enabled: true, fits: true });
-    await page.click('#btn-delete-ex-confirm'); await page.waitForTimeout(350);
+    await page.click('#btn-delete-ex-confirm'); await H.settle(page);
     const afterDel = await state();
     H.check(`${tag} na verwijderen: rij en melding`, afterDel, { row: 'Verwijderde oefeningen (1)', toast: 'Oefening verwijderd' });
-    await page.waitForTimeout(2200);
+    await page.waitForFunction(() => !document.getElementById('toast').classList.contains('show')); await H.settle(page); // the toast has gone
     await page.evaluate(() => document.getElementById('exercise-list').scrollTo(0, 99999));
     await shot(page, `exercises-row-${tag}`);
     if (full) {
@@ -90,14 +90,14 @@ H.run(async () => {
     }
 
     // ── 2. Scherm Verwijderde oefeningen + terugzetten van een ingebouwde oefening
-    await page.click('#exercises-deleted-row'); await page.waitForTimeout(300);
+    await page.click('#exercises-deleted-row'); await H.settle(page);
     const scr = await page.evaluate(() => ({
       active: document.getElementById('screen-deleted-exercises').classList.contains('active'),
       rows: [...document.querySelectorAll('.deleted-ex-row')].map(r => [r.querySelector('.deleted-ex-name').textContent, r.querySelector('.deleted-ex-meta').textContent, r.querySelectorAll('.row-icon-btn').length]),
       tap: [...document.querySelectorAll('.row-icon-btn')].map(b => { const r = b.getBoundingClientRect(); return r.width + 'x' + r.height; }),
     }));
     if (full) H.check('scherm met ingebouwde oefening', scr, { active: true, rows: [['Bench press', 'Borst · ingebouwd', 1]], tap: ['48x48'] });
-    await page.click('.deleted-ex-restore'); await page.waitForTimeout(300);
+    await page.click('.deleted-ex-restore'); await H.settle(page);
     const afterRestore = await page.evaluate(() => ({
       empty: document.getElementById('deleted-ex-list').innerText.trim(),
       inBorst: exercisesInCategory('chest').some(e => e.id === 'bench-press'),
@@ -107,7 +107,7 @@ H.run(async () => {
     }));
     H.check(`${tag} terugzetten`, { ...afterRestore, toast: (await state()).toast }, { empty: 'Geen verwijderde oefeningen', inBorst: true, sets: 2, favoriet: true,
       info: { primaryMuscleGroup: 'chest', benchSetting: '3' }, pr: true, rowInList: false, toast: 'Bench press is teruggezet' });
-    await page.waitForTimeout(400);
+    await H.settle(page);
     await shot(page, `deleted-empty-${tag}`);
 
     // ── 3. Twee verwijderd: ingebouwd + eigen; alleen de eigen kan permanent weg
@@ -115,7 +115,7 @@ H.run(async () => {
       for (const id of ['bench-press', 'ex-mijn']) { openDeleteExerciseConfirm(allExercises().find(e => e.id === id)); document.getElementById('btn-delete-ex-confirm').click(); }
       openDeletedExercises();
     });
-    await page.waitForTimeout(2300);
+    await page.waitForFunction(() => !document.getElementById('toast').classList.contains('show')); await H.settle(page); // the toast has gone
     const two = await page.evaluate(() => [...document.querySelectorAll('.deleted-ex-row')].map(r => [r.querySelector('.deleted-ex-name').textContent, r.querySelector('.deleted-ex-meta').textContent, [...r.querySelectorAll('.row-icon-btn')].map(b => b.getAttribute('aria-label') + ' ' + b.getBoundingClientRect().width + 'x' + b.getBoundingClientRect().height)]));
     H.check(`${tag} twee rijen (ingebouwd zonder Permanent verwijderen)`, two, [['Bench press', 'Borst · ingebouwd', ['Terugzetten 48x48']], ['Mijn press', 'Borst · eigen oefening', ['Terugzetten 48x48', 'Permanent verwijderen 48x48']]]);
     const fits = await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth && [...document.querySelectorAll('.deleted-ex-row')].every(r => r.scrollWidth <= r.clientWidth));
@@ -192,11 +192,11 @@ H.run(async () => {
       }, MSG);
       H.check('naam van verwijderde oefening geweigerd', refuse, { toasts: [MSG, MSG, MSG, 'Deze oefening bestaat al', 'Oefening aangemaakt'], toegevoegd: 1, hernoemd: 'Ander', msgOk: true });
       await page.evaluate(() => openDeletedExercises());
-      await page.waitForTimeout(300);
+      await H.settle(page);
     }
 
     // ── 4. Permanent verwijderen (eigen oefening), met vinkje
-    await page.click('.deleted-ex-purge'); await page.waitForTimeout(350);
+    await page.click('.deleted-ex-purge'); await H.settle(page);
     const pp = await page.evaluate(() => {
       const p = document.querySelector('#purge-exercise-overlay .overlay-panel');
       return { msg: document.getElementById('purge-ex-msg').innerText, title: document.querySelector('#purge-exercise-overlay h3').textContent,
@@ -212,7 +212,7 @@ H.run(async () => {
     H.check(`${tag} zonder vinkje niet aan te tikken`, { ...blocked, tapped: blocked2 }, { open: true, exists: true, tapped: true });
     await page.check('#purge-ex-confirm-check');
     H.check(`${tag} met vinkje aan te tikken`, await page.evaluate(() => !document.getElementById('btn-purge-ex-confirm').disabled), true);
-    await page.click('#btn-purge-ex-confirm'); await page.waitForTimeout(300);
+    await page.click('#btn-purge-ex-confirm'); await H.settle(page);
     const p = await page.evaluate(() => ({
       oefening: findExercise('ex-mijn'), custom: db.custom_exercises.length,
       workouts: Object.fromEntries(Object.entries(db.workouts).map(([d, w]) => [d, w.map(e => e.exerciseId)])),

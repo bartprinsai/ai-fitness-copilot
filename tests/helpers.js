@@ -9,6 +9,14 @@
 //     (runInVm() with a FakeStore), for storage logic without a browser.
 // Both count their checks in the same way; done() prints the summary line that
 // tests/run-all.js reads (RESULT {"passed":n,"failed":m}) and sets the exit code.
+//
+// Quick and full round — ONE setting for every test file: the layout checks run over THEMES ×
+// WIDTHS. Quick (npm test, the default): light at 360px. Full (npm run test:full, or TEST_FULL=1 /
+// --full when you run one file): light and dark at 360 and 390px. A test never lists the themes or
+// widths itself: `for (const theme of H.THEMES) for (const w of H.WIDTHS)`.
+//
+// Speed: one browser per test file (openApp() opens a new context in it, cheap), and no fixed
+// waits — settle(page) waits until the app is idle (see there).
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
@@ -17,6 +25,9 @@ const ROOT = path.join(__dirname, '..');
 const APP_URL = 'file:///' + path.join(ROOT, 'index.html').replace(/\\/g, '/');
 // "Today" in every test unless a test says otherwise: Thursday 22 October 2026 (week 43).
 const TODAY = '2026-10-22';
+const FULL = process.env.TEST_FULL === '1' || process.argv.includes('--full');
+const THEMES = FULL ? ['light', 'dark'] : ['light'];
+const WIDTHS = FULL ? [360, 390] : [360];
 
 // ── Checks ──────────────────────────────────────────────────────────────────────
 let passed = 0, failed = 0;
@@ -41,9 +52,12 @@ function done(extraErrors = []) {
   console.log('RESULT ' + JSON.stringify({ passed, failed }));
   process.exitCode = failed ? 1 : 0;
 }
-// Runs an async test body; a crash counts as a failure (and is shown), never as a pass.
+// Runs an async test body; a crash counts as a failure (and is shown), never as a pass. The shared
+// browser is always closed afterwards, also after a crash, so a crashed test ends at once instead of
+// keeping its process alive (until run-all's time-out).
 function run(fn) {
-  fn().catch(e => { failed++; console.log('FAIL test liep vast: ' + (e && e.stack || e)); }).finally(() => done());
+  fn().catch(e => { failed++; console.log('FAIL test liep vast: ' + (e && e.stack || e)); })
+    .finally(async () => { await closeBrowser(); done(); });
 }
 
 // ── Output (screenshots and the like) ───────────────────────────────────────────
@@ -62,10 +76,54 @@ const FIREBASE_STUB = `(function(){ const stub = () => new Proxy(function(){}, {
 // blocked. Returns { browser, ctx, page, errors } (errors: uncaught page errors).
 //   width/height: viewport (default 360 × 800); theme: 'light' | 'dark'; now: an ISO time;
 //   touch: a mobile context with touch events.
+//   The returned `browser` only closes this context (browser.close()); the real browser is shared by
+//   every openApp() of the test file and closed by run().
+let sharedBrowser = null;
+async function getBrowser() {
+  if (!sharedBrowser) { const { chromium } = require('playwright'); sharedBrowser = chromium.launch(); }
+  return sharedBrowser;
+}
+async function closeBrowser() {
+  if (!sharedBrowser) return;
+  const b = sharedBrowser; sharedBrowser = null;
+  try { await (await b).close(); } catch (e) { /* already gone */ }
+}
+// In the page, before the app's own scripts: keeps count of the app's pending short timers
+// (setTimeout up to IDLE_TIMER_MS), so settle() can wait until they have run. Longer timers (a toast
+// that hides after 2 s, the splash) are not waited for: a test that needs them waits for their
+// result (the toast hidden) instead.
+const IDLE_TIMER_MS = 1000;
+// Per pending timer its callback's source, so settle() can see a safety net that has nothing left to do.
+const TIMER_TRACKER = `(() => {
+  const pending = new Map(), st = window.setTimeout.bind(window), ct = window.clearTimeout.bind(window);
+  window.__pendingTimers = pending;
+  window.setTimeout = (fn, ms = 0, ...a) => {
+    if (!(ms <= ${IDLE_TIMER_MS})) return st(fn, ms, ...a);
+    const id = st((...x) => { pending.delete(id); typeof fn === 'function' ? fn(...x) : eval(fn); }, ms, ...a);
+    pending.set(id, String(fn)); return id;
+  };
+  window.clearTimeout = id => { pending.delete(id); ct(id); };
+})();`;
+// Waits until the app is idle — a concrete state instead of a fixed wait: no CSS transition or
+// finite animation running (an endless spinner doesn't count), no short app timer pending, the fonts
+// loaded; then two more frames, so whatever that last step changed has been laid out and painted.
+// One kind of pending timer doesn't count: the app's 500ms safety net after a history step
+// (popHistoryEntrySilently / restoreConsumedEntry: `if (suppressNextPopstate) …`) once the popstate it
+// guards has arrived — suppressNextPopstate is false again, so the timer has nothing left to do.
+async function settle(page, { timeout = 5000 } = {}) {
+  // A running transition or finite animation is finished at once (Animation.finish(): the same end
+  // state, the same events, as waiting it out — the app doesn't listen to transition events anyway).
+  await page.waitForFunction(() => {
+    document.getAnimations().forEach(a => { if (a.playState === 'running' && a.effect.getComputedTiming().endTime !== Infinity) a.finish(); });
+    const guardOff = typeof suppressNextPopstate !== 'undefined' && !suppressNextPopstate;
+    const busy = [...(window.__pendingTimers || new Map()).values()].filter(src => !(guardOff && src.includes('if (suppressNextPopstate)')));
+    return document.fonts.status === 'loaded' && busy.length === 0;
+  }, null, { polling: 'raf', timeout });
+  await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+}
 async function openApp({ width = 360, height = 800, theme = 'light', now = TODAY + 'T12:00:00+02:00', touch = false, scale = 1 } = {}) {
-  const { chromium } = require('playwright');
-  const browser = await chromium.launch();
-  const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: scale, ...(touch ? { hasTouch: true, isMobile: true } : {}) });
+  const real = await getBrowser();
+  const ctx = await real.newContext({ viewport: { width, height }, deviceScaleFactor: scale, ...(touch ? { hasTouch: true, isMobile: true } : {}) });
   await ctx.route('**/*', route => {
     const u = route.request().url();
     if (u.includes('gstatic.com/firebasejs')) return route.fulfill({ contentType: 'text/javascript', body: u.includes('app-compat') ? FIREBASE_STUB : '' });
@@ -73,11 +131,13 @@ async function openApp({ width = 360, height = 800, theme = 'light', now = TODAY
     return route.abort();
   });
   const page = await ctx.newPage();
+  const browser = { close: () => ctx.close(), newContext: (...a) => real.newContext(...a) };
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   await page.clock.setFixedTime(new Date(now));
+  await page.addInitScript(TIMER_TRACKER); // after the clock, so it wraps the clock's setTimeout
   await page.goto(APP_URL);
-  await page.waitForTimeout(300);
+  await settle(page);
   await page.evaluate(theme => {
     document.documentElement.dataset.theme = theme;
     const sp = document.getElementById('splash-screen'); if (sp) sp.style.display = 'none';
@@ -230,4 +290,4 @@ async function runInVm(testSource, { store = new FakeStore(), logs = false } = {
   await ctx.__test;
 }
 
-module.exports = { ROOT, APP_URL, TODAY, check, ok, section, done, run, outDir, openApp, loadData, sleep, tokenColor, FIREBASE_STUB, FakeStore, runInVm };
+module.exports = { ROOT, APP_URL, TODAY, FULL, THEMES, WIDTHS, check, ok, section, done, run, outDir, openApp, closeBrowser, settle, loadData, sleep, tokenColor, FIREBASE_STUB, FakeStore, runInVm };

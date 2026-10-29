@@ -46,9 +46,9 @@ H.run(async () => {
   const setup = async (data = DATA, theme = 'light') => {
     await H.loadData(page, data, theme);
     await page.evaluate(() => { showScreen('screen-home'); openInsight(); });
-    await page.waitForTimeout(60);
+    await H.settle(page);
   };
-  const click = async sel => { await page.click(sel); await page.waitForTimeout(80); };
+  const click = async sel => { await page.click(sel); await H.settle(page); };
   const card = () => page.evaluate(() => {
     const c = document.querySelector('[data-insight-metric="strength"]');
     return { label: c.querySelector('.insight-card-label').textContent, chevron: !!c.querySelector('.insight-chevron'),
@@ -139,7 +139,7 @@ H.run(async () => {
   const FUT = JSON.parse(JSON.stringify(DATA));
   FUT.workouts['2026-11-05'] = [{ exerciseId: 'bench-press', sets: [S(130, 5)] }];
   await setup(FUT);
-  await page.evaluate(() => { insightSwitchPeriod('year'); openInsightCategory('chest'); }); await page.waitForTimeout(120);
+  await page.evaluate(() => { insightSwitchPeriod('year'); openInsightCategory('chest'); }); await H.settle(page);
   const chartOf = async id => page.evaluate(id => {
     const svg = document.querySelector(`[data-insight-exercise-card="${id}"] .insight-chart-svg`);
     return svg && { x: [...svg.querySelectorAll('.insight-chart-day')].map(t => t.textContent).join(' '), points: svg.querySelectorAll('.insight-point').length, line: !!svg.querySelector('.insight-line') };
@@ -198,14 +198,14 @@ H.run(async () => {
     check(`${how}: tik in de kaart Borst (ook op de grafiek) opent Borst in dezelfde periode`, at, ['screen-insight-category', 'Borst', 'Week 43']);
     await click('#insight-category-head [data-insight-period="month"]');
     if (how === 'arrow') await page.evaluate(() => document.getElementById('btn-back-insight-category').click()); else await page.goBack();
-    await page.waitForTimeout(250);
+    await H.settle(page);
     check(`${how}: terug → Kracht, in Oktober 2026`, await page.evaluate(() => [document.querySelector('.screen.active').id, document.querySelector('#insight-strength-head .insight-nav-title').textContent]), ['screen-insight-strength', 'Oktober 2026']);
     if (how === 'arrow') await page.evaluate(() => document.getElementById('btn-back-insight-strength').click()); else await page.goBack();
-    await page.waitForTimeout(250);
+    await H.settle(page);
     check(`${how}: nog eens terug → hoofdscherm`, await page.evaluate(() => document.querySelector('.screen.active').id), 'screen-insight');
   }
   await setup();
-  await page.evaluate(() => openInsightStrength()); await page.waitForTimeout(80);
+  await page.evaluate(() => openInsightStrength()); await H.settle(page);
   await click('[data-insight-category="chest"]');
   // Bench press: 119,6 ÷ 116,7 − 1 = +2,5% (de geschatte 1RM van week 43 t.o.v. week 42, alleen op de achtergrond).
   // Grafiek: 110,8 · 116,7 · 119,6 → 0% · +5,3% · +7,9%. Sterkst / Zwakst: de echte sets 102,5 × 5 en 95 × 5.
@@ -229,17 +229,17 @@ H.run(async () => {
       cursor: getComputedStyle(c).cursor };
   });
   check('oefeningkaart: tikken doet niets, geen knoppen in de kaarten', tap, { screen: 'screen-insight-category', buttons: 0, cursor: 'auto' });
-  await page.goBack(); await page.waitForTimeout(200);
+  await page.goBack(); await H.settle(page);
   await click('[data-insight-category="back"]');
   check('Rug Week 43: Deadlift niet gedaan ("Niet gedaan" grijs, geen kg), één punt: "Pas één week getraind", geen Sterkst/Zwakst', await exCards(), [
     { tag: 'DIV', name: 'Deadlift', sub: 't.o.v. week 42', figure: 'Niet gedaan(grijs)', chevron: false, points: 1, ticks: '−0,5% 0% +0,5%', extremes: [], note: 'Pas één week getraind', empty: '' }]);
   await click('#insight-category-head [data-insight-period="month"]');
   check('Rug Oktober: "Pas één maand getraind"', (await exCards())[0].note, 'Pas één maand getraind');
-  await page.goBack(); await page.waitForTimeout(200);
+  await page.goBack(); await H.settle(page);
   await click('[data-insight-category="arms"]');
   check('Armen (Oktober): Barbell curl nooit gedaan: "Niet gedaan" grijs, lege staat zonder grafiek', await exCards(), [
     { tag: 'DIV', name: 'Barbell curl', sub: 't.o.v. september', figure: 'Niet gedaan(grijs)', chevron: false, points: 0, ticks: '', extremes: [], note: '', empty: 'Nog niet getraind in deze periode' }]);
-  await page.goBack(); await page.waitForTimeout(200);
+  await page.goBack(); await H.settle(page);
   await click('[data-insight-category="legs"]');
   // Squat: 163,3 (oktober) ÷ 175 (september) − 1 = −6,7%
   check('Benen Oktober (de periode bleef Maand): −6,7%, t.o.v. september', await exCards().then(c => [c[0].figure, c[0].sub]), ['−6,7%', 't.o.v. september']);
@@ -250,14 +250,14 @@ H.run(async () => {
   ORD.exerciseInfo['bench-press-dumbbell'] = { trackStrength: true };
   ORD.workouts['2026-10-05'] = [{ exerciseId: 'bench-press-dumbbell', sets: [S(150, 5)] }]; // week 41: 175, niet in week 43
   await setup(ORD);
-  await page.evaluate(() => openInsightCategory('chest')); await page.waitForTimeout(100);
+  await page.evaluate(() => openInsightCategory('chest')); await H.settle(page);
   check('volgorde op geschatte 1RM: Bench press (119,6) · Incline (101,3) · daarna niet gedaan (Bench press (dumbbell), laatst 175)', (await exCards()).map(c => c.name + ' ' + c.figure),
     ['🏆 Bench press +2,5%(groen)', '🏆 Incline bench press Geen vergelijking(grijs)', 'Bench press (dumbbell) Niet gedaan(grijs)']);
   // Allemaal niet gedaan in week 43: onderling op de laatst bekende geschatte 1RM (175 · 116,7 · 95)
   const ORD2 = JSON.parse(JSON.stringify(ORD));
   delete ORD2.workouts['2026-10-19'];
   await setup(ORD2);
-  await page.evaluate(() => openInsightCategory('chest')); await page.waitForTimeout(100);
+  await page.evaluate(() => openInsightCategory('chest')); await H.settle(page);
   check('niet gedaan: onderling op de laatst bekende geschatte 1RM', (await exCards()).map(c => c.name + ' ' + c.figure),
     ['Bench press (dumbbell) Niet gedaan(grijs)', 'Bench press Niet gedaan(grijs)', 'Incline bench press Niet gedaan(grijs)']);
 
@@ -268,7 +268,7 @@ H.run(async () => {
       '2026-10-20': [{ exerciseId: 'squat', sets: [S(142.25, 5, { extra: '3', extraType: 'forced' }), S(140, 5)] }], // 166 (met de extra reps 179,9)
     } };
   await setup(XR);
-  await page.evaluate(() => openInsightCategory('legs')); await page.waitForTimeout(100);
+  await page.evaluate(() => openInsightCategory('legs')); await H.settle(page);
   const xr = (await exCards())[0];
   check('echte set "142,25 kg × 5" (extra reps niet in de weergave); percentage 166 ÷ 116,7 − 1 = +42,2%', [xr.figure, xr.extremes],
     ['+42,2%(groen)', ['Sterkst 142,25 kg × 5 · dinsdag 20 oktober 2026', 'Zwakst 100 kg × 5 · dinsdag 13 oktober 2026']]);
@@ -287,16 +287,16 @@ H.run(async () => {
   const eq = await page.evaluate(() => insightExtremes(insightStrengthSeries('squat', insightStrengthPoints(insightRange()))));
   check('gelijke waarden: Sterkst = de meest recente 120 (vrijdag 9 oktober), Zwakst = de meest recente 100 (15 september)', eq,
     { strongest: { value: 120, weight: 120, reps: 1, date: '2026-10-09' }, weakest: { value: 100, weight: 100, reps: 1, date: '2026-09-15' } });
-  await page.evaluate(() => openInsightCategory('legs')); await page.waitForTimeout(100);
+  await page.evaluate(() => openInsightCategory('legs')); await H.settle(page);
   check('gelijke waarden op het scherm', (await exCards())[0].extremes, ['Sterkst 120 kg × 1 · vrijdag 9 oktober 2026', 'Zwakst 100 kg × 1 · dinsdag 15 september 2026']);
   // Gelijke geschatte 1RM op één dag (100 × 1 = 100 en 75 × 10 = 100): de latere set geldt
   const SAMEDAY = { ...EQ, workouts: { '2026-10-13': [{ exerciseId: 'squat', sets: [S(80, 1)] }], '2026-10-20': [{ exerciseId: 'squat', sets: [S(100, 1), S(75, 10)] }] } };
   await setup(SAMEDAY);
-  await page.evaluate(() => openInsightCategory('legs')); await page.waitForTimeout(100);
+  await page.evaluate(() => openInsightCategory('legs')); await H.settle(page);
   check('gelijke waarden op één dag: de latere set (75 kg × 10)', (await exCards())[0].extremes[0], 'Sterkst 75 kg × 10 · dinsdag 20 oktober 2026');
   const ALLEQ = { ...EQ, workouts: { '2026-09-01': EQ.workouts['2026-09-01'], '2026-09-15': EQ.workouts['2026-09-15'] } };
   await setup(ALLEQ);
-  await page.evaluate(() => openInsightCategory('legs')); await page.waitForTimeout(100);
+  await page.evaluate(() => openInsightCategory('legs')); await H.settle(page);
   check('alle punten gelijk: Sterkst en Zwakst zijn allebei het meest recente punt', (await exCards())[0].extremes, ['Sterkst 100 kg × 1 · dinsdag 15 september 2026', 'Zwakst 100 kg × 1 · dinsdag 15 september 2026']);
 
   // ── Nergens in Inzicht een geschatte 1RM in kg (alleen de echte sets bij Sterkst en Zwakst)
@@ -306,14 +306,14 @@ H.run(async () => {
     const grab = sel => page.evaluate(sel => [...document.querySelectorAll(sel)].map(el => { const c = el.cloneNode(true); c.querySelectorAll('.insight-extremes').forEach(x => x.remove()); return c.textContent; }).join(' '), sel);
     await page.evaluate(p => { insightSwitchPeriod(p); renderInsight(); }, per);
     const texts = [await grab('[data-insight-metric="strength"]')];
-    await page.evaluate(() => openInsightStrength()); await page.waitForTimeout(80);
+    await page.evaluate(() => openInsightStrength()); await H.settle(page);
     texts.push(await grab('#insight-strength-body'));
     for (const cat of ['chest', 'back', 'arms', 'legs']) {
-      await page.evaluate(c => openInsightCategory(c), cat); await page.waitForTimeout(60);
+      await page.evaluate(c => openInsightCategory(c), cat); await H.settle(page);
       texts.push(await grab('#insight-category-body'));
       const ext = await page.evaluate(() => [...document.querySelectorAll('.insight-extremes .role-sub')].every(e => /^(Sterkst|Zwakst) \d+(,\d{1,2})? kg × \d+ · /.test(e.textContent)));
       if (!ext) kgFound.push(per + ' ' + cat + ': Sterkst/Zwakst niet als echte set');
-      await page.goBack(); await page.waitForTimeout(150);
+      await page.goBack(); await H.settle(page);
     }
     texts.forEach((t, i) => { if (/kg/.test(t)) kgFound.push(per + ' #' + i + ': ' + t.slice(0, 80)); });
   }
@@ -343,7 +343,7 @@ H.run(async () => {
     const v = document.getElementById('exercise-info-view-content');
     return [...v.querySelectorAll('.section-head')].map(h => h.textContent).join(',') + ' / ' + [...v.querySelectorAll('.info-view-stat')].map(s => s.textContent).join(' · ');
   });
-  await page.evaluate(() => { openTraining('incline-bench-press'); openExerciseInfo(); }); await page.waitForTimeout(80);
+  await page.evaluate(() => { openTraining('incline-bench-press'); openExerciseInfo(); }); await H.settle(page);
   check('bekijken, aan: INZICHT met Kracht volgen Ja', await info(), 'Spiergroep,Inzicht / PrimairNiet ingesteld · SecundairNiet ingesteld · Kracht volgenJa');
   await click('#btn-exercise-info-edit');
   const ed = await page.evaluate(() => ({ heads: [...document.querySelectorAll('#exercise-info-edit-mode .section-head')].filter(h => h.offsetParent).map(h => h.textContent),
@@ -360,21 +360,21 @@ H.run(async () => {
   await click('#info-track-strength');
   await click('#btn-exercise-info-save');
   check('aan + opslaan: trackStrength true, andere velden blijven', await page.evaluate(() => db.exerciseInfo['incline-bench-press']), { trackStrength: true });
-  await page.evaluate(() => closeOverlay('exercise-info-overlay')); await page.waitForTimeout(50);
+  await page.evaluate(() => closeOverlay('exercise-info-overlay')); await H.settle(page);
   // Andere velden bewaren trackStrength
-  await page.evaluate(() => { openTraining('bench-press'); openExerciseInfo(); }); await page.waitForTimeout(50);
+  await page.evaluate(() => { openTraining('bench-press'); openExerciseInfo(); }); await H.settle(page);
   await click('#btn-exercise-info-edit'); await click('#info-powerlift-bench'); await click('#btn-exercise-info-save');
   check('Powerliftbank wijzigen houdt Kracht volgen', await page.evaluate(() => db.exerciseInfo['bench-press']), { primaryMuscleGroup: 'chest', trackStrength: true, powerliftBench: true });
-  await page.evaluate(() => closeOverlay('exercise-info-overlay')); await page.waitForTimeout(50);
+  await page.evaluate(() => closeOverlay('exercise-info-overlay')); await H.settle(page);
   // Cardio
-  await page.evaluate(() => { openTraining('treadmill'); openExerciseInfo(); }); await page.waitForTimeout(50);
+  await page.evaluate(() => { openTraining('treadmill'); openExerciseInfo(); }); await H.settle(page);
   const cv = await info();
   await click('#btn-exercise-info-edit');
   const ce = await page.evaluate(() => [...document.querySelectorAll('#exercise-info-edit-mode .section-head')].filter(h => h.offsetParent).map(h => h.textContent).concat(document.getElementById('info-track-strength').offsetParent ? ['knop zichtbaar'] : []));
   check('Cardio: niet bij bekijken (ook al staat trackStrength opgeslagen), niet bij bewerken', [cv, ce], ['Spiergroep / PrimairNiet ingesteld · SecundairNiet ingesteld', ['Spiergroep', 'Apparatuur']]);
-  await page.evaluate(() => closeOverlay('exercise-info-overlay')); await page.waitForTimeout(50);
+  await page.evaluate(() => closeOverlay('exercise-info-overlay')); await H.settle(page);
   // Nieuwe oefening / Oefening bewerken
-  await page.evaluate(() => openNewExerciseScreen()); await page.waitForTimeout(350);
+  await page.evaluate(() => openNewExerciseScreen()); await H.settle(page);
   const nx = () => page.evaluate(() => ({ shown: !!document.getElementById('new-ex-info-insight-head').offsetParent, btn: document.getElementById('new-ex-info-track-strength').textContent, hint: document.getElementById('new-ex-info-track-strength-hint').textContent }));
   check('Nieuwe oefening: zichtbaar, uit, hulpregel zonder categorie', await nx(), { shown: true, btn: 'Nee', hint: 'Telt mee voor Kracht in Inzicht.' });
   await page.evaluate(() => { document.getElementById('new-ex-name').value = 'Hip thrust'; });
@@ -388,14 +388,14 @@ H.run(async () => {
   await click('#btn-new-ex-save');
   const hip = await page.evaluate(() => { const e = db.custom_exercises.find(x => x.name === 'Hip thrust'); return e && db.exerciseInfo[e.id]; });
   check('Nieuwe oefening opgeslagen met Kracht volgen', hip, { trackStrength: true });
-  await page.evaluate(() => openEditExerciseScreen(findExercise('squat'))); await page.waitForTimeout(100);
+  await page.evaluate(() => openEditExerciseScreen(findExercise('squat'))); await H.settle(page);
   check('Oefening bewerken (squat): aan, Benen', await nx(), { shown: true, btn: 'Ja', hint: 'Telt mee voor Kracht in Inzicht, bij de categorie Benen.' });
   await click('#new-ex-category'); await click('#field-picker-list [data-value="cardio"]');
   await click('#btn-new-ex-save');
   check('Oefening naar Cardio verplaatst: Kracht volgen vervalt', await page.evaluate(() => db.exerciseInfo.squat || null), null);
 
   // ── Layout: licht/donker, 360/390
-  for (const wpx of [360, 390]) for (const theme of ['light', 'dark']) {
+  for (const wpx of H.WIDTHS) for (const theme of H.THEMES) {
     const tag = `${theme} ${wpx}px`;
     await page.setViewportSize({ width: wpx, height: 1400 });
     await setup(DATA, theme);
