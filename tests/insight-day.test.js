@@ -116,7 +116,7 @@ H.run(async () => {
   check('label met legenda', d.label, 'PER SPIERGROEP Gedaan Schema');
   check('rijen: alleen de spiergroepen van die dag, op percentage, Geen spiergroep als laatste', d.rows, [
     ['Borst', '4 van 4 · op schema · +1 extra [success]', 'Bench press · 5 sets · 2 failure · 1 partial · 1 forced · 1 dropset', '29%'],
-    ['Triceps', '4 van 4 · op schema [success]', 'Dips · 4 sets', 'Gepland: Triceps pushdown [muted]', '24%'],
+    ['Triceps', '4 van 4 · op schema [success]', 'Dips · 4 sets', '24%'], // Dips replaced Triceps pushdown, on schedule: no "Gepland"
     ['Zijkant schouders', '3 sets · extra', 'Lateral raise · 3 sets', '18%'],
     ['Voorste schouders', '2 van 3 · −1 [danger]', 'Overhead press · 2 sets', '12%'],
     ['Bovenborst', '0 van 3 · −3 [danger]', 'Gepland: Incline dumbbell press [muted]', '0%'],

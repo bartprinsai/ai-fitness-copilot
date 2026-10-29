@@ -2218,12 +2218,17 @@ function insightCompareKey(id) {
 //   trainings: plannedTrainings = planned days (as above), doneTrainings = those of them with
 //            ≥ 1 logged set; a training on a day without a planned training isn't one of them
 //            (its sets are extra). loggedDays = all days with ≥ 1 logged set (no comparison).
-// compare: false when no counted day had a fixed or Week A/B schedule (no schedule, or a
-// sequential one — that comparison follows later).
+// compare: false when no counted day can be compared (insightComparable: no schedule, a sequential
+// one — that comparison follows later — or a Week A/B day whose week isn't known).
 // Also per comparison key (planned, done) and per exercise id: plannedEx { sets, name } (as
 // planned above) and doneEx (insightSetFeatures of all its logged sets, summed) — the
 // training overview and the muscle-group screens are built from these. Today's plan day before
 // today's first set doesn't count, but is kept apart: plannedToday (per key) and todayEx.
+// Whether a day is compared with the schedule — the one place that decides it, for every screen: a
+// plan day or rest day of a fixed / Week A/B schedule. Not: no version, no plan, a sequential
+// schedule, or a Week A/B day whose week (A or B) isn't known ('no-week'). Such a day's sets count
+// in the totals and the shares per muscle group, never as planned, shortfall or extra.
+function insightComparable(d) { return d.planned.status === 'day' || d.planned.status === 'rest'; }
 function insightTrainingStats(days) {
   const counted = days.filter(d => d.counted);
   const keyOf = insightCompareKey;
@@ -2248,7 +2253,7 @@ function insightTrainingStats(days) {
       });
     }
     if (d.logged) loggedDays++;
-    const comparable = d.planned.status === 'day' || d.planned.status === 'rest';
+    const comparable = insightComparable(d);
     getWorkout(d.date).forEach(ex => {
       const n = countWorkingSets(ex.sets || []);
       if (n === 0) return;
@@ -2265,7 +2270,7 @@ function insightTrainingStats(days) {
     fromSchedule += Math.min(p, c);
     extra += Math.max(0, c - p);
   });
-  const compare = counted.some(d => ['day', 'rest', 'no-week'].includes(d.planned.status));
+  const compare = counted.some(insightComparable);
   return { compare, plannedSets, doneSets, fromSchedule, shortfall: plannedSets - fromSchedule, extra, plannedTrainings, doneTrainings, loggedDays,
     planned, done, doneCompared, plannedEx, doneEx, plannedToday, todayEx };
 }
@@ -2654,7 +2659,7 @@ function insightDayTrainingHtml(d) {
   const st = d.planned.status;
   if (!d.logged && st !== 'day') return `<div class="card insight-summary">${insightEmptyHtml(st === 'rest' ? 'Rustdag' : 'Geen training')}</div>`;
   const stats = insightTrainingStats([d]);
-  const compare = st === 'day' || st === 'rest';
+  const compare = stats.compare;
   const rows = insightMuscleRows(stats).filter(r => r.planned || r.done || r.today);
   let note;
   if (!compare) note = 'Geen vergelijking met schema';
@@ -3007,6 +3012,18 @@ function insightMuscleCompareText(r, compare, ofPlanned = '') {
   if (r.done) return insightPlural(r.done, 'set', 'sets') + (r.extra > 0 ? ' · extra' : '');
   return r.today ? '0 sets · vandaag gepland' : '0 sets · niet in schema';
 }
+// The planned exercises of a row that were not done — only when the group has a shortfall (fewer
+// sets done than planned, also none at all) or is only planned today with no set yet ("0 sets ·
+// vandaag gepland"). On schedule or with extra sets they are left out: another exercise of the same
+// group replaced them, which is the idea. The "Geen spiergroep" row compares per exercise, so a
+// planned exercise without sets is always a shortfall there. One rule for the day overview's
+// "Gepland: …" and the muscle-group screen's "Gepland · 4 sets" / "Vandaag gepland · 4 sets".
+//   { missed: [[exerciseId, { sets, name }]] (plannedEx), today: [...] (todayEx, only planned today) }
+function insightPlannedNotDone(r, stats) {
+  if (!(r.planned > r.counted || (r.today > 0 && r.done === 0))) return { missed: [], today: [] };
+  const mine = obj => Object.entries(obj).filter(([ex]) => insightMuscleRowId(ex) === r.id && !stats.doneEx[ex]);
+  return { missed: mine(stats.plannedEx), today: mine(stats.todayEx).filter(([ex]) => !stats.plannedEx[ex]) };
+}
 
 // Summary card with five columns: SETS, FAILURE, PARTIAL, FORCED, DROPSET.
 function insightFeaturesSummaryHtml(f, noteHtml) {
@@ -3078,9 +3095,9 @@ function insightMuscleRowLines(r, dayStats) {
     const features = insightFeaturesText(r.features);
     return features ? `<div class="role-sub">${features}</div>` : '';
   }
-  const mine = obj => Object.entries(obj).filter(([ex]) => insightMuscleRowId(ex) === r.id);
-  const done = mine(dayStats.doneEx).map(([ex, f]) => `<div class="role-sub">${insightExerciseLine(ex, f)}</div>`);
-  const missed = [...mine(dayStats.plannedEx), ...mine(dayStats.todayEx)].filter(([ex]) => !dayStats.doneEx[ex]);
+  const done = Object.entries(dayStats.doneEx).filter(([ex]) => insightMuscleRowId(ex) === r.id)
+    .map(([ex, f]) => `<div class="role-sub">${insightExerciseLine(ex, f)}</div>`);
+  const notDone = insightPlannedNotDone(r, dayStats), missed = [...notDone.missed, ...notDone.today];
   return done.join('') + (missed.length ? `<div class="role-sub insight-muted">Gepland: ${missed.map(([ex, p]) => exerciseName(ex) || p.name).join(', ')}</div>` : '');
 }
 document.getElementById('btn-back-insight-training').addEventListener('click', () => goBack('screen-insight'));
@@ -3108,11 +3125,12 @@ function renderInsightMuscle() {
   document.getElementById('insight-muscle-schema').textContent = insightScheduleText(days, range.period);
   const note = (stats.compare ? `<div>${insightMuscleCompareText(r, true, ' sets uit je schema')}</div>` : '')
     + `<div>${r.pct}% van al je sets</div>`;
-  // OEFENINGEN: done with this group as primary (most sets first), then planned but not done.
+  // OEFENINGEN: done with this group as primary (most sets first), then planned but not done (only
+  // with a shortfall, insightPlannedNotDone).
   const bySets = (a, b) => b[1].sets - a[1].sets || exerciseName(a[0]).localeCompare(exerciseName(b[0]), 'nl');
   const done = Object.entries(stats.doneEx).filter(([ex]) => insightMuscleRowId(ex) === id).sort(bySets);
-  const missed = Object.entries(stats.plannedEx).filter(([ex]) => insightMuscleRowId(ex) === id && !stats.doneEx[ex]).sort(bySets);
-  const today = Object.entries(stats.todayEx).filter(([ex]) => insightMuscleRowId(ex) === id && !stats.doneEx[ex] && !stats.plannedEx[ex]).sort(bySets);
+  const notDone = insightPlannedNotDone(r, stats);
+  const missed = notDone.missed.sort(bySets), today = notDone.today.sort(bySets);
   const exRows = done.map(([ex, f]) => {
     const features = insightFeaturesText(f);
     return insightListRowHtml(`<div class="role-row">${exerciseName(ex)}</div>${features ? `<div class="role-sub">${features}</div>` : ''}`, insightSetsFigureHtml(f.sets));
