@@ -213,12 +213,15 @@ H.run(async () => {
   // --- Voeding, Slaap and Gewicht: the label in the card; the pencil right, in the middle, where
   //     the main screen's chevron is
   await setup(page, { ...BASE, sleep: { '2026-10-19': { bedtime: '00:20', wakeTime: '06:50' } }, bodyWeight: { '2026-10-19': 98.4 } }, '2026-10-19');
-  const cards = await page.evaluate(() => ['insight-day-food', 'insight-day-sleep', 'insight-day-weight'].map(id => {
+  const readCards = () => page.evaluate(() => ['insight-day-food', 'insight-day-sleep', 'insight-day-weight'].map(id => {
     const card = document.getElementById(id).firstElementChild, label = card.querySelector('.section-label');
-    const icon = card.querySelector('.insight-edit-icon'), r = card.getBoundingClientRect(), ir = icon && icon.getBoundingClientRect();
+    const icon = card.querySelector('.insight-edit-icon'), r = card.getBoundingClientRect(), ir = icon && icon.getBoundingClientRect(), lr = label.getBoundingClientRect();
     return { label: label && label.textContent, inCard: !!label && card.contains(label) && label === (card.querySelector('.insight-edit-main') || card).firstElementChild,
-      pencil: !!(icon && !icon.classList.contains('insight-chevron')), right: ir && Math.round(r.right - ir.right), mid: ir && Math.abs((ir.top + ir.bottom) / 2 - (r.top + r.bottom) / 2) < 0.6 };
+      pencil: !!(icon && !icon.classList.contains('insight-chevron')), right: ir && Math.round(r.right - ir.right), mid: ir && Math.abs((ir.top + ir.bottom) / 2 - (r.top + r.bottom) / 2) < 0.6,
+      size: ir && [Math.round(ir.width), Math.round(ir.height)], labelPos: [Math.round(lr.left - r.left), Math.round(lr.top - r.top)],
+      tag: card.tagName, edit: card.dataset.insightEdit || null, buttons: card.querySelectorAll('.btn, button').length };
   }));
+  const cards = await readCards();
   check('labels in de kaart', cards.map(c => [c.label, c.inCard]), [['Voeding', true], ['Slaap', true], ['Gewicht', true]]);
   check('geen labels meer boven de kaarten', await page.evaluate(() => document.querySelectorAll('#screen-insight-day .insight-scroll > .insight-label, #screen-insight-day .insight-cards > .section-label').length), 0);
   check('potloodjes rechts, verticaal in het midden', cards.slice(1).map(c => [c.pencil, c.mid]), [[true, true], [true, true]]);
@@ -226,6 +229,25 @@ H.run(async () => {
     const c = document.querySelector('[data-insight-metric="sleep"]'), i = c.querySelector('.insight-chevron');
     return Math.round(c.getBoundingClientRect().right - i.getBoundingClientRect().right); });
   check('potlood op dezelfde plek als het pijltje op het hoofdscherm', cards.slice(1).map(c => c.right), [chevronRight, chevronRight]);
+  // Empty Slaap / Gewicht (Tuesday 20: nothing filled in): the same card, the pencil in the same place, no button
+  await setup(page, BASE, '2026-10-20');
+  const empty = await readCards();
+  d = await readDay(page);
+  check('lege kaarten: label, "Nog niet ingevuld" (en de nacht)', [d.sleep, d.weight], ['SLAAP Nog niet ingevuld Nacht van maandag op dinsdag', 'GEWICHT Nog niet ingevuld']);
+  check('lege kaarten: de hele kaart is de knop, geen invulknop erin', empty.slice(1).map(c => [c.tag, c.edit, c.buttons]), [['BUTTON', 'sleep', 0], ['BUTTON', 'weight', 0]]);
+  check('lege kaarten: potlood rechts in het midden', empty.slice(1).map(c => [c.pencil, c.mid]), [[true, true], [true, true]]);
+  check('leeg en ingevuld: potlood even groot en op dezelfde afstand van de rand, label op dezelfde plek',
+    empty.slice(1).map(c => [c.size, c.right, c.labelPos]), cards.slice(1).map(c => [c.size, c.right, c.labelPos]));
+  check('"Nog niet ingevuld" in de rol Rij in een lijst, --text-muted', await page.evaluate(() => {
+    const e = document.querySelector('#insight-day-weight .role-row.insight-empty'), x = document.createElement('div');
+    x.style.color = 'var(--text-muted)'; document.body.appendChild(x); const muted = getComputedStyle(x).color; x.remove();
+    return [getComputedStyle(e).fontSize, getComputedStyle(e).fontWeight, getComputedStyle(e).color === muted];
+  }), ['15px', '400', true]);
+  for (const [kind, sheet, sub] of [['sleep', 'insight-sleep-overlay', 'Nacht van maandag 19 op dinsdag 20 oktober 2026'], ['weight', 'insight-weight-overlay', 'Dinsdag 20 oktober 2026']]) {
+    await page.click(`#insight-day-${kind} .insight-edit-card .insight-empty`); await H.settle(page); // a tap on the empty text: the card is the button
+    check(`tik op lege ${kind}-kaart opent het invulvenster voor die dag`, await page.evaluate(([o, k]) => [document.getElementById(o).classList.contains('open'), document.getElementById(`insight-${k}-sub`).textContent], [sheet, kind]), [true, sub]);
+    await page.evaluate(o => closeOverlay(o), sheet); await H.settle(page);
+  }
   await setup(page, BASE, '2026-10-19');
 
   // --- Days browsing; can't go past today
@@ -277,8 +299,8 @@ H.run(async () => {
   };
   await setup(page, BASE, '2026-10-22');
   d = await readDay(page);
-  check('lege staat Slaap: label in de kaart', d.sleep, 'SLAAP Nog niet ingevuld Nacht van woensdag op donderdag SLAAP INVULLEN');
-  await page.click('#insight-day-sleep .insight-fill-btn');
+  check('lege staat Slaap: label in de kaart', d.sleep, 'SLAAP Nog niet ingevuld Nacht van woensdag op donderdag');
+  await page.click('#insight-day-sleep .insight-edit-card');
   await H.settle(page);
   const sub = await page.textContent('#insight-sleep-sub');
   check('slaap-sheet subregel', sub, 'Nacht van woensdag 21 op donderdag 22 oktober 2026');
@@ -301,12 +323,12 @@ H.run(async () => {
   await page.click('#insight-day-sleep .insight-edit-card'); await H.settle(page);
   await page.click('#btn-insight-sleep-clear'); await H.settle(page);
   d = await readDay(page);
-  check('Wissen → gewist', [d.sleep, await page.evaluate(() => db.sleep['2026-10-22'] || null), await page.textContent('#toast-msg')], ['SLAAP Nog niet ingevuld Nacht van woensdag op donderdag SLAAP INVULLEN', null, 'Slaap gewist']);
+  check('Wissen → gewist', [d.sleep, await page.evaluate(() => db.sleep['2026-10-22'] || null), await page.textContent('#toast-msg')], ['SLAAP Nog niet ingevuld Nacht van woensdag op donderdag', null, 'Slaap gewist']);
   // Annuleren with changes asks; without changes just closes
-  await page.click('#insight-day-sleep .insight-fill-btn'); await H.settle(page);
+  await page.click('#insight-day-sleep .insight-edit-card'); await H.settle(page);
   await page.click('#btn-insight-sleep-cancel'); await H.settle(page);
   check('annuleren zonder wijziging sluit', await page.evaluate(() => document.getElementById('insight-sleep-overlay').classList.contains('open')), false);
-  await page.click('#insight-day-sleep .insight-fill-btn'); await H.settle(page);
+  await page.click('#insight-day-sleep .insight-edit-card'); await H.settle(page);
   await setClock('22:00', '07:00');
   await page.click('#btn-insight-sleep-cancel'); await H.settle(page);
   check('annuleren met wijziging vraagt', await page.evaluate(() => document.getElementById('discard-changes-overlay').classList.contains('open')), true);
@@ -318,8 +340,8 @@ H.run(async () => {
   // --- Weight: comma, point, invalid, t.o.v.
   await setup(page, BASE, '2026-10-22');
   d = await readDay(page);
-  check('lege staat Gewicht: label in de kaart', d.weight, 'GEWICHT Nog niet ingevuld GEWICHT INVULLEN');
-  await page.click('#insight-day-weight .insight-fill-btn'); await H.settle(page);
+  check('lege staat Gewicht: label in de kaart', d.weight, 'GEWICHT Nog niet ingevuld');
+  await page.click('#insight-day-weight .insight-edit-card'); await H.settle(page);
   check('gewicht-sheet subregel', await page.textContent('#insight-weight-sub'), 'Donderdag 22 oktober 2026');
   await page.type('#insight-weight-input', '98,456');
   check('max 2 decimalen tijdens typen', await page.inputValue('#insight-weight-input'), '98,45');
@@ -364,7 +386,7 @@ H.run(async () => {
   await page.click('#btn-insight-weight-save'); await H.settle(page);
   check('leeg opslaan wist niet: rode melding, venster blijft open', await page.evaluate(() => [document.getElementById('toast-msg').textContent, document.getElementById('insight-weight-overlay').classList.contains('open'), db.bodyWeight['2026-10-22']]), ['Vul een gewicht in', true, 400]);
   await page.click('#btn-insight-weight-clear'); await H.settle(page);
-  check('Wissen → gewist', [await page.evaluate(() => db.bodyWeight['2026-10-22'] ?? null), (await readDay(page)).weight], [null, 'GEWICHT Nog niet ingevuld GEWICHT INVULLEN']);
+  check('Wissen → gewist', [await page.evaluate(() => db.bodyWeight['2026-10-22'] ?? null), (await readDay(page)).weight], [null, 'GEWICHT Nog niet ingevuld']);
 
   // --- Week overview updated right after saving
   await page.evaluate(() => { saveSleep('2026-10-22', '00:20', '06:50'); saveBodyWeight('2026-10-22', 98.4); });
@@ -383,10 +405,10 @@ H.run(async () => {
     await setup(page, BASE, '2026-10-22', theme);
     const f2 = `day-empty-${theme}-${w}.png`; await page.screenshot({ path: path.join(OUT, f2) }); shots.push(f2);
     await page.setViewportSize({ width: w, height: 760 });
-    await page.click('#insight-day-sleep .insight-fill-btn'); await H.settle(page); await setClock('23:10', '06:40'); await H.settle(page);
+    await page.click('#insight-day-sleep .insight-edit-card'); await H.settle(page); await setClock('23:10', '06:40'); await H.settle(page);
     const f3 = `sheet-sleep-${theme}-${w}.png`; await page.screenshot({ path: path.join(OUT, f3) }); shots.push(f3);
     await page.evaluate(() => closeOverlay('insight-sleep-overlay')); await H.settle(page);
-    await page.click('#insight-day-weight .insight-fill-btn'); await page.type('#insight-weight-input', '98,4'); await H.settle(page);
+    await page.click('#insight-day-weight .insight-edit-card'); await page.type('#insight-weight-input', '98,4'); await H.settle(page);
     const f4 = `sheet-weight-${theme}-${w}.png`; await page.screenshot({ path: path.join(OUT, f4) }); shots.push(f4);
     await page.evaluate(() => closeOverlay('insight-weight-overlay')); await H.settle(page);
     // overflow check

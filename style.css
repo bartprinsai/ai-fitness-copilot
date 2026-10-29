@@ -1170,13 +1170,12 @@ button.insight-table-row:active { background: var(--bg); }
 .insight-mg-figure { flex-shrink: 0; text-align: right; }
 .insight-mg-figure .insight-figure { justify-content: flex-end; }
 .role-sub.insight-muted, .role-row.insight-muted { color: var(--text-muted); } /* "Gepland: …", a planned exercise not done — wins over the role colour */
-/* Sleep / weight filled in: the whole card is a button that opens its sheet, a 20px pencil on the right. */
+/* Sleep / weight, filled in or not ("Nog niet ingevuld"): the whole card is a button that opens its
+   sheet, a 20px pencil on the right. */
 .insight-edit-card { width: 100%; display: flex; align-items: center; gap: var(--space-3); border: none; text-align: left; font-family: inherit; color: inherit; cursor: pointer; }
 .insight-edit-card:active { background: var(--bg); }
 .insight-edit-main { flex: 1; min-width: 0; }
 .insight-edit-icon svg { display: block; width: var(--icon-list); height: var(--icon-list); fill: var(--text-secondary); }
-/* Not filled in: "Nog niet ingevuld", then the full-width fill button (.btn-primary.btn-block). */
-.insight-fill-btn { margin-top: var(--space-3); }
 /* Week cards Slaap / Gewicht: the whole card opens the detail screen (.insight-edit-card), with a
    20px chevron in --text-muted on the right, like .nav-card-arrow. */
 .insight-chevron svg { fill: var(--text-muted); }

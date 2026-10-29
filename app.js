@@ -2692,20 +2692,16 @@ function insightWeightCompareText(date, kg) {
   return `${diff < 0 ? '−' : diff > 0 ? '+' : ''}${formatWeight(Math.abs(diff))} kg t.o.v. ${when}`;
 }
 
-// A filled-in value: the main screen's card (insightCardHtml), but the pencil instead of the
-// chevron — the whole card opens the sheet to change it here.
+// Slaap / Gewicht, filled in or not: the main screen's card (insightCardHtml), but the pencil instead
+// of the chevron — the whole card opens the sheet to fill in or change the value here. Not filled in:
+// "Nog niet ingevuld" (the empty state) in the place of the value, the card otherwise the same.
 function insightEditCardHtml(kind, label, bodyHtml) {
   return insightTapCardHtml(`data-insight-edit="${kind}"`, insightCardLabelHtml(label) + bodyHtml, `<span class="insight-edit-icon">${INSIGHT_PENCIL_SVG}</span>`);
-}
-// Not filled in: the label, "Nog niet ingevuld" and a full-width fill button.
-function insightFillCardHtml(kind, label, subHtml, btnLabel) {
-  return `<div class="card insight-card">${insightCardLabelHtml(label)}${insightEmptyHtml('Nog niet ingevuld')}${subHtml}`
-    + `<button type="button" class="btn btn-primary btn-block insight-fill-btn" data-insight-edit="${kind}">${btnLabel}</button></div>`;
 }
 
 function insightDaySleepHtml(date) {
   const s = getSleep(date);
-  if (!s) return insightFillCardHtml('sleep', 'Slaap', `<div class="role-sub">${insightNightText(date)}</div>`, 'Slaap invullen');
+  if (!s) return insightEditCardHtml('sleep', 'Slaap', insightEmptyHtml('Nog niet ingevuld') + `<div class="role-sub">${insightNightText(date)}</div>`);
   const min = sleepDurationMinutes(s.bedtime, s.wakeTime);
   return insightEditCardHtml('sleep', 'Slaap',
     `<div class="insight-figure"><span class="set-val${min < SLEEP_SHORT_MINUTES ? ' insight-danger' : ''}">${formatDuration(min)}</span><span class="set-unit">u</span></div>`
@@ -2714,7 +2710,7 @@ function insightDaySleepHtml(date) {
 
 function insightDayWeightHtml(date) {
   const kg = getBodyWeight(date);
-  if (kg === null) return insightFillCardHtml('weight', 'Gewicht', '', 'Gewicht invullen');
+  if (kg === null) return insightEditCardHtml('weight', 'Gewicht', insightEmptyHtml('Nog niet ingevuld'));
   const cmp = insightWeightCompareText(date, kg);
   return insightEditCardHtml('weight', 'Gewicht', insightFigureHtml(formatWeight(kg), 'kg') + (cmp ? `<div class="role-sub">${cmp}</div>` : ''));
 }
