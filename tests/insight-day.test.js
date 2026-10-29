@@ -1,4 +1,4 @@
-// Inzicht, Dagoverzicht: muscle-group rows, rest/missed/today/no-schedule days, day navigation, opening from the week grid, the sleep and weight sheets.
+// Inzicht, Dagoverzicht: the schedule line with the plan day, the training overview's summary card and PER SPIERGROEP for one day (only that day's groups), rest/missed/today/no-schedule days, Voeding/Slaap/Gewicht with the label in the card, day navigation, opening from the week grid, the sleep and weight sheets.
 const path = require('path');
 const H = require('./helpers');
 const { check } = H;
@@ -59,78 +59,174 @@ async function setup(page, data, date, theme = 'light') {
   }, { data, date, theme });
 }
 
+// A summary column as "SETS 17" (the label as shown, in capitals), also on a screen that isn't shown.
+const COL_HELPER = () => { window.insightTestCol = c => c.querySelector('.section-label').textContent.toUpperCase() + ' ' + c.querySelector('.insight-figure').textContent; };
 async function readDay(page) {
+  await page.evaluate(COL_HELPER);
   return page.evaluate(() => {
     const t = el => el ? el.innerText.replace(/\s+/g, ' ').trim() : null;
-    const head = [...document.querySelectorAll('#insight-day-training .insight-day-head > *')].map(t);
-    const rows = [...document.querySelectorAll('#insight-day-training .insight-mg-row')].map(r => ({
-      left: [...r.querySelector('.insight-mg-main').children].map(c => t(c) + (c.classList.contains('insight-muted') ? ' [muted]' : '')),
-      right: [...r.querySelector('.insight-mg-figure').children].map(c => t(c)
-        + (c.querySelector('.insight-danger') ? ' [danger]' : '') + (c.querySelector('.insight-success') ? ' [success]' : '')),
-    }));
+    const mark = el => (el.querySelector('.insight-danger') ? ' [danger]' : '') + (el.querySelector('.insight-success') ? ' [success]' : '') + (el.classList.contains('insight-muted') ? ' [muted]' : '');
+    const sum = document.querySelector('#insight-day-training .insight-summary');
+    const cols = sum && sum.querySelector('.insight-summary-cols');
+    const rows = [...document.querySelectorAll('#insight-day-training .insight-mg-row')].map(r =>
+      [...r.querySelector('.insight-mg-main').children].filter(c => c.tagName.toLowerCase() !== 'svg').map(c => t(c) + mark(c)).concat(r.querySelector('.insight-mg-figure').textContent));
     return {
       title: document.getElementById('insight-day-title').textContent, next: document.getElementById('insight-day-next').disabled,
-      head, rows, sleep: t(document.getElementById('insight-day-sleep')), weight: t(document.getElementById('insight-day-weight')),
+      schema: document.getElementById('insight-day-schema').textContent,
+      summary: cols ? [...cols.children].map(insightTestCol) : [t(sum)],
+      note: sum && sum.querySelector('.insight-summary-note') ? t(sum.querySelector('.insight-summary-note')) + mark(sum.querySelector('.insight-summary-note')) : null,
+      label: t(document.querySelector('#insight-day-training .insight-label')),
+      rows, sleep: t(document.getElementById('insight-day-sleep')), weight: t(document.getElementById('insight-day-weight')),
       sleepDanger: !!document.querySelector('#insight-day-sleep .set-val.insight-danger'),
     };
   });
+}
+// What the training overview gives for exactly this one day: renderInsightTraining() over the range
+// date..date (insightRange stubbed for a moment), its summary and the rows that have sets or a plan.
+async function overviewOfDay(page, date) {
+  await page.evaluate(COL_HELPER);
+  return page.evaluate(date => {
+    const t = el => el.innerText.replace(/\s+/g, ' ').trim();
+    const real = insightRange;
+    insightRange = () => ({ ...real(), from: date, to: date });
+    try { renderInsightTraining(); } finally { insightRange = real; }
+    const body = document.getElementById('insight-training-body');
+    return {
+      summary: [...body.querySelectorAll('.insight-summary-cols > div')].map(insightTestCol),
+      note: body.querySelector('.insight-summary-note div').textContent,
+      rows: [...body.querySelectorAll('.insight-mg-row')].map(r => [r.querySelector('.role-row').textContent, r.querySelector('.insight-mg-main > .role-sub').textContent, r.querySelector('.insight-mg-figure').textContent])
+        .filter(r => !/niet in schema$/.test(r[1])),
+    };
+  }, date);
 }
 
 H.run(async () => {
   const { browser, page, errors } = await H.openApp({ width: 360, height: 1200, scale: 2 }); // today = Thursday 22 Oct
 
-  // --- Day with shortfall, extra, replacement, skipped group, dropset, no muscle group
+  // --- An ordinary day: shortfall, extra sets, a dropset, a replaced exercise (Dips for Triceps
+  //     pushdown), a skipped group (Bovenborst) and exercises without a muscle group
   await setup(page, BASE, '2026-10-19');
   let d = await readDay(page);
-  console.log('\nMaandag 19 oktober (Push A):'); console.log(JSON.stringify(d, null, 1));
+  console.log('\nMaandag 19 oktober (Push A):'); console.log(JSON.stringify({ schema: d.schema, summary: d.summary, note: d.note, label: d.label }, null, 1));
+  d.rows.forEach(r => console.log('   ' + r.join(' | ')));
   check('titel', d.title, 'Maandag 19 oktober 2026');
-  check('kop', d.head, ['Push A', 'Schema: Push Pull Legs', '11 van 16 sets · −5 · +6 extra']);
-  check('rijen', d.rows.map(r => [r.left, r.right]), [
-    [['Bovenborst', 'Gepland: Incline dumbbell press [muted]'], ['0 van 3', '−3 [danger]']],
-    [['Borst', 'Bench press · 5 sets · 2 failure · 1 partial · 1 forced · 1 dropset'], ['4 van 4', 'op schema · +1 extra [success]']],
-    [['Voorste schouders', 'Overhead press · 2 sets'], ['2 van 3', '−1 [danger]']],
-    [['Zijkant schouders', 'Lateral raise · 3 sets'], ['3 sets', 'extra']],
-    [['Triceps', 'Dips · 4 sets'], ['4 van 4', 'op schema [success]']],
-    [['Geen spiergroep', 'Face pull · 1 set', 'Band pull-apart · 2 sets'], ['1 van 2', '−1 · +2 extra [danger]']],
+  check('schemaregel met de plandag', d.schema, 'Schema: Push Pull Legs · Push A');
+  check('samenvatting: vijf totalen', d.summary, ['SETS 17', 'FAILURE 2', 'PARTIAL 1', 'FORCED 1', 'DROPSET 1']);
+  check('samenvatting: vergelijking (geen regel met trainingen)', d.note, '11 van 16 sets uit je schema · −5 · +6 extra [danger]');
+  check('label met legenda', d.label, 'PER SPIERGROEP Gedaan Schema');
+  check('rijen: alleen de spiergroepen van die dag, op percentage, Geen spiergroep als laatste', d.rows, [
+    ['Borst', '4 van 4 · op schema · +1 extra [success]', 'Bench press · 5 sets · 2 failure · 1 partial · 1 forced · 1 dropset', '29%'],
+    ['Triceps', '4 van 4 · op schema [success]', 'Dips · 4 sets', 'Gepland: Triceps pushdown [muted]', '24%'],
+    ['Zijkant schouders', '3 sets · extra', 'Lateral raise · 3 sets', '18%'],
+    ['Voorste schouders', '2 van 3 · −1 [danger]', 'Overhead press · 2 sets', '12%'],
+    ['Bovenborst', '0 van 3 · −3 [danger]', 'Gepland: Incline dumbbell press [muted]', '0%'],
+    ['Geen spiergroep', '1 van 2 · −1 · +2 extra [danger]', 'Face pull · 1 set', 'Band pull-apart · 2 sets', '18%'],
   ]);
-  // Wait: total shortfall check: planned 4+3+3+4+2=16, counted 4+0+2+4+1=11 ... recomputed below
-  const tot = await page.evaluate(() => { const t = insightDayTraining(insightDay('2026-10-19')); return [t.planned, t.counted, t.extra, t.done]; });
-  console.log('totalen planned/counted/extra/done', tot);
+  const shape = await page.evaluate(() => {
+    const list = document.querySelector('#insight-day-training .insight-mg-list');
+    const tok = v => { const x = document.createElement('div'); x.style.color = `var(${v})`; document.body.appendChild(x); const c = getComputedStyle(x).color; x.remove(); return c; };
+    return { cls: list.className, buttons: list.querySelectorAll('button, [data-insight-mg]').length, chevrons: list.querySelectorAll('.insight-chevron').length,
+      bars: list.querySelectorAll('.insight-mg-row > .insight-mg-main > svg.insight-mg-bars').length, cols: getComputedStyle(list).gridTemplateColumns.split(' ').length,
+      muted: getComputedStyle(list.querySelector('.role-sub.insight-muted')).color === tok('--text-muted'),
+      small: [...list.querySelectorAll('.insight-mg-main > .role-sub')].every(e => getComputedStyle(e).fontSize === '12px' && getComputedStyle(e).fontWeight === '400') };
+  });
+  check('lijst: gedeelde spiergroeprij, dagvariant zonder chevron en niet aan te tikken', [shape.cls, shape.buttons, shape.chevrons, shape.bars, shape.cols],
+    ['card insight-day-card insight-list insight-mg-list is-day divided-list', 0, 0, 6, 2]);
+  check('oefeningregels in de rol Klein, "Gepland: …" in --text-muted', [shape.small, shape.muted], [true, true]);
+  // the bars: one scale, the highest done or planned of these rows (Borst done 5)
+  const bars = await page.evaluate(() => [...document.querySelectorAll('#insight-day-training .insight-mg-bars')].map(s => [...s.querySelectorAll('rect')].map(r => r.getAttribute('class') + ' ' + r.getAttribute('width'))));
+  check('balkjes op één schaal (max 5)', bars, [['insight-bar 100.00%', 'insight-bar-planned 80.00%'], ['insight-bar 80.00%', 'insight-bar-planned 80.00%'], ['insight-bar 60.00%'],
+    ['insight-bar 40.00%', 'insight-bar-planned 60.00%'], ['insight-bar-planned 60.00%'], ['insight-bar 60.00%', 'insight-bar-planned 40.00%']]);
+
+  // --- The day's totals are what the training overview gives for that one day
+  for (const date of ['2026-10-19', '2026-10-20', '2026-10-21']) {
+    await setup(page, BASE, date);
+    d = await readDay(page);
+    const ov = await overviewOfDay(page, date);
+    check(`${date}: totalen gelijk aan het trainingsoverzicht voor die dag`, d.summary, ov.summary);
+    // a rest day: the overview says "0 van 0 sets uit je schema · op schema · +3 extra", the day "Geen sets gepland · +3 extra"
+    if (date !== '2026-10-20') check(`${date}: vergelijking gelijk`, d.note.replace(/ \[\w+\]$/, ''), ov.note);
+    check(`${date}: rijen (naam, regel 1, percentage) gelijk`, d.rows.map(r => [r[0], r[1].replace(/ \[\w+\]$/, ''), r[r.length - 1]]), ov.rows);
+  }
 
   // --- Rest day with training
   await setup(page, BASE, '2026-10-20');
   d = await readDay(page);
-  check('rustdag met training', [d.head, d.rows.map(r => [r.left, r.right])],
-    [['Rustdag', 'Schema: Push Pull Legs', '3 sets · +3 extra'], [[['Biceps', 'Curl · 3 sets'], ['3 sets', 'extra']]]]);
+  check('rustdag met training', [d.schema, d.summary, d.note, d.rows],
+    ['Schema: Push Pull Legs · Rustdag', ['SETS 3', 'FAILURE 0', 'PARTIAL 0', 'FORCED 0', 'DROPSET 0'], 'Geen sets gepland · +3 extra', [['Biceps', '3 sets · extra', 'Curl · 3 sets', '100%']]]);
 
-  // --- Missed day
+  // --- Missed day: totals 0
   await setup(page, BASE, '2026-10-21');
   d = await readDay(page);
-  check('gemiste dag', [d.head, d.rows.map(r => [r.left, r.right])],
-    [['Pull A', 'Schema: Push Pull Legs', '0 van 7 sets · −7'],
-     [[['Middenrug', 'Gepland: Barbell row [muted]'], ['0 van 4', '−4 [danger]']], [['Biceps', 'Gepland: Curl [muted]'], ['0 van 3', '−3 [danger]']]]]);
+  check('gemiste dag', [d.schema, d.summary, d.note, d.rows],
+    ['Schema: Push Pull Legs · Pull A', ['SETS 0', 'FAILURE 0', 'PARTIAL 0', 'FORCED 0', 'DROPSET 0'], '0 van 7 sets uit je schema · −7 [danger]',
+      [['Middenrug', '0 van 4 · −4 [danger]', 'Gepland: Barbell row [muted]', '0%'], ['Biceps', '0 van 3 · −3 [danger]', 'Gepland: Curl [muted]', '0%']]]);
 
   // --- Today before and after the first set
   await setup(page, BASE, '2026-10-22');
   d = await readDay(page);
-  check('vandaag vóór eerste set', [d.head, d.rows.map(r => [r.left, r.right]), d.next],
-    [['Legs A', 'Schema: Push Pull Legs', 'Gepland: 8 sets'],
-     [[['Quadriceps', 'Gepland: Squat [muted]'], ['5 sets', 'gepland']], [['Hamstrings', 'Gepland: Leg curl [muted]'], ['3 sets', 'gepland']]], true]);
+  check('vandaag vóór eerste set: "Gepland: 8 sets", geen tekort', [d.schema, d.summary, d.note, d.rows, d.next],
+    ['Schema: Push Pull Legs · Legs A', ['SETS 0', 'FAILURE 0', 'PARTIAL 0', 'FORCED 0', 'DROPSET 0'], 'Gepland: 8 sets',
+      [['Quadriceps', '0 sets · vandaag gepland', 'Gepland: Squat [muted]', '0%'], ['Hamstrings', '0 sets · vandaag gepland', 'Gepland: Leg curl [muted]', '0%']], true]);
   await page.evaluate(() => { db.workouts['2026-10-22'] = [{ exerciseId: 'squat', sets: [{ weight: 100, reps: 5 }] }]; renderInsightDay(); });
   d = await readDay(page);
-  check('vandaag na eerste set', [d.head, d.rows.map(r => [r.left, r.right])],
-    [['Legs A', 'Schema: Push Pull Legs', '1 van 8 sets · −7'],
-     [[['Quadriceps', 'Squat · 1 set'], ['1 van 5', '−4 [danger]']], [['Hamstrings', 'Gepland: Leg curl [muted]'], ['0 van 3', '−3 [danger]']]]]);
-  // the week's Training card keeps its own rule (today only counts after the first set) — unchanged
+  check('vandaag na eerste set', [d.summary[0], d.note, d.rows],
+    ['SETS 1', '1 van 8 sets uit je schema · −7 [danger]',
+      [['Quadriceps', '1 van 5 · −4 [danger]', 'Squat · 1 set', '100%'], ['Hamstrings', '0 van 3 · −3 [danger]', 'Gepland: Leg curl [muted]', '0%']]]);
 
-  // --- Day without schedule (no version) and with "geen schema actief"
+  // --- Rest day without training; no schedule with and without training
+  await setup(page, BASE, '2026-10-16');
+  d = await readDay(page);
+  check('rustdag zonder training: "Rustdag" in de kaart, geen PER SPIERGROEP', [d.schema, d.summary, d.note, d.label, d.rows.length],
+    ['Schema: Push Pull Legs · Rustdag', ['Rustdag'], null, null, 0]);
+  check('in de stijl van de lege staten (.role-row.insight-empty)', await page.evaluate(() => !!document.querySelector('#insight-day-training .insight-summary > .role-row.insight-empty')), true);
   await setup(page, BASE, '2026-09-30');
   d = await readDay(page);
-  check('zonder versie, niets gelogd', [d.head, d.rows.length], [['Geen training', 'Geen schema bekend', '0 sets · geen vergelijking met schema'], 0]);
+  check('geen schema, geen training: "Geen training"', [d.schema, d.summary, d.note, d.label], ['Geen schema bekend', ['Geen training'], null, null]);
   await page.evaluate(() => { db.workouts['2026-09-30'] = [{ exerciseId: 'squat', sets: [{ weight: 1, reps: 1 }, { weight: 1, reps: 1 }] }]; renderInsightDay(); });
   d = await readDay(page);
-  check('zonder versie, wel gelogd', [d.head, d.rows.map(r => [r.left, r.right])],
-    [['Training', 'Geen schema bekend', '2 sets · geen vergelijking met schema'], [[['Quadriceps', 'Squat · 2 sets'], ['2 sets']]]]);
+  check('geen schema, wel training: geen vergelijking', [d.summary[0], d.note, d.rows], ['SETS 2', 'Geen vergelijking met schema', [['Quadriceps', '2 sets', 'Squat · 2 sets', '100%']]]);
+
+  // --- Schedule lines: Week A/B, sequential (with a loaded plan day), no schedule active
+  const AB = { ...BASE, scheduleVersions: { '2026-10-01': { ...ppl, type: 'weekAB',
+    days: [{ ...ppl.days[0], name: 'Push', week: 'A' }, { id: 'd9', name: 'Pull', weekday: 0, week: 'B', exercises: [] }], restWeekdaysA: [1, 2, 3, 4, 5, 6], restWeekdaysB: [1, 2, 3, 4, 5, 6] } },
+  weekCycle: { '2026-10-19': { effectiveFrom: '2026-10-19', planId: 'ppl', week: 'A' } } };
+  await setup(page, AB, '2026-10-19');
+  check('Week A/B', (await readDay(page)).schema, 'Schema: Push Pull Legs · Week A · Push');
+  await setup(page, AB, '2026-10-20');
+  check('Week A/B rustdag', (await readDay(page)).schema, 'Schema: Push Pull Legs · Week A · Rustdag');
+  await setup(page, AB, '2026-10-13');
+  d = await readDay(page);
+  check('Week A/B zonder vastgelegde week: geen vergelijking', [d.schema, d.summary], ['Schema: Push Pull Legs', ['Geen training']]);
+  const SEQ = { ...BASE, scheduleVersions: { '2026-10-01': { effectiveFrom: '2026-10-01', planId: 'seq', planName: 'Test 1', type: 'sequential', days: ppl.days.map(({ weekday, ...x }) => x) } },
+    workoutPlanDays: { '2026-10-19': [{ planId: 'seq', dayId: 'd1', dayName: 'Push A' }] } };
+  await setup(page, SEQ, '2026-10-19');
+  d = await readDay(page);
+  check('doorlopend met geladen plandag', [d.schema, d.summary[0], d.note], ['Schema: Test 1 · Push A', 'SETS 17', 'Geen vergelijking met schema']);
+  check('doorlopend: rijen zonder vergelijking', d.rows.map(r => r[1]), ['5 sets', '4 sets', '3 sets', '2 sets', '3 sets']);
+  await setup(page, SEQ, '2026-10-20');
+  check('doorlopend zonder geladen plandag', (await readDay(page)).schema, 'Schema: Test 1');
+  await setup(page, { ...BASE, scheduleVersions: { '2026-10-01': { effectiveFrom: '2026-10-01', planId: null } } }, '2026-10-19');
+  d = await readDay(page);
+  check('geen schema actief', [d.schema, d.note], ['Geen schema actief', 'Geen vergelijking met schema']);
+
+  // --- Voeding, Slaap and Gewicht: the label in the card; the pencil right, in the middle, where
+  //     the main screen's chevron is
+  await setup(page, { ...BASE, sleep: { '2026-10-19': { bedtime: '00:20', wakeTime: '06:50' } }, bodyWeight: { '2026-10-19': 98.4 } }, '2026-10-19');
+  const cards = await page.evaluate(() => ['insight-day-food', 'insight-day-sleep', 'insight-day-weight'].map(id => {
+    const card = document.getElementById(id).firstElementChild, label = card.querySelector('.section-label');
+    const icon = card.querySelector('.insight-edit-icon'), r = card.getBoundingClientRect(), ir = icon && icon.getBoundingClientRect();
+    return { label: label && label.textContent, inCard: !!label && card.contains(label) && label === (card.querySelector('.insight-edit-main') || card).firstElementChild,
+      pencil: !!(icon && !icon.classList.contains('insight-chevron')), right: ir && Math.round(r.right - ir.right), mid: ir && Math.abs((ir.top + ir.bottom) / 2 - (r.top + r.bottom) / 2) < 0.6 };
+  }));
+  check('labels in de kaart', cards.map(c => [c.label, c.inCard]), [['Voeding', true], ['Slaap', true], ['Gewicht', true]]);
+  check('geen labels meer boven de kaarten', await page.evaluate(() => document.querySelectorAll('#screen-insight-day .insight-scroll > .insight-label, #screen-insight-day .insight-cards > .section-label').length), 0);
+  check('potloodjes rechts, verticaal in het midden', cards.slice(1).map(c => [c.pencil, c.mid]), [[true, true], [true, true]]);
+  const chevronRight = await page.evaluate(() => { insightWeekStart = '2026-10-19'; showScreen('screen-insight');
+    const c = document.querySelector('[data-insight-metric="sleep"]'), i = c.querySelector('.insight-chevron');
+    return Math.round(c.getBoundingClientRect().right - i.getBoundingClientRect().right); });
+  check('potlood op dezelfde plek als het pijltje op het hoofdscherm', cards.slice(1).map(c => c.right), [chevronRight, chevronRight]);
+  await setup(page, BASE, '2026-10-19');
 
   // --- Days browsing; can't go past today
   await setup(page, BASE, '2026-10-21');
@@ -181,7 +277,7 @@ H.run(async () => {
   };
   await setup(page, BASE, '2026-10-22');
   d = await readDay(page);
-  check('slaap leeg', d.sleep, 'Nog niet ingevuld Nacht van woensdag op donderdag SLAAP INVULLEN');
+  check('lege staat Slaap: label in de kaart', d.sleep, 'SLAAP Nog niet ingevuld Nacht van woensdag op donderdag SLAAP INVULLEN');
   await page.click('#insight-day-sleep .insight-fill-btn');
   await H.settle(page);
   const sub = await page.textContent('#insight-sleep-sub');
@@ -193,19 +289,19 @@ H.run(async () => {
   check('totaal live', await page.textContent('#insight-sleep-total'), 'Totaal: 8:15 u · tik op een tijd om hem in te typen');
   await page.click('#btn-insight-sleep-save'); await H.settle(page);
   d = await readDay(page);
-  check('slaap ingevuld', [d.sleep, d.sleepDanger], ['8:15 u 23:00 – 07:15 · nacht van woensdag op donderdag', false]);
+  check('slaap ingevuld', [d.sleep, d.sleepDanger], ['SLAAP 8:15 u 23:00 – 07:15 · nacht van woensdag op donderdag', false]);
   await page.click('#insight-day-sleep .insight-edit-card'); await H.settle(page);
   check('sheet vooringevuld', await page.evaluate(() => [insightSleepValues(), document.getElementById('insight-sleep-total').textContent]), [['23:00', '07:15'], 'Totaal: 8:15 u · tik op een tijd om hem in te typen']);
   await setClock('00:20', '06:50');
   check('totaal 6:30', await page.textContent('#insight-sleep-total'), 'Totaal: 6:30 u · tik op een tijd om hem in te typen');
   await page.click('#btn-insight-sleep-save'); await H.settle(page);
   d = await readDay(page);
-  check('slaap gewijzigd, onder 7:00 rood', [d.sleep, d.sleepDanger], ['6:30 u 00:20 – 06:50 · nacht van woensdag op donderdag', true]);
+  check('slaap gewijzigd, onder 7:00 rood', [d.sleep, d.sleepDanger], ['SLAAP 6:30 u 00:20 – 06:50 · nacht van woensdag op donderdag', true]);
   check('opgeslagen', await page.evaluate(() => db.sleep['2026-10-22']), { bedtime: '00:20', wakeTime: '06:50' });
   await page.click('#insight-day-sleep .insight-edit-card'); await H.settle(page);
   await page.click('#btn-insight-sleep-clear'); await H.settle(page);
   d = await readDay(page);
-  check('Wissen → gewist', [d.sleep, await page.evaluate(() => db.sleep['2026-10-22'] || null), await page.textContent('#toast-msg')], ['Nog niet ingevuld Nacht van woensdag op donderdag SLAAP INVULLEN', null, 'Slaap gewist']);
+  check('Wissen → gewist', [d.sleep, await page.evaluate(() => db.sleep['2026-10-22'] || null), await page.textContent('#toast-msg')], ['SLAAP Nog niet ingevuld Nacht van woensdag op donderdag SLAAP INVULLEN', null, 'Slaap gewist']);
   // Annuleren with changes asks; without changes just closes
   await page.click('#insight-day-sleep .insight-fill-btn'); await H.settle(page);
   await page.click('#btn-insight-sleep-cancel'); await H.settle(page);
@@ -222,31 +318,31 @@ H.run(async () => {
   // --- Weight: comma, point, invalid, t.o.v.
   await setup(page, BASE, '2026-10-22');
   d = await readDay(page);
-  check('gewicht leeg', d.weight, 'Nog niet ingevuld GEWICHT INVULLEN');
+  check('lege staat Gewicht: label in de kaart', d.weight, 'GEWICHT Nog niet ingevuld GEWICHT INVULLEN');
   await page.click('#insight-day-weight .insight-fill-btn'); await H.settle(page);
   check('gewicht-sheet subregel', await page.textContent('#insight-weight-sub'), 'Donderdag 22 oktober 2026');
   await page.type('#insight-weight-input', '98,456');
   check('max 2 decimalen tijdens typen', await page.inputValue('#insight-weight-input'), '98,45');
   await page.click('#btn-insight-weight-save'); await H.settle(page);
   d = await readDay(page);
-  check('komma, t.o.v. datum (>6 dagen)', d.weight, '98,45 kg −0,75 kg t.o.v. 8 oktober');
+  check('komma, t.o.v. datum (>6 dagen)', d.weight, 'GEWICHT 98,45 kg −0,75 kg t.o.v. 8 oktober');
   await page.evaluate(() => { db.bodyWeight['2026-10-21'] = 98.85; renderInsightDay(); });
   d = await readDay(page);
-  check('t.o.v. weekdag', d.weight, '98,45 kg −0,4 kg t.o.v. woensdag');
+  check('t.o.v. weekdag', d.weight, 'GEWICHT 98,45 kg −0,4 kg t.o.v. woensdag');
   await page.evaluate(() => { db.bodyWeight['2026-10-16'] = 98; delete db.bodyWeight['2026-10-21']; renderInsightDay(); });
   d = await readDay(page);
-  check('t.o.v. 6 dagen terug = weekdag', d.weight, '98,45 kg +0,45 kg t.o.v. vrijdag');
+  check('t.o.v. 6 dagen terug = weekdag', d.weight, 'GEWICHT 98,45 kg +0,45 kg t.o.v. vrijdag');
   await page.evaluate(() => { db.bodyWeight['2026-10-15'] = 98.45; delete db.bodyWeight['2026-10-16']; renderInsightDay(); });
   d = await readDay(page);
-  check('7 dagen terug = datum, verschil 0', d.weight, '98,45 kg 0 kg t.o.v. 15 oktober');
+  check('7 dagen terug = datum, verschil 0', d.weight, 'GEWICHT 98,45 kg 0 kg t.o.v. 15 oktober');
   await page.evaluate(() => { db.bodyWeight = { '2026-10-22': 98.45 }; renderInsightDay(); });
   d = await readDay(page);
-  check('zonder eerdere waarde geen regel', d.weight, '98,45 kg');
+  check('zonder eerdere waarde geen regel', d.weight, 'GEWICHT 98,45 kg');
   await page.click('#insight-day-weight .insight-edit-card'); await H.settle(page);
   check('vooringevuld', await page.inputValue('#insight-weight-input'), '98,45');
   await page.fill('#insight-weight-input', ''); await page.type('#insight-weight-input', '97.5');
   await page.click('#btn-insight-weight-save'); await H.settle(page);
-  check('punt geaccepteerd', [await page.evaluate(() => db.bodyWeight['2026-10-22']), (await readDay(page)).weight], [97.5, '97,5 kg']);
+  check('punt geaccepteerd', [await page.evaluate(() => db.bodyWeight['2026-10-22']), (await readDay(page)).weight], [97.5, 'GEWICHT 97,5 kg']);
   for (const [val, label] of [['19,99', 'onder 20'], ['400,01', 'boven 400'], ['0', 'nul'], [',', 'alleen komma']]) {
     await page.click('#insight-day-weight .insight-edit-card'); await H.settle(page);
     await page.fill('#insight-weight-input', ''); await page.type('#insight-weight-input', val);
@@ -268,7 +364,7 @@ H.run(async () => {
   await page.click('#btn-insight-weight-save'); await H.settle(page);
   check('leeg opslaan wist niet: rode melding, venster blijft open', await page.evaluate(() => [document.getElementById('toast-msg').textContent, document.getElementById('insight-weight-overlay').classList.contains('open'), db.bodyWeight['2026-10-22']]), ['Vul een gewicht in', true, 400]);
   await page.click('#btn-insight-weight-clear'); await H.settle(page);
-  check('Wissen → gewist', [await page.evaluate(() => db.bodyWeight['2026-10-22'] ?? null), (await readDay(page)).weight], [null, 'Nog niet ingevuld GEWICHT INVULLEN']);
+  check('Wissen → gewist', [await page.evaluate(() => db.bodyWeight['2026-10-22'] ?? null), (await readDay(page)).weight], [null, 'GEWICHT Nog niet ingevuld GEWICHT INVULLEN']);
 
   // --- Week overview updated right after saving
   await page.evaluate(() => { saveSleep('2026-10-22', '00:20', '06:50'); saveBodyWeight('2026-10-22', 98.4); });

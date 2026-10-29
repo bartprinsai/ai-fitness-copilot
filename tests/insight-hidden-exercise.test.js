@@ -35,9 +35,9 @@ H.run(async () => {
       training: (await text('[data-insight-metric="training"]'))[0],
     };
     await page.evaluate(() => openInsightDay('2026-10-19')); await H.settle(page);
-    const monday = await text('#insight-day-training .insight-mg-row, #insight-day-training .insight-day-head');
+    const monday = await text('#insight-day-training .insight-mg-row');
     await page.evaluate(() => openInsightDay('2026-10-20')); await H.settle(page);
-    const tuesday = await text('#insight-day-training .insight-mg-row, #insight-day-training .insight-day-head');
+    const tuesday = await text('#insight-day-training .insight-mg-row');
     await page.evaluate(() => { showScreen('screen-insight'); openInsightTraining(); }); await H.settle(page);
     const overview = { summary: (await text('#insight-training-body .insight-summary'))[0], rows: await text('#insight-training-body .insight-mg-row') };
     return { week, monday, tuesday, overview };

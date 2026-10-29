@@ -87,13 +87,13 @@ const SIT = {
 };
 const EXPECT = {
   tekort: { card: '71% van je schema / 5 van 7 sets · −2 / 1 van 1 training', sum: '5 van 7 sets uit je schema · −2', chest: '2 van 4 · −2', none: '3 van 3 · op schema',
-    detail: '2 van 4 sets uit je schema · −2', dayHead: '5 van 7 sets · −2', dayChest: '−2' },
+    detail: '2 van 4 sets uit je schema · −2' },
   opSchema: { card: '100% van je schema / 7 van 7 sets · op schema / 1 van 1 training', sum: '7 van 7 sets uit je schema · op schema', chest: '4 van 4 · op schema', none: '3 van 3 · op schema',
-    detail: '4 van 4 sets uit je schema · op schema', dayHead: '7 van 7 sets · op schema', dayChest: 'op schema' },
+    detail: '4 van 4 sets uit je schema · op schema' },
   opSchemaExtra: { card: '100% van je schema / 7 van 7 sets · op schema · +2 extra / 1 van 1 training', sum: '7 van 7 sets uit je schema · op schema · +2 extra', chest: '4 van 4 · op schema · +2 extra', none: '3 van 3 · op schema',
-    detail: '4 van 4 sets uit je schema · op schema · +2 extra', dayHead: '7 van 7 sets · op schema · +2 extra', dayChest: 'op schema · +2 extra' },
+    detail: '4 van 4 sets uit je schema · op schema · +2 extra' },
   tekortExtra: { card: '43% van je schema / 3 van 7 sets · −4 · +2 extra / 1 van 1 training', sum: '3 van 7 sets uit je schema · −4 · +2 extra', chest: '2 van 4 · −2', none: '1 van 3 · −2 · +2 extra',
-    detail: '1 van 3 sets uit je schema · −2 · +2 extra', dayHead: '3 van 7 sets · −4 · +2 extra', dayChest: '−2', dayNone: '−2 · +2 extra' },
+    detail: '1 van 3 sets uit je schema · −2 · +2 extra' },
 };
 
 async function setup(page, data, theme = 'light') {
@@ -328,8 +328,8 @@ async function comparisons(page) {
     const detCol = await colours(page);
     await go(page, 'openInsightDay', '2026-10-19');
     const day = await page.evaluate(() => ({
-      head: document.querySelectorAll('#insight-day-training .insight-day-head .role-sub')[1].textContent,
-      rows: [...document.querySelectorAll('#insight-day-training .insight-mg-row')].map(r => [r.querySelector('.role-row').textContent, r.querySelector('.insight-mg-figure .role-sub').textContent]),
+      head: document.querySelector('#insight-day-training .insight-summary-note div').textContent,
+      rows: [...document.querySelectorAll('#insight-day-training .insight-mg-row')].map(r => [r.querySelector('.role-row').textContent, r.querySelector('.insight-mg-main > .role-sub').textContent]),
     }));
     const dayCol = await colours(page);
     const dayRow = name => (day.rows.find(r => r[0] === name) || [])[1];
@@ -337,8 +337,9 @@ async function comparisons(page) {
     check(`${k}: samenvatting trainingsoverzicht`, ov.sum, e.sum);
     check(`${k}: spiergroeprij Borst / Geen spiergroep`, [ov.rows.chest, ov.rows['']], [e.chest, e.none]);
     check(`${k}: detailscherm (${k === 'tekortExtra' ? 'Geen spiergroep' : 'Borst'})`, det, e.detail);
-    check(`${k}: dagoverzicht kop`, day.head, e.dayHead);
-    check(`${k}: dagoverzicht rij Borst${e.dayNone ? ' / Geen spiergroep' : ''}`, e.dayNone ? [dayRow('Borst'), dayRow('Geen spiergroep')] : dayRow('Borst'), e.dayNone ? [e.dayChest, e.dayNone] : e.dayChest);
+    // the week holds only Monday, so the day overview of Monday says what the training overview says
+    check(`${k}: dagoverzicht samenvatting = trainingsoverzicht`, day.head, e.sum);
+    check(`${k}: dagoverzicht rij Borst / Geen spiergroep = trainingsoverzicht`, [dayRow('Borst'), dayRow('Geen spiergroep')], [e.chest, e.none]);
     check(`${k}: kleuren (−N danger, op schema success, extra secundair)`, [...cardCol, ...ovCol, ...detCol, ...dayCol], []);
   }
 
@@ -423,10 +424,10 @@ async function comparisons(page) {
       check(`${tag}: ${kind} rijen (${[...new Set(rr.map(r => r.lines))].join('+')} regels) 58px, links en rechts in het midden`, [...new Set(rr.map(r => r.h))].concat(rr.every(r => Math.abs(r.leftOff) <= 0.6 && (r.figOff === null || Math.abs(r.figOff) <= 0.6))), [58, true]);
       await page.screenshot({ path: path.join(OUT, `v2-${kind}-${theme}-${w}.png`), fullPage: true });
     }
-    // Day overview muscle rows stay on the baseline
+    // Day overview muscle rows: the training overview's row, the value in the middle
     await go(page, 'openInsightDay', '2026-10-19');
     const base = await page.evaluate(() => [...document.querySelectorAll('#insight-day-training .insight-mg-row')].map(r => getComputedStyle(r).alignItems));
-    check(`${tag}: dagoverzicht spiergroeprijen op de basislijn`, [...new Set(base)], ['baseline']);
+    check(`${tag}: dagoverzicht spiergroeprijen in het midden`, [...new Set(base)], ['center']);
   }
 }
 

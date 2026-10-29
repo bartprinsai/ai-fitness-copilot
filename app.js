@@ -2288,15 +2288,20 @@ function insightTopLineHtml(leftHtml, endHtml, chevron, cls = '') {
     + `<span class="insight-card-head-end">${endHtml}${chevron ? INSIGHT_CHEVRON_HTML : ''}</span></div>`;
 }
 function insightCardHtml(label, bodyHtml, metric, asideHtml = '', rows = false) {
-  const chevron = INSIGHT_CHEVRON_HTML;
   const head = rows && metric
     ? insightTopLineHtml(`<span class="section-label">${label}</span>`, asideHtml, true, 'insight-card-label')
     : asideHtml ? `<div class="insight-card-label insight-label-row"><span class="section-label">${label}</span>${asideHtml}</div>`
-      : `<div class="section-label insight-card-label">${label}</div>`;
+      : insightCardLabelHtml(label);
   const inner = head + bodyHtml;
   if (!metric) return `<div class="card insight-card">${inner}</div>`;
-  return `<button type="button" class="card insight-card insight-edit-card" data-insight-metric="${metric}">`
-    + `<div class="insight-edit-main">${inner}</div>${rows ? '' : chevron}</button>`;
+  return insightTapCardHtml(`data-insight-metric="${metric}"`, inner, rows ? '' : INSIGHT_CHEVRON_HTML);
+}
+// The Label at the top inside a card (TRAINING, VOEDING, SLAAP, GEWICHT): main screen and day overview.
+function insightCardLabelHtml(label) { return `<div class="section-label insight-card-label">${label}</div>`; }
+// A card that is a button as a whole, its icon on the right in the middle: the chevron to go on to
+// another screen (the main screen's cards), the pencil to change the value here (the day overview).
+function insightTapCardHtml(attr, innerHtml, iconHtml) {
+  return `<button type="button" class="card insight-card insight-edit-card" ${attr}><div class="insight-edit-main">${innerHtml}</div>${iconHtml}</button>`;
 }
 function insightFigureHtml(value, unit) {
   return `<div class="insight-figure"><span class="set-val">${value}</span><span class="set-unit">${unit}</span></div>`;
@@ -2572,55 +2577,12 @@ const INSIGHT_PENCIL_SVG = '<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L1
 function weekdayLower(date) { return WEEKDAY_FULL_NAMES[weekdayOfDateStr(date)].toLowerCase(); }
 const insightPlural = (n, one, more) => `${formatCount(n)} ${n === 1 ? one : more}`;
 
-// The day's training as compared with its schedule:
-//   mode 'compare'  fixed / Week A/B day or rest day: planned (plan day) vs done
-//        'pending'  today with a plan day but no set logged yet: only what is planned
-//        'none'     no schedule, no version, no recorded week, or sequential: no comparison
-//   rows: one per primary muscle group planned or trained (MUSCLE_GROUPS order), then one
-//         "Geen spiergroep" row (id '') for exercises without one, compared per exercise.
-//         { id, planned, done, counted (min per comparison key), extra, exercises: logged
-//         [{ exerciseId, sets }], missed: planned exercises without a logged set }
 // The muscle-group row an exercise belongs to: its primary muscle group as set now, or ''
 // ("Geen spiergroep") without a (known) one. Day overview and training overview alike.
 function insightMuscleRowId(id) {
   const info = getExerciseInfo(id);
   const mg = info && info.primaryMuscleGroup;
   return mg && MUSCLE_GROUPS.some(m => m.id === mg) ? mg : '';
-}
-function insightDayTraining(d) {
-  const st = d.planned.status;
-  const mode = st === 'day' || st === 'rest' ? (st === 'day' && d.date === todayStr() && !d.logged ? 'pending' : 'compare') : 'none';
-  const rows = new Map();
-  const rowFor = id => {
-    const rid = insightMuscleRowId(id);
-    if (!rows.has(rid)) rows.set(rid, { id: rid, plannedBy: {}, doneBy: {}, exercises: [], plannedEx: [] });
-    return rows.get(rid);
-  };
-  if (st === 'day') d.planned.day.exercises.filter(ex => ex.sets > 0).forEach(ex => {
-    const r = rowFor(ex.exerciseId), k = insightCompareKey(ex.exerciseId);
-    r.plannedBy[k] = (r.plannedBy[k] || 0) + ex.sets;
-    r.plannedEx.push(ex);
-  });
-  getWorkout(d.date).forEach(ex => {
-    const n = countWorkingSets(ex.sets || []);
-    if (n === 0) return;
-    const r = rowFor(ex.exerciseId), k = insightCompareKey(ex.exerciseId);
-    r.doneBy[k] = (r.doneBy[k] || 0) + n;
-    r.exercises.push({ exerciseId: ex.exerciseId, sets: ex.sets });
-  });
-  const order = [...MUSCLE_GROUPS.map(m => m.id), ''];
-  const list = [...rows.values()].sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id)).map(r => {
-    const keys = new Set([...Object.keys(r.plannedBy), ...Object.keys(r.doneBy)]);
-    let planned = 0, done = 0, counted = 0, extra = 0;
-    keys.forEach(k => {
-      const p = r.plannedBy[k] || 0, n = r.doneBy[k] || 0;
-      planned += p; done += n; counted += Math.min(p, n); extra += Math.max(0, n - p);
-    });
-    const logged = new Set(r.exercises.map(e => e.exerciseId));
-    return { id: r.id, planned, done, counted, extra, exercises: r.exercises, missed: r.plannedEx.filter(ex => !logged.has(ex.exerciseId)) };
-  });
-  const sum = f => list.reduce((a, r) => a + f(r), 0);
-  return { mode, rows: list, planned: sum(r => r.planned), done: sum(r => r.done), counted: sum(r => r.counted), extra: sum(r => r.extra) };
 }
 
 // The counts of one exercise's logged sets, per set with its drops included: a set with drops
@@ -2652,9 +2614,8 @@ function insightFeaturesText(f) {
   if (f.drops) parts.push(insightPlural(f.drops, 'dropset', 'dropsets'));
   return parts.join(' · ');
 }
-// "Bench press · 4 sets · 2 failure · 1 partial · 1 forced · 1 dropset" (insightSetFeatures).
-function insightExerciseLine(exerciseId, sets) {
-  const f = insightSetFeatures(sets);
+// "Bench press · 4 sets · 2 failure · 1 partial · 1 forced · 1 dropset" (f: insightSetFeatures).
+function insightExerciseLine(exerciseId, f) {
   return [exerciseName(exerciseId), insightPlural(f.sets, 'set', 'sets'), insightFeaturesText(f)].filter(Boolean).join(' · ');
 }
 
@@ -2668,46 +2629,40 @@ function insightCompareText(shortfall, extra) {
   return parts.join(' · ');
 }
 
-function insightDayRowHtml(r, mode) {
-  const name = r.id ? muscleGroupName(r.id) : 'Geen spiergroep';
-  const lines = r.exercises.map(e => `<div class="role-sub">${insightExerciseLine(e.exerciseId, e.sets)}</div>`);
-  // A planned group without a logged set lists what was planned; the "Geen spiergroep" row
-  // (compared per exercise) lists every planned exercise without a set.
-  if (r.missed.length && (r.done === 0 || !r.id)) {
-    lines.push(`<div class="role-sub insight-muted">Gepland: ${r.missed.map(ex => exerciseName(ex.exerciseId) || ex.name).join(', ')}</div>`);
-  }
-  let figure;
-  if (mode === 'compare' && r.planned > 0) {
-    figure = insightFigureHtml(formatCount(r.counted), `van ${formatCount(r.planned)}`)
-      + `<div class="role-sub">${insightCompareText(r.planned - r.counted, r.extra)}</div>`;
-  } else if (mode === 'compare') {
-    figure = insightFigureHtml(formatCount(r.done), r.done === 1 ? 'set' : 'sets') + '<div class="role-sub">extra</div>';
-  } else if (mode === 'pending') {
-    figure = insightFigureHtml(formatCount(r.planned), r.planned === 1 ? 'set' : 'sets') + '<div class="role-sub">gepland</div>';
-  } else {
-    figure = insightFigureHtml(formatCount(r.done), r.done === 1 ? 'set' : 'sets');
-  }
-  return `<div class="insight-mg-row"><div class="insight-mg-main"><div class="role-row">${name}</div>${lines.join('')}</div>`
-    + `<div class="insight-mg-figure">${figure}</div></div>`;
+// The schedule line of one day: insightScheduleText() for that day plus what was planned:
+// "Schema: Test 1 · Maandag", "Schema: Push Pull Legs · Week A · Push", "Schema: Test 1 · Rustdag";
+// a sequential schedule (or an unknown A/B week) names the plan day(s) loaded that day, if any.
+function insightDayScheduleText(d) {
+  const text = insightScheduleText([d]);
+  const st = d.planned.status;
+  if (st === 'day') return `${text} · ${d.planned.day.name}`;
+  if (st === 'rest') return `${text} · Rustdag`;
+  const planDays = st === 'sequential' || st === 'no-week' ? getWorkoutPlanDays(d.date) : [];
+  return planDays.length ? `${text} · ${planDays.map(p => p.dayName).join(' + ')}` : text;
 }
 
+// The day's training: the training overview's numbers (insightTrainingStats, insightMuscleRows)
+// for this one day. A comparison only on a plan day or rest day of a fixed / Week A/B schedule.
+// The summary card: the five totals with one line under them —
+//   plan day    "5 van 6 sets uit je schema · −1 · +1 extra" (a missed day: "0 van 6 … · −6")
+//   today       before its first set: "Gepland: 6 sets" (no shortfall in the morning)
+//   rest day    "Geen sets gepland · +3 extra"
+//   otherwise   "Geen vergelijking met schema" (no schedule, sequential, unknown A/B week)
+// — or, without a set on a day without a plan day, only "Rustdag" / "Geen training". Then PER
+// SPIERGROEP with only the groups planned or trained that day (none: the block is left out).
 function insightDayTrainingHtml(d) {
-  const t = insightDayTraining(d);
   const st = d.planned.status;
-  const planDays = getWorkoutPlanDays(d.date);
-  let title;
-  if (st === 'day') title = d.planned.day.name;
-  else if (st === 'rest') title = 'Rustdag';
-  else if (planDays.length) title = planDays.map(p => p.dayName).join(' + ');
-  else title = d.logged ? 'Training' : 'Geen training';
-  let summary;
-  if (t.mode === 'pending') summary = `Gepland: ${insightPlural(t.planned, 'set', 'sets')}`;
-  else if (t.mode === 'none') summary = `${insightPlural(t.done, 'set', 'sets')} · geen vergelijking met schema`;
-  else if (st === 'rest') summary = t.done ? `${insightPlural(t.done, 'set', 'sets')} · +${formatCount(t.extra)} extra` : 'Geen sets gepland';
-  else summary = `${formatCount(t.counted)} van ${insightPlural(t.planned, 'set', 'sets')} · ${insightCompareText(t.planned - t.counted, t.extra)}`;
-  return `<div class="insight-day-head"><div class="t-number">${title}</div>`
-    + `<div class="role-sub">${insightScheduleText([d])}</div><div class="role-sub">${summary}</div></div>`
-    + t.rows.map(r => insightDayRowHtml(r, t.mode)).join('');
+  if (!d.logged && st !== 'day') return `<div class="card insight-summary">${insightEmptyHtml(st === 'rest' ? 'Rustdag' : 'Geen training')}</div>`;
+  const stats = insightTrainingStats([d]);
+  const compare = st === 'day' || st === 'rest';
+  const rows = insightMuscleRows(stats).filter(r => r.planned || r.done || r.today);
+  let note;
+  if (!compare) note = 'Geen vergelijking met schema';
+  else if (st === 'rest') note = `Geen sets gepland · +${formatCount(stats.extra)} extra`;
+  else if (!d.logged && d.date === todayStr()) note = `Gepland: ${insightPlural(Object.values(stats.plannedToday).reduce((a, b) => a + b, 0), 'set', 'sets')}`;
+  else note = insightSetsCompareText(stats);
+  const total = rows.reduce((a, r) => insightAddFeatures(a, r.features), INSIGHT_FEATURES_EMPTY);
+  return insightFeaturesSummaryHtml(total, `<div>${note}</div>`) + (rows.length ? insightMuscleListHtml(rows, compare, stats) : '');
 }
 
 // "00:20 – 06:50 · nacht van woensdag op donderdag" / "Nacht van woensdag op donderdag".
@@ -2732,41 +2687,44 @@ function insightWeightCompareText(date, kg) {
   return `${diff < 0 ? '−' : diff > 0 ? '+' : ''}${formatWeight(Math.abs(diff))} kg t.o.v. ${when}`;
 }
 
-// A filled-in value: the whole card opens the sheet, a pencil on the right.
-function insightEditCardHtml(kind, bodyHtml) {
-  return `<button type="button" class="card insight-edit-card" data-insight-edit="${kind}">`
-    + `<div class="insight-edit-main">${bodyHtml}</div><span class="insight-edit-icon">${INSIGHT_PENCIL_SVG}</span></button>`;
+// A filled-in value: the main screen's card (insightCardHtml), but the pencil instead of the
+// chevron — the whole card opens the sheet to change it here.
+function insightEditCardHtml(kind, label, bodyHtml) {
+  return insightTapCardHtml(`data-insight-edit="${kind}"`, insightCardLabelHtml(label) + bodyHtml, `<span class="insight-edit-icon">${INSIGHT_PENCIL_SVG}</span>`);
 }
-// Not filled in: "Nog niet ingevuld" with a full-width fill button.
-function insightFillCardHtml(kind, subHtml, label) {
-  return `<div class="card">${insightEmptyHtml('Nog niet ingevuld')}${subHtml}`
-    + `<button type="button" class="btn btn-primary btn-block insight-fill-btn" data-insight-edit="${kind}">${label}</button></div>`;
+// Not filled in: the label, "Nog niet ingevuld" and a full-width fill button.
+function insightFillCardHtml(kind, label, subHtml, btnLabel) {
+  return `<div class="card insight-card">${insightCardLabelHtml(label)}${insightEmptyHtml('Nog niet ingevuld')}${subHtml}`
+    + `<button type="button" class="btn btn-primary btn-block insight-fill-btn" data-insight-edit="${kind}">${btnLabel}</button></div>`;
 }
 
 function insightDaySleepHtml(date) {
   const s = getSleep(date);
-  if (!s) return insightFillCardHtml('sleep', `<div class="role-sub">${insightNightText(date)}</div>`, 'Slaap invullen');
+  if (!s) return insightFillCardHtml('sleep', 'Slaap', `<div class="role-sub">${insightNightText(date)}</div>`, 'Slaap invullen');
   const min = sleepDurationMinutes(s.bedtime, s.wakeTime);
-  return insightEditCardHtml('sleep',
+  return insightEditCardHtml('sleep', 'Slaap',
     `<div class="insight-figure"><span class="set-val${min < SLEEP_SHORT_MINUTES ? ' insight-danger' : ''}">${formatDuration(min)}</span><span class="set-unit">u</span></div>`
     + `<div class="role-sub">${s.bedtime} – ${s.wakeTime} · ${insightNightText(date).toLowerCase()}</div>`);
 }
 
 function insightDayWeightHtml(date) {
   const kg = getBodyWeight(date);
-  if (kg === null) return insightFillCardHtml('weight', '', 'Gewicht invullen');
+  if (kg === null) return insightFillCardHtml('weight', 'Gewicht', '', 'Gewicht invullen');
   const cmp = insightWeightCompareText(date, kg);
-  return insightEditCardHtml('weight', insightFigureHtml(formatWeight(kg), 'kg') + (cmp ? `<div class="role-sub">${cmp}</div>` : ''));
+  return insightEditCardHtml('weight', 'Gewicht', insightFigureHtml(formatWeight(kg), 'kg') + (cmp ? `<div class="role-sub">${cmp}</div>` : ''));
 }
 
 function renderInsightDay() {
   if (!insightDayDate || insightDayDate > todayStr()) insightDayDate = todayStr();
   const date = insightDayDate;
+  const d = insightDay(date);
   insightPeriod = 'week';
   insightWeekStart = weekStartOf(date); // back (arrow or hardware) lands on this day's week
   document.getElementById('insight-day-title').textContent = formatDateStr(date);
   document.getElementById('insight-day-next').disabled = date >= todayStr();
-  document.getElementById('insight-day-training').innerHTML = insightDayTrainingHtml(insightDay(date));
+  document.getElementById('insight-day-schema').textContent = insightDayScheduleText(d);
+  document.getElementById('insight-day-training').innerHTML = insightDayTrainingHtml(d);
+  document.getElementById('insight-day-food').innerHTML = insightCardHtml('Voeding', insightEmptyHtml('Nog geen voedingsschema'));
   document.getElementById('insight-day-sleep').innerHTML = insightDaySleepHtml(date);
   document.getElementById('insight-day-weight').innerHTML = insightDayWeightHtml(date);
 }
@@ -3084,22 +3042,46 @@ function renderInsightTraining() {
   document.getElementById('insight-training-head').innerHTML = insightPeriodHeadHtml(r0);
   document.getElementById('insight-training-schema').textContent = insightScheduleText(days, r0.period);
   const total = rows.reduce((a, r) => insightAddFeatures(a, r.features), INSIGHT_FEATURES_EMPTY);
-  const note = t.none ? `<div>${t.none}</div>`
-    : `<div>${formatCount(stats.fromSchedule)} ${t.ofPlanned} · ${t.diff}</div><div>${t.trainings}</div>`;
+  const note = t.none ? `<div>${t.none}</div>` : `<div>${insightSetsCompareText(stats)}</div><div>${t.trainings}</div>`;
+  document.getElementById('insight-training-body').innerHTML = insightFeaturesSummaryHtml(total, note) + insightMuscleListHtml(rows, stats.compare);
+}
+// "21 van 25 sets uit je schema · −4 · +6 extra": the summary's comparison, training and day overview.
+function insightSetsCompareText(stats) {
+  return `${formatCount(stats.fromSchedule)} ${insightTrainingTexts(stats).ofPlanned} · ${insightCompareText(stats.shortfall, stats.extra)}`;
+}
+
+// PER SPIERGROEP: the Label with the legend Gedaan · Schema, then a card with a row per group (one
+// component for the training overview and the day overview, so their rows can't drift apart). Per
+// row the name, the two bars on one scale (the highest done or planned over these rows), line 1
+// (insightMuscleCompareText) and on the right the share of all sets.
+//   training overview: then the features line; the row is a button with a chevron (the group's screen)
+//   day overview (dayStats: that day's insightTrainingStats): then a Klein line per exercise done
+//     ("Bench press · 4 sets · 1 failure") and "Gepland: …" (--text-muted) for the planned exercises
+//     not done; no chevron and not a button: the lowest level
+function insightMuscleListHtml(rows, compare, dayStats = null) {
   const scale = Math.max(0, ...rows.map(r => Math.max(r.done, r.planned)));
   const list = rows.map(r => {
-    const features = insightFeaturesText(r.features);
-    return `<button type="button" class="insight-mg-row insight-list-row" data-insight-mg="${r.id}">`
-      + `<div class="insight-mg-main"><div class="role-row">${insightMuscleName(r.id)}</div>${insightMuscleBarsSvg(r.done, r.planned, scale)}`
-      + `<div class="role-sub">${insightMuscleCompareText(r, stats.compare)}</div>${features ? `<div class="role-sub">${features}</div>` : ''}</div>`
-      + `<div class="insight-mg-figure">${insightPctHtml(r.pct)}</div>`
-      + `<span class="insight-edit-icon insight-chevron">${INSIGHT_CHEVRON_SVG}</span></button>`;
+    const main = `<div class="insight-mg-main"><div class="role-row">${insightMuscleName(r.id)}</div>${insightMuscleBarsSvg(r.done, r.planned, scale)}`
+      + `<div class="role-sub">${insightMuscleCompareText(r, compare)}</div>${insightMuscleRowLines(r, dayStats)}</div>`
+      + `<div class="insight-mg-figure">${insightPctHtml(r.pct)}</div>`;
+    return dayStats ? `<div class="insight-mg-row">${main}</div>`
+      : `<button type="button" class="insight-mg-row insight-list-row" data-insight-mg="${r.id}">${main}${INSIGHT_CHEVRON_HTML}</button>`;
   }).join('');
-  document.getElementById('insight-training-body').innerHTML = insightFeaturesSummaryHtml(total, note)
-    + '<div class="insight-label insight-label-row"><span class="section-label">Per spiergroep</span>'
+  return '<div class="insight-label insight-label-row"><span class="section-label">Per spiergroep</span>'
     + '<span class="t-small insight-legend"><span class="insight-legend-item"><span class="insight-dot insight-dot-done"></span>Gedaan</span>'
     + '<span class="insight-legend-item"><span class="insight-dot insight-dot-planned"></span>Schema</span></span></div>'
-    + `<div class="card insight-day-card insight-list insight-mg-list divided-list">${list}</div>`;
+    + `<div class="card insight-day-card insight-list insight-mg-list${dayStats ? ' is-day' : ''} divided-list">${list}</div>`;
+}
+// The Klein lines under line 1 (see insightMuscleListHtml).
+function insightMuscleRowLines(r, dayStats) {
+  if (!dayStats) {
+    const features = insightFeaturesText(r.features);
+    return features ? `<div class="role-sub">${features}</div>` : '';
+  }
+  const mine = obj => Object.entries(obj).filter(([ex]) => insightMuscleRowId(ex) === r.id);
+  const done = mine(dayStats.doneEx).map(([ex, f]) => `<div class="role-sub">${insightExerciseLine(ex, f)}</div>`);
+  const missed = [...mine(dayStats.plannedEx), ...mine(dayStats.todayEx)].filter(([ex]) => !dayStats.doneEx[ex]);
+  return done.join('') + (missed.length ? `<div class="role-sub insight-muted">Gepland: ${missed.map(([ex, p]) => exerciseName(ex) || p.name).join(', ')}</div>` : '');
 }
 document.getElementById('btn-back-insight-training').addEventListener('click', () => goBack('screen-insight'));
 document.getElementById('insight-training-body').addEventListener('click', e => {

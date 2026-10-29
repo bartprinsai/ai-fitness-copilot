@@ -85,8 +85,9 @@ H.run(async () => {
   // the day overview of a day without a schedule: still no comparison
   check('dagoverzicht 13 oktober (geen schema): geen vergelijking', await page.evaluate(() => {
     showScreen('screen-home'); openInsight(); openInsightDay('2026-10-13');
-    return document.querySelectorAll('#insight-day-training .insight-day-head .role-sub')[1].textContent;
-  }), '5 sets · geen vergelijking met schema');
+    const sum = document.querySelector('#insight-day-training .insight-summary');
+    return [sum.querySelector('.insight-summary-cols > div').innerText.replace(/\s+/g, ' ').trim(), sum.querySelector('.insight-summary-note').textContent];
+  }), ['SETS 5', 'Geen vergelijking met schema']);
 
   // ── fixed columns in the tables PER WEEK (Maand) and PER MAAND (Jaar) ─────────────────────
   H.section('vaste kolommen bij Maand en Jaar');

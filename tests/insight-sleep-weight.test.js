@@ -215,7 +215,7 @@ H.run(async () => {
   await page.evaluate(() => openInsightDay('2026-10-22')); await H.settle(page);
   await page.click('#insight-day-weight [data-insight-edit]'); await H.settle(page);
   await page.fill('#insight-weight-input', '97'); await page.click('#btn-insight-weight-save'); await H.settle(page);
-  check('dagoverzicht: invullen werkt nog, wordt bijgewerkt', await page.evaluate(() => document.getElementById('insight-day-weight').innerText.replace(/\s+/g, ' ').trim()), '97 kg −1,2 kg t.o.v. woensdag');
+  check('dagoverzicht: invullen werkt nog, wordt bijgewerkt', await page.evaluate(() => document.getElementById('insight-day-weight').innerText.replace(/\s+/g, ' ').trim()), 'GEWICHT 97 kg −1,2 kg t.o.v. woensdag');
   await page.evaluate(() => deleteBodyWeight('2026-10-22'));
 
   // --- Light / dark × 360 / 390: no horizontal overflow, colours from the tokens

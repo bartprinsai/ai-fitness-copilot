@@ -1032,14 +1032,15 @@
         <svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
       </button>
     </div>
-    <div class="section-label insight-label">Training</div>
-    <div class="card insight-day-card divided-list" id="insight-day-training"></div>
-    <div class="section-label insight-label">Voeding</div>
-    <div class="card"><div class="role-row insight-empty">Nog geen voedingsschema</div></div>
-    <div class="section-label insight-label">Slaap</div>
-    <div id="insight-day-sleep"></div>
-    <div class="section-label insight-label">Gewicht</div>
-    <div id="insight-day-weight"></div>
+    <div class="t-small insight-meta" id="insight-day-schema"></div>
+    <!-- the training overview's summary card and PER SPIERGROEP, for this day: insightDayTrainingHtml() -->
+    <div id="insight-day-training"></div>
+    <!-- Voeding, Slaap and Gewicht with the label in the card, like the main screen -->
+    <div class="insight-cards">
+      <div id="insight-day-food"></div>
+      <div id="insight-day-sleep"></div>
+      <div id="insight-day-weight"></div>
+    </div>
   </div>
 </div>
 

@@ -1156,17 +1156,16 @@ button.insight-table-row:active { background: var(--bg); }
 .insight-cell.insight-col-pressed { background: var(--bg); }
 
 /* ── Dagoverzicht (#screen-insight-day) ──────────────────────────────────────
-   ‹ Donderdag 22 oktober 2026 › (the week's .insight-nav), then a Label above each card:
-   TRAINING (head + one row per muscle group), VOEDING, SLAAP, GEWICHT. */
+   ‹ Donderdag 22 oktober 2026 › (the week's .insight-nav) with the schedule line under it, then the
+   training overview's summary card and PER SPIERGROEP for that day, then the cards VOEDING, SLAAP and
+   GEWICHT with their label inside (.insight-cards, like the main screen). */
 .insight-day-nav { margin-top: 0; }
-/* The 48px nav row already has ±14px air under its text; together that is about a section gap. */
-.insight-day-nav + .insight-label { padding-top: var(--space-3); }
-/* Training: a card without padding, so the rows run from edge to edge (like a list in a card); their
-   lines stay 16px from the card edges (see DIVIDERS). */
+/* A list in a card: no padding, so the rows run from edge to edge; their lines stay 16px from the
+   card edges (see DIVIDERS). */
 .insight-day-card { padding: 0; overflow: hidden; }
-.insight-day-head { padding: var(--card-padding); }
-.insight-day-head .role-sub, .insight-mg-main .role-sub, .overlay-head .role-sub, .insight-empty + .role-sub { margin-top: 2px; }
-.insight-mg-row { display: flex; align-items: baseline; gap: var(--space-3); padding: var(--space-3) var(--card-padding); }
+.insight-mg-main .role-sub, .overlay-head .role-sub, .insight-empty + .role-sub { margin-top: 2px; }
+/* A row with the name (and Klein lines) on the left and the value on the right, in the middle. */
+.insight-mg-row { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--card-padding); }
 .insight-mg-main { flex: 1; min-width: 0; }
 .insight-mg-figure { flex-shrink: 0; text-align: right; }
 .insight-mg-figure .insight-figure { justify-content: flex-end; }
@@ -1214,9 +1213,8 @@ button.insight-table-row:active { background: var(--bg); }
 .insight-list-row:active { background: var(--bg); }
 /* Every row of a list as high as a row with two lines (.role-row 18px + 2px + .role-sub 14px), with
    or without a value or Klein line; the value on the right sits in the middle of the row. Also the
-   lists of the training overview and the muscle-group screen (rows there are not all buttons). */
-.insight-list .insight-mg-row { align-items: center; }
-/* A single line on the left sits in the middle of that height too; two lines fill it as before. */
+   lists of the training overview, the day overview and the muscle-group screen (rows there are not
+   all buttons). A single line on the left sits in the middle of that height too; two lines fill it. */
 .insight-list .insight-mg-main { min-height: 34px; display: flex; flex-direction: column; justify-content: center; }
 
 /* ── Training overview (#screen-insight-training) and muscle-group screen (#screen-insight-muscle) ──
@@ -1243,6 +1241,8 @@ button.insight-table-row:active { background: var(--bg); }
    bars of every row share one width, and with it one scale. */
 .insight-mg-list { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; column-gap: var(--space-3); }
 .insight-mg-list > .insight-mg-row { display: grid; grid-template-columns: subgrid; grid-column: 1 / -1; }
+/* The day overview's variant (insightMuscleListHtml with dayStats): no chevron column. */
+.insight-mg-list.is-day { grid-template-columns: minmax(0, 1fr) auto; }
 .insight-mg-bars { display: block; margin: var(--space-1) 0 2px; }
 .insight-bar-planned { fill: var(--text-muted); }
 .insight-pct { column-gap: 0; } /* "16%": the % right after the number, no space */
