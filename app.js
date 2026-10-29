@@ -2208,7 +2208,12 @@ function insightCompareKey(id) {
 //            today's plan day only counts once a set is logged today (no shortfall in the
 //            morning) — from tomorrow on it counts like any past day
 //   done:    the logged sets; a dropset continuation counts with the set before it
-//   per group: min(planned, done) is "uit je schema", the rest of done is extra
+//   doneCompared: the same, but only on days that can be compared with a schedule: a plan day or
+//            rest day of a fixed / Week A/B schedule (status 'day' / 'rest'). Sets on a day without
+//            a schedule, with a sequential one or with an unknown A/B week are no "extra": there is
+//            nothing to compare them with. So the same days give the same numbers in a week, a
+//            month and a year, whatever else is logged in the period.
+//   per group: min(planned, doneCompared) is "uit je schema", the rest of doneCompared is extra
 //   no primary muscle group: compared per exercise id instead
 //   trainings: plannedTrainings = planned days (as above), doneTrainings = those of them with
 //            ≥ 1 logged set; a training on a day without a planned training isn't one of them
@@ -2222,7 +2227,7 @@ function insightCompareKey(id) {
 function insightTrainingStats(days) {
   const counted = days.filter(d => d.counted);
   const keyOf = insightCompareKey;
-  const planned = {}, done = {}, plannedEx = {}, doneEx = {}, plannedToday = {}, todayEx = {};
+  const planned = {}, done = {}, doneCompared = {}, plannedEx = {}, doneEx = {}, plannedToday = {}, todayEx = {};
   const today = todayStr();
   let plannedTrainings = 0, doneTrainings = 0, loggedDays = 0;
   counted.forEach(d => {
@@ -2243,24 +2248,26 @@ function insightTrainingStats(days) {
       });
     }
     if (d.logged) loggedDays++;
+    const comparable = d.planned.status === 'day' || d.planned.status === 'rest';
     getWorkout(d.date).forEach(ex => {
       const n = countWorkingSets(ex.sets || []);
       if (n === 0) return;
       const k = keyOf(ex.exerciseId); done[k] = (done[k] || 0) + n;
+      if (comparable) doneCompared[k] = (doneCompared[k] || 0) + n;
       doneEx[ex.exerciseId] = insightAddFeatures(doneEx[ex.exerciseId], insightSetFeatures(ex.sets));
     });
   });
   const keys = new Set([...Object.keys(planned), ...Object.keys(done)]);
   let fromSchedule = 0, extra = 0, plannedSets = 0, doneSets = 0;
   keys.forEach(k => {
-    const p = planned[k] || 0, n = done[k] || 0;
-    plannedSets += p; doneSets += n;
-    fromSchedule += Math.min(p, n);
-    extra += Math.max(0, n - p);
+    const p = planned[k] || 0, c = doneCompared[k] || 0;
+    plannedSets += p; doneSets += done[k] || 0;
+    fromSchedule += Math.min(p, c);
+    extra += Math.max(0, c - p);
   });
   const compare = counted.some(d => ['day', 'rest', 'no-week'].includes(d.planned.status));
   return { compare, plannedSets, doneSets, fromSchedule, shortfall: plannedSets - fromSchedule, extra, plannedTrainings, doneTrainings, loggedDays,
-    planned, done, plannedEx, doneEx, plannedToday, todayEx };
+    planned, done, doneCompared, plannedEx, doneEx, plannedToday, todayEx };
 }
 
 function insightAverage(values) { return values.reduce((a, b) => a + b, 0) / values.length; }
@@ -2312,18 +2319,12 @@ function insightTrainingTexts(stats) {
 function insightSchedulePct(stats) {
   return stats.compare && stats.plannedSets > 0 ? Math.round(stats.fromSchedule / stats.plannedSets * 100) : null;
 }
-// Week: "58 van 82 sets uit je schema · −24 · +6 extra" / "4 van 5 trainingen" (the comparison is
-// about sets, so it stays on the sets line; it runs on to a next line under the number). Maand and Jaar:
-// "86% van je schema" / "241 van 280 sets · −39 · +12 extra" / "17 van 19 trainingen". Without a
-// comparison: "N sets" / "M trainingen · geen vergelijking met schema".
-function insightTrainingCardHtml(stats, period = 'week') {
+// Week, Maand and Jaar alike: "86% van je schema" / "241 van 280 sets · −39 · +12 extra" /
+// "17 van 19 trainingen". Without a comparison: "N sets" / "M trainingen · geen vergelijking met schema".
+function insightTrainingCardHtml(stats) {
   const t = insightTrainingTexts(stats);
   const setsFigure = insightFigureHtml(formatCount(stats.doneSets), stats.doneSets === 1 ? 'set' : 'sets');
   if (t.none) return setsFigure + `<div class="role-sub">${t.none}</div>`;
-  if (period === 'week') {
-    return `<div class="insight-figure insight-figure-flow"><span class="set-val">${formatCount(stats.fromSchedule)}</span><span class="set-unit">${t.ofPlanned} · ${t.diff}</span></div>`
-      + `<div class="role-sub">${t.trainings}</div>`;
-  }
   const pct = insightSchedulePct(stats);
   if (pct === null) return setsFigure + `<div class="role-sub">Geen sets gepland</div><div class="role-sub">${t.trainings}</div>`;
   return `<div class="insight-figure">${insightPctHtml(pct)}<span class="set-unit">van je schema</span></div>`
@@ -2479,7 +2480,7 @@ function renderInsight() {
   grid.innerHTML = r.period === 'week' ? insightDaysGridHtml(days) : insightPeriodTableHtml(r);
   const strength = insightStrengthStats(r);
   document.getElementById('insight-cards').innerHTML =
-    insightCardHtml('Training', insightTrainingCardHtml(insightTrainingStats(days), r.period), 'training')
+    insightCardHtml('Training', insightTrainingCardHtml(insightTrainingStats(days)), 'training')
     + insightCardHtml('Voeding', insightEmptyHtml('Nog geen voedingsschema'))
     + insightCardHtml('Slaap', insightSleepCardHtml(r), 'sleep')
     + insightCardHtml('Gewicht', insightWeightCardHtml(r), 'weight')
@@ -2509,23 +2510,14 @@ INSIGHT_PERIOD_SCREENS.forEach(id => document.getElementById(id).addEventListene
   if (step) insightSlideIn(id, step);
 }));
 // The page-turn animation on an Inzicht screen: everything under the head (the period head or the
-// day's ‹ ›, always the scroll area's first child) slides; the head itself stays put. The class goes
-// once the animation has run, so coming back to the screen (display: none → shown) doesn't replay it.
+// day's ‹ ›, always the scroll area's first child) slides; the head itself stays put.
 function insightSlideIn(screenId, delta) {
-  [...document.querySelector(`#${screenId} .insight-scroll`).children].slice(1).forEach(el => {
-    playSlideIn(el, delta);
-    el.addEventListener('animationend', function end(e) {
-      if (e.target !== el) return;
-      el.classList.remove('slide-in-next', 'slide-in-prev');
-      el.removeEventListener('animationend', end);
-    });
-  });
+  [...document.querySelector(`#${screenId} .insight-scroll`).children].slice(1).forEach(el => playSlideIn(el, delta));
 }
 // Swiping left / right on an Inzicht screen with ‹ › is a tap on › / ‹ (the tracker's swipe, see
 // setupSwipeNav): one week / month / year, or one day on the day overview; nothing where that
-// arrow is disabled, and no history step. Not from the screen's edge (Android's back swipe), and
-// never in a sheet: those lie outside the screens.
-const INSIGHT_SWIPE_EDGE_ZONE = 24;
+// arrow is disabled, and no history step. Anywhere on the screen, like the tracker; never in a
+// sheet: those lie outside the screens.
 function setupInsightSwipeNav() {
   [...INSIGHT_PERIOD_SCREENS, 'screen-insight-day'].forEach(id => {
     const scroll = document.querySelector(`#${id} .insight-scroll`);
@@ -2533,7 +2525,7 @@ function setupInsightSwipeNav() {
       const btn = id === 'screen-insight-day' ? document.getElementById(delta > 0 ? 'insight-day-next' : 'insight-day-prev')
         : scroll.querySelector(`[data-insight-step="${delta}"]`);
       if (btn && !btn.disabled) btn.click();
-    }, { edgeZone: INSIGHT_SWIPE_EDGE_ZONE });
+    });
   });
 }
 setupInsightSwipeNav();
@@ -3031,10 +3023,10 @@ function insightMuscleRows(stats) {
   MUSCLE_GROUPS.forEach(m => row(m.id));
   const rowOfKey = k => row(k.startsWith('mg:') && rows.has(k.slice(3)) && k.slice(3) ? k.slice(3) : '');
   new Set([...Object.keys(stats.planned), ...Object.keys(stats.done)]).forEach(k => {
-    const p = stats.planned[k] || 0, n = stats.done[k] || 0;
+    const p = stats.planned[k] || 0, n = stats.done[k] || 0, c = stats.doneCompared[k] || 0;
     if (!p && !n) return;
     const r = rowOfKey(k);
-    r.planned += p; r.done += n; r.counted += Math.min(p, n); r.extra += Math.max(0, n - p);
+    r.planned += p; r.done += n; r.counted += Math.min(p, c); r.extra += Math.max(0, c - p);
   });
   Object.entries(stats.plannedToday).forEach(([k, p]) => { rowOfKey(k).today += p; });
   Object.entries(stats.doneEx).forEach(([id, f]) => { const r = row(insightMuscleRowId(id)); r.features = insightAddFeatures(r.features, f); });
@@ -3047,13 +3039,14 @@ const INSIGHT_MUSCLE_ROW_EMPTY = { id: '', planned: 0, done: 0, counted: 0, extr
 const insightMuscleName = id => id ? muscleGroupName(id) : 'Geen spiergroep';
 
 // A row's comparison: "8 van 10 · " + insightCompareText ("−2" / "op schema", "· +2 extra"); not
-// planned (yet): "2 sets · extra", "0 sets · vandaag gepland" (only planned today, before today's
-// first set) or "0 sets · niet in schema"; no comparison: "N sets".
+// planned (yet): "2 sets · extra" ("2 sets" when they were all on days without a comparison, see
+// insightTrainingStats), "0 sets · vandaag gepland" (only planned today, before today's first set)
+// or "0 sets · niet in schema"; no comparison: "N sets".
 // `ofPlanned` goes after "van 10" (the muscle-group screen: " sets uit je schema").
 function insightMuscleCompareText(r, compare, ofPlanned = '') {
   if (!compare) return insightPlural(r.done, 'set', 'sets');
   if (r.planned > 0) return `${formatCount(r.counted)} van ${formatCount(r.planned)}${ofPlanned} · ${insightCompareText(r.planned - r.counted, r.extra)}`;
-  if (r.done) return `${insightPlural(r.done, 'set', 'sets')} · extra`;
+  if (r.done) return insightPlural(r.done, 'set', 'sets') + (r.extra > 0 ? ' · extra' : '');
   return r.today ? '0 sets · vandaag gepland' : '0 sets · niet in schema';
 }
 
@@ -5055,10 +5048,7 @@ function navigateTrainingTab(delta) {
 // setupSetListDragReorder) even if that drag starts *after* the swipe
 // already began tracking; the day-nav swipe has no such competing gesture
 // and only ever needs the touchstart check, exactly as before this refactor.
-// `edgeZone` (px), if given: a touch that starts that close to the left or
-// right edge of the screen is left alone, so Android's back swipe keeps
-// working (Inzicht only; the tracker swipes pass none and are unchanged).
-function setupSwipeNav(containerId, onSwipe, { startGuard, duringGuard, edgeZone = 0 } = {}) {
+function setupSwipeNav(containerId, onSwipe, { startGuard, duringGuard } = {}) {
   const container = document.getElementById(containerId);
   const SWIPE_THRESHOLD = 50;
   const DIRECTION_LOCK = 10;
@@ -5066,8 +5056,6 @@ function setupSwipeNav(containerId, onSwipe, { startGuard, duringGuard, edgeZone
 
   container.addEventListener('touchstart', e => {
     if (e.touches.length !== 1 || (startGuard && startGuard())) { tracking = false; return; }
-    const x = e.touches[0].clientX;
-    if (edgeZone && (x < edgeZone || x > window.innerWidth - edgeZone)) { tracking = false; return; }
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
     tracking = true;
@@ -6336,11 +6324,18 @@ function navigateDay(delta) {
 }
 // The page-turn animation of the day / period navigation (style.css, .slide-in-next /
 // .slide-in-prev): the new content slides in from the right (delta > 0, later) or from the left
-// (earlier); restarted when it is still running.
+// (earlier); restarted when it is still running. The class goes once the animation is over — run
+// to the end, or broken off because the screen was left (display: none) — so coming back to the
+// screen doesn't play it once more. Not when a restart broke it off: then the new one is running.
+const SLIDE_IN_ANIMATIONS = ['slideInFromRight', 'slideInFromLeft'];
 function playSlideIn(el, delta) {
   el.classList.remove('slide-in-next', 'slide-in-prev');
   void el.offsetWidth;
   el.classList.add(delta > 0 ? 'slide-in-next' : 'slide-in-prev');
+  const running = () => el.getAnimations().filter(a => SLIDE_IN_ANIMATIONS.includes(a.animationName));
+  const over = () => { if (!running().length) el.classList.remove('slide-in-next', 'slide-in-prev'); };
+  // finished: resolves at the end, rejects when broken off (Chromium sends no animationcancel)
+  running().forEach(a => a.finished.then(over, over));
 }
 
 function setupDaySwipeNav() {

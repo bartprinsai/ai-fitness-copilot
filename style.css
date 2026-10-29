@@ -1131,24 +1131,21 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 /* Big figure on Groot getal (.set-val) with its unit/explanation on Klein (.set-unit), like "80 kg". */
 .insight-figure { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: var(--space-1); }
 .insight-figure ~ .role-sub { margin-top: 2px; }
-/* A figure whose explanation is a sentence (Training, Week: "11 van 12 sets uit je schema · −1"): the
-   text runs on after the number and wraps to a next line, instead of moving under it as one block. */
-.insight-figure.insight-figure-flow { display: block; }
-.insight-figure-flow .set-unit { margin-left: var(--space-1); }
 .role-row.insight-empty { color: var(--text-muted); } /* wins over .role-row's --text in the role block */
 .insight-danger { color: var(--danger); }
 .insight-success { color: var(--success); }
 /* PER WEEK (Maand) / PER MAAND (Jaar): a table in a list card (.insight-day-card: no padding, rows
    from edge to edge, their lines 16px from the card edges, see DIVIDERS). One grid for all rows (subgrid), so the columns line up: the period on the
-   left, four equal centred value columns. The card padding is a track of its own on both sides
+   left in a fixed width, the same in both tables (64px: room for "September" on 360px; a larger font
+   only widens it, never cuts it off), so the four equal centred value columns sit at exactly the same
+   place in Maand and Jaar. The card padding is a track of its own on both sides
    (a subgrid's own padding would come off the first and last column only); --space-2 between the
    columns comes from the cells' padding. Every row is a button of at least 48px (a part still to
    come is a grey div); a line above every row, also under the column heads, none under the last. */
-.insight-table { display: grid; grid-template-columns: var(--card-padding) auto repeat(4, minmax(0, 1fr)) var(--card-padding); }
+.insight-table { display: grid; grid-template-columns: var(--card-padding) minmax(calc(var(--control-height) + var(--space-4)), max-content) repeat(4, minmax(0, 1fr)) var(--card-padding); }
 .insight-table-row { display: grid; grid-template-columns: subgrid; grid-column: 1 / -1; align-items: center; min-height: var(--control-height); padding: 0; border: none; background: none; font-family: inherit; color: var(--text); text-align: center; white-space: nowrap; }
 .insight-table-cell { padding: 0 var(--space-1); }
 .insight-table-row > :first-child { grid-column-start: 2; padding-left: 0; text-align: left; }
-.insight-table-row > :last-child { padding-right: 0; }
 button.insight-table-row { width: 100%; cursor: pointer; }
 button.insight-table-row:active { background: var(--bg); }
 .insight-table-head { min-height: 0; padding-top: var(--space-3); padding-bottom: var(--space-3); color: var(--text-secondary); }

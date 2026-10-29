@@ -1,8 +1,9 @@
 // Swiping to browse on every Inzicht screen with ‹ › (the main screen, the day overview, Slaap, Gewicht,
 // Training, a muscle group, Kracht, a category), in Week / Maand / Jaar, both ways: the same as a tap on
 // the arrow, not past the current period / today, no history step, the head stays put; a vertical
-// move scrolls; not from the screen's edge; never in the sleep clock or the weight sheet. The Fitness
-// Tracker's day swipe as before. And no zooming in the whole app (viewport + touch-action; a real
+// move scrolls; from anywhere, also right at the screen's edge (like the tracker); never in the sleep
+// clock or the weight sheet; the animation doesn't replay when you come back to a screen (Inzicht and
+// the tracker alike). The Fitness Tracker's day swipe as before. And no zooming in the whole app (viewport + touch-action; a real
 // pinch can't be checked headless, see there).
 // The touches are real ones (CDP Input.dispatchTouchEvent), so scrolling and preventDefault behave as
 // on a phone.
@@ -127,18 +128,24 @@ H.run(async () => {
 
   // ── thresholds, direction, edge ──────────────────────────────────────────────────────────
   H.section('drempel, richting, rand');
+  // Animations that start after leaving the screen and coming back (history.back(): the real way back).
+  const replayed = async leave => {
+    await page.evaluate(leave); await H.settle(page);
+    await page.evaluate(() => { window.__starts = []; document.addEventListener('animationstart', e => window.__starts.push(e.animationName + ' ' + (e.target.id || e.target.className)), true); history.back(); });
+    await H.settle(page);
+    return page.evaluate(() => [document.querySelector('.screen.active').id, window.__starts, document.querySelectorAll('.slide-in-next, .slide-in-prev').length]);
+  };
   await open(() => { openInsight(); insightStep(-1); renderInsight(); });
   const MT = '#screen-insight .insight-nav-title';
   await swipe(200, Y, 40);
   check('40px horizontaal (onder de drempel van 50) bladert niet', await title(MT), 'Week 42');
   await swipe(200, Y, 60);
   check('60px horizontaal bladert wel', await title(MT), 'Week 41');
-  await swipe(10, Y, 150);
-  check('vanaf de linkerrand bladert niet', await title(MT), 'Week 41');
-  await swipe(W - 10, Y, -150);
-  check('vanaf de rechterrand bladert niet', await title(MT), 'Week 41');
-  await swipe(40, Y, 150);
-  check('net buiten de randzone bladert wel', await title(MT), 'Week 40');
+  await swipe(2, Y, 150);
+  check('vanaf de linkerrand (2px) bladert ook: geen randzone', await title(MT), 'Week 40');
+  await swipe(W - 2, Y, -150);
+  check('vanaf de rechterrand (2px) bladert ook', await title(MT), 'Week 41');
+  await swipe(2, Y, 150);
   // vertical: scrolls, doesn't browse
   await page.evaluate(() => { document.getElementById('insight-scroll').scrollTop = 0; });
   await swipe(180, 600, 30, -300);
@@ -151,9 +158,7 @@ H.run(async () => {
   check('touch-action van de Inzicht-inhoud', await page.evaluate(() => [...document.querySelectorAll('.insight-scroll')].map(e => getComputedStyle(e).touchAction)), Array(7).fill('pan-y'));
 
   // the animation doesn't replay when you come back to the screen
-  await page.evaluate(() => { openInsightMetric('sleep'); }); await H.settle(page);
-  await page.evaluate(() => { showScreen('screen-insight'); });
-  check('terug op het scherm: de schuifanimatie speelt niet opnieuw', await page.evaluate(() => [document.getAnimations().length, document.querySelectorAll('.slide-in-next, .slide-in-prev').length]), [0, 0]);
+  check('Inzicht, terug op het scherm: de schuifanimatie speelt niet opnieuw', await replayed(() => openInsightMetric('sleep')), ['screen-insight', [], 0]);
 
   // ── sheets: the sleep clock and the weight sheet ─────────────────────────────────────────
   H.section('slaapklok en gewichtsvenster');
@@ -198,11 +203,12 @@ H.run(async () => {
   check('tracker: dezelfde animatie (de hele inhoud)', await page.evaluate(() => window.__homeSlid), ['slide-in-next', 'slide-in-prev', 'slide-in-prev']);
   await swipe(200, Y, 40);
   check('tracker: drempel 50px ongewijzigd', await cd(), '2026-10-21');
-  await swipe(10, Y, 150);
+  await swipe(2, Y, 150);
   check('tracker: vanaf de rand werkt zoals voorheen (geen randzone)', await cd(), '2026-10-20');
   await swipe(180, Y, 10, -200);
   check('tracker: verticaal bladert niet', await cd(), '2026-10-20');
   check('tracker: vegen geeft geen stap in de geschiedenis', await hist(), th0);
+  check('tracker, terug op het scherm: de schuifanimatie speelt niet opnieuw', await replayed(() => openInsight()), ['screen-fitness-tracker', [], 0]);
   check('tracker: animatie-CSS ongewijzigd', await page.evaluate(() => { const el = document.getElementById('home-content'); el.classList.remove('slide-in-prev'); el.classList.add('slide-in-next'); const cs = getComputedStyle(el); const r = [cs.animationName, cs.animationDuration, cs.animationTimingFunction]; el.classList.remove('slide-in-next'); return r; }),
     ['slideInFromRight', '0.22s', 'ease-out']);
 

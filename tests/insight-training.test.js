@@ -86,13 +86,13 @@ const SIT = {
   tekortExtra: week([{ exerciseId: 'bench-press', sets: n(2) }, { exerciseId: 'bench-press-dumbbell', sets: n(0) }, { exerciseId: 'my-nogroup', sets: n(1) }, { exerciseId: 'my-other', sets: n(2) }]),
 };
 const EXPECT = {
-  tekort: { card: '5 van 7 sets uit je schema · −2 / 1 van 1 training', sum: '5 van 7 sets uit je schema · −2', chest: '2 van 4 · −2', none: '3 van 3 · op schema',
+  tekort: { card: '71% van je schema / 5 van 7 sets · −2 / 1 van 1 training', sum: '5 van 7 sets uit je schema · −2', chest: '2 van 4 · −2', none: '3 van 3 · op schema',
     detail: '2 van 4 sets uit je schema · −2', dayHead: '5 van 7 sets · −2', dayChest: '−2' },
-  opSchema: { card: '7 van 7 sets uit je schema · op schema / 1 van 1 training', sum: '7 van 7 sets uit je schema · op schema', chest: '4 van 4 · op schema', none: '3 van 3 · op schema',
+  opSchema: { card: '100% van je schema / 7 van 7 sets · op schema / 1 van 1 training', sum: '7 van 7 sets uit je schema · op schema', chest: '4 van 4 · op schema', none: '3 van 3 · op schema',
     detail: '4 van 4 sets uit je schema · op schema', dayHead: '7 van 7 sets · op schema', dayChest: 'op schema' },
-  opSchemaExtra: { card: '7 van 7 sets uit je schema · op schema · +2 extra / 1 van 1 training', sum: '7 van 7 sets uit je schema · op schema · +2 extra', chest: '4 van 4 · op schema · +2 extra', none: '3 van 3 · op schema',
+  opSchemaExtra: { card: '100% van je schema / 7 van 7 sets · op schema · +2 extra / 1 van 1 training', sum: '7 van 7 sets uit je schema · op schema · +2 extra', chest: '4 van 4 · op schema · +2 extra', none: '3 van 3 · op schema',
     detail: '4 van 4 sets uit je schema · op schema · +2 extra', dayHead: '7 van 7 sets · op schema · +2 extra', dayChest: 'op schema · +2 extra' },
-  tekortExtra: { card: '3 van 7 sets uit je schema · −4 · +2 extra / 1 van 1 training', sum: '3 van 7 sets uit je schema · −4 · +2 extra', chest: '2 van 4 · −2', none: '1 van 3 · −2 · +2 extra',
+  tekortExtra: { card: '43% van je schema / 3 van 7 sets · −4 · +2 extra / 1 van 1 training', sum: '3 van 7 sets uit je schema · −4 · +2 extra', chest: '2 van 4 · −2', none: '1 van 3 · −2 · +2 extra',
     detail: '1 van 3 sets uit je schema · −2 · +2 extra', dayHead: '3 van 7 sets · −4 · +2 extra', dayChest: '−2', dayNone: '−2 · +2 extra' },
 };
 
@@ -314,7 +314,8 @@ async function comparisons(page) {
     const e = EXPECT[k];
     await setup(page, data);
     const card = await page.evaluate(() => { const c = document.querySelector('[data-insight-metric="training"]');
-      return c.querySelector('.set-val').textContent + ' ' + c.querySelector('.set-unit').textContent + ' / ' + c.querySelector('.insight-figure + .role-sub').textContent; });
+      const fig = c.querySelector('.insight-edit-main > .insight-figure');
+      return [fig.querySelector('.insight-pct').textContent + ' ' + fig.querySelector(':scope > .set-unit').textContent, ...[...c.querySelectorAll('.insight-edit-main > .role-sub')].map(x => x.textContent)].join(' / '); });
     const cardCol = await colours(page);
     await go(page, 'openInsightTraining');
     const ov = await page.evaluate(() => ({
