@@ -34,13 +34,19 @@ let homeExDragDy = 0;
 const FAVORITES_CATEGORY = '__favorites__';
 
 // -- Splash coordination --------------------------------
-let splashDone = false, authDone = false;
+// The splash (a copy of Android's launch screen) stays until auth has settled and the first screen
+// (main menu or login) is shown, then fades out in 200ms (.is-hiding, style.css). No minimum wait.
+let authDone = false, splashHidden = false;
 function checkAndReveal() {
-  if (!splashDone || !authDone) return;
+  if (!authDone || splashHidden) return;
   const splash = document.getElementById('splash-screen');
-  if (splash) splash.style.display = 'none';
+  if (!splash) return;
+  splashHidden = true;
+  const remove = () => { splash.style.display = 'none'; };
+  splash.addEventListener('transitionend', remove, { once: true });
+  setTimeout(remove, 400); // in case no transition runs (hidden tab, reduced motion)
+  splash.classList.add('is-hiding');
 }
-setTimeout(() => { splashDone = true; checkAndReveal(); }, 1200);
 
 // -- Helpers --------------------------------------------
 // Dates are plain 'YYYY-MM-DD' strings. "Today" is always the date in Amsterdam

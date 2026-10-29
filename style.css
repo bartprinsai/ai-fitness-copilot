@@ -50,6 +50,15 @@ input, textarea, .comment-text { user-select: text; -webkit-user-select: text; -
   --google-yellow: #FBBC05;
   --google-red: #EA4335;
 
+  /* Splash (loading screen): a copy of Android's launch screen, which is always light (manifest
+     background_color), so these are the same in both themes and are NOT overridden in the dark block.
+     A deliberate exception to "only the existing tokens": --splash-bg = --bg light (#f2f2f2),
+     --splash-text = --text light, --splash-track = --primary-light light (the dark --primary-light is
+     dark blue, which would show on the light splash). */
+  --splash-bg: #f2f2f2;
+  --splash-text: #212121;
+  --splash-track: #E1F5FE;
+
   /* Derived tints — computed from the palette above, so both themes get them for free */
   --danger-light: color-mix(in srgb, var(--danger) 12%, transparent);
   --success-light: color-mix(in srgb, var(--success) 12%, transparent);
@@ -94,7 +103,7 @@ input, textarea, .comment-text { user-select: text; -webkit-user-select: text; -
   --fs-body: 15px;     /* Body — list items, running text */
   --fs-heading: 16px;  /* Kop — exercise names, card titles, toolbar title */
   --fs-number: 20px;   /* Groot getal — set values, weight/reps fields */
-  --fs-hero: 32px;     /* Hero — 1RM result, app name on splash/login */
+  --fs-hero: 32px;     /* Hero — 1RM result, app name on login */
   --fs-button: 14px;   /* .btn label */
   --ls-label: .08em;
   --ls-button: .06em;
@@ -276,11 +285,24 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .day-actions-row .pill { pointer-events: auto; }
 .day-actions-row .pill svg { fill: var(--text-secondary); }
 
-/* ══ SPLASH & LOGIN (shared brand block) ════════════════ */
-.splash { position: fixed; inset: 0; z-index: var(--z-splash); background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-5); }
+/* ══ SPLASH (loading screen) ════════════════════════════ */
+/* A copy of Android's launch screen (Chrome's WebAPK splash): the logo in the exact centre of the
+   screen, the name below it, always light (--splash-* tokens, the same in both themes). Under the name
+   a thin loading bar. Positioned so the logo never moves when the name or bar change. Fades out in
+   200ms as soon as the app is ready (checkAndReveal() in app.js adds .is-hiding). */
+.splash { position: fixed; inset: 0; z-index: var(--z-splash); background: var(--splash-bg); transition: opacity .2s ease-out; }
+.splash.is-hiding { opacity: 0; pointer-events: none; }
+.splash-logo { position: absolute; left: 50%; top: 50%; width: 128px; height: 128px; transform: translate(-50%, -50%); display: block; }
+.splash-below { position: absolute; left: 0; right: 0; top: calc(50% + 64px + var(--space-5)); display: flex; flex-direction: column; align-items: center; gap: var(--space-4); }
+.splash-name { font-size: var(--fs-number); font-weight: var(--fw-medium); line-height: 1.2; color: var(--splash-text); text-align: center; }
+.splash-bar { position: relative; width: 128px; height: 3px; border-radius: var(--radius-pill); background: var(--splash-track); overflow: hidden; }
+.splash-bar::before { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 40%; border-radius: var(--radius-pill); background: var(--primary); animation: splashBar 1.2s ease-in-out infinite; }
+@keyframes splashBar { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+
+/* ══ LOGIN (brand block) ════════════════════════════════ */
 .brand { display: flex; flex-direction: column; align-items: center; gap: var(--space-4); text-align: center; }
-.brand-logo { width: 120px; height: 120px; border-radius: var(--radius-lg); object-fit: contain; }
-.splash .brand-logo { width: 160px; height: 160px; }
+/* The logo (icons/logo.svg) has its own rounded tile, so no border-radius here. */
+.brand-logo { width: 120px; height: 120px; display: block; }
 .brand-name { font-size: var(--fs-hero); font-weight: var(--fw-bold); line-height: 1.1; color: var(--text); }
 .brand-sub { font-size: var(--fs-heading); font-weight: var(--fw-medium); color: var(--primary); letter-spacing: .16em; text-transform: uppercase; }
 .brand-text { display: flex; flex-direction: column; gap: var(--space-1); }

@@ -9,7 +9,9 @@ Dit bestand documenteert de visuele stijl zoals die daadwerkelijk in `style.css`
 ## Harde regels
 
 1. **Alle waardes komen uit `:root`.** Buiten `:root` en `:root[data-theme="dark"]` staat er in `style.css` geen enkele kleur-literal (geen hex, geen `rgb()`), en in `index.html`/`app.js` staan geen inline kleuren of `style="…"`-opmaak. Afgeleide tinten (bv. `--danger-light`) worden in `:root` met `color-mix()` uit de basiskleuren berekend, zodat het donkere thema ze automatisch volgt.
-   - Bewuste uitzondering: `<meta name="theme-color">`, het kleine thema-script bovenin `<head>` en `manifest.json` (Android-statusbalk/PWA-splash). Die draaien vóór `style.css` of kunnen geen CSS-variabele lezen; ze gebruiken de `--toolbar`-waarde per thema (`#212121` licht, `#1E1E1E` donker). Manifest: `theme_color` `#212121`, `background_color` `#f2f2f2` (= `--bg` licht).
+   - Bewuste uitzondering: `<meta name="theme-color">`, het kleine thema-script bovenin `<head>` en `manifest.json` (Android-statusbalk/PWA-splash). Die draaien vóór `style.css` of kunnen geen CSS-variabele lezen; ze gebruiken de `--toolbar`-waarde per thema (`#212121` licht, `#1E1E1E` donker). Manifest: `theme_color` `#212121`, `background_color` `#f2f2f2` (= `--bg` licht, = `--splash-bg`: de kleur van het opstartscherm van Android).
+   - Bewuste uitzondering: de splash-tokens (`--splash-bg`, `--splash-text`, `--splash-track`), zie "Splash (laadscherm)". Altijd licht, in beide thema's dezelfde waarde.
+   - Het logo (`icons/logo.svg`) heeft zijn eigen vaste kleuren, zie "Logo".
    - De grafiek (`<canvas>` in de Graph-tab) leest zijn kleuren tijdens het tekenen uit de tokens (`getComputedStyle(…).getPropertyValue('--primary')` enz.).
 2. **Nieuwe schermen gebruiken uitsluitend deze tokens en basisklassen** (`.toolbar`, `.btn`, `.pill`, `.badge`, `.card`/`.nav-card`, `.section-label`, `.divided-list`, de gedeelde input-stijl, de choice-controls). `.divided-list` (lijst met scheidingslijnen, zie "Scheidingslijnen tussen rijen") is een bewuste latere toevoeging aan de basisklassen. Geen eigen hex-waardes, geen eigen knopklasse met eigen kleuren/hoogte/radius.
 3. **Geen font-weight 600.** Alleen 400 / 500 / 700 (dat zijn ook de enige geladen Roboto-gewichten).
@@ -46,6 +48,14 @@ Tekst/iconen óp een kleurvlak:
 | `--on-gold` | `#000000` | Tekst/iconen op `--pr-gold` |
 | `--google-blue/-green/-yellow/-red` | Google-merkkleuren | Alleen het Google-logo op de inlogknop |
 
+Splash (laadscherm), **altijd licht, in licht én donker dezelfde waarde** (staan niet in het donkere blok). Bewuste uitzondering op "alleen bestaande tokens": het opstartscherm van Android is altijd licht (manifest `background_color`), en het laadscherm moet daar naadloos op aansluiten, ook als de app in donker thema staat.
+
+| Token | Waarde | Gebruik |
+|---|---|---|
+| `--splash-bg` | `#f2f2f2` | Achtergrond van het laadscherm (= `--bg` licht = manifest `background_color`) |
+| `--splash-text` | `#212121` | De appnaam op het laadscherm (= `--text` licht) |
+| `--splash-track` | `#E1F5FE` | Spoor van de laadbalk (= `--primary-light` licht; het donkere `--primary-light` `#0B3A52` zou als donkere streep op het lichte laadscherm staan). Het bewegende stuk is gewoon `--primary` (in beide thema's gelijk) |
+
 Afgeleid (in `:root`, via `color-mix`, volgen het thema vanzelf): `--danger-light`, `--success-light` (12% tint), `--pressed` (8% `--text`, druk-feedback op neutrale knoppen), `--toolbar-pressed` (15% wit, druk-feedback van toolbar-iconen), `--toolbar-icon-muted` (45% wit: inactieve tab, inactieve plan-ster), `--scrim` (overlay-achtergrond).
 
 ### Donker thema (`<html data-theme="dark">`)
@@ -80,7 +90,7 @@ Font `Roboto` (Google Fonts, alleen 400/500/700). Er zijn **zes niveaus**, als t
 | Body | `--fs-body` | 15px / 400 | Lijstitems (rijen in een lijst), lopende tekst, lege staten, toasts |
 | Kop | `--fs-heading` | 16px / 500 | Toolbartitel, modal-titel, titels in een blok (kaart, tegel, grote keuzeknop) |
 | Groot getal | `--fs-number` | 20px / 700 | Setwaardes (alle setlijsten), waarde in de gewicht/reps/RPE/extra-velden, record-gewichten, plate-totaal |
-| Hero | `--fs-hero` | 32px / 700 | Alleen nog de appnaam ("AI Fitness") op splash en login. Het geschatte 1RM in de 1RM-calculator is Groot getal (uitkomstenstijl), geen Hero meer |
+| Hero | `--fs-hero` | 32px / 700 | Alleen nog de appnaam ("AI Fitness") op het inlogscherm (het laadscherm volgt de maat van het opstartscherm van Android, zie "Splash (laadscherm)"). Het geschatte 1RM in de 1RM-calculator is Groot getal (uitkomstenstijl), geen Hero meer |
 
 - `.section-label` is **de** sectielabelklasse. De vroegere losse klassen `.field-label`, `.info-section-label`, `.new-ex-label`, `.plate-section-label`, `.plate-result-title`, `.cal-month-header` en `.history-day-date` bestaan niet meer. Positionering (marges) gaat via de context (`.field-group .section-label`, `.cal-month > .section-label`, …) of een aparte positie-klasse (`.plan-list-label`, `.plan-day-group-label`).
 - **Eén labelstijl**: elk label boven een veld of een waarde is `.section-label` (11px / 500, hoofdletters via CSS, `.08em`, `--text-secondary`) — ook de TRACK-veldlabels, het Reps-label in de Graph-tab, Primary/Secondary in New/Update Exercise en alle veldlabels van Exercise info (bekijk- én bewerkmodus). De brontekst houdt zijn eigen casing; de hoofdletters komen uit de klasse. De vroegere kleine labels `.info-field-label` en `.info-view-stat-label` (12px / 400, gewone letters) bestaan niet meer.
@@ -118,7 +128,7 @@ Elke tekst krijgt de stijl van zijn **rol**, niet van de plek waar hij staat. **
 - **Subregels erven geen gewicht 500** van hun knop: ze zijn altijd 400. Ook de teller onder de weekdagen in Plan schedule ("0 / 5 dagen geselecteerd") is een subregel.
 - **Tekstknoppen** (Dagindeling, Partial, Forced, doel en niveau in het AI-formulier, …) blijven "Compacte keuzeknop" (12px/500); alleen knoppen met uitsluitend een getal of korte dagnaam zijn "Keuzeraster".
 - **Vorm: datums rond, aantallen vierkant.** Een knop die een **datum of periode** kiest is altijd rond: een **cirkel** (weekdagen in Plan schedule `.ps-day-circle`, de dagkiezer `.day-picker-circle`, de dagen in de kalender `.cal-day`), of een **pil** (`--radius-pill`) als de tekst niet in een cirkel past (de periodefilters 1m 3m 6m 1j alles in de Grafiek en Week · Maand · Jaar in Inzicht, beide `.time-filter`). Een knop die een **aantal** kiest is **vierkant** met `--radius-sm` (AANTAL DAGEN in Plan schedule en "Dagen per week" in het AI-formulier, beide `.ps-num-box` in een `.ps-num-grid`). In hetzelfde raster (7 kolommen, `--space-2` tussenruimte) zijn ronde en vierkante knoppen verder gelijk: zelfde maat (een vierkant van de rastercel, `aspect-ratio: 1`), 1px `--border`, `--surface`, `--text`, 15px/500.
-- **Vaste uitzonderingen** (vallen buiten de rollen): setnummer in setrijen (15px/700) en het RM-label op Records (idem), RPE in setrijen (12px/500), waardes in setrijen en getalvelden (20px/700), getalvelden in Sets & reps aanpassen (16px/700), de appnaam op splash en login (Hero), toolbartitels, lege staten (titel en tekst) en toasts.
+- **Vaste uitzonderingen** (vallen buiten de rollen): setnummer in setrijen (15px/700) en het RM-label op Records (idem), RPE in setrijen (12px/500), waardes in setrijen en getalvelden (20px/700), getalvelden in Sets & reps aanpassen (16px/700), de appnaam op login (Hero) en op het laadscherm, toolbartitels, lege staten (titel en tekst) en toasts.
 
 ## Radius en schaduw
 
@@ -128,7 +138,7 @@ Precies vier radiussen:
 |---|---|---|
 | `--radius-xs` | 4px | Alleen de vinkjes in een keuzelijst met meerdere keuzes (`.field-picker-check`), zodat ze naast de rondjes duidelijk vierkant zijn (met 8px leek een 20px-vakje bijna rond) |
 | `--radius-sm` | 8px | Knoppen, inputs, steppers, choice-blokjes (aantallen zoals AANTAL DAGEN en "Dagen per week", toggles, stang-opties), dropdownmenu, icoonvakjes, bewerk-/verwijderknoppen, de bovenhoeken van de staven in de slaapgrafiek (Inzicht) |
-| `--radius-lg` | 12px | Kaarten, bottom sheets (alleen bovenhoeken), stippel-"toevoegen"-blokken, resultaatkaarten, app-icoon op splash/login |
+| `--radius-lg` | 12px | Kaarten, bottom sheets (alleen bovenhoeken), stippel-"toevoegen"-blokken, resultaatkaarten. Niet op het logo: dat heeft zijn eigen afgeronde tegel |
 | `--radius-pill` | 999px | Pillen (AI Coach, Recap/Comment, Recap-PR), badges, filterchips, tijdfilters, en alles wat rond is (dagcirkels, kalenderdagen, avatar, radio's, ronde toolbar-ripple) |
 
 Schaduwen:
@@ -254,8 +264,20 @@ Vergroten staat in de hele app uit, met twee vingers en met dubbeltikken. De vie
 - **Geen uitleghints boven lijsten** (zoals vroeger "Houd ≡ ingedrukt om te herschikken …"): gebaren als herschikken en selecteren werken zonder uitlegregel.
 - Overige lege-lijst-teksten: Body, `--text-muted`, gecentreerd. Voeding (Binnenkort beschikbaar) gebruikt het gewone thema: standaard toolbar, `--bg`, 48px icoon in `--primary`, titel op Kop, beschrijving op Body.
 
-### Splash en login
-Volgen het actieve thema (`--bg`), delen het `.brand`-blok: app-icoon (`--radius-lg`), "AI Fitness" op Hero (`--text`), "Co-Pilot" op Kop in `--primary` (hoofdletters). Geen inline stijlen meer in de splash.
+### Logo
+- **Bron**: `icons/logo.svg` (viewBox 0 0 100 100): een afgeronde donkere tegel (`rx` 22) met een kroon boven een halter. Alle iconen worden daaruit gemaakt (zie PROJECT_CONTEXT.md, "Logo en iconen").
+- **Vaste kleuren** (in het SVG zelf, geen tokens, in beide thema's gelijk): tegel `#212121` (= `--toolbar` licht), kroon `#F9A825` (goud), halter wit `#fff`.
+- **Iconen**: purpose "any" (192, 512) = het logo zoals het is, met transparante hoeken; purpose "maskable" (192, 512) = de tegelkleur over het hele vierkant, kroon en halter verkleind (×0,78) en gecentreerd, ruim binnen de veilige zone (cirkel van 80%); apple-touch-icon (180) = tegelkleur over het hele vierkant; favicon = `icons/favicon.svg` + `icons/favicon-32.png`.
+- In de app staat het logo op het laadscherm (128px) en het inlogscherm (`.brand-logo`, 120px), altijd als `icons/logo.svg`, zonder eigen radius (de tegel is al afgerond).
+
+### Splash (laadscherm, `#splash-screen`)
+- **Een kopie van het opstartscherm van Android**, zodat de wissel onzichtbaar is: achtergrond `--splash-bg`, het logo (`.splash-logo`, 128×128) precies in het midden van het scherm, daaronder (`--space-5`) de naam "AI Fitness Co-Pilot" (`.splash-name`, `--fs-number` / `--fw-medium`, `--splash-text`). **Altijd licht**, ook in donker thema (de splash-tokens hebben in beide thema's dezelfde waarde).
+- Onder de naam (`--space-4`) een **laadbalk** (`.splash-bar`): 3px hoog, even breed als het logo, afgeronde uiteinden (`--radius-pill`), spoor `--splash-track` met een heen-en-weer bewegend stuk in `--primary`.
+- Logo en naam staan absoluut gepositioneerd, zodat het logo nooit verschuift. Maat en plek zijn afgestemd op het opstartscherm van Android en worden bijgesteld aan de hand van screenshots.
+- **Verdwijnen**: zodra auth klaar is en het eerste scherm (hoofdmenu of inloggen) staat, vervaagt het laadscherm in 200 ms (`.is-hiding`, `checkAndReveal()` in app.js) en daarna `display: none`. Geen minimale wachttijd.
+
+### Inlogscherm
+Volgt het actieve thema (`--bg`), met het `.brand`-blok: het logo (`icons/logo.svg`, 120px), "AI Fitness" op Hero (`--text`), "Co-Pilot" op Kop in `--primary` (hoofdletters).
 
 ---
 

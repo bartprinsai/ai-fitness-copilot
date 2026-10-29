@@ -22,7 +22,10 @@
     })();
   </script>
   <link rel="manifest" href="manifest.json"/>
-  <link rel="apple-touch-icon" href="icon-192.png"/>
+  <!-- App icons: all made from icons/logo.svg by scripts/make-icons.js -->
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml"/>
+  <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png"/>
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png"/>
   <title>AI Fitness Co-Pilot</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet"/>
@@ -30,14 +33,13 @@
 </head>
 <body>
 
-<!-- SPLASH SCREEN -->
-<div id="splash-screen" class="splash">
-  <div class="brand">
-    <img src="icon-512.png" alt="AI Fitness Co-Pilot" class="brand-logo"/>
-    <div class="brand-text">
-      <div class="brand-name">AI Fitness</div>
-      <div class="brand-sub">Co-Pilot</div>
-    </div>
+<!-- SPLASH SCREEN: a copy of Android's launch screen (manifest background_color, icon, name), always
+     light, so the switch from Android's screen to this one is invisible. See DESIGN_SYSTEM.md. -->
+<div id="splash-screen" class="splash" role="status" aria-label="AI Fitness Co-Pilot wordt geladen">
+  <img src="icons/logo.svg" alt="" class="splash-logo"/>
+  <div class="splash-below">
+    <div class="splash-name">AI Fitness Co-Pilot</div>
+    <div class="splash-bar"></div>
   </div>
 </div>
 
@@ -45,7 +47,7 @@
 <div id="screen-login" class="screen">
   <div class="login-content">
     <div class="brand">
-      <img src="icon-192.png" alt="AI Fitness Co-Pilot" class="brand-logo"/>
+      <img src="icons/logo.svg" alt="AI Fitness Co-Pilot" class="brand-logo"/>
       <div class="brand-text">
         <div class="brand-name">AI Fitness</div>
         <div class="brand-sub">Co-Pilot</div>
