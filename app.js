@@ -2494,16 +2494,49 @@ function openInsight() {
 // On every screen with the period head: Week · Maand · Jaar switches period, ‹ › steps one period
 // (not past the current one); then that screen is redrawn. A row with data-insight-open (the
 // table, the Slaap / Gewicht lists) zooms in: that week or month on the same screen, one step back.
-['screen-insight', 'screen-insight-metric', 'screen-insight-training', 'screen-insight-muscle', 'screen-insight-strength', 'screen-insight-category'].forEach(id => document.getElementById(id).addEventListener('click', e => {
+// ‹ › (tapped or swiped, see setupInsightSwipeNav) also plays the page-turn animation under the head.
+const INSIGHT_PERIOD_SCREENS = ['screen-insight', 'screen-insight-metric', 'screen-insight-training', 'screen-insight-muscle', 'screen-insight-strength', 'screen-insight-category'];
+INSIGHT_PERIOD_SCREENS.forEach(id => document.getElementById(id).addEventListener('click', e => {
   const p = e.target.closest('[data-insight-period]');
   const b = e.target.closest('[data-insight-step]');
   const o = e.target.closest('[data-insight-open]');
+  const step = b && !b.disabled ? Number(b.dataset.insightStep) : 0;
   if (p) insightSwitchPeriod(p.dataset.insightPeriod);
-  else if (b && !b.disabled) insightStep(Number(b.dataset.insightStep));
+  else if (step) insightStep(step);
   else if (o) insightZoomIn(o.dataset.insightOpen, id);
   else return;
   SCREEN_ON_ENTER[id]();
+  if (step) insightSlideIn(id, step);
 }));
+// The page-turn animation on an Inzicht screen: everything under the head (the period head or the
+// day's ‹ ›, always the scroll area's first child) slides; the head itself stays put. The class goes
+// once the animation has run, so coming back to the screen (display: none → shown) doesn't replay it.
+function insightSlideIn(screenId, delta) {
+  [...document.querySelector(`#${screenId} .insight-scroll`).children].slice(1).forEach(el => {
+    playSlideIn(el, delta);
+    el.addEventListener('animationend', function end(e) {
+      if (e.target !== el) return;
+      el.classList.remove('slide-in-next', 'slide-in-prev');
+      el.removeEventListener('animationend', end);
+    });
+  });
+}
+// Swiping left / right on an Inzicht screen with ‹ › is a tap on › / ‹ (the tracker's swipe, see
+// setupSwipeNav): one week / month / year, or one day on the day overview; nothing where that
+// arrow is disabled, and no history step. Not from the screen's edge (Android's back swipe), and
+// never in a sheet: those lie outside the screens.
+const INSIGHT_SWIPE_EDGE_ZONE = 24;
+function setupInsightSwipeNav() {
+  [...INSIGHT_PERIOD_SCREENS, 'screen-insight-day'].forEach(id => {
+    const scroll = document.querySelector(`#${id} .insight-scroll`);
+    setupSwipeNav(scroll.id, delta => {
+      const btn = id === 'screen-insight-day' ? document.getElementById(delta > 0 ? 'insight-day-next' : 'insight-day-prev')
+        : scroll.querySelector(`[data-insight-step="${delta}"]`);
+      if (btn && !btn.disabled) btn.click();
+    }, { edgeZone: INSIGHT_SWIPE_EDGE_ZONE });
+  });
+}
+setupInsightSwipeNav();
 document.getElementById('insight-cards').addEventListener('click', e => {
   const c = e.target.closest('[data-insight-metric]');
   if (!c) return;
@@ -2749,11 +2782,13 @@ function renderInsightDay() {
 document.getElementById('insight-day-prev').addEventListener('click', () => {
   insightDayDate = addDaysToDateStr(insightDayDate, -1);
   renderInsightDay();
+  insightSlideIn('screen-insight-day', -1);
 });
 document.getElementById('insight-day-next').addEventListener('click', () => {
   if (insightDayDate >= todayStr()) return;
   insightDayDate = addDaysToDateStr(insightDayDate, 1);
   renderInsightDay();
+  insightSlideIn('screen-insight-day', 1);
 });
 document.getElementById('btn-back-insight-day').addEventListener('click', () => goBack('screen-insight'));
 document.getElementById('screen-insight-day').addEventListener('click', e => {
@@ -5011,7 +5046,8 @@ function navigateTrainingTab(delta) {
 }
 
 // Shared horizontal-swipe-with-direction-lock gesture, used by the day-nav
-// swipe (Fitness Tracker) and the training-tab swipe (TRACK/HISTORY/GRAPH).
+// swipe (Fitness Tracker), the training-tab swipe (TRACK/HISTORY/GRAPH) and
+// the period swipe on every Inzicht screen with ‹ › (setupInsightSwipeNav).
 // `startGuard`, if given, is checked once at touchstart alongside the
 // single-finger check. `duringGuard`, if given, is re-checked on every
 // touchmove AND at touchend — needed only by the training-tab swipe, which
@@ -5019,7 +5055,10 @@ function navigateTrainingTab(delta) {
 // setupSetListDragReorder) even if that drag starts *after* the swipe
 // already began tracking; the day-nav swipe has no such competing gesture
 // and only ever needs the touchstart check, exactly as before this refactor.
-function setupSwipeNav(containerId, onSwipe, { startGuard, duringGuard } = {}) {
+// `edgeZone` (px), if given: a touch that starts that close to the left or
+// right edge of the screen is left alone, so Android's back swipe keeps
+// working (Inzicht only; the tracker swipes pass none and are unchanged).
+function setupSwipeNav(containerId, onSwipe, { startGuard, duringGuard, edgeZone = 0 } = {}) {
   const container = document.getElementById(containerId);
   const SWIPE_THRESHOLD = 50;
   const DIRECTION_LOCK = 10;
@@ -5027,6 +5066,8 @@ function setupSwipeNav(containerId, onSwipe, { startGuard, duringGuard } = {}) {
 
   container.addEventListener('touchstart', e => {
     if (e.touches.length !== 1 || (startGuard && startGuard())) { tracking = false; return; }
+    const x = e.touches[0].clientX;
+    if (edgeZone && (x < edgeZone || x > window.innerWidth - edgeZone)) { tracking = false; return; }
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
     tracking = true;
@@ -6291,10 +6332,15 @@ function navigateDay(delta) {
   exitHomeSelMode();
   changeDate(delta);
   renderHome();
-  const content = document.getElementById('home-content');
-  content.classList.remove('slide-in-next', 'slide-in-prev');
-  void content.offsetWidth;
-  content.classList.add(delta > 0 ? 'slide-in-next' : 'slide-in-prev');
+  playSlideIn(document.getElementById('home-content'), delta);
+}
+// The page-turn animation of the day / period navigation (style.css, .slide-in-next /
+// .slide-in-prev): the new content slides in from the right (delta > 0, later) or from the left
+// (earlier); restarted when it is still running.
+function playSlideIn(el, delta) {
+  el.classList.remove('slide-in-next', 'slide-in-prev');
+  void el.offsetWidth;
+  el.classList.add(delta > 0 ? 'slide-in-next' : 'slide-in-prev');
 }
 
 function setupDaySwipeNav() {
