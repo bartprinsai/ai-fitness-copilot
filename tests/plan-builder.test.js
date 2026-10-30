@@ -281,11 +281,12 @@ H.run(async () => {
     const { browser, page, errors } = await H.openApp({ width: w, height: 780, theme, touch: true });
     await page.evaluate(NO_TRANSITIONS);
     await page.evaluate(() => { db.plans = { test: { name: 'Test', createdAt: 1, days: [{ name: 'Dag 3', exercises: [] }] } }; currentPlanId = 'test'; currentPlanData = db.plans.test; });
-    const openArms = () => page.evaluate(() => { openPlanDayEdit(0); openPlanDayAddExercises(0); exerciseBrowserMode = 'exercises'; currentBrowseCategory = 'arms'; renderExercisesInCategory('arms'); });
+    const openArms = () => page.evaluate(() => { openPlanDayEdit(0); openPlanDayAddExercises(0); exerciseBrowserMode = 'exercises'; currentBrowseCategory = 'arms'; openExerciseGroups = new Set(['']); renderExercisesInCategory('arms'); }); // Armen has only Losse oefeningen: opened
     await openArms(); await H.settle(page);
     const row = name => `#exercise-list .exercise-item:has(.exercise-item-name:text-is("${name}"))`;
-    // Rows within the viewport (elementFromPoint only sees those).
-    const geo = await page.evaluate(() => [...document.querySelectorAll('#exercise-list .exercise-item')].filter(r => r.getBoundingClientRect().bottom < window.innerHeight - 80).map(r => {
+    // Rows within the viewport (elementFromPoint only sees those), measured at the top, the middle and
+    // the end of the list: the rows sit in a group now (by name), so not all of them fit in one view.
+    const measure = () => page.evaluate(() => [...document.querySelectorAll('#exercise-list .exercise-item')].filter(r => r.getBoundingClientRect().bottom < window.innerHeight - 80 && r.getBoundingClientRect().top >= document.getElementById('exercise-list').getBoundingClientRect().top).map(r => {
       const n = r.querySelector('.exercise-item-name'), b = r.querySelector('.ex-add-btn'), d = r.querySelector('.exercise-item-dots');
       const rr = r.getBoundingClientRect(), nr = n.getBoundingClientRect(), br = b.getBoundingClientRect(), dr = d.getBoundingClientRect();
       const after = getComputedStyle(b, '::after'), tw = parseFloat(after.width), th = parseFloat(after.height);
@@ -297,18 +298,26 @@ H.run(async () => {
         hitDots: !!(hitDots && hitDots.closest('.exercise-item-dots')), hitEdge: !!(hitEdge && hitEdge.closest('.ex-add-btn')),
         lines: new Set([...range.getClientRects()].map(x => Math.round(x.top))).size, h: Math.round(rr.height), cursor: getComputedStyle(r).cursor };
     }));
+    const geo = [];
+    for (const y of [0, 300, 99999]) {
+      await page.evaluate(y => document.getElementById('exercise-list').scrollTo(0, y), y); await H.settle(page);
+      for (const x of await measure()) if (!geo.some(g => g.name === x.name)) geo.push(x);
+    }
     H.ok(geo.length > 5 && geo.every(x => x.btn.join() === '36,36' && x.tap.join() === '48,48'), `${tag}: plusje 36×36, tikvlak 48×48`, geo[0] && [geo[0].btn, geo[0].tap]);
     H.ok(geo.every(x => x.hitDots && x.gapDots >= 0 && x.hitEdge && x.gapName >= 0), `${tag}: tikvlak plusje valt niet over ⋮ en niet over de naam`, geo.filter(x => !(x.hitDots && x.gapDots >= 0 && x.hitEdge && x.gapName >= 0)).map(x => x.name));
-    H.ok(geo.every(x => x.dotsRight === x.padRight && x.h === 56 && x.cursor === 'default'), `${tag}: ⋮ helemaal rechts, rijen 56px, geen knop-cursor`, geo.filter(x => !(x.dotsRight === x.padRight && x.h === 56 && x.cursor === 'default')));
+    // A name too long for one line (Overhead triceps extension …) wraps and makes its row taller.
+    H.ok(geo.every(x => x.dotsRight === x.padRight && (x.lines > 1 || x.h === 56) && x.cursor === 'default'), `${tag}: ⋮ helemaal rechts, rijen 56px, geen knop-cursor`, geo.filter(x => !(x.dotsRight === x.padRight && (x.lines > 1 || x.h === 56) && x.cursor === 'default')));
     H.ok(['Preacher curl (dumbbell)', 'Preacher curl (barbell)', 'Incline dumbbell curl'].every(n => (geo.find(x => x.name === n) || {}).lines === 1), `${tag}: lange curl-namen op één regel naast plusje en ⋮`);
+    await page.evaluate(() => document.getElementById('exercise-list').scrollTo(0, 0)); await H.settle(page);
 
     // ⋮ menu also works in add mode
-    await page.tap(row('Hammer curl') + ' .exercise-item-dots'); await H.settle(page);
+    // A row near the top: the ⋮ menu opens below its button.
+    await page.tap(row('Cable curl') + ' .exercise-item-dots'); await H.settle(page);
     const menu = await page.evaluate(() => [...document.querySelectorAll('.dropdown-item')].filter(e => e.offsetParent).map(e => e.textContent.trim()));
     H.check(`${tag}: ⋮-menu in toevoegmodus`, menu, ['Bewerken', 'Verwijderen', 'Favoriet maken']);
     await page.tap('.dropdown-item:has-text("Favoriet maken")'); await H.settle(page);
-    H.check(`${tag}: menu-actie "Favoriet maken" uitgevoerd`, await page.evaluate(() => isFavoriteExercise('hammer-curl')), true);
-    await page.evaluate(() => { toggleFavoriteExercise('hammer-curl'); refreshExerciseList(); });
+    H.check(`${tag}: menu-actie "Favoriet maken" uitgevoerd`, await page.evaluate(() => isFavoriteExercise('cable-curl')), true);
+    await page.evaluate(() => { toggleFavoriteExercise('cable-curl'); refreshExerciseList(); });
 
     // Taps on the name or the empty space of a row do nothing
     for (const [desc, fn] of [

@@ -40,7 +40,8 @@ const STATES = [
   ['Kalender-popup', 'showScreen("screen-fitness-tracker"); openCalendar(); openWorkoutDetail("2026-10-13");', ['set-row in overlay-panel']],
   ['Oefeninginfo', 'openTraining("bench-press"); openExerciseInfo();', ['div in overlay-panel']],
   ['Alle oefeningen', 'exerciseScreenMode = "browse"; showScreen("screen-exercises"); renderCategoryBrowser();', ['category-item in list-card']],
-  ['Categorie', 'exerciseScreenMode = "browse"; showScreen("screen-exercises"); exerciseBrowserMode = "exercises"; currentBrowseCategory = "chest"; renderExercisesInCategory("chest");', ['exercise-item in list-card']],
+  // Groups (Losse oefeningen closed, subcategory Fly open): lines between the groups, under each head and between the rows.
+  ['Categorie', 'db.categories = { subcategories: [{ id: "sub-fly", name: "Fly", category: "chest" }] }; db.custom_exercises = [{ id: "ex-fly", name: "Fly - Cable", category: "chest", subcategory: "sub-fly" }, { id: "ex-fly2", name: "Fly - Pec deck", category: "chest", subcategory: "sub-fly" }]; exerciseScreenMode = "browse"; showScreen("screen-exercises"); exerciseBrowserMode = "exercises"; currentBrowseCategory = "chest"; openExerciseGroups = new Set(["sub-fly"]); renderExercisesInCategory("chest");', ['ex-group in list-card', 'ex-group-body in list-card', 'exercise-item in list-card']],
   ['⋮-menu', 'exerciseScreenMode = "browse"; showScreen("screen-exercises"); exerciseBrowserMode = "exercises"; currentBrowseCategory = "chest"; renderExercisesInCategory("chest"); showOverflowMenu([{ label: "Bewerken", action: () => {} }, { label: "Verbergen", action: () => {} }, { label: "Verwijderen", action: () => {}, danger: true }], document.querySelector(".exercise-item-dots"));', ['dropdown-item in dropdown-panel']],
   ['Verwijderde oefeningen', 'db.hiddenBuiltins = { [EXERCISE_DB[5].id]: true, [EXERCISE_DB[6].id]: true, [EXERCISE_DB[7].id]: true }; openDeletedExercises();', ['deleted-ex-row in list-card']],
   ['Keuzelijst', 'openFieldPicker("Test", [{ value: "a", label: "Optie A" }, { value: "b", label: "Optie B" }, { value: "c", label: "Optie C" }], "b", () => {});', ['field-picker-row in overlay-panel']],
@@ -85,7 +86,7 @@ const codeOf = label => STATES.find(s => s[0] === label)[1];
 function lineCandidates() {
   const tok = n => { const d = document.createElement('div'); d.style.color = `var(${n})`; document.body.appendChild(d); const c = getComputedStyle(d).color; d.remove(); return c; };
   const border = tok('--border');
-  const KEYS = ['set-row', 'recap-ex', 'records-row', 'section-head', 'category-item', 'exercise-item', 'deleted-ex-row', 'dropdown-item', 'field-picker-row', 'new-ex-group',
+  const KEYS = ['set-row', 'recap-ex', 'records-row', 'section-head', 'category-item', 'exercise-item', 'ex-group-body', 'ex-group', 'deleted-ex-row', 'dropdown-item', 'field-picker-row', 'new-ex-group',
     'plan-day-preview', 'plate-row', 'orm-table-row', 'insight-table-row', 'insight-mg-row', 'insight-strength-row', 'insight-strength-note', 'insight-extremes'];
   const FRAMES = ['exercise-card', 'history-card', 'records-list', 'list-card', 'dropdown-panel', 'overlay-panel', 'plan-day-card', 'plate-list', 'orm-table-card', 'insight-strength-card', 'insight-day-card', 'insight-card'];
   const key = (el, list) => list.find(k => el.classList.contains(k)) || el.tagName.toLowerCase() + [...el.classList].map(c => '.' + c).join('');
@@ -101,7 +102,9 @@ function lineCandidates() {
       const y = Math.round(side === 'Top' ? r.top : r.bottom - 1);
       if (y < 0 || y >= innerHeight - 1) continue;
       const hit = document.elementFromPoint(Math.min(innerWidth - 1, Math.max(0, r.left + r.width / 2)), y + 0.5);
-      if (!hit || !(el === hit || el.contains(hit) || hit.contains(el) || hit.parentElement === el.parentElement)) continue; // under a popup
+      // under a popup; a hit in the next row, or in the next group of the same list (a category's groups), is fine
+      const sameList = el.parentElement && el.parentElement.classList.contains('divided-list') && el.parentElement.contains(hit);
+      if (!hit || !(el === hit || el.contains(hit) || hit.contains(el) || hit.parentElement === el.parentElement || sameList)) continue;
       let f = el.parentElement; while (f && f !== document.body && !isFrame(f)) f = f.parentElement;
       const framed = f && f !== document.body, fr = framed ? f.getBoundingClientRect() : { left: 0, right: innerWidth };
       lines.push({ name: `${key(el, KEYS)} in ${framed ? key(f, FRAMES) : 'scherm'}`, y, fl: fr.left, fr: fr.right });

@@ -339,6 +339,13 @@
       </div>
     </div>
     <div class="new-ex-section">
+      <div class="section-label">Subcategorie</div>
+      <div class="new-ex-field-row">
+        <button type="button" class="new-ex-select new-ex-select-btn" id="new-ex-subcategory"></button>
+        <button class="new-ex-add-cat-btn" id="btn-new-ex-add-subcat" aria-label="Nieuwe subcategorie">+</button>
+      </div>
+    </div>
+    <div class="new-ex-section">
       <div class="section-label">Type</div>
       <button type="button" class="new-ex-select new-ex-select-btn" id="new-ex-type"></button>
     </div>
@@ -1299,6 +1306,18 @@
     <div class="overlay-btns">
       <button class="btn btn-secondary" id="btn-new-category-cancel">Annuleren</button>
       <button class="btn btn-primary" id="btn-new-category-save">Opslaan</button>
+    </div>
+  </div>
+</div>
+
+<!-- NEW SUBCATEGORY OVERLAY (under the category chosen in the exercise form) -->
+<div class="overlay" id="new-subcategory-overlay">
+  <div class="overlay-panel">
+    <h3>Nieuwe subcategorie</h3>
+    <input type="text" id="new-subcategory-input" placeholder="Naam subcategorie" autocomplete="off"/>
+    <div class="overlay-btns">
+      <button class="btn btn-secondary" id="btn-new-subcategory-cancel">Annuleren</button>
+      <button class="btn btn-primary" id="btn-new-subcategory-save">Opslaan</button>
     </div>
   </div>
 </div>

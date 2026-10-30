@@ -173,6 +173,8 @@ function exerciseName(id) {
 //   names:   { standardId: shown name } for a renamed standard category (id stays the same)
 //   custom:  [{ id, name }] user-added categories, shown after the seven in creation order
 //   deleted: [standardId] standard categories deleted while empty
+//   subcategories: [{ id, name, category }] user-added subcategories, each under exactly one
+//                  category (its id); an exercise stores the subcategory id in `subcategory`
 // Adding and renaming are always allowed; deleting only while no exercise is in it.
 function categoryState() {
   if (!db.categories) db.categories = {};
@@ -180,6 +182,7 @@ function categoryState() {
   if (!s.names) s.names = {};
   if (!s.custom) s.custom = [];
   if (!s.deleted) s.deleted = [];
+  if (!s.subcategories) s.subcategories = [];
   return s;
 }
 function allCategories() {
@@ -198,6 +201,31 @@ function findCategoryByName(name, exceptId) {
   return allCategories().find(c => c.id !== exceptId && c.name.toLowerCase() === n) || null;
 }
 function exercisesInCategory(id) { return allExercises().filter(e => e.category === id); }
+
+// -- Subcategories ---------------------------------------
+// Optional grouping of variants inside one category (e.g. Pulldown under Rug), only used to group
+// the exercise list. Built-ins have none. Names are unique (case-insensitive) within a category.
+function sortByName(list) { return list.sort((a, b) => a.name.localeCompare(b.name, 'nl', { sensitivity: 'base' })); }
+function subcategoriesOf(categoryId) {
+  return sortByName(categoryState().subcategories.filter(s => s.category === categoryId));
+}
+function findSubcategory(id) { return id ? categoryState().subcategories.find(s => s.id === id) || null : null; }
+function findSubcategoryByName(categoryId, name) {
+  const n = name.trim().toLowerCase();
+  return categoryState().subcategories.find(s => s.category === categoryId && s.name.toLowerCase() === n) || null;
+}
+function addSubcategory(categoryId, name) {
+  const sub = { id: 'sub-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name, category: categoryId };
+  categoryState().subcategories.push(sub);
+  persistCategories();
+  return sub;
+}
+// The exercise's subcategory, or null: none set, or one that doesn't exist (anymore) or belongs
+// to another category — such an exercise simply counts as loose.
+function exerciseSubcategory(ex) {
+  const sub = findSubcategory(ex.subcategory);
+  return sub && sub.category === ex.category ? sub : null;
+}
 // A category can be deleted while a deleted (hidden) exercise is still in it. A deleted custom
 // category is therefore remembered in `removed` ([{ id, name }]), so putting such an exercise
 // back (restoreExercise) can bring its category back too, with the same id and name.
@@ -3808,6 +3836,7 @@ function openExerciseList() {
 function enterExerciseBrowseCategory(browseId, title, renderFn) {
   exerciseBrowserMode = 'exercises';
   currentBrowseCategory = browseId;
+  openExerciseGroups = new Set(); // every group starts closed when a category is opened
   setExercisesTitle(title);
   renderFn();
   pushHistoryEntry({ screen: 'screen-exercises', browse: browseId }, '#screen-exercises');
@@ -3830,6 +3859,7 @@ function syncExerciseBrowseToHistory(browse) {
   } else if (exerciseBrowserMode !== 'exercises' || currentBrowseCategory !== browse) {
     exerciseBrowserMode = 'exercises';
     currentBrowseCategory = browse;
+    openExerciseGroups = new Set();
     if (browse === FAVORITES_CATEGORY) { setExercisesTitle('Favorieten'); renderFavoriteExercises(); }
     else { setExercisesTitle(categoryName(browse)); renderExercisesInCategory(browse); }
   }
@@ -3972,6 +4002,15 @@ document.getElementById('btn-cat-delete-confirm').addEventListener('click', () =
   toast('Categorie verwijderd');
 });
 
+// A category is a list of collapsible groups: first "Losse oefeningen" (no subcategory), then
+// the subcategories by name. A group without exercises is not shown; exercises within a group
+// are sorted by name. Every group starts closed each time a category is opened
+// (enterExerciseBrowseCategory / syncExerciseBrowseToHistory clear openExerciseGroups); a
+// re-render of the same category (favorite, delete, + in plan-add mode) keeps them as they were.
+// Group key: '' for Losse oefeningen, else the subcategory id.
+let openExerciseGroups = new Set();
+const LOOSE_GROUP_NAME = 'Losse oefeningen';
+
 function renderExercisesInCategory(cat) {
   const list = exerciseListCard();
   const exercises = exercisesInCategory(cat);
@@ -3979,7 +4018,38 @@ function renderExercisesInCategory(cat) {
     document.getElementById('exercise-list').innerHTML = `<div class="exercise-empty">Geen oefeningen gevonden</div>`;
     return;
   }
-  exercises.forEach(ex => renderExerciseItem(list, ex));
+  const groups = [{ key: '', name: LOOSE_GROUP_NAME }, ...subcategoriesOf(cat).map(s => ({ key: s.id, name: s.name }))];
+  groups.forEach(g => {
+    const items = sortByName(exercises.filter(ex => (exerciseSubcategory(ex) || { id: '' }).id === g.key));
+    if (items.length) renderExerciseGroup(list, g, items);
+  });
+}
+
+function renderExerciseGroup(list, group, items) {
+  const open = openExerciseGroups.has(group.key);
+  const bodyId = 'ex-group-' + (group.key || 'loose');
+  const wrap = document.createElement('div');
+  wrap.className = 'ex-group divided-list';
+  wrap.innerHTML = `
+    <button type="button" class="ex-group-head list-row" aria-expanded="${open}" aria-controls="${bodyId}">
+      <svg class="ex-group-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+      <span class="ex-group-name"></span>
+      <span class="badge ex-group-count">${items.length}</span>
+    </button>
+    <div class="ex-group-body divided-list${open ? '' : ' hidden'}" id="${bodyId}"></div>
+  `;
+  wrap.querySelector('.ex-group-name').textContent = group.name;
+  const head = wrap.querySelector('.ex-group-head');
+  const body = wrap.querySelector('.ex-group-body');
+  head.addEventListener('click', () => {
+    const nowOpen = head.getAttribute('aria-expanded') !== 'true';
+    head.setAttribute('aria-expanded', String(nowOpen));
+    body.classList.toggle('hidden', !nowOpen);
+    if (nowOpen) openExerciseGroups.add(group.key);
+    else openExerciseGroups.delete(group.key);
+  });
+  items.forEach(ex => renderExerciseItem(body, ex));
+  list.appendChild(wrap);
 }
 
 function renderFavoriteExercises() {
@@ -3994,7 +4064,11 @@ function renderFavoriteExercises() {
 
 function renderExerciseSearchResults(q) {
   const list = exerciseListCard();
-  const filtered = allExercises().filter(e => e.name.toLowerCase().includes(q));
+  // Flat, over all categories (no groups); a subcategory name also finds its exercises.
+  const filtered = allExercises().filter(e => {
+    const sub = exerciseSubcategory(e);
+    return e.name.toLowerCase().includes(q) || (sub && sub.name.toLowerCase().includes(q));
+  });
   if (filtered.length === 0) {
     document.getElementById('exercise-list').innerHTML = `<div class="exercise-empty">Geen oefeningen gevonden</div>`;
     return;
@@ -5936,9 +6010,100 @@ document.getElementById('field-picker-list').addEventListener('click', e => {
 // Value is the category id, label its (possibly renamed) name; same order as Alle oefeningen.
 document.getElementById('new-ex-category').addEventListener('click', () => {
   openFieldPicker('Categorie', allCategories().map(c => ({ value: c.id, label: c.name })), getFieldBtnValue('new-ex-category'), value => {
-    setFieldBtnValue('new-ex-category', value, categoryName(value));
-    syncTrackStrengthField(EXERCISE_INFO_FORMS.newEx);
+    setNewExCategory(value, categoryName(value));
   });
+});
+// A different category resets Subcategorie to "Geen subcategorie" (and takes its prefix off Naam).
+function setNewExCategory(value, label) {
+  const changed = value !== getFieldBtnValue('new-ex-category');
+  setFieldBtnValue('new-ex-category', value, label);
+  syncTrackStrengthField(EXERCISE_INFO_FORMS.newEx);
+  if (changed) setNewExSubcategory('');
+}
+
+// -- Subcategorie field (Nieuwe oefening / Oefening bewerken) --
+// Locked until a category is chosen: lock icon, dashed border and "Kies eerst een categorie" on
+// the dropdown, a lock instead of the + (not colour alone). Then "Geen subcategorie" (empty
+// state) or a subcategory of the chosen category.
+const NO_SUBCATEGORY_LABEL = 'Geen subcategorie';
+const SUBCAT_PREFIX_SEP = ' - ';
+const LOCK_ICON = '<svg class="new-ex-lock-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>';
+
+function syncNewExSubcategoryLock() {
+  const locked = !getFieldBtnValue('new-ex-category');
+  const btn = document.getElementById('new-ex-subcategory');
+  const add = document.getElementById('btn-new-ex-add-subcat');
+  btn.disabled = locked;
+  add.disabled = locked;
+  btn.classList.toggle('new-ex-locked', locked);
+  add.classList.toggle('new-ex-locked', locked);
+  add.innerHTML = locked ? LOCK_ICON : '+';
+  add.setAttribute('aria-label', locked ? 'Nieuwe subcategorie (kies eerst een categorie)' : 'Nieuwe subcategorie');
+  if (locked) {
+    btn.dataset.value = '';
+    btn.classList.add('new-ex-select-empty');
+    btn.innerHTML = LOCK_ICON + '<span class="new-ex-locked-text">Kies eerst een categorie</span>';
+  }
+}
+
+// Sets the field; unless `keepName`, Naam follows: the old subcategory's "<naam> - " prefix
+// comes off, the new one goes in front (not twice). Empty Naam gets just the prefix, with the
+// cursor after it.
+function setNewExSubcategory(subId, { keepName = false } = {}) {
+  const oldSub = findSubcategory(getFieldBtnValue('new-ex-subcategory'));
+  const sub = findSubcategory(subId);
+  if (getFieldBtnValue('new-ex-category')) setFieldBtnValue('new-ex-subcategory', sub ? sub.id : '', sub ? sub.name : NO_SUBCATEGORY_LABEL);
+  syncNewExSubcategoryLock();
+  if (keepName) return;
+  const input = document.getElementById('new-ex-name');
+  const wasEmpty = input.value.trim() === '';
+  const next = nameWithSubcategoryPrefix(input.value, oldSub && oldSub.name, sub && sub.name);
+  if (next === input.value) return;
+  input.value = next;
+  if (wasEmpty && sub) {
+    input.focus();
+    input.setSelectionRange(next.length, next.length);
+  }
+}
+// Case-insensitive, so "pulldown - wide" counts as already prefixed with Pulldown.
+function startsWithPrefix(name, subName) {
+  return name.toLowerCase().startsWith((subName + SUBCAT_PREFIX_SEP).toLowerCase());
+}
+function nameWithSubcategoryPrefix(name, oldSubName, newSubName) {
+  if (newSubName && startsWithPrefix(name, newSubName)) return name; // already right: leave it
+  let rest = name;
+  if (oldSubName && startsWithPrefix(rest, oldSubName)) rest = rest.slice((oldSubName + SUBCAT_PREFIX_SEP).length);
+  if (!newSubName || startsWithPrefix(rest, newSubName)) return rest;
+  return newSubName + SUBCAT_PREFIX_SEP + rest.replace(/^\s+/, '');
+}
+
+document.getElementById('new-ex-subcategory').addEventListener('click', () => {
+  const cat = getFieldBtnValue('new-ex-category');
+  if (!cat) return;
+  const options = [{ value: '', label: NO_SUBCATEGORY_LABEL }, ...subcategoriesOf(cat).map(s => ({ value: s.id, label: s.name }))];
+  openFieldPicker('Subcategorie', options, getFieldBtnValue('new-ex-subcategory'), value => setNewExSubcategory(value));
+});
+document.getElementById('btn-new-ex-add-subcat').addEventListener('click', () => {
+  if (!getFieldBtnValue('new-ex-category')) return;
+  document.getElementById('new-subcategory-input').value = '';
+  openOverlay('new-subcategory-overlay');
+  setTimeout(() => document.getElementById('new-subcategory-input').focus(), 100);
+});
+document.getElementById('btn-new-subcategory-cancel').addEventListener('click', () => {
+  confirmDiscardIfChanged(
+    () => hasChanges('', document.getElementById('new-subcategory-input').value),
+    () => closeOverlay('new-subcategory-overlay')
+  );
+});
+// Adds the subcategory right away under the chosen category and selects it in the form.
+document.getElementById('btn-new-subcategory-save').addEventListener('click', () => {
+  const name = document.getElementById('new-subcategory-input').value.trim();
+  const cat = getFieldBtnValue('new-ex-category');
+  if (!name || !cat) return;
+  if (findSubcategoryByName(cat, name)) { toast('Deze subcategorie bestaat al'); return; }
+  const sub = addSubcategory(cat, name);
+  closeOverlay('new-subcategory-overlay');
+  setNewExSubcategory(sub.id);
 });
 document.getElementById('new-ex-type').addEventListener('click', () => {
   openFieldPicker('Type', EX_TYPE_OPTIONS, getFieldBtnValue('new-ex-type'), value => {
@@ -5946,15 +6111,19 @@ document.getElementById('new-ex-type').addEventListener('click', () => {
   });
 });
 
-function populateNewExCategorySelect(selected) {
+// Fills Categorie and Subcategorie without touching Naam (opening the form, not a choice).
+function populateNewExCategorySelect(selected, subcategory) {
   const name = selected ? categoryName(selected) : '';
   setFieldBtnValue('new-ex-category', name ? selected : '', name || 'Kies een categorie...');
+  setFieldBtnValue('new-ex-subcategory', '', NO_SUBCATEGORY_LABEL);
+  setNewExSubcategory(subcategory || '', { keepName: true });
 }
 
 function getNewExerciseFormSnapshot() {
   return {
     name: document.getElementById('new-ex-name').value,
     category: getFieldBtnValue('new-ex-category'),
+    subcategory: getFieldBtnValue('new-ex-subcategory'),
     type: getFieldBtnValue('new-ex-type'),
     info: getExerciseInfoFormSnapshot(EXERCISE_INFO_FORMS.newEx),
   };
@@ -5990,7 +6159,9 @@ function openEditExerciseScreen(ex) {
   document.getElementById('new-ex-name').value = ex.name;
   const typeOpt = EX_TYPE_OPTIONS.find(o => o.value === ex.type) || EX_TYPE_OPTIONS[0];
   setFieldBtnValue('new-ex-type', typeOpt.value, typeOpt.label);
-  populateNewExCategorySelect(ex.category);
+  // A subcategory of another category (or one that's gone) shows as Geen subcategorie.
+  const sub = exerciseSubcategory(ex);
+  populateNewExCategorySelect(ex.category, sub && sub.id);
   populateExerciseInfoForm(EXERCISE_INFO_FORMS.newEx, getExerciseInfo(ex.id) || {});
   setNewExEquipmentOpen(false);
   newExerciseBaseline = getNewExerciseFormSnapshot();
@@ -6010,6 +6181,8 @@ function updateExistingExercise(id, updated) {
   entry.category = updated.category;
   entry.name = updated.name;
   entry.type = updated.type;
+  if (updated.subcategory) entry.subcategory = updated.subcategory;
+  else delete entry.subcategory;
   persistCustomExercises();
   toast('Oefening bijgewerkt');
 }
@@ -6038,14 +6211,17 @@ function saveNewExerciseFromScreen() {
   const name = document.getElementById('new-ex-name').value.trim();
   const cat = getFieldBtnValue('new-ex-category');
   const type = getFieldBtnValue('new-ex-type');
-  if (!name) { toast('Vul een naam in'); return; }
+  const sub = findSubcategory(getFieldBtnValue('new-ex-subcategory'));
+  const subcategory = sub && sub.category === cat ? sub.id : '';
+  // Only the prefix ("Pulldown - ") is no name yet.
+  if (!name || (sub && (name + ' ').toLowerCase() === (sub.name + SUBCAT_PREFIX_SEP).toLowerCase())) { toast('Vul een naam in'); return; }
   if (!cat) { toast('Kies een categorie'); return; }
 
   if (pendingEditExerciseId) {
     const id = pendingEditExerciseId;
     if (exerciseNameTaken(name, id)) { toast('Deze oefening bestaat al'); return; }
     if (deletedExerciseNameTaken(name)) { toast(DELETED_NAME_MSG); return; }
-    updateExistingExercise(id, { category: cat, name, type });
+    updateExistingExercise(id, { category: cat, subcategory, name, type });
     setExerciseInfoFor(id, readExerciseInfoForm(EXERCISE_INFO_FORMS.newEx));
     pendingEditExerciseId = null;
     exerciseBrowserMode = 'categories';
@@ -6059,7 +6235,7 @@ function saveNewExerciseFromScreen() {
   if (deletedExerciseNameTaken(name)) { toast(DELETED_NAME_MSG); return; }
   if (!db.custom_exercises) db.custom_exercises = [];
   const id = newExerciseId();
-  db.custom_exercises.push({ id, category: cat, name, type });
+  db.custom_exercises.push({ id, category: cat, name, type, ...(subcategory ? { subcategory } : {}) });
   persistCustomExercises();
   setExerciseInfoFor(id, readExerciseInfoForm(EXERCISE_INFO_FORMS.newEx));
   toast('Oefening aangemaakt');
@@ -6270,9 +6446,8 @@ document.getElementById('btn-new-category-save').addEventListener('click', () =>
   if (!newCat) return;
   if (findCategoryByName(newCat)) { toast('Deze categorie bestaat al'); return; }
   const cat = addCategory(newCat);
-  setFieldBtnValue('new-ex-category', cat.id, cat.name);
-  syncTrackStrengthField(EXERCISE_INFO_FORMS.newEx);
   closeOverlay('new-category-overlay');
+  setNewExCategory(cat.id, cat.name);
 });
 
 // -- Overlay helpers ------------------------------------
@@ -6288,6 +6463,7 @@ const OVERLAY_CANCEL_BUTTON = {
   'set-note-overlay': 'btn-set-note-cancel',
   'records-history-overlay': 'btn-records-history-ok',
   'new-category-overlay': 'btn-new-category-cancel',
+  'new-subcategory-overlay': 'btn-new-subcategory-cancel',
   'cat-edit-overlay': 'btn-cat-edit-cancel',
   'delete-exercise-overlay': 'btn-delete-ex-cancel',
   'purge-exercise-overlay': 'btn-purge-ex-cancel',
