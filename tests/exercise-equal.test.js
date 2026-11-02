@@ -83,6 +83,36 @@ H.run(async () => {
   }
   check('Inzicht Kracht: aria-label van de grafiek met de naam letterlijk', await page.evaluate(() => [...document.querySelectorAll('.screen.active svg[aria-label]')].some(s => s.getAttribute('aria-label').startsWith('<b>Vet</b> & "co"'))), true);
 
+  // ── 3b. Plan-, dag-, categorie- en subcategorienamen ook als tekst
+  const N = '<i>X</i> & "q" <img src=x onerror="window.__xss=2">';
+  await page.evaluate(N => {
+    db.categories = { names: {}, custom: [{ id: 'custom-x', name: 'Cat ' + N }], deleted: [], subcategories: [{ id: 'sub-x', name: 'Sub ' + N, category: 'chest' }] };
+    db.custom_exercises.push({ id: 'ex-cat', name: 'In eigen categorie', category: 'custom-x', type: 'weight_reps' });
+    db.exerciseInfo['ex-cat'] = { trackStrength: true };
+    db.workouts['2026-10-20'] = [{ exerciseId: 'ex-cat', sets: [{ weight: '40', reps: '10', rpe: '8', extra: '0', extraType: '' }] }];
+    db.workouts['2026-10-13'] = [{ exerciseId: 'ex-cat', sets: [{ weight: '35', reps: '10', rpe: '8', extra: '0', extraType: '' }] }];
+    db.plans.q = { id: 'q', name: 'Plan ' + N, fixedDays: true, createdAt: 2, days: [{ id: 'dq', name: 'Dag ' + N, weekday: 1, exercises: [{ exerciseId: 'squat', sets: 3, reps: 5 }] }] };
+  }, N);
+  const named = {
+    'Trainingsplannen': () => { openWorkoutPlan(); return document.querySelector('.screen.active'); },
+    'Plan: dagkaart': () => { openPlanDetail('q'); return document.querySelector('.screen.active'); },
+    'Schema handmatig laden: plannen': () => { openSchedulePickPlan(); return document.querySelector('.screen.active'); },
+    'Schema handmatig laden: dagen': () => { openSchedulePickDay('q'); return document.getElementById('schedule-pick-day-scroll'); },
+    'Alle oefeningen: categorieën': () => { openExerciseList(); exerciseBrowserMode = 'categories'; currentBrowseCategory = null; renderCategoryBrowser(); return document.getElementById('exercise-list'); },
+    'Keuzelijst Categorie': () => { openNewExerciseScreen(); document.getElementById('new-ex-category').click(); return document.getElementById('field-picker-list'); },
+    'Keuzelijst Subcategorie': () => { closeOverlay('field-picker-overlay'); setNewExCategory('chest', 'Borst'); document.getElementById('new-ex-subcategory').click(); return document.getElementById('field-picker-list'); },
+    'Inzicht: Kracht-kaart': () => { closeOverlay('field-picker-overlay'); showScreen('screen-home'); openInsight(); return document.querySelector('[data-insight-metric="strength"]'); },
+    'Inzicht: scherm Kracht': () => { openInsightStrength(); return document.querySelector('.screen.active'); },
+  };
+  for (const [name, fn] of Object.entries(named)) {
+    const r = await page.evaluate(fn => {
+      const el = (0, eval)('(' + fn + ')')();
+      return { text: el.innerText, tags: el.querySelectorAll('i, img').length, xss: !!window.__xss };
+    }, fn.toString()).catch(e => ({ fout: e.message }));
+    await H.settle(page);
+    check(`${name}: naam letterlijk, geen HTML uit de naam`, { naam: !!(r.text && r.text.includes('<i>X</i> & "q"')), tags: r.tags, xss: r.xss, fout: r.fout || null }, { naam: true, tags: 0, xss: false, fout: null });
+  }
+
   // ── 4. Type: Oefening bewerken toont het type van de ingebouwde
   const type = await page.evaluate(() => {
     openEditExerciseScreen(allExercises().find(e => e.id === 'treadmill')); const t = document.getElementById('new-ex-type').textContent.trim();

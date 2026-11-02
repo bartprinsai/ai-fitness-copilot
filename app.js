@@ -184,8 +184,8 @@ function exerciseName(id) {
   const ex = findExercise(id);
   return ex ? ex.name : '';
 }
-// Text for inside innerHTML or an attribute: an exercise name is typed by the user, so "<", "&"
-// or a quote in it must show as itself. Wherever a name goes in as text (textContent) this isn't needed.
+// Text for inside innerHTML or an attribute: exercise, plan, day, category and subcategory names
+// are typed by the user, so "<", "&" or a quote in them must show as themselves. Wherever a name goes in as text (textContent) this isn't needed.
 function escapeHtml(text) {
   return String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 }
@@ -3391,7 +3391,7 @@ function insightStrengthCardHtml(s) {
   if (!s.exercises.length) return insightEmptyHtml(INSIGHT_STRENGTH_EMPTY);
   return '<div class="divided-list">' + s.categories.map(c => {
     const p = c.pct === null ? null : insightStrengthPct(c.pct);
-    return `<div class="insight-strength-row"><div class="insight-mg-main"><div class="role-row">${c.name}</div></div>`
+    return `<div class="insight-strength-row"><div class="insight-mg-main"><div class="role-row">${escapeHtml(c.name)}</div></div>`
       + `<div class="insight-mg-figure">${p ? insightPctHtml(p.text, p.cls) : insightNoCompareHtml}`
       + (c.records ? `<div class="role-sub">${insightRecordsText(c.records)}</div>` : '') + '</div></div>';
   }).join('') + `<div class="role-sub insight-strength-note">Gemiddelde verandering van de geschatte 1RM t.o.v. ${insightPeriodName(s.prev)}</div></div>`;
@@ -3490,7 +3490,7 @@ function renderInsightStrength() {
     const p = c.pct === null ? null : insightStrengthPct(c.pct);
     const sub = `t.o.v. ${insightPeriodName(s.prev)}` + (c.records ? ` · <span class="insight-records">${prTrophySvg('insight-pr')}${insightRecordsText(c.records)}</span>` : '');
     return `<button type="button" class="card insight-strength-card insight-edit-card" data-insight-category="${c.id}">`
-      + insightStrengthHeadHtml(`<div class="role-title">${c.name}</div>`, p ? insightPctHtml(p.text, p.cls) : insightNoCompareHtml, `<div class="role-sub">${sub}</div>`, true)
+      + insightStrengthHeadHtml(`<div class="role-title">${escapeHtml(c.name)}</div>`, p ? insightPctHtml(p.text, p.cls) : insightNoCompareHtml, `<div class="role-sub">${sub}</div>`, true)
       + insightStrengthChartHtml(`insight-strength-chart-${c.id}`, insightPctChartOptions(line, labels, `${c.name}, gemiddelde verandering`),
         line.filter(v => v !== null).length, `Na nog een ${insightStrengthUnit(r)} trainen verschijnt hier een lijn`)
       + '</button>';
@@ -3757,7 +3757,7 @@ document.getElementById('btn-insight-weight-save').addEventListener('click', () 
 function renderNewWorkoutScreen() {
   const pick = getTodaysScheduledDay();
   document.getElementById('nw-schema-auto-desc').textContent = pick
-    ? `Vandaag staat ${pick.dayName} op het programma.`
+    ? `Vandaag staat ${pick.dayName} op het programma${planDayHasExercises(pick.day) ? '' : ', nog zonder oefeningen'}.`
     : 'Automatische planning nog niet ingesteld';
 }
 
@@ -3780,7 +3780,7 @@ function loadPlanDayIntoWorkout(plan, day, date) {
   recordWorkoutPlanDay(date, plan, day);
   const workout = getWorkout(date);
   let added = 0;
-  (day.exercises || []).forEach(ex => {
+  planDayExercises(day).forEach(ex => {
     if (workout.find(e => e.exerciseId === ex.exerciseId)) return;
     const target = planExerciseTarget(ex);
     workout.push({ exerciseId: ex.exerciseId, sets: [], ...(target && { target }) });
@@ -3804,8 +3804,16 @@ function recordWorkoutPlanDay(date, plan, day) {
   uDoc('workouts/' + date).set({ planDays: db.workoutPlanDays[date] }, { merge: true }).catch(persistFailed);
 }
 
+// A plan day's exercises that exist: one that's no longer there (taken out of EXERCISE_DB, or
+// permanently deleted) can't be loaded and doesn't count. A deleted (hidden) one still does.
+function planDayExercises(day) {
+  return ((day && day.exercises) || []).filter(e => findExercise(e.exerciseId));
+}
+// Only a day with at least one such exercise is offered for loading: the smart day banner,
+// Load Schedule Automatically (popup and New Workout's subtitle) and the day picker of Load
+// Schedule Manually.
 function planDayHasExercises(day) {
-  return !!(day && day.exercises && day.exercises.length > 0);
+  return planDayExercises(day).length > 0;
 }
 
 // After a schedule load from New Workout: back to the Fitness Tracker showing `date`
@@ -3865,21 +3873,24 @@ function renderSchedulePickDay() {
 }
 
 // Same look as Plan Detail's day card head, but no preview/edit controls: the
-// whole card is one tap target that loads the day.
+// whole card is one tap target that loads the day. A day without exercises
+// (planDayHasExercises) says "Geen oefeningen", has no chevron and can't be tapped.
 function buildSchedulePickDayCard(day, idx) {
+  const loadable = planDayHasExercises(day);
   const card = document.createElement('div');
-  card.className = 'plan-day-card';
+  card.className = 'plan-day-card' + (loadable ? '' : ' plan-day-card-empty');
+  if (!loadable) card.setAttribute('aria-disabled', 'true');
   card.innerHTML = `
     <div class="plan-day-head">
       <div class="plan-day-num">${idx + 1}</div>
       <div class="plan-day-info">
-        <div class="plan-day-name">${day.name}</div>
+        <div class="plan-day-name">${escapeHtml(day.name)}</div>
         <div class="plan-day-sub">${planDaySubText(day)}</div>
       </div>
-      <svg class="plan-day-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+      ${loadable ? '<svg class="plan-day-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>' : ''}
     </div>
   `;
-  card.addEventListener('click', () => loadPickedScheduleDay(idx));
+  if (loadable) card.addEventListener('click', () => loadPickedScheduleDay(idx));
   return card;
 }
 
@@ -3899,16 +3910,21 @@ function loadPickedScheduleDay(idx) {
 // would load; null for the notice.
 let pendingScheduleLoad = null;
 
+// A day without exercises gets the notice too: nothing to load.
 function openScheduleLoadAuto() {
-  const pick = getTodaysScheduledDay();
+  const scheduled = getTodaysScheduledDay();
+  const empty = scheduled && !planDayHasExercises(scheduled.day);
+  const pick = empty ? null : scheduled;
   pendingScheduleLoad = pick;
   // No pick but a usable active plan: that plan simply has no day for today.
   const activePlan = db.activePlan && db.plans[db.activePlan.planId];
   const noDayToday = !pick && activePlan && (activePlan.days || []).length > 0;
   document.getElementById('schedule-load-title').textContent = pick ? `Vandaag is ${pick.dayName}`
+    : empty ? `Vandaag is ${scheduled.dayName}`
     : noDayToday ? 'Geen dag voor vandaag' : 'Geen actief plan';
   document.getElementById('schedule-load-msg').textContent = pick
     ? 'Oefeningen van dit plan laden voor vandaag?'
+    : empty ? 'Deze dag heeft nog geen oefeningen, er is niets om te laden.'
     : noDayToday ? `Je actieve plan "${activePlan.name}" heeft geen passende dag voor vandaag.`
     : 'Geen actief plan gevonden. Stel een plan in als actief via Trainingsplannen.';
   document.getElementById('btn-schedule-load-cancel').classList.toggle('hidden', !pick);
@@ -4017,7 +4033,7 @@ function renderCategoryBrowser() {
     const item = document.createElement('div');
     item.className = 'category-item list-row';
     item.innerHTML = `
-      <span class="category-item-name">${cat.name}</span>
+      <span class="category-item-name">${escapeHtml(cat.name)}</span>
       <svg class="category-item-dots" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
     `;
     item.querySelector('.category-item-name').addEventListener('click', () => {
@@ -6081,12 +6097,12 @@ const FIELD_PICKER_CHECK = '<span class="field-picker-check"><svg viewBox="0 0 2
 function renderFieldPickerList(title, options, isSelected, mark, disabled = {}) {
   document.getElementById('field-picker-title').textContent = title;
   document.getElementById('field-picker-list').innerHTML = options.map(o => o.header !== undefined
-    ? `<div class="section-label field-picker-group-label">${o.header}</div>`
+    ? `<div class="section-label field-picker-group-label">${escapeHtml(o.header)}</div>`
     : `
-    <div class="field-picker-row${isSelected(o.value) ? ' selected' : ''}${disabled[o.value] ? ' disabled' : ''}" data-value="${o.value}"${disabled[o.value] ? ' aria-disabled="true"' : ''}>
+    <div class="field-picker-row${isSelected(o.value) ? ' selected' : ''}${disabled[o.value] ? ' disabled' : ''}" data-value="${escapeHtml(o.value)}"${disabled[o.value] ? ' aria-disabled="true"' : ''}>
       ${mark}
-      <span class="field-picker-label">${o.label}</span>
-      ${disabled[o.value] ? `<span class="field-picker-note">${disabled[o.value]}</span>` : ''}
+      <span class="field-picker-label">${escapeHtml(o.label)}</span>
+      ${disabled[o.value] ? `<span class="field-picker-note">${escapeHtml(disabled[o.value])}</span>` : ''}
     </div>
   `).join('');
 }
@@ -7794,7 +7810,7 @@ function buildPlanItem(plan, { withMenu, featured = false }) {
   item.className = 'plan-item' + (featured ? ' plan-item-featured' : '');
   item.innerHTML = `
     <div class="plan-item-info">
-      <div class="plan-item-name">${plan.name}</div>
+      <div class="plan-item-name">${escapeHtml(plan.name)}</div>
       <div class="plan-item-meta">${dayCount} dag${dayCount !== 1 ? 'en' : ''}</div>
     </div>
     ${withMenu ? '<button class="plan-item-dots" aria-label="Opties"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button>' : ''}
@@ -7925,7 +7941,7 @@ function buildPlanDayGroupLabel(group) {
 }
 
 function planDaySubText(day) {
-  const exCount = (day.exercises || []).length;
+  const exCount = planDayExercises(day).length;
   return exCount === 0 ? 'Geen oefeningen' : `${exCount} ${exCount === 1 ? 'oefening' : 'oefeningen'}`;
 }
 
@@ -7952,7 +7968,7 @@ function buildPlanDayCard(day, idx) {
       <div class="plan-day-num">${idx + 1}</div>
       <div class="plan-day-info">
         <div class="plan-day-name-row">
-          <div class="plan-day-name">${day.name}</div>
+          <div class="plan-day-name">${escapeHtml(day.name)}</div>
           ${planDetailEditMode ? `
           <button class="plan-day-rename-btn" aria-label="Naam wijzigen">
             <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
@@ -8800,7 +8816,7 @@ function openPresetsOverlay() {
     item.className = 'preset-item';
     item.innerHTML = `
       <div class="preset-item-body">
-        <div class="preset-item-name">${preset.name}</div>
+        <div class="preset-item-name">${escapeHtml(preset.name)}</div>
         <div class="preset-item-meta">${preset.days.length} dagen</div>
       </div>
       <span class="preset-item-arrow">›</span>
@@ -8892,13 +8908,14 @@ async function addExerciseToPlanDay(exId, setsReps) {
 // filled (manual add, Load Schedule Manually/Automatically, the banner itself):
 // shown only while TODAY's workout (todayStr(), not the viewed day) is still empty,
 // and only while the tracker shows today (hidden on any other day, back on today).
+// Not for a plan day without exercises (planDayHasExercises): there's nothing to load.
 function renderSmartBanner() {
   const banner = document.getElementById('smart-day-banner');
   if (!banner) return;
   recordWeekCycle().catch(persistFailed);
   const pick = getTodaysScheduledDay();
   bannerSuggestedPick = pick;
-  if (bannerDismissed || !pick || currentDate !== todayStr() || getWorkout(todayStr()).length > 0) { banner.classList.add('hidden'); return; }
+  if (bannerDismissed || !pick || !planDayHasExercises(pick.day) || currentDate !== todayStr() || getWorkout(todayStr()).length > 0) { banner.classList.add('hidden'); return; }
   document.getElementById('smart-banner-msg').textContent = `Volgens je plan staat vandaag ${pick.dayName} op het programma. Laden?`;
   banner.classList.remove('hidden');
 }
