@@ -2,6 +2,8 @@
 // Subcategorie in Nieuwe oefening / Oefening bewerken (vergrendeld zonder categorie, keuzelijst,
 // + met de pop-up Nieuwe subcategorie), het voorvoegsel "<subcategorie> - " in Naam, en de
 // gegroepeerde lijst per categorie (Alle oefeningen, ook vanuit een plandag), zoeken, favoriet.
+// Ingebouwde subcategorieën (BUILTIN_SUBCATEGORIES) staan ertussen alsof ze eigen zijn; een eigen
+// subcategorie met dezelfde naam (hier Pulldown onder Rug) is dezelfde: één keuze, één groep.
 // See PROJECT_CONTEXT.md ("Categorieën en spiergroepen" → Subcategorieën) and DESIGN_SYSTEM.md
 // ("Exercise-formulier" → Subcategorie, "All Exercises-scherm" → Groepen in een categorie).
 const path = require('path');
@@ -15,8 +17,8 @@ const DATA = {
     { id: 'sub-fly', name: 'Fly', category: 'chest' },
   ] },
   custom_exercises: [
-    { id: 'ex-pd2', name: 'Pulldown - Wide grip', category: 'back', type: 'weight_reps', subcategory: 'sub-pd' },
-    { id: 'ex-pd1', name: 'Pulldown - Close grip', category: 'back', type: 'weight_reps', subcategory: 'sub-pd' },
+    { id: 'ex-pd2', name: 'Pulldown - Behind neck', category: 'back', type: 'weight_reps', subcategory: 'sub-pd' },
+    { id: 'ex-pd1', name: 'Pulldown - Kneeling', category: 'back', type: 'weight_reps', subcategory: 'sub-pd' },
     { id: 'ex-row1', name: 'Row - Cable', category: 'back', type: 'weight_reps', subcategory: 'sub-row' },
     // a subcategory of another category counts as loose
     { id: 'ex-odd', name: 'Odd one', category: 'back', type: 'weight_reps', subcategory: 'sub-fly' },
@@ -65,7 +67,7 @@ H.run(async () => {
     await shot(page, `form-active-${tag}`);
     await click('#new-ex-subcategory');
     H.check(`${tag} keuzelijst Rug`, await page.evaluate(() => [...document.querySelectorAll('#field-picker-list .field-picker-label')].map(l => l.textContent)),
-      ['Geen subcategorie', 'Aaa leeg', 'Pulldown', 'Row']);
+      ['Geen subcategorie', 'Aaa leeg', 'Barbell Row', 'Pulldown', 'Row', 'Seated Cable Row', 'Single Arm Row']);
     await shot(page, `picker-${tag}`);
 
     // ── 3. Voorvoegsel in Naam
@@ -103,6 +105,10 @@ H.run(async () => {
     await click('#btn-new-subcategory-save');
     H.check(`${tag} dubbele naam geweigerd`, await page.evaluate(() => ({ toast: document.getElementById('toast-msg').textContent, open: document.getElementById('new-subcategory-overlay').classList.contains('open') })),
       { toast: 'Deze subcategorie bestaat al', open: true });
+    await page.fill('#new-subcategory-input', 'seated cable row');
+    await click('#btn-new-subcategory-save');
+    H.check(`${tag} naam van een ingebouwde subcategorie geweigerd`, await page.evaluate(() => ({ toast: document.getElementById('toast-msg').textContent, own: db.categories.subcategories.length })),
+      { toast: 'Deze subcategorie bestaat al', own: 4 });
     await page.fill('#new-subcategory-input', ' T-bar ');
     await click('#btn-new-subcategory-save');
     const made = await page.evaluate(() => { const s = db.categories.subcategories.find(s => s.name === 'T-bar'); return s && { category: s.category, idOk: /^sub-/.test(s.id), selected: getFieldBtnValue('new-ex-subcategory') === s.id }; });
@@ -126,20 +132,22 @@ H.run(async () => {
     // ── 6. Oefening bewerken
     await page.evaluate(() => openEditExerciseScreen(allExercises().find(e => e.id === 'ex-pd1')));
     await H.settle(page);
-    H.check(`${tag} bewerken: veld ingevuld, naam ongewijzigd`, await form(), { name: 'Pulldown - Close grip', sub: 'sub-pd', text: 'Pulldown', locked: false, lockIcons: 0, dashed: false, chevron: true, plus: '+' });
+    H.check(`${tag} bewerken: veld ingevuld, naam ongewijzigd`, await form(), { name: 'Pulldown - Kneeling', sub: 'sub-pd', text: 'Pulldown', locked: false, lockIcons: 0, dashed: false, chevron: true, plus: '+' });
     await click('#new-ex-subcategory'); await pick('sub-row');
-    H.check(`${tag} bewerken: wisselen`, (await form()).name, 'Row - Close grip');
+    H.check(`${tag} bewerken: wisselen`, (await form()).name, 'Row - Kneeling');
     await click('#btn-new-ex-save');
-    H.check(`${tag} bewerken opgeslagen`, await page.evaluate(() => { const e = db.custom_exercises.find(e => e.id === 'ex-pd1'); return [e.name, e.subcategory]; }), ['Row - Close grip', 'sub-row']);
+    H.check(`${tag} bewerken opgeslagen`, await page.evaluate(() => { const e = db.custom_exercises.find(e => e.id === 'ex-pd1'); return [e.name, e.subcategory]; }), ['Row - Kneeling', 'sub-row']);
     await page.evaluate(() => openEditExerciseScreen(allExercises().find(e => e.id === 'ex-odd')));
     await H.settle(page);
     H.check(`${tag} subcategorie van andere categorie toont Geen`, (await form()).text, 'Geen subcategorie');
     await page.evaluate(() => openEditExerciseScreen(allExercises().find(e => e.id === 'lat-pulldown')));
     await H.settle(page);
-    await click('#new-ex-subcategory'); await pick('sub-pd');
+    // Its built-in subcategory Pulldown is the own one with that name.
+    H.check(`${tag} ingebouwde oefening: eigen subcategorie met dezelfde naam`, await form(), { name: 'Pulldown - Wide Grip', sub: 'sub-pd', text: 'Pulldown', locked: false, lockIcons: 0, dashed: false, chevron: true, plus: '+' });
+    await click('#new-ex-subcategory'); await pick('sub-row');
     await click('#btn-new-ex-save');
     H.check(`${tag} ingebouwde oefening: id blijft, subcategorie gezet`, await page.evaluate(() => { const e = allExercises().find(e => e.id === 'lat-pulldown'); return [e.name, e.subcategory, EXERCISE_DB.find(b => b.id === 'lat-pulldown').subcategory]; }),
-      ['Pulldown - Lat pulldown', 'sub-pd', undefined]);
+      ['Row - Wide Grip', 'sub-row', 'sub-pulldown']);
     await page.evaluate(() => openEditExerciseScreen(allExercises().find(e => e.id === 'ex-row1')));
     await H.settle(page);
     await click('#new-ex-subcategory'); await pick('');
@@ -157,10 +165,14 @@ H.run(async () => {
     const g1 = await groups();
     const loose = await page.evaluate(() => sortByName(exercisesInCategory('back').filter(e => !exerciseSubcategory(e))).map(e => e.name));
     H.check(`${tag} groepen: volgorde, aantallen, dicht`, g1.map(g => [g.name, g.count, g.open]),
-      [['Losse oefeningen', String(loose.length), false], ['Pulldown', '2', false], ['Row', '1', false], ['T-bar', '1', false]]);
-    H.check(`${tag} groepen: volledige namen op alfabet`, g1.slice(1).map(g => g.items), [['Pulldown - Lat pulldown', 'Pulldown - Wide grip'], ['Row - Close grip'], ['T-bar - Chest supported']]);
+      [['Losse oefeningen', String(loose.length), false], ['Barbell Row', '2', false], ['Pulldown', '6', false], ['Row', '2', false], ['Seated Cable Row', '4', false], ['Single Arm Row', '2', false], ['T-bar', '1', false]]);
+    H.check(`${tag} groepen: volledige namen op alfabet`, g1.slice(1).map(g => g.items), [['Barbell Row - Overhand', 'Barbell Row - Underhand'],
+      ['Pulldown - Behind neck', 'Pulldown - Close Grip', 'Pulldown - Machine', 'Pulldown - Machine Single Arm', 'Pulldown - Neutral Grip', 'Pulldown - Underhand'],
+      ['Row - Kneeling', 'Row - Wide Grip'],
+      ['Seated Cable Row - Close Grip', 'Seated Cable Row - Neutral Grip', 'Seated Cable Row - Rope', 'Seated Cable Row - Wide Overhand'],
+      ['Single Arm Row - High to Low', 'Single Arm Row - Medium'], ['T-bar - Chest supported']]);
     H.check(`${tag} Losse oefeningen op alfabet`, g1[0].items, loose);
-    H.ok(loose.includes('Odd one') && loose.includes('Cable') && !loose.includes('Lat pulldown'), `${tag} los: andere-categorie-sub en Geen; niet de ingedeelde`);
+    H.ok(loose.includes('Odd one') && loose.includes('Cable') && !loose.includes('Row - Wide Grip'), `${tag} los: andere-categorie-sub en Geen; niet de ingedeelde`);
     H.ok(!g1.some(g => g.items.includes('Pulldown - Weg')), `${tag} verwijderde oefening niet in de groep`);
     await shot(page, `list-closed-${tag}`);
     await click('#exercise-list .ex-group:nth-child(2) .ex-group-head');
@@ -176,23 +188,23 @@ H.run(async () => {
     });
     H.check(`${tag} open: ingesprongen, vet, chevron omlaag, label rechts`, geo, { indented: geo.nameLeft, nameLeft: 16 + 20 + 12, badgeRight: 16, bold: '700', rotated: true });
     const g2 = await groups();
-    H.check(`${tag} tik opent alleen die groep`, g2.map(g => g.open), [false, true, false, false]);
+    H.check(`${tag} tik opent alleen die groep`, g2.map(g => g.open), [false, true, false, false, false, false, false]);
     await shot(page, `list-open-${tag}`);
     // a re-render of the same category (favorite) keeps the open group
     await page.evaluate(() => { toggleFavoriteExercise('ex-pd2'); refreshExerciseList(); });
-    H.check(`${tag} favoriet: groep blijft open`, (await groups()).map(g => g.open), [false, true, false, false]);
+    H.check(`${tag} favoriet: groep blijft open`, (await groups()).map(g => g.open), [false, true, false, false, false, false, false]);
     await click('#exercise-list .ex-group:nth-child(2) .ex-group-head');
-    H.check(`${tag} tik klapt dicht`, (await groups()).map(g => g.open), [false, false, false, false]);
+    H.check(`${tag} tik klapt dicht`, (await groups()).map(g => g.open), [false, false, false, false, false, false, false]);
     await click('#exercise-list .ex-group:nth-child(3) .ex-group-head');
     await page.evaluate(() => { resetExerciseBrowseToCategories(); }); await openBack(); await H.settle(page);
-    H.check(`${tag} opnieuw openen: alles dicht`, (await groups()).map(g => g.open), [false, false, false, false]);
-    // A category without subcategories: just Losse oefeningen
-    await page.evaluate(() => enterExerciseBrowseCategory('arms', 'Armen', () => renderExercisesInCategory('arms'))); await H.settle(page);
-    H.check(`${tag} Armen: alleen Losse oefeningen`, (await groups()).map(g => [g.name, g.count]), [['Losse oefeningen', String(await page.evaluate(() => exercisesInCategory('arms').length))]]);
+    H.check(`${tag} opnieuw openen: alles dicht`, (await groups()).map(g => g.open), [false, false, false, false, false, false, false]);
+    // A category without subcategories (Buik): just Losse oefeningen
+    await page.evaluate(() => enterExerciseBrowseCategory('abs', 'Buik', () => renderExercisesInCategory('abs'))); await H.settle(page);
+    H.check(`${tag} Buik: alleen Losse oefeningen`, (await groups()).map(g => [g.name, g.count]), [['Losse oefeningen', String(await page.evaluate(() => exercisesInCategory('abs').length))]]);
 
     // ── 8. Zoeken: plat, ook op subcategorie
     const search = q => page.evaluate(q => { const i = document.getElementById('exercise-search'); i.value = q; i.dispatchEvent(new Event('input')); return { groups: document.querySelectorAll('#exercise-list .ex-group').length, names: [...document.querySelectorAll('#exercise-list .exercise-item-name')].map(n => n.textContent) }; }, q);
-    H.check(`${tag} zoeken op subcategorie`, await search('t-bar'), { groups: 0, names: ['T-bar row', 'T-bar - Chest supported'] });
+    H.check(`${tag} zoeken op subcategorie`, await search('t-bar'), { groups: 0, names: ['T-bar - Chest supported'] });
     await search('');
     H.check(`${tag} zoekveld leeg: weer groepen`, (await groups()).length, 1);
 
@@ -203,13 +215,13 @@ H.run(async () => {
       enterExerciseBrowseCategory('back', 'Rug', () => renderExercisesInCategory('back'));
     });
     await H.settle(page);
-    H.check(`${tag} plandag: groepen dicht`, (await groups()).map(g => [g.name, g.open]), [['Losse oefeningen', false], ['Pulldown', false], ['Row', false], ['T-bar', false]]);
+    H.check(`${tag} plandag: groepen dicht`, (await groups()).map(g => [g.name, g.open]), [['Losse oefeningen', false], ['Barbell Row', false], ['Pulldown', false], ['Row', false], ['Seated Cable Row', false], ['Single Arm Row', false], ['T-bar', false]]);
     await click('#exercise-list .ex-group:nth-child(2) .ex-group-head');
     await click('#exercise-list .ex-group:nth-child(2) .exercise-item:first-child .ex-add-btn');
     await click('#btn-pde-sr-save');
     const added = await page.evaluate(() => ({ day: currentPlanData.days[0].exercises.map(e => e.exerciseId), done: !!document.querySelector('#exercise-list .ex-group:nth-child(2) .exercise-item:first-child .ex-add-btn-done'),
       open: document.querySelector('#exercise-list .ex-group:nth-child(2) .ex-group-head').getAttribute('aria-expanded') }));
-    H.check(`${tag} plandag: toegevoegd, groep blijft open`, added, { day: ['lat-pulldown'], done: true, open: 'true' });
+    H.check(`${tag} plandag: toegevoegd, groep blijft open`, added, { day: ['bent-over-barbell-row'], done: true, open: 'true' });
     await shot(page, `plan-add-${tag}`);
 
     await browser.close();

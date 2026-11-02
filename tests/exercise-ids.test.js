@@ -8,7 +8,7 @@ const U = 'users/u1/';
 const store = new FakeStore({
   [U + 'meta/custom_exercises']: { list: [{ category: 'arms', name: 'Mijn curl', type: 'weight_reps' }] },
   [U + 'meta/favorites']: { names: ['Bench press', 'Mijn curl'] },
-  [U + 'meta/hidden_builtins']: { names: ['Snatch'] },
+  [U + 'meta/hidden_builtins']: { names: ['Lat pulldown'] }, // the name before November 2026, now "Pulldown - Wide Grip"
   [U + 'meta/exercise_info']: { data: {
     'Bench press': { primaryMuscleGroup: 'upper-chest', secondaryMuscleGroups: ['triceps', 'front-delts'], benchSettingNew: 2, powerliftBench: true, handPosition: 'Ringvinger op ring' },
     'Mijn curl': { primaryMuscleGroup: 'biceps' },
@@ -51,7 +51,7 @@ const p1 = F('users/u1/plans/p1');
 A(JSON.stringify(p1.days[0].exercises) === JSON.stringify([{ exerciseId: 'bench-press', sets: 3, reps: 5 }, { exerciseId: mijnId, repsPerSet: [12, 10, 8] }]), 'plandag Maandag: ids, sets/reps behouden');
 A(JSON.stringify(p1.days[1].exercises) === JSON.stringify([{ exerciseId: 'squat', sets: 5, reps: 5 }]), 'plandag Dinsdag: squat; "Bestaat niet" eruit');
 A(JSON.stringify(F('users/u1/meta/favorites')) === JSON.stringify({ ids: ['bench-press', mijnId] }), 'favorieten op id');
-A(JSON.stringify(F('users/u1/meta/hidden_builtins')) === JSON.stringify({ ids: ['snatch'] }), 'verborgen ingebouwde op id');
+A(JSON.stringify(F('users/u1/meta/hidden_builtins')) === JSON.stringify({ ids: ['lat-pulldown'], shown: [] }), 'verborgen ingebouwde op id (ook op de oude naam)');
 const info = F('users/u1/meta/exercise_info').data;
 A(info['bench-press'].primaryMuscleGroup === 'upper-chest' && info['bench-press'].benchSettingNew === 2 && info[mijnId].primaryMuscleGroup === 'biceps', 'exercise_info op id, inhoud behouden');
 A(info['Weg oefening'] && !info['Bench press'], 'onbekende exercise_info-sleutel blijft staan, oude naam-sleutel weg');
@@ -90,7 +90,7 @@ A(document.getElementById('training-title').textContent === 'Bankdrukken', 'Trai
 openExerciseInfo();
 A(document.getElementById('exercise-info-view-title').textContent === 'Info Bankdrukken', 'Oefeninginfo-titel toont nieuwe naam');
 A(F('users/u1/workouts/2026-10-20').exercises[0].exerciseId === 'bench-press', 'Firestore-workout ongewijzigd (alleen id)');
-A(JSON.stringify(F('users/u1/meta/custom_exercises').list.find(e => e.id === 'bench-press')) === JSON.stringify({ id: 'bench-press', category: 'chest', name: 'Bankdrukken', type: 'weight_reps' }), 'opgeslagen als override met id bench-press');
+A(JSON.stringify(F('users/u1/meta/custom_exercises').list.find(e => e.id === 'bench-press')) === JSON.stringify({ id: 'bench-press', category: 'chest', name: 'Bankdrukken', type: 'weight_reps', subcategory: 'sub-bench-press' }), 'opgeslagen als override met id bench-press, subcategorie Bench Press blijft');
 
 console.test('\n# Eigen oefening hernoemen (Mijn curl -> Curl special)');
 openEditExerciseScreen(allExercises().find(e => e.id === mijnId));
@@ -173,7 +173,7 @@ pendingDeleteExercise = allExercises().find(e => e.id === 'bench-press');
 await document.getElementById('btn-delete-ex-confirm').__fire('click');
 A(!allExercises().some(e => e.id === 'bench-press') && db.hiddenBuiltins['bench-press'] && db.custom_exercises.find(e => e.id === 'bench-press').deleted === true && exerciseName('bench-press') === 'Bankdrukken', 'hernoemde ingebouwde: verborgen, override blijft als verwijderd item met de nieuwe naam');
 A(getPRSetKeys('bench-press').size > 0 && getExerciseValidSets('bench-press').length === 3, 'hernoemde ingebouwde: geschiedenis (3 sets, ook de set van 26-10) en PR bewaard');
-A(JSON.stringify(deletedExercises().map(e => e.id).sort()) === JSON.stringify([mijnId, 'bench-press', 'snatch', 'squat'].sort()), 'deletedExercises(): de drie verwijderde en de al verborgen Snatch');
+A(JSON.stringify(deletedExercises().map(e => e.id).sort()) === JSON.stringify([mijnId, 'bench-press', 'lat-pulldown', 'squat', 'crunches', 'sit-ups', 'plank', 'hanging-leg-raises'].sort()), 'deletedExercises(): de drie verwijderde, de al verborgen Lat pulldown en de vier standaard verborgen');
 openNewExerciseScreen();
 document.getElementById('new-ex-name').value = 'Curl special';
 setFieldBtnValue('new-ex-category', 'arms', 'Armen');

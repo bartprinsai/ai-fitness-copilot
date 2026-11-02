@@ -48,7 +48,7 @@ H.run(async () => {
   check('weekoverzicht: maandag en dinsdag gedaan in Per dag', hidden.week.done, ['2026-10-19', '2026-10-20']);
   check('weekoverzicht: Training-kaart telt de 3 sets uit het schema en de 2 extra sets', hidden.week.training, 'TRAINING 100 % van je schema 3 van 3 sets · op schema · +2 extra 1 van 1 training');
   check('dagoverzicht maandag: Verborgen press telt mee (Borst, 3 sets)', hidden.monday.some(t => /Borst/.test(t) && /Verborgen press/.test(t) && /3/.test(t)), true);
-  check('dagoverzicht dinsdag: Leg press telt mee (Quadriceps, 2 sets)', hidden.tuesday.some(t => /Leg press/.test(t) && /2/.test(t)), true);
+  check('dagoverzicht dinsdag: Leg Press telt mee (Quadriceps, 2 sets)', hidden.tuesday.some(t => /Leg Press/.test(t) && /2/.test(t)), true);
   check('trainingsoverzicht: 5 sets in totaal', /^SETS 5\b/.test(hidden.overview.summary), true);
   check('trainingsoverzicht: Borst 3 sets (60%) en Quadriceps 2 sets (40%)', hidden.overview.rows.slice(0, 2), ['Borst 3 van 3 · op schema 60 %', 'Quadriceps 2 sets · extra 40 %']);
 

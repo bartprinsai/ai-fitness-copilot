@@ -8,7 +8,7 @@ const path = require('path');
 const H = require('./helpers');
 
 const NO_TRANSITIONS = () => { const st = document.createElement('style'); st.textContent = '*{transition:none!important;animation:none!important}'; document.head.appendChild(st); };
-const EX_IDS = ['bench-press', 'squat', 'deadlift', 'pull-ups', 'leg-press', 'leg-curl-machine', 'hammer-curl', 'barbell-curl', 'dumbbell-curl', 'cable-curl', 'spider-curl', 'reverse-curl'];
+const EX_IDS = ['bench-press', 'squat', 'deadlift', 'pull-ups', 'leg-press', 'leg-curl-machine', 'hammer-curl', 'barbell-curl', 'dumbbell-curl', 'cable-curl', 'bicep-curl-machine', 'reverse-curl'];
 const exList = n => EX_IDS.slice(0, n).map(exerciseId => ({ exerciseId, sets: 3, reps: 10 }));
 
 // In-page helpers, installed once per page.
@@ -244,7 +244,7 @@ H.run(async () => {
       const el = document.querySelectorAll('.pde-item')[1], inner = el.querySelector('.pde-item-inner');
       return { order: currentPlanData.days[0].exercises.map(e => e.exerciseId), dom: [...document.querySelectorAll('.pde-ex-name')].map(e => e.textContent), dragging: document.querySelectorAll('.pde-dragging').length, z: getComputedStyle(el).zIndex, shadow: getComputedStyle(inner).boxShadow, transform: inner.style.transform };
     });
-    H.check(`${tag}: slepen — volgorde opgeslagen en lijst gelijk`, [afterDrag.order, afterDrag.dom], [['squat', 'bench-press', 'deadlift'], ['Squat', 'Bench press', 'Deadlift']]);
+    H.check(`${tag}: slepen — volgorde opgeslagen en lijst gelijk`, [afterDrag.order, afterDrag.dom], [['squat', 'bench-press', 'deadlift'], ['Squat', 'Bench Press', 'Deadlift']]);
     H.check(`${tag}: tijdens slepen schaduw = gesleepte kaart in de tracker, geen vergroting, boven de buren`, [drag.shadow === drag.ref, drag.scale, drag.z, drag.siblingZ, drag.overflow, drag.translate], [true, 'none', '10', 'auto', 'visible', true]);
     H.check(`${tag}: na loslaten niets achtergebleven`, [afterDrag.dragging, afterDrag.z, afterDrag.shadow === normal, afterDrag.transform], [0, 'auto', true, '']);
 
@@ -261,7 +261,7 @@ H.run(async () => {
     H.check(`${tag}: selecteren — lang drukken, tik erbij; stijl = geselecteerde trackerkaart`, sel, { active: true, one: '1 oefening', two: '2 oefeningen', same: true });
     await page.click('#btn-pde-sel-delete'); await H.settle(page);
     H.check(`${tag}: prullenbak vraagt bevestiging met de namen`, await page.evaluate(() => [document.getElementById('delete-pde-exercise-title').textContent, document.getElementById('delete-pde-exercise-msg').textContent]),
-      ['Oefeningen verwijderen?', 'Weet je zeker dat je 2 oefeningen ("Squat", "Bench press") wilt verwijderen uit deze dag?']);
+      ['Oefeningen verwijderen?', 'Weet je zeker dat je 2 oefeningen ("Squat", "Bench Press") wilt verwijderen uit deze dag?']);
     await page.click('#btn-delete-pde-exercise-confirm'); await H.settle(page);
     H.check(`${tag}: na verwijderen één oefening over`, await page.evaluate(() => currentPlanData.days[0].exercises.map(e => e.exerciseId)), ['deadlift']);
     await page.evaluate(async () => { await __longPress(document.querySelectorAll('#pde-list .pde-item-inner')[0]); });
@@ -281,7 +281,7 @@ H.run(async () => {
     const { browser, page, errors } = await H.openApp({ width: w, height: 780, theme, touch: true });
     await page.evaluate(NO_TRANSITIONS);
     await page.evaluate(() => { db.plans = { test: { name: 'Test', createdAt: 1, days: [{ name: 'Dag 3', exercises: [] }] } }; currentPlanId = 'test'; currentPlanData = db.plans.test; });
-    const openArms = () => page.evaluate(() => { openPlanDayEdit(0); openPlanDayAddExercises(0); exerciseBrowserMode = 'exercises'; currentBrowseCategory = 'arms'; openExerciseGroups = new Set(['']); renderExercisesInCategory('arms'); }); // Armen has only Losse oefeningen: opened
+    const openArms = () => page.evaluate(() => { openPlanDayEdit(0); openPlanDayAddExercises(0); exerciseBrowserMode = 'exercises'; currentBrowseCategory = 'arms'; openExerciseGroups = new Set(['', ...subcategoriesOf('arms').map(s => s.id)]); renderExercisesInCategory('arms'); }); // every group of Armen opened
     await openArms(); await H.settle(page);
     const row = name => `#exercise-list .exercise-item:has(.exercise-item-name:text-is("${name}"))`;
     // Rows within the viewport (elementFromPoint only sees those), measured at the top, the middle and
@@ -305,14 +305,14 @@ H.run(async () => {
     }
     H.ok(geo.length > 5 && geo.every(x => x.btn.join() === '36,36' && x.tap.join() === '48,48'), `${tag}: plusje 36×36, tikvlak 48×48`, geo[0] && [geo[0].btn, geo[0].tap]);
     H.ok(geo.every(x => x.hitDots && x.gapDots >= 0 && x.hitEdge && x.gapName >= 0), `${tag}: tikvlak plusje valt niet over ⋮ en niet over de naam`, geo.filter(x => !(x.hitDots && x.gapDots >= 0 && x.hitEdge && x.gapName >= 0)).map(x => x.name));
-    // A name too long for one line (Overhead triceps extension …) wraps and makes its row taller.
+    // A name too long for one line (Bicep Curl - Cable Preacher - Single Arm …) wraps and makes its row taller.
     H.ok(geo.every(x => x.dotsRight === x.padRight && (x.lines > 1 || x.h === 56) && x.cursor === 'default'), `${tag}: ⋮ helemaal rechts, rijen 56px, geen knop-cursor`, geo.filter(x => !(x.dotsRight === x.padRight && (x.lines > 1 || x.h === 56) && x.cursor === 'default')));
-    H.ok(['Preacher curl (dumbbell)', 'Preacher curl (barbell)', 'Incline dumbbell curl'].every(n => (geo.find(x => x.name === n) || {}).lines === 1), `${tag}: lange curl-namen op één regel naast plusje en ⋮`);
+    H.ok(['Bicep Curl - Cable Bayesian', 'Overhead Extension - Rope', 'Pushdown - Rope Seated'].every(n => (geo.find(x => x.name === n) || {}).lines === 1) && (geo.find(x => x.name === 'Bicep Curl - Cable Preacher - Single Arm') || {}).lines === 2, `${tag}: middellange namen op één regel naast plusje en ⋮, een lange op twee`);
     await page.evaluate(() => document.getElementById('exercise-list').scrollTo(0, 0)); await H.settle(page);
 
     // ⋮ menu also works in add mode
     // A row near the top: the ⋮ menu opens below its button.
-    await page.tap(row('Cable curl') + ' .exercise-item-dots'); await H.settle(page);
+    await page.tap(row('Bicep Curl - Cable Straight Bar') + ' .exercise-item-dots'); await H.settle(page);
     const menu = await page.evaluate(() => [...document.querySelectorAll('.dropdown-item')].filter(e => e.offsetParent).map(e => e.textContent.trim()));
     H.check(`${tag}: ⋮-menu in toevoegmodus`, menu, ['Bewerken', 'Verwijderen', 'Favoriet maken']);
     await page.tap('.dropdown-item:has-text("Favoriet maken")'); await H.settle(page);
@@ -321,8 +321,8 @@ H.run(async () => {
 
     // Taps on the name or the empty space of a row do nothing
     for (const [desc, fn] of [
-      ['de naam', () => page.tap(row('Preacher curl (dumbbell)') + ' .exercise-item-name')],
-      ['de lege ruimte van de rij', async () => { const b = await page.locator(row('Barbell curl') + ' .ex-add-btn').boundingBox(); const n = await page.locator(row('Barbell curl') + ' .exercise-item-name').boundingBox(); await page.touchscreen.tap(n.x + n.width - 20, b.y + b.height / 2); }],
+      ['de naam', () => page.tap(row('Bicep Curl - Ez-Bar') + ' .exercise-item-name')],
+      ['de lege ruimte van de rij', async () => { const b = await page.locator(row('Bicep Curl - Barbell') + ' .ex-add-btn').boundingBox(); const n = await page.locator(row('Bicep Curl - Barbell') + ' .exercise-item-name').boundingBox(); await page.touchscreen.tap(n.x + n.width - 20, b.y + b.height / 2); }],
     ]) {
       await fn(); await H.settle(page);
       H.check(`${tag}: tik op ${desc}: niets gebeurt`, await page.evaluate(() => [document.getElementById('pde-sets-reps-overlay').classList.contains('open'), document.querySelector('.screen.active').id, currentPlanData.days[0].exercises.length]), [false, 'screen-exercises', 0]);
@@ -331,22 +331,22 @@ H.run(async () => {
     const popupState = () => page.evaluate(() => ({ open: document.getElementById('pde-sets-reps-overlay').classList.contains('open'), title: document.getElementById('pde-sr-title').textContent, save: document.getElementById('btn-pde-sr-save').textContent, uniform: document.getElementById('pde-sr-mode-uniform').classList.contains('active'), sets: document.getElementById('pde-sr-sets').value, reps: document.getElementById('pde-sr-reps').value }));
     const day = () => page.evaluate(() => JSON.parse(JSON.stringify(currentPlanData.days[0].exercises)));
     // + → popup, Annuleren adds nothing
-    await page.tap(row('Preacher curl (dumbbell)') + ' .ex-add-btn'); await H.settle(page);
-    H.check(`${tag}: plusje opent "<naam> toevoegen", voorgevuld 3 × 10`, await popupState(), { open: true, title: 'Preacher curl (dumbbell) toevoegen', save: 'Toevoegen', uniform: true, sets: '3', reps: '10' });
+    await page.tap(row('Bicep Curl - Ez-Bar') + ' .ex-add-btn'); await H.settle(page);
+    H.check(`${tag}: plusje opent "<naam> toevoegen", voorgevuld 3 × 10`, await popupState(), { open: true, title: 'Bicep Curl - Ez-Bar toevoegen', save: 'Toevoegen', uniform: true, sets: '3', reps: '10' });
     await page.click('#btn-pde-sr-cancel'); await H.settle(page);
     H.check(`${tag}: Annuleren voegt niets toe, plusje blijft`, [await day(), await page.evaluate(() => document.querySelector('.ex-add-btn-done') === null)], [[], true]);
     // Uniform add with own values
-    await page.tap(row('Preacher curl (dumbbell)') + ' .ex-add-btn'); await H.settle(page);
+    await page.tap(row('Bicep Curl - Ez-Bar') + ' .ex-add-btn'); await H.settle(page);
     await page.fill('#pde-sr-sets', '4'); await page.fill('#pde-sr-reps', '8');
     await page.click('#btn-pde-sr-save'); await H.settle(page);
-    const added = await page.evaluate(() => { const r = [...document.querySelectorAll('#exercise-list .exercise-item')].find(x => x.querySelector('.exercise-item-name').textContent === 'Preacher curl (dumbbell)'); const b = r.querySelector('.ex-add-btn'); return { done: b.classList.contains('ex-add-btn-done'), bg: getComputedStyle(b).backgroundColor, fill: getComputedStyle(b.querySelector('svg')).fill, size: b.getBoundingClientRect().width, dots: !!r.querySelector('.exercise-item-dots') }; });
+    const added = await page.evaluate(() => { const r = [...document.querySelectorAll('#exercise-list .exercise-item')].find(x => x.querySelector('.exercise-item-name').textContent === 'Bicep Curl - Ez-Bar'); const b = r.querySelector('.ex-add-btn'); return { done: b.classList.contains('ex-add-btn-done'), bg: getComputedStyle(b).backgroundColor, fill: getComputedStyle(b.querySelector('svg')).fill, size: b.getBoundingClientRect().width, dots: !!r.querySelector('.exercise-item-dots') }; });
     const primary = await H.tokenColor(page, '--primary');
-    H.check(`${tag}: toegevoegd als { exerciseId, sets, reps }`, await day(), [{ exerciseId: 'preacher-curl-dumbbell', sets: 4, reps: 8 }]);
+    H.check(`${tag}: toegevoegd als { exerciseId, sets, reps }`, await day(), [{ exerciseId: 'bicep-curl-ez-bar', sets: 4, reps: 8 }]);
     H.check(`${tag}: plusje wordt blauw vinkje (36px, wit vinkje), ⋮ blijft`, added, { done: true, bg: primary, fill: 'rgb(255, 255, 255)', size: 36, dots: true });
-    await page.tap(row('Preacher curl (dumbbell)') + ' .ex-add-btn', { force: true }); await H.settle(page);
+    await page.tap(row('Bicep Curl - Ez-Bar') + ' .ex-add-btn', { force: true }); await H.settle(page);
     H.check(`${tag}: tweede tik op het vinkje: niets gebeurt`, [(await popupState()).open, (await day()).length], [false, 1]);
     // Per-set add
-    await page.tap(row('Incline dumbbell curl') + ' .ex-add-btn'); await H.settle(page);
+    await page.tap(row('Bicep Curl - Seated Dumbbell 45') + ' .ex-add-btn'); await H.settle(page);
     H.check(`${tag}: nieuwe popup weer op 3 × 10`, [(await popupState()).sets, (await popupState()).reps], ['3', '10']);
     await page.click('#pde-sr-mode-persets');
     H.check(`${tag}: Andere reps per set: 3 rijen`, await page.locator('.pde-sr-set-row').count(), 3);
@@ -356,19 +356,19 @@ H.run(async () => {
     await page.click('#btn-pde-sr-save'); await H.settle(page);
     H.check(`${tag}: per set opgeslagen als { exerciseId, repsPerSet }`, (await day())[1], { exerciseId: 'incline-dumbbell-curl', repsPerSet: [12, 10, 8, 6] });
     // Invalid input keeps the popup open
-    await page.tap(row('Spider curl') + ' .ex-add-btn'); await H.settle(page);
+    await page.tap(row('Bicep Curl - Machine') + ' .ex-add-btn'); await H.settle(page);
     await page.fill('#pde-sr-sets', '0'); await page.click('#btn-pde-sr-save'); await H.settle(page);
     H.check(`${tag}: ongeldige waarde: popup blijft open, niets toegevoegd`, [(await popupState()).open, (await day()).length], [true, 2]);
     await page.click('#btn-pde-sr-cancel'); await H.settle(page);
     if (w === 360) await page.screenshot({ path: path.join(out, `add-${theme}.png`), clip: { x: 0, y: 120, width: w, height: 400 } });
     // Back on Dag bewerken: both exercises, edit popup keeps its own title
     await page.evaluate(() => goBack('screen-plan-day-edit')); await H.settle(page);
-    H.check(`${tag}: terug op Dag bewerken staan beide oefeningen`, await page.evaluate(() => [...document.querySelectorAll('#pde-list .pde-ex-name')].map(e => e.textContent)), ['Preacher curl (dumbbell)', 'Incline dumbbell curl']);
+    H.check(`${tag}: terug op Dag bewerken staan beide oefeningen`, await page.evaluate(() => [...document.querySelectorAll('#pde-list .pde-ex-name')].map(e => e.textContent)), ['Bicep Curl - Ez-Bar', 'Bicep Curl - Seated Dumbbell 45']);
     await page.evaluate(() => openPdeSetsRepsEdit(0)); await H.settle(page);
     const ed = await popupState();
     H.check(`${tag}: bewerkpopup "Sets & reps aanpassen" / "Opslaan" met 4 × 8`, [ed.title, ed.save, ed.sets, ed.reps], ['Sets & reps aanpassen', 'Opslaan', '4', '8']);
     await page.fill('#pde-sr-reps', '5'); await page.click('#btn-pde-sr-save'); await H.settle(page);
-    H.check(`${tag}: Opslaan past de bestaande oefening aan`, (await day())[0], { exerciseId: 'preacher-curl-dumbbell', sets: 4, reps: 5 });
+    H.check(`${tag}: Opslaan past de bestaande oefening aan`, (await day())[0], { exerciseId: 'bicep-curl-ez-bar', sets: 4, reps: 5 });
     allErrors.push(...errors);
     await browser.close();
   }

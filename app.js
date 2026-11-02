@@ -151,11 +151,17 @@ function persistFailed(e) {
 // built-in's id overrides that built-in. A deleted entry stays as { …, deleted: true } so a
 // plan day that still lists it keeps its name.
 function newExerciseId() { return 'ex-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+// A built-in is hidden when the user deleted it (db.hiddenBuiltins[id] true) or when it's
+// `hidden` in EXERCISE_DB (taken out of the list) and the user didn't put it back
+// (db.hiddenBuiltins[id] false, stored as `shown` in meta/hidden_builtins).
+function isBuiltinHidden(b) {
+  const h = (db.hiddenBuiltins || {})[b.id];
+  return h === undefined ? !!b.hidden : h;
+}
 function allExercises() {
   const custom = db.custom_exercises || [];
   const customIds = new Set(custom.map(e => e.id));
-  const hidden = db.hiddenBuiltins || {};
-  const builtins = EXERCISE_DB.filter(e => !hidden[e.id] && !customIds.has(e.id));
+  const builtins = EXERCISE_DB.filter(e => !isBuiltinHidden(e) && !customIds.has(e.id));
   return [...builtins, ...custom.filter(e => !e.deleted).map(e => ({ ...e, custom: true }))];
 }
 // Any exercise by id, deleted ones included, or null.
@@ -165,6 +171,11 @@ function findExercise(id) {
 function exerciseName(id) {
   const ex = findExercise(id);
   return ex ? ex.name : '';
+}
+// The built-in with this exact name, its current one or the one it had before (BUILTIN_PREVIOUS),
+// or null. Only for data stored by name before exercises had an id (the one-time migrations).
+function builtinByName(name) {
+  return EXERCISE_DB.find(b => b.name === name) || EXERCISE_DB.find(b => (BUILTIN_PREVIOUS[b.id] || {}).name === name) || null;
 }
 
 // -- Categories -----------------------------------------
@@ -204,15 +215,31 @@ function exercisesInCategory(id) { return allExercises().filter(e => e.category 
 
 // -- Subcategories ---------------------------------------
 // Optional grouping of variants inside one category (e.g. Pulldown under Rug), only used to group
-// the exercise list. Built-ins have none. Names are unique (case-insensitive) within a category.
+// the exercise list. Names are unique (case-insensitive) within a category.
+// Two sources, shown alike: the user's own (meta/categories) and BUILTIN_SUBCATEGORIES (exercises.js,
+// used by the built-in exercises). An own one with the same name in the same category takes the
+// built-in's place: the built-in id then resolves to it, so there's one group and one choice.
 function sortByName(list) { return list.sort((a, b) => a.name.localeCompare(b.name, 'nl', { sensitivity: 'base' })); }
-function subcategoriesOf(categoryId) {
-  return sortByName(categoryState().subcategories.filter(s => s.category === categoryId));
+function ownSubcategoryLike(sub) {
+  const n = sub.name.toLowerCase();
+  return categoryState().subcategories.find(s => s.category === sub.category && s.name.toLowerCase() === n) || null;
 }
-function findSubcategory(id) { return id ? categoryState().subcategories.find(s => s.id === id) || null : null; }
+function allSubcategories() {
+  return [...categoryState().subcategories, ...BUILTIN_SUBCATEGORIES.filter(s => !ownSubcategoryLike(s))];
+}
+function subcategoriesOf(categoryId) {
+  return sortByName(allSubcategories().filter(s => s.category === categoryId));
+}
+function findSubcategory(id) {
+  if (!id) return null;
+  const own = categoryState().subcategories.find(s => s.id === id);
+  if (own) return own;
+  const builtin = BUILTIN_SUBCATEGORIES.find(s => s.id === id);
+  return builtin ? ownSubcategoryLike(builtin) || builtin : null;
+}
 function findSubcategoryByName(categoryId, name) {
   const n = name.trim().toLowerCase();
-  return categoryState().subcategories.find(s => s.category === categoryId && s.name.toLowerCase() === n) || null;
+  return allSubcategories().find(s => s.category === categoryId && s.name.toLowerCase() === n) || null;
 }
 function addSubcategory(categoryId, name) {
   const sub = { id: 'sub-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name, category: categoryId };
@@ -286,7 +313,7 @@ function migrateCustomExerciseCategories() {
     if (knownIds.has(ex.category)) return;
     const old = String(ex.category || '').trim();
     const key = old.toLowerCase();
-    const builtin = EXERCISE_DB.find(b => b.name === ex.name);
+    const builtin = builtinByName(ex.name);
     let id = LEGACY_CATEGORY_MAP[key] || (LEGACY_CATEGORY_FALLBACK[key] && (builtin ? builtin.category : LEGACY_CATEGORY_FALLBACK[key]));
     if (!id) {
       const existing = old && findCategoryByName(old);
@@ -343,9 +370,15 @@ function toggleFavoriteExercise(id) {
   persistFavorites();
   return next;
 }
+// meta/hidden_builtins: `ids` deleted built-ins, `shown` built-ins hidden in EXERCISE_DB that the
+// user put back (see isBuiltinHidden()).
+function hiddenBuiltinsDoc() {
+  const h = db.hiddenBuiltins || {};
+  return { ids: Object.keys(h).filter(id => h[id]), shown: Object.keys(h).filter(id => !h[id]) };
+}
 async function persistHiddenBuiltins() {
   if (!currentUser) return;
-  uDoc('meta/hidden_builtins').set({ ids: Object.keys(db.hiddenBuiltins || {}) }).catch(persistFailed);
+  uDoc('meta/hidden_builtins').set(hiddenBuiltinsDoc()).catch(persistFailed);
 }
 async function persistExerciseInfo() {
   if (!currentUser) return;
@@ -427,6 +460,7 @@ async function loadUserData(userUid) {
     db.hiddenBuiltins = {};
     if (hiddenBuiltinsSnap.exists) {
       (hiddenBuiltinsSnap.data().ids || hiddenBuiltinsSnap.data().names || []).forEach(key => { db.hiddenBuiltins[key] = true; });
+      (hiddenBuiltinsSnap.data().shown || []).forEach(id => { db.hiddenBuiltins[id] = false; });
     }
     db.exerciseInfo = exerciseInfoSnap.exists ? (exerciseInfoSnap.data().data || {}) : {};
     if (stripLegacyMuscleFields()) persistExerciseInfo();
@@ -438,6 +472,7 @@ async function loadUserData(userUid) {
     const migrations = migrationsSnap.exists ? migrationsSnap.data() : {};
     if (!migrations.exerciseIds) await migrateExerciseIds(userUid);
     if (!migrations.planDays) await migratePlanDays(userUid);
+    if (!migrations.builtinSubcategories) await migrateBuiltinSubcategories(userUid);
     // The first run stores today's schedule (and Week A/B) as the starting point.
     await syncInsightSchedule();
     console.log('[Load] loadUserData finished OK');
@@ -474,12 +509,14 @@ async function migrateExerciseIds(userUid) {
   const report = { custom: 0, workouts: 0, plans: 0, favorites: 0, hidden: 0, info: 0, records: 0, unmatched: [] };
   (db.custom_exercises || []).forEach(ex => {
     if (ex.id) return;
-    const builtin = EXERCISE_DB.find(b => b.name === ex.name);
+    const builtin = builtinByName(ex.name);
     ex.id = builtin ? builtin.id : newExerciseId();
     report.custom++;
   });
-  // Custom entries last: one with a built-in's name is that (edited) built-in.
-  const idByName = new Map([...EXERCISE_DB, ...(db.custom_exercises || [])].map(e => [e.name, e.id]));
+  // Custom entries last: one with a built-in's name is that (edited) built-in. A built-in's
+  // previous name (BUILTIN_PREVIOUS) goes first: the data being converted is from before.
+  const previousNames = Object.entries(BUILTIN_PREVIOUS).filter(([, p]) => p.name).map(([id, p]) => ({ id, name: p.name }));
+  const idByName = new Map([...previousNames, ...EXERCISE_DB, ...(db.custom_exercises || [])].map(e => [e.name, e.id]));
 
   const convertEntries = (entries, where) => {
     let changed = false;
@@ -539,7 +576,7 @@ async function migrateExerciseIds(userUid) {
     ...changedPlans.map(id => [prefix + 'plans/' + id, db.plans[id]]),
     ...(report.custom ? [[prefix + 'meta/custom_exercises', { list: db.custom_exercises }]] : []),
     ...(report.favorites ? [[prefix + 'meta/favorites', { ids: Object.keys(db.favoriteExercises) }]] : []),
-    ...(report.hidden ? [[prefix + 'meta/hidden_builtins', { ids: Object.keys(db.hiddenBuiltins) }]] : []),
+    ...(report.hidden ? [[prefix + 'meta/hidden_builtins', hiddenBuiltinsDoc()]] : []),
     ...(report.info ? [[prefix + 'meta/exercise_info', { data: db.exerciseInfo }]] : []),
     ...(report.records ? [[prefix + 'meta/records', { data: db.records }]] : []),
     [prefix + 'meta/migrations', { exerciseIds: todayStr() }, { merge: true }],
@@ -576,6 +613,37 @@ async function migratePlanDays(userUid) {
     [prefix + 'meta/migrations', { planDays: todayStr() }, { merge: true }],
   ]);
   console.log('[Migration] plan days:', report);
+  return report;
+}
+
+// One-time step, per user (flag meta/migrations.builtinSubcategories, set in the last write batch),
+// for the indeling of the built-ins in subcategories (November 2026). An edited built-in (custom
+// entry with a built-in's id) overrides the built-in as a whole, so it would keep the old name and
+// category and get no subcategory. It's brought along where it still has what the built-in had
+// (BUILTIN_PREVIOUS): the old name → the new name, the old category → the new one, and without a
+// subcategory of its own it gets the built-in's (if it's in the built-in's category). A name or
+// subcategory the user chose is kept (and logged).
+// Returns { renamed, moved, subcategory, keptName: [names], keptSubcategory: [names] }.
+async function migrateBuiltinSubcategories(userUid) {
+  const report = { renamed: 0, moved: 0, subcategory: 0, keptName: [], keptSubcategory: [] };
+  let changed = false;
+  (db.custom_exercises || []).forEach(e => {
+    const b = EXERCISE_DB.find(b => b.id === e.id);
+    if (!b) return;
+    const prev = BUILTIN_PREVIOUS[b.id] || {};
+    if (prev.name && e.name === prev.name) { e.name = b.name; report.renamed++; changed = true; }
+    else if (e.name !== b.name) report.keptName.push(e.name);
+    if (prev.category && e.category === prev.category) { e.category = b.category; report.moved++; changed = true; }
+    if (e.subcategory) { if (e.subcategory !== b.subcategory) report.keptSubcategory.push(e.name); }
+    else if (b.subcategory && e.category === b.category) { e.subcategory = b.subcategory; report.subcategory++; changed = true; }
+  });
+  const prefix = 'users/' + userUid + '/';
+  await commitMigrationWrites([
+    ...(changed ? [[prefix + 'meta/custom_exercises', { list: db.custom_exercises }]] : []),
+    [prefix + 'meta/migrations', { builtinSubcategories: todayStr() }, { merge: true }],
+  ]);
+  if (report.keptName.length || report.keptSubcategory.length) console.warn('[Migration] edited built-ins kept as the user set them:', report);
+  console.log('[Migration] built-in subcategories:', report);
   return report;
 }
 
@@ -6198,8 +6266,7 @@ function exerciseNameTaken(name, exceptId) {
 function deletedExercises() {
   const custom = db.custom_exercises || [];
   const customIds = new Set(custom.map(e => e.id));
-  const hidden = db.hiddenBuiltins || {};
-  return [...custom.filter(e => e.deleted), ...EXERCISE_DB.filter(e => hidden[e.id] && !customIds.has(e.id))];
+  return [...custom.filter(e => e.deleted), ...EXERCISE_DB.filter(e => isBuiltinHidden(e) && !customIds.has(e.id))];
 }
 function deletedExerciseNameTaken(name) {
   const n = name.toLowerCase();
@@ -6361,8 +6428,10 @@ function restoreExercise(id) {
     delete entry.deleted;
     persistCustomExercises();
   }
-  if (db.hiddenBuiltins && db.hiddenBuiltins[id]) {
-    delete db.hiddenBuiltins[id];
+  const builtin = EXERCISE_DB.find(b => b.id === id);
+  if (builtin && isBuiltinHidden(builtin)) {
+    if (builtin.hidden) (db.hiddenBuiltins || (db.hiddenBuiltins = {}))[id] = false;
+    else delete db.hiddenBuiltins[id];
     persistHiddenBuiltins();
   }
   const ex = findExercise(id);
@@ -8649,17 +8718,17 @@ const PLAN_PRESETS = [
     { name: 'Upper A', exercises: [{ exerciseId:'bench-press', sets:4, reps:6 }, { exerciseId:'bent-over-barbell-row', sets:4, reps:6 }, { exerciseId:'military-press-barbell', sets:3, reps:8 }, { exerciseId:'pull-ups', sets:3, reps:8 }] },
     { name: 'Lower A', exercises: [{ exerciseId:'squat', sets:4, reps:6 }, { exerciseId:'romanian-deadlift', sets:3, reps:8 }, { exerciseId:'leg-press', sets:3, reps:10 }, { exerciseId:'leg-curl-machine', sets:3, reps:12 }] },
     { name: 'Upper B', exercises: [{ exerciseId:'incline-bench-press', sets:4, reps:8 }, { exerciseId:'seated-cable-row', sets:4, reps:10 }, { exerciseId:'shoulder-press-dumbbell', sets:3, reps:10 }, { exerciseId:'dumbbell-curl', sets:3, reps:12 }] },
-    { name: 'Lower B', exercises: [{ exerciseId:'deadlift', sets:4, reps:5 }, { exerciseId:'hack-squat', sets:3, reps:10 }, { exerciseId:'lunges-dumbbell', sets:3, reps:12 }, { exerciseId:'standing-calf-raise-machine', sets:4, reps:15 }] },
+    { name: 'Lower B', exercises: [{ exerciseId:'deadlift', sets:4, reps:5 }, { exerciseId:'front-squat', sets:3, reps:10 }, { exerciseId:'lunges-dumbbell', sets:3, reps:12 }, { exerciseId:'standing-calf-raise-machine', sets:4, reps:15 }] },
   ]},
   { name: 'Full body (3 dagen)', days: [
     { name: 'Dag A', exercises: [{ exerciseId:'squat', sets:3, reps:8 }, { exerciseId:'bench-press', sets:3, reps:8 }, { exerciseId:'bent-over-barbell-row', sets:3, reps:8 }, { exerciseId:'military-press-barbell', sets:3, reps:8 }] },
     { name: 'Dag B', exercises: [{ exerciseId:'deadlift', sets:3, reps:5 }, { exerciseId:'incline-bench-press', sets:3, reps:10 }, { exerciseId:'pull-ups', sets:3, reps:8 }, { exerciseId:'dumbbell-curl', sets:3, reps:12 }] },
-    { name: 'Dag C', exercises: [{ exerciseId:'front-squat', sets:3, reps:8 }, { exerciseId:'dips-chest', sets:3, reps:10 }, { exerciseId:'chin-ups', sets:3, reps:8 }, { exerciseId:'lateral-raises-dumbbell', sets:3, reps:15 }] },
+    { name: 'Dag C', exercises: [{ exerciseId:'front-squat', sets:3, reps:8 }, { exerciseId:'bench-press-dumbbell', sets:3, reps:10 }, { exerciseId:'chin-ups', sets:3, reps:8 }, { exerciseId:'lateral-raises-dumbbell', sets:3, reps:15 }] },
   ]},
   { name: 'Bro split (5 dagen)', days: [
-    { name: 'Borst', exercises: [{ exerciseId:'bench-press', sets:4, reps:8 }, { exerciseId:'incline-bench-press-dumbbell', sets:3, reps:10 }, { exerciseId:'flyes-cable', sets:3, reps:12 }, { exerciseId:'dips-chest', sets:3, reps:12 }] },
+    { name: 'Borst', exercises: [{ exerciseId:'bench-press', sets:4, reps:8 }, { exerciseId:'incline-bench-press-dumbbell', sets:3, reps:10 }, { exerciseId:'flyes-cable', sets:3, reps:12 }, { exerciseId:'dips-triceps', sets:3, reps:12 }] },
     { name: 'Rug', exercises: [{ exerciseId:'deadlift', sets:4, reps:5 }, { exerciseId:'pull-ups', sets:4, reps:8 }, { exerciseId:'bent-over-barbell-row', sets:3, reps:10 }, { exerciseId:'seated-cable-row', sets:3, reps:12 }] },
-    { name: 'Schouders', exercises: [{ exerciseId:'military-press-barbell', sets:4, reps:8 }, { exerciseId:'lateral-raises-dumbbell', sets:4, reps:15 }, { exerciseId:'front-raises-dumbbell', sets:3, reps:12 }, { exerciseId:'shrugs-barbell', sets:3, reps:12 }] },
+    { name: 'Schouders', exercises: [{ exerciseId:'military-press-barbell', sets:4, reps:8 }, { exerciseId:'lateral-raises-dumbbell', sets:4, reps:15 }, { exerciseId:'shoulder-press-dumbbell', sets:3, reps:12 }, { exerciseId:'rear-delt-flyes-machine', sets:3, reps:12 }] },
     { name: 'Armen', exercises: [{ exerciseId:'barbell-curl', sets:4, reps:10 }, { exerciseId:'hammer-curl', sets:3, reps:12 }, { exerciseId:'skull-crushers-barbell', sets:4, reps:10 }, { exerciseId:'triceps-pushdown-cable', sets:3, reps:12 }] },
     { name: 'Benen', exercises: [{ exerciseId:'squat', sets:4, reps:8 }, { exerciseId:'romanian-deadlift', sets:3, reps:10 }, { exerciseId:'leg-press', sets:3, reps:12 }, { exerciseId:'standing-calf-raise-machine', sets:5, reps:15 }] },
   ]},

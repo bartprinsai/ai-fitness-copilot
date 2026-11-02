@@ -233,7 +233,7 @@ async function monthAndYear(page) {
     note: [...document.querySelectorAll('#insight-muscle-body .insight-summary-note div')].map(d => d.textContent),
     rows: [...document.querySelectorAll('#insight-muscle-body .insight-mg-row')].map(r => r.innerText.replace(/\n/g, ' | ')) }));
   console.log('     LATS, OKTOBER:'); show(lat);
-  check('Lats maand: vergelijking en oefeningen', [lat.head, lat.note, lat.rows], ['Oktober 2026', ['6 van 6 sets uit je schema · op schema', '24% van al je sets'], ['Lat pulldown | 6 | sets']]);
+  check('Lats maand: vergelijking en oefeningen', [lat.head, lat.note, lat.rows], ['Oktober 2026', ['6 van 6 sets uit je schema · op schema', '24% van al je sets'], ['Pulldown - Wide Grip | 6 | sets']]);
   await click(page, '#insight-muscle-head [data-insight-period="year"]');
   const latY = await page.evaluate(() => ({ head: document.querySelector('#insight-muscle-head .insight-nav-title').textContent, schema: document.getElementById('insight-muscle-schema').textContent,
     note: [...document.querySelectorAll('#insight-muscle-body .insight-summary-note div')].map(d => d.textContent),

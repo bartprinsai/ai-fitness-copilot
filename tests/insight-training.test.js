@@ -183,7 +183,7 @@ async function trainingOverview(page) {
   const tri = async () => { await page.evaluate(() => openInsightMuscle('triceps')); await H.settle(page); return detail(page); };
   const dTri = await tri();
   console.log('     DETAIL TRICEPS:'); show(dTri);
-  check('Triceps: Meegetraind met primair', dTri.meegetraind, ['Bench press | Primair: Borst | 4sets', 'Mijn oefening | Primair: niet ingesteld | 3sets']);
+  check('Triceps: Meegetraind met primair', dTri.meegetraind, ['Bench Press | Primair: Borst | 4sets', 'Mijn oefening | Primair: niet ingesteld | 3sets']);
   await page.evaluate(() => openInsightMuscle('side-delts')); await H.settle(page);
   const dSide = await detail(page);
   console.log('     DETAIL ZIJKANT SCHOUDERS (gepland, niet gedaan):'); show(dSide);
@@ -304,7 +304,7 @@ async function trainingOverview(page) {
   await page.evaluate(() => openInsightDay('2026-10-19')); await H.settle(page);
   const day = await page.evaluate(() => [...document.querySelectorAll('#insight-day-training .insight-mg-row')].map(r => r.textContent));
   console.log('     DAGOVERZICHT MAANDAG:'); show(day);
-  check('dagoverzicht: Bench press-regel ongewijzigd', day.some(t => t.includes('Bench press · 4 sets · 2 failure · 1 partial · 1 forced · 1 dropset')), true);
+  check('dagoverzicht: Bench Press-regel ongewijzigd', day.some(t => t.includes('Bench Press · 4 sets · 2 failure · 1 partial · 1 forced · 1 dropset')), true);
 }
 
 async function comparisons(page) {

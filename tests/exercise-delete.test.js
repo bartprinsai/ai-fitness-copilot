@@ -22,6 +22,8 @@ const DATA = {
     q: { id: 'q', name: 'Ander plan', days: [{ id: 'd2', name: 'Dag 1', exercises: [{ exerciseId: 'ex-mijn', sets: 2, reps: 10 }] }] },
   },
   activePlan: { planId: 'p', planName: 'Plan', lastDayIndex: -1 },
+  // The built-ins hidden in EXERCISE_DB (`hidden: true`) put back, so the list starts empty.
+  hiddenBuiltins: { crunches: false, 'sit-ups': false, plank: false, 'hanging-leg-raises': false },
 };
 
 H.run(async () => {
@@ -65,8 +67,8 @@ H.run(async () => {
       };
     });
     await shot(page, `delete-popup-${tag}`);
-    H.check(`${tag} verwijderpop-up`, pop, { title: 'Oefening verwijderen?', msg: 'Weet je zeker dat je Bench press wilt verwijderen? De oefening verdwijnt uit je lijsten. Je trainingsgeschiedenis blijft bewaard, en je kunt hem terugzetten via Verwijderde oefeningen.',
-      bold: 'Bench press', checkbox: false, enabled: true, fits: true });
+    H.check(`${tag} verwijderpop-up`, pop, { title: 'Oefening verwijderen?', msg: 'Weet je zeker dat je Bench Press wilt verwijderen? De oefening verdwijnt uit je lijsten. Je trainingsgeschiedenis blijft bewaard, en je kunt hem terugzetten via Verwijderde oefeningen.',
+      bold: 'Bench Press', checkbox: false, enabled: true, fits: true });
     await page.click('#btn-delete-ex-confirm'); await H.settle(page);
     const afterDel = await state();
     H.check(`${tag} na verwijderen: rij en melding`, afterDel, { row: 'Verwijderde oefeningen (1)', toast: 'Oefening verwijderd' });
@@ -96,7 +98,7 @@ H.run(async () => {
       rows: [...document.querySelectorAll('.deleted-ex-row')].map(r => [r.querySelector('.deleted-ex-name').textContent, r.querySelector('.deleted-ex-meta').textContent, r.querySelectorAll('.row-icon-btn').length]),
       tap: [...document.querySelectorAll('.row-icon-btn')].map(b => { const r = b.getBoundingClientRect(); return r.width + 'x' + r.height; }),
     }));
-    if (full) H.check('scherm met ingebouwde oefening', scr, { active: true, rows: [['Bench press', 'Borst · ingebouwd', 1]], tap: ['48x48'] });
+    if (full) H.check('scherm met ingebouwde oefening', scr, { active: true, rows: [['Bench Press', 'Borst · ingebouwd', 1]], tap: ['48x48'] });
     await page.click('.deleted-ex-restore'); await H.settle(page);
     const afterRestore = await page.evaluate(() => ({
       empty: document.getElementById('deleted-ex-list').innerText.trim(),
@@ -106,7 +108,7 @@ H.run(async () => {
       rowInList: !!document.getElementById('exercises-deleted-row'),
     }));
     H.check(`${tag} terugzetten`, { ...afterRestore, toast: (await state()).toast }, { empty: 'Geen verwijderde oefeningen', inBorst: true, sets: 2, favoriet: true,
-      info: { primaryMuscleGroup: 'chest', benchSetting: '3' }, pr: true, rowInList: false, toast: 'Bench press is teruggezet' });
+      info: { primaryMuscleGroup: 'chest', benchSetting: '3' }, pr: true, rowInList: false, toast: 'Bench Press is teruggezet' });
     await H.settle(page);
     await shot(page, `deleted-empty-${tag}`);
 
@@ -117,7 +119,7 @@ H.run(async () => {
     });
     await page.waitForFunction(() => !document.getElementById('toast').classList.contains('show')); await H.settle(page); // the toast has gone
     const two = await page.evaluate(() => [...document.querySelectorAll('.deleted-ex-row')].map(r => [r.querySelector('.deleted-ex-name').textContent, r.querySelector('.deleted-ex-meta').textContent, [...r.querySelectorAll('.row-icon-btn')].map(b => b.getAttribute('aria-label') + ' ' + b.getBoundingClientRect().width + 'x' + b.getBoundingClientRect().height)]));
-    H.check(`${tag} twee rijen (ingebouwd zonder Permanent verwijderen)`, two, [['Bench press', 'Borst · ingebouwd', ['Terugzetten 48x48']], ['Mijn press', 'Borst · eigen oefening', ['Terugzetten 48x48', 'Permanent verwijderen 48x48']]]);
+    H.check(`${tag} twee rijen (ingebouwd zonder Permanent verwijderen)`, two, [['Bench Press', 'Borst · ingebouwd', ['Terugzetten 48x48']], ['Mijn press', 'Borst · eigen oefening', ['Terugzetten 48x48', 'Permanent verwijderen 48x48']]]);
     const fits = await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth && [...document.querySelectorAll('.deleted-ex-row')].every(r => r.scrollWidth <= r.clientWidth));
     H.check(`${tag} past in breedte`, fits, true);
     await shot(page, `deleted-screen-${tag}`);
@@ -134,7 +136,7 @@ H.run(async () => {
         renderExerciseSearchResults('press'); const search = names();
         renderFavoriteExercises(); const favs = document.getElementById('exercise-list').innerText.trim();
         exerciseScreenMode = 'plan-add'; renderExercisesInCategory('chest'); const planAdd = names(); exerciseScreenMode = 'normal';
-        const gone = l => !l.includes('Bench press') && !l.includes('Mijn press');
+        const gone = l => !l.includes('Bench Press') && !l.includes('Mijn press');
         return { allExercises: !vis.includes('bench-press') && !vis.includes('ex-mijn'), favorietenCategorie: !cats.includes('Favorieten'),
           borst: gone(chest) && chest.length > 0, zoeken: gone(search) && search.length > 0, toevoegenPlandag: gone(planAdd) && planAdd.length > 0,
           favorietenLijst: favs, aiLijst: gone(aiExerciseNameList().split('\n')) };
@@ -153,7 +155,7 @@ H.run(async () => {
       H.check('bewaard: sets, favoriet, Oefeninginfo, records, naam', kept, {
         sets: { '2026-10-19': ['bench-press:2', 'ex-mijn:1'], '2026-10-20': ['ex-mijn:1'] }, favoriet: true,
         info: [{ primaryMuscleGroup: 'chest', benchSetting: '3' }, { primaryMuscleGroup: 'chest', trackStrength: true }],
-        namen: ['Bench press', 'Mijn press'], records: true, opgeslagen: [true, true] });
+        namen: ['Bench Press', 'Mijn press'], records: true, opgeslagen: [true, true] });
 
       // The name still shows in the history
       const hist = await page.evaluate(() => {
@@ -164,11 +166,11 @@ H.run(async () => {
         openTraining('ex-mijn'); renderHistoryTab();
         const histTab = { titel: document.getElementById('training-title').textContent, sets: document.getElementById('history-content').textContent };
         showScreen('screen-fitness-tracker');
-        return { dagoverzicht: tracker, kalender: cal.includes('Bench press') && cal.includes('Mijn press'), samenvatting: recap.includes('Bench press') && recap.includes('Mijn press'),
+        return { dagoverzicht: tracker, kalender: cal.includes('Bench Press') && cal.includes('Mijn press'), samenvatting: recap.includes('Bench Press') && recap.includes('Mijn press'),
           geschiedenis: [histTab.titel, histTab.sets.includes('42') && histTab.sets.includes('40')],
           plandag: db.plans.p.days[0].exercises.map(e => exerciseName(e.exerciseId)) };
       });
-      H.check('naam blijft in de geschiedenis', hist, { dagoverzicht: ['Bench press', 'Mijn press'], kalender: true, samenvatting: true, geschiedenis: ['Mijn press', true], plandag: ['Bench press', 'Mijn press'] });
+      H.check('naam blijft in de geschiedenis', hist, { dagoverzicht: ['Bench Press', 'Mijn press'], kalender: true, samenvatting: true, geschiedenis: ['Mijn press', true], plandag: ['Bench Press', 'Mijn press'] });
 
       // A new or renamed exercise can't take a deleted exercise's name (case-insensitive)
       const refuse = await page.evaluate(MSG => {
@@ -227,7 +229,7 @@ H.run(async () => {
     H.check(`${tag} permanent verwijderd`, { ...p, toast: (await state()).toast }, {
       oefening: null, custom: 0, workouts: { '2026-10-19': ['bench-press'] }, records: false, info: false, favoriet: false,
       plannen: [[['bench-press']], [[]]], versies: ['2026-10-01', '2026-10-22'], nieuweVersie: ['bench-press'], oudOnveranderd: true,
-      oudeVersieHeeftNaam: ['Bench press', 'Mijn press'], scherm: ['Bench press'], toast: 'Mijn press is permanent verwijderd' });
+      oudeVersieHeeftNaam: ['Bench Press', 'Mijn press'], scherm: ['Bench Press'], toast: 'Mijn press is permanent verwijderd' });
 
     // ── 5. De naam is weer vrij
     const again = await page.evaluate(() => {

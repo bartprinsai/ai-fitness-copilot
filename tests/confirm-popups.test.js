@@ -48,7 +48,7 @@ H.run(async () => {
   await page.evaluate(() => homeSel.toggle(document.querySelectorAll('#home-content .exercise-card')[2]));
   await page.click('#btn-home-sel-delete'); await settle();
   H.check('meerdere: titel en melding met alle namen', [await text('#confirm-delete-title'), await text('#confirm-delete-msg')],
-    ['Oefeningen verwijderen?', '2 oefeningen ("Squat", "Bent-over barbell row") verwijderen uit deze workout? Alle sets gaan verloren. Dit kan niet ongedaan worden gemaakt.']);
+    ['Oefeningen verwijderen?', '2 oefeningen ("Squat", "Barbell Row - Overhand") verwijderen uit deze workout? Alle sets gaan verloren. Dit kan niet ongedaan worden gemaakt.']);
   await lastToast();
   await page.click('#btn-confirm-delete-confirm'); await settle();
   H.check('Verwijderen haalt precies de geselecteerde oefeningen weg', [(await W()).map(e => e.exerciseId), await openOverlays(), await lastToast()], [['bench-press'], [], '2 oefeningen verwijderd']);
@@ -64,7 +64,7 @@ H.run(async () => {
   H.check('een set kiezen maakt er Verwijderen van', await text('#btn-clear'), 'Verwijderen');
   await page.click('#btn-clear'); await settle();
   H.check('Verwijderen vraagt bevestiging', [await openOverlays(), await text('#confirm-delete-title'), await text('#confirm-delete-msg')],
-    [['confirm-delete-overlay'], 'Set verwijderen?', 'Set 2 van "Bench press" verwijderen? Dit kan niet ongedaan worden gemaakt.']);
+    [['confirm-delete-overlay'], 'Set verwijderen?', 'Set 2 van "Bench Press" verwijderen? Dit kan niet ongedaan worden gemaakt.']);
   await page.click('#btn-confirm-delete-cancel'); await settle();
   H.check('Annuleren: set blijft', (await W())[0].sets.length, 3);
   await page.click('#btn-clear'); await settle();

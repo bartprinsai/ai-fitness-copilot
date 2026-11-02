@@ -46,7 +46,7 @@ A(F('users/u1/plans/pFixed').days[0].id === fx.days[0].id && F('users/u1/meta/mi
 A(JSON.stringify(Object.keys(versions())) === '["users/u1/schedule_versions/2026-10-21"]', 'startpunt: één schemaversie met datum van vandaag, niets terugwerkend');
 const v1 = F('users/u1/schedule_versions/2026-10-21');
 A(v1.planId === 'pFixed' && v1.planName === 'Vast schema' && v1.type === 'fixed' && v1.effectiveFrom === '2026-10-21', 'versie: plan-id, naam, soort, ingangsdatum');
-A(JSON.stringify(v1.days[0]) === JSON.stringify({ id: fx.days[0].id, name: 'Maandag', weekday: 0, exercises: [{ exerciseId: 'bench-press', name: 'Bench press', sets: 3 }, { exerciseId: 'squat', name: 'Squat', sets: 4 }] }), 'plandag met id, naam, weekdag, oefeningen (id, naam, sets; repsPerSet [5,5,5,5] = 4 sets)');
+A(JSON.stringify(v1.days[0]) === JSON.stringify({ id: fx.days[0].id, name: 'Maandag', weekday: 0, exercises: [{ exerciseId: 'bench-press', name: 'Bench Press', sets: 3 }, { exerciseId: 'squat', name: 'Squat', sets: 4 }] }), 'plandag met id, naam, weekdag, oefeningen (id, naam, sets; repsPerSet [5,5,5,5] = 4 sets)');
 A(JSON.stringify(v1.restWeekdays) === '[1,3,4,5,6]', 'rustdagen: di, do, vr, za, zo');
 A(!JSON.stringify(v1).includes('upper-chest'), 'geen spiergroepen in de versie');
 A(Object.keys(weeks()).length === 0, 'geen Week A/B-opslag zolang het actieve plan geen Week A/B is');
