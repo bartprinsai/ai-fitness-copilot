@@ -1,7 +1,7 @@
 // De ingebouwde oefeningenlijst (vm, geen browser): aantallen per categorie en subcategorie, de
-// ingebouwde subcategorieën (samen met een eigen subcategorie met dezelfde naam), standaard
-// verborgen oefeningen (`hidden: true`: verborgen, terug te zetten), de eenmalige migratie van
-// bewerkte ingebouwde oefeningen, oude namen, sjablonen en de AI-koppeling.
+// ingebouwde subcategorieën (samen met een eigen subcategorie met dezelfde naam), de eenmalige
+// migratie van bewerkte ingebouwde oefeningen, gelogde sets van een oefening die niet meer bestaat
+// (overgeslagen, in Firestore bewaard), oude namen, sjablonen en de AI-koppeling.
 // See PROJECT_CONTEXT.md ("Categorieën en spiergroepen" → Ingebouwde oefeningen, Subcategorieën).
 const H = require('./helpers');
 const { FakeStore } = H;
@@ -20,7 +20,9 @@ const store = new FakeStore({
     { id: 'sub-eigen', name: 'Eigen', category: 'back' },
   ] },
   [U + 'meta/migrations']: { exerciseIds: '2026-10-26', planDays: '2026-10-26' },
-  [U + 'workouts/2026-10-20']: { exercises: [{ exerciseId: 'crunches', sets: [{ weight: 0, reps: 20 }] }] },
+  // Crunches and Plank were taken out of EXERCISE_DB (November 2026); their logged sets stay.
+  [U + 'workouts/2026-10-20']: { exercises: [{ exerciseId: 'crunches', sets: [{ weight: 0, reps: 20 }] }, { exerciseId: 'plank', sets: [{ weight: 0, reps: 1 }] }], planDays: [{ planId: 'p', dayId: 'd' }] },
+  [U + 'workouts/2026-10-21']: { exercises: [{ exerciseId: 'crunches', sets: [{ weight: 0, reps: 15 }] }, { exerciseId: 'bench-press', sets: [{ weight: 100, reps: 5 }] }], sessionNote: 'Zwaar' },
 });
 
 const test = String.raw`
@@ -40,7 +42,7 @@ A(new Set(BUILTIN_SUBCATEGORIES.map(s => s.id)).size === 21 && BUILTIN_SUBCATEGO
 A(visible.every(e => !e.subcategory || BUILTIN_SUBCATEGORIES.some(s => s.id === e.subcategory && s.category === e.category)), 'elke subcategorie bestaat, in de categorie van de oefening');
 A(BUILTIN_SUBCATEGORIES.every(s => visible.some(e => e.subcategory === s.id)), 'geen lege ingebouwde subcategorie');
 A(visible.filter(e => e.subcategory).every(e => { const s = BUILTIN_SUBCATEGORIES.find(s => s.id === e.subcategory); return e.name === s.name || e.name.startsWith(s.name + ' - '); }), 'naam = subcategorie of "<subcategorie> - …"');
-A(JSON.stringify(EXERCISE_DB.filter(e => e.hidden).map(e => e.id)) === '["crunches","sit-ups","plank","hanging-leg-raises"]', 'standaard verborgen: Crunches, Sit-ups, Plank, Hanging leg raises');
+A(!EXERCISE_DB.some(e => e.hidden) && !['crunches', 'sit-ups', 'plank', 'hanging-leg-raises'].some(id => EXERCISE_DB.some(e => e.id === id)), 'Crunches, Sit-ups, Plank, Hanging leg raises helemaal weg, geen verborgen ingebouwde');
 A(Object.keys(BUILTIN_PREVIOUS).every(id => EXERCISE_DB.some(e => e.id === id)), 'BUILTIN_PREVIOUS alleen voor bestaande oefeningen');
 
 console.test('\n# Laden en migratie van bewerkte ingebouwde oefeningen');
@@ -67,30 +69,27 @@ A(findSubcategoryByName('chest', 'BENCH PRESS').id === 'sub-bench-press' && find
 A(subcategoriesOf('chest').length === 4 && subcategoriesOf('abs').length === 0 && subcategoriesOf('cardio').length === 0, 'Borst 4, Buik en Cardio geen');
 A(!JSON.stringify(F('users/u1/meta/categories') || {}).includes('sub-bench-press'), 'ingebouwde subcategorieën niet in meta/categories opgeslagen');
 
-console.test('\n# Standaard verborgen oefeningen');
-A(!allExercises().some(e => ['crunches', 'sit-ups', 'plank', 'hanging-leg-raises'].includes(e.id)), 'niet in de lijsten');
-A(JSON.stringify(deletedExercises().map(e => e.id).sort()) === JSON.stringify(['crunches', 'hanging-leg-raises', 'plank', 'sit-ups']), 'wel in Verwijderde oefeningen');
-A(exerciseName('crunches') === 'Crunches' && getWorkout('2026-10-20')[0].exerciseId === 'crunches', 'naam en gelogde set blijven');
-A(exercisesInCategory('abs').map(e => e.name).sort().join('|') === 'Ab Roller|Weighted Crunch', 'Buik toont Ab Roller en Weighted Crunch');
-restoreExercise('crunches');
-A(allExercises().some(e => e.id === 'crunches') && !deletedExercises().some(e => e.id === 'crunches'), 'terugzetten: weer zichtbaar');
-A(JSON.stringify(F('users/u1/meta/hidden_builtins')) === JSON.stringify({ ids: [], shown: ['crunches'] }), 'opgeslagen als shown');
-db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, favoriteExercises: {}, hiddenBuiltins: {} };
-await loadUserData('u1');
-A(allExercises().some(e => e.id === 'crunches') && !allExercises().some(e => e.id === 'plank'), 'na herladen: Crunches zichtbaar, Plank nog verborgen');
-pendingDeleteExercise = allExercises().find(e => e.id === 'crunches');
-await document.getElementById('btn-delete-ex-confirm').__fire('click');
-A(!allExercises().some(e => e.id === 'crunches') && JSON.stringify(F('users/u1/meta/hidden_builtins')) === JSON.stringify({ ids: ['crunches'], shown: [] }), 'opnieuw verwijderen: verborgen, ids');
-openNewExerciseScreen();
-document.getElementById('new-ex-name').value = 'Plank';
-setFieldBtnValue('new-ex-category', 'abs', 'Buik');
-saveNewExerciseFromScreen();
-A(document.getElementById('toast-msg').textContent === DELETED_NAME_MSG, 'naam van een standaard verborgen oefening is bezet');
+console.test('\n# Sets van een oefening die niet meer bestaat');
+const W = date => F('users/u1/workouts/' + date);
+A(!findExercise('crunches') && !allExercises().some(e => e.id === 'crunches') && deletedExercises().length === 0, 'Crunches bestaat niet meer, geen Verwijderde oefeningen');
+A(!('2026-10-20' in db.workouts) && !('2026-10-20' in db.workoutPlanDays), 'dag met alleen onbekende sets: geen training in de app');
+A(JSON.stringify(getWorkout('2026-10-21').map(e => e.exerciseId)) === '["bench-press"]' && getSessionNote('2026-10-21') === 'Zwaar', 'gemengde dag: alleen Bench Press, notitie blijft');
+A(JSON.stringify(Object.keys(db.unknownWorkoutEntries)) === '["2026-10-20","2026-10-21"]', 'apart gezet per datum');
+A(W('2026-10-20').exercises.length === 2 && W('2026-10-20').planDays.length === 1 && W('2026-10-21').exercises.length === 2, 'Firestore niet aangeraakt bij het laden');
+setWorkout('2026-10-21', [{ ...getWorkout('2026-10-21')[0], sets: [{ weight: 100, reps: 5 }, { weight: 102.5, reps: 5 }] }]);
+A(JSON.stringify(W('2026-10-21').exercises.map(e => e.exerciseId + ':' + e.sets.length)) === '["bench-press:2","crunches:1"]' && W('2026-10-21').sessionNote === 'Zwaar', 'set loggen: Crunches-sets blijven in Firestore, notitie ook');
+setWorkout('2026-10-21', []);
+A(JSON.stringify(W('2026-10-21')) === JSON.stringify({ exercises: [{ exerciseId: 'crunches', sets: [{ weight: 0, reps: 15 }] }] }) && !('2026-10-21' in db.workouts), 'dag leeggemaakt: alleen de Crunches-sets blijven bewaard');
+setWorkout('2026-10-20', [{ exerciseId: 'squat', sets: [{ weight: 120, reps: 5 }] }]);
+A(JSON.stringify(W('2026-10-20').exercises.map(e => e.exerciseId)) === '["squat","crunches","plank"]', 'nieuwe set op een dag met alleen onbekende sets: erbij, de rest blijft');
+setWorkout('2026-10-25', [{ exerciseId: 'squat', sets: [{ weight: 1, reps: 1 }] }]); setWorkout('2026-10-25', []);
+A(W('2026-10-25') === undefined, 'gewone dag leegmaken verwijdert het document nog steeds');
+A(!aiExerciseNameList().split('\n').some(n => /^(Crunches|Plank|Sit-ups|Hanging leg raises)$/.test(n)) && JSON.stringify(aiPlanDaysToIds([{ name: 'Core', exercises: [{ name: 'Crunches', sets: 3, reps: 20 }] }])) === JSON.stringify([{ name: 'Core', exercises: [] }]), 'AI: niet in de lijst, als antwoord weggelaten');
 
 console.test('\n# Oude namen, sjablonen, AI');
-A(builtinByName('Lat pulldown').id === 'lat-pulldown' && builtinByName('Pulldown - Wide Grip').id === 'lat-pulldown' && builtinByName('Snatch') === null, 'oude en nieuwe naam gevonden, verwijderde niet');
+A(builtinByName('Lat pulldown').id === 'lat-pulldown' && builtinByName('Pulldown - Wide Grip').id === 'lat-pulldown' && builtinByName('Snatch') === null && builtinByName('Crunches') === null, 'oude en nieuwe naam gevonden, verwijderde niet');
 A(PLAN_PRESETS.every(p => p.days.every(d => d.exercises.every(e => visible.some(b => b.id === e.exerciseId)))), 'alle sjabloonoefeningen bestaan en zijn zichtbaar');
-A(!aiExerciseNameList().split('\n').includes('Plank') && aiExerciseNameList().split('\n').includes('Bench Press - Close Grip'), 'AI-lijst: nieuwe namen, geen verborgen');
+A(aiExerciseNameList().split('\n').includes('Bench Press - Close Grip') && aiExerciseNameList().split('\n').length === 114, 'AI-lijst: de 113 ingebouwde (nieuwe namen) en Mijn row');
 const ai = aiPlanDaysToIds([{ name: 'Pull', exercises: [{ name: 'Barbell Row - Overhand', sets: 3, reps: 8 }, { name: 'Bent-over barbell row', sets: 3, reps: 8 }] }]);
 A(JSON.stringify(ai[0].exercises) === JSON.stringify([{ exerciseId: 'bent-over-barbell-row', sets: 3, reps: 8 }]), 'AI-naam naar id, oude naam niet geraden');
 `;

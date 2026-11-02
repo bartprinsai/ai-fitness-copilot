@@ -18,7 +18,7 @@ const fStore = firebase.firestore();
 let currentUser = null;
 
 // -- In-memory state ------------------------------------
-let db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, workoutPlanDays: {}, favoriteExercises: {}, hiddenBuiltins: {}, exerciseInfo: {}, plateInventory: {}, plateOnBar: {}, categories: { names: {}, custom: [], deleted: [] }, scheduleVersions: {}, weekCycle: {}, sleep: {}, bodyWeight: {} };
+let db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, workoutPlanDays: {}, unknownWorkoutEntries: {}, favoriteExercises: {}, hiddenBuiltins: {}, exerciseInfo: {}, plateInventory: {}, plateOnBar: {}, categories: { names: {}, custom: [], deleted: [] }, scheduleVersions: {}, weekCycle: {}, sleep: {}, bodyWeight: {} };
 
 // -- Home selection mode state --------------------------
 // Fitness Tracker's long-press selection mode (see createSelectionMode).
@@ -151,17 +151,11 @@ function persistFailed(e) {
 // built-in's id overrides that built-in. A deleted entry stays as { …, deleted: true } so a
 // plan day that still lists it keeps its name.
 function newExerciseId() { return 'ex-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
-// A built-in is hidden when the user deleted it (db.hiddenBuiltins[id] true) or when it's
-// `hidden` in EXERCISE_DB (taken out of the list) and the user didn't put it back
-// (db.hiddenBuiltins[id] false, stored as `shown` in meta/hidden_builtins).
-function isBuiltinHidden(b) {
-  const h = (db.hiddenBuiltins || {})[b.id];
-  return h === undefined ? !!b.hidden : h;
-}
 function allExercises() {
   const custom = db.custom_exercises || [];
   const customIds = new Set(custom.map(e => e.id));
-  const builtins = EXERCISE_DB.filter(e => !isBuiltinHidden(e) && !customIds.has(e.id));
+  const hidden = db.hiddenBuiltins || {};
+  const builtins = EXERCISE_DB.filter(e => !hidden[e.id] && !customIds.has(e.id));
   return [...builtins, ...custom.filter(e => !e.deleted).map(e => ({ ...e, custom: true }))];
 }
 // Any exercise by id, deleted ones included, or null.
@@ -332,13 +326,40 @@ function migrateCustomExerciseCategories() {
 // -- Firestore persistence ------------------------------
 function uDoc(path) { return fStore.doc('users/' + currentUser.uid + '/' + path); }
 
+// The day's entries of exercises that no longer exist (setAsideUnknownExercises()) go along
+// unchanged, so Firestore keeps them. A day that's empty in the app but has such entries keeps
+// only those (not its note or plan day, like a deleted document).
 async function persistWorkout(date, exercises) {
   if (!currentUser) return;
-  if (!exercises || exercises.length === 0) {
+  const unknown = (db.unknownWorkoutEntries || {})[date] || [];
+  if ((!exercises || exercises.length === 0) && !unknown.length) {
     uDoc('workouts/' + date).delete().catch(persistFailed);
+  } else if (!exercises || exercises.length === 0) {
+    uDoc('workouts/' + date).set({ exercises: unknown }).catch(persistFailed);
   } else {
-    uDoc('workouts/' + date).set({ exercises }, { merge: true }).catch(persistFailed);
+    uDoc('workouts/' + date).set({ exercises: [...exercises, ...unknown] }, { merge: true }).catch(persistFailed);
   }
+}
+// Logged entries whose exercise doesn't exist (any more: a built-in taken out of EXERCISE_DB) are
+// skipped everywhere — Fitness Tracker, history, calendar, records, Graph, Inzicht, AI — by taking
+// them out of db.workouts once at load, into db.unknownWorkoutEntries ({ date: [entries] }). They
+// stay as they are in Firestore (persistWorkout() writes them back). A day with only such entries
+// is no training day in the app.
+function setAsideUnknownExercises() {
+  db.unknownWorkoutEntries = {};
+  Object.keys(db.workouts).forEach(date => {
+    const all = db.workouts[date] || [];
+    const known = all.filter(e => findExercise(e.exerciseId));
+    if (known.length === all.length) return;
+    db.unknownWorkoutEntries[date] = all.filter(e => !findExercise(e.exerciseId));
+    if (known.length) db.workouts[date] = known;
+    else {
+      delete db.workouts[date];
+      if (db.workoutPlanDays) delete db.workoutPlanDays[date];
+    }
+  });
+  const n = Object.values(db.unknownWorkoutEntries).reduce((t, l) => t + l.length, 0);
+  if (n) console.warn('[Load] logged entries of exercises that no longer exist, skipped:', n, Object.keys(db.unknownWorkoutEntries));
 }
 function getSessionNote(date) { return (db.sessionNotes || {})[date] || ''; }
 function saveSessionNote(date, note) {
@@ -370,15 +391,9 @@ function toggleFavoriteExercise(id) {
   persistFavorites();
   return next;
 }
-// meta/hidden_builtins: `ids` deleted built-ins, `shown` built-ins hidden in EXERCISE_DB that the
-// user put back (see isBuiltinHidden()).
-function hiddenBuiltinsDoc() {
-  const h = db.hiddenBuiltins || {};
-  return { ids: Object.keys(h).filter(id => h[id]), shown: Object.keys(h).filter(id => !h[id]) };
-}
 async function persistHiddenBuiltins() {
   if (!currentUser) return;
-  uDoc('meta/hidden_builtins').set(hiddenBuiltinsDoc()).catch(persistFailed);
+  uDoc('meta/hidden_builtins').set({ ids: Object.keys(db.hiddenBuiltins || {}) }).catch(persistFailed);
 }
 async function persistExerciseInfo() {
   if (!currentUser) return;
@@ -459,9 +474,7 @@ async function loadUserData(userUid) {
     }
     db.hiddenBuiltins = {};
     if (hiddenBuiltinsSnap.exists) {
-      (hiddenBuiltinsSnap.data().ids || hiddenBuiltinsSnap.data().names || []).forEach(key => { db.hiddenBuiltins[key] = true; });
-      (hiddenBuiltinsSnap.data().shown || []).forEach(id => { db.hiddenBuiltins[id] = false; });
-    }
+      (hiddenBuiltinsSnap.data().ids || hiddenBuiltinsSnap.data().names || []).forEach(key => { db.hiddenBuiltins[key] = true; });    }
     db.exerciseInfo = exerciseInfoSnap.exists ? (exerciseInfoSnap.data().data || {}) : {};
     if (stripLegacyMuscleFields()) persistExerciseInfo();
     db.plateInventory = plateInventorySnap.exists ? (plateInventorySnap.data().counts || {}) : {};
@@ -473,6 +486,8 @@ async function loadUserData(userUid) {
     if (!migrations.exerciseIds) await migrateExerciseIds(userUid);
     if (!migrations.planDays) await migratePlanDays(userUid);
     if (!migrations.builtinSubcategories) await migrateBuiltinSubcategories(userUid);
+    // After the migrations: they convert entries stored by name.
+    setAsideUnknownExercises();
     // The first run stores today's schedule (and Week A/B) as the starting point.
     await syncInsightSchedule();
     console.log('[Load] loadUserData finished OK');
@@ -576,7 +591,7 @@ async function migrateExerciseIds(userUid) {
     ...changedPlans.map(id => [prefix + 'plans/' + id, db.plans[id]]),
     ...(report.custom ? [[prefix + 'meta/custom_exercises', { list: db.custom_exercises }]] : []),
     ...(report.favorites ? [[prefix + 'meta/favorites', { ids: Object.keys(db.favoriteExercises) }]] : []),
-    ...(report.hidden ? [[prefix + 'meta/hidden_builtins', hiddenBuiltinsDoc()]] : []),
+    ...(report.hidden ? [[prefix + 'meta/hidden_builtins', { ids: Object.keys(db.hiddenBuiltins) }]] : []),
     ...(report.info ? [[prefix + 'meta/exercise_info', { data: db.exerciseInfo }]] : []),
     ...(report.records ? [[prefix + 'meta/records', { data: db.records }]] : []),
     [prefix + 'meta/migrations', { exerciseIds: todayStr() }, { merge: true }],
@@ -1090,7 +1105,7 @@ async function initAuth() {
       console.log('[Auth] showScreen(screen-home) done');
     } else {
       console.log('[Auth] no user, showing login screen');
-      db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, workoutPlanDays: {}, favoriteExercises: {}, hiddenBuiltins: {}, scheduleVersions: {}, weekCycle: {}, sleep: {}, bodyWeight: {} };
+      db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, workoutPlanDays: {}, unknownWorkoutEntries: {}, favoriteExercises: {}, hiddenBuiltins: {}, scheduleVersions: {}, weekCycle: {}, sleep: {}, bodyWeight: {} };
       currentPlanId = null; currentPlanData = null; bannerDismissed = false;
       showScreen('screen-login');
     }
@@ -1261,7 +1276,7 @@ document.getElementById('btn-reset-confirm').addEventListener('click', async () 
       await batch.commit();
     }
 
-    db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, workoutPlanDays: {}, favoriteExercises: {}, hiddenBuiltins: {}, scheduleVersions: {}, weekCycle: {}, sleep: {}, bodyWeight: {} };
+    db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, workoutPlanDays: {}, unknownWorkoutEntries: {}, favoriteExercises: {}, hiddenBuiltins: {}, scheduleVersions: {}, weekCycle: {}, sleep: {}, bodyWeight: {} };
     currentPlanId = null;
     currentPlanData = null;
     await syncInsightSchedule(); // starts over: "geen schema" from today
@@ -6266,7 +6281,8 @@ function exerciseNameTaken(name, exceptId) {
 function deletedExercises() {
   const custom = db.custom_exercises || [];
   const customIds = new Set(custom.map(e => e.id));
-  return [...custom.filter(e => e.deleted), ...EXERCISE_DB.filter(e => isBuiltinHidden(e) && !customIds.has(e.id))];
+  const hidden = db.hiddenBuiltins || {};
+  return [...custom.filter(e => e.deleted), ...EXERCISE_DB.filter(e => hidden[e.id] && !customIds.has(e.id))];
 }
 function deletedExerciseNameTaken(name) {
   const n = name.toLowerCase();
@@ -6428,10 +6444,8 @@ function restoreExercise(id) {
     delete entry.deleted;
     persistCustomExercises();
   }
-  const builtin = EXERCISE_DB.find(b => b.id === id);
-  if (builtin && isBuiltinHidden(builtin)) {
-    if (builtin.hidden) (db.hiddenBuiltins || (db.hiddenBuiltins = {}))[id] = false;
-    else delete db.hiddenBuiltins[id];
+  if (db.hiddenBuiltins && db.hiddenBuiltins[id]) {
+    delete db.hiddenBuiltins[id];
     persistHiddenBuiltins();
   }
   const ex = findExercise(id);

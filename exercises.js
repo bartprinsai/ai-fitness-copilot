@@ -93,9 +93,9 @@ const BUILTIN_SUBCATEGORIES = [
 // `id` is the exercise's fixed id (kebab-case of its name when ids were introduced, October 2026,
 // or when it was added). It never changes, also not when the name or category does: plans,
 // workouts, favorites, exercise info and records all point at it. Never edit an existing id; a
-// new built-in gets a new, unique one. A built-in that's taken out of the list while logged sets
-// still point at it stays here with `hidden: true`: hidden like a deleted built-in (see
-// isBuiltinHidden() in app.js), so its history keeps its name and it can be put back.
+// new built-in gets a new, unique one. A built-in can be taken out of the list: logged sets that
+// still point at its id are then skipped everywhere in the app (setAsideUnknownExercises() in
+// app.js) and kept as they are in Firestore.
 const EXERCISE_DB = [
   { id: "bench-press", category: "chest", subcategory: "sub-bench-press", name: "Bench Press" },
   { id: "close-grip-bench-press", category: "chest", subcategory: "sub-bench-press", name: "Bench Press - Close Grip" },
@@ -236,12 +236,6 @@ const EXERCISE_DB = [
   { id: "stairmaster", category: "cardio", name: "Stairmaster" },
   { id: "hiit", category: "cardio", name: "HIIT" },
   { id: "swimming", category: "cardio", name: "Swimming" },
-
-  // Taken out of the list (November 2026) while logged sets still point at them: hidden, see above.
-  { id: "crunches", category: "abs", name: "Crunches", hidden: true },
-  { id: "sit-ups", category: "abs", name: "Sit-ups", hidden: true },
-  { id: "plank", category: "abs", name: "Plank", hidden: true },
-  { id: "hanging-leg-raises", category: "abs", name: "Hanging leg raises", hidden: true },
 ];
 
 // What the renamed or moved built-ins were called / where they were before the indeling in

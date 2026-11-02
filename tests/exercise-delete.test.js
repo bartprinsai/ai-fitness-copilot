@@ -22,8 +22,6 @@ const DATA = {
     q: { id: 'q', name: 'Ander plan', days: [{ id: 'd2', name: 'Dag 1', exercises: [{ exerciseId: 'ex-mijn', sets: 2, reps: 10 }] }] },
   },
   activePlan: { planId: 'p', planName: 'Plan', lastDayIndex: -1 },
-  // The built-ins hidden in EXERCISE_DB (`hidden: true`) put back, so the list starts empty.
-  hiddenBuiltins: { crunches: false, 'sit-ups': false, plank: false, 'hanging-leg-raises': false },
 };
 
 H.run(async () => {
