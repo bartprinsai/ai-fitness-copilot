@@ -96,7 +96,7 @@ H.run(async () => {
       rows: [...document.querySelectorAll('.deleted-ex-row')].map(r => [r.querySelector('.deleted-ex-name').textContent, r.querySelector('.deleted-ex-meta').textContent, r.querySelectorAll('.row-icon-btn').length]),
       tap: [...document.querySelectorAll('.row-icon-btn')].map(b => { const r = b.getBoundingClientRect(); return r.width + 'x' + r.height; }),
     }));
-    if (full) H.check('scherm met ingebouwde oefening', scr, { active: true, rows: [['Bench Press', 'Borst · ingebouwd', 1]], tap: ['48x48'] });
+    if (full) H.check('scherm met ingebouwde oefening: alleen de categorie, terugzetten en permanent verwijderen', scr, { active: true, rows: [['Bench Press', 'Borst', 2]], tap: ['48x48', '48x48'] });
     await page.click('.deleted-ex-restore'); await H.settle(page);
     const afterRestore = await page.evaluate(() => ({
       empty: document.getElementById('deleted-ex-list').innerText.trim(),
@@ -110,14 +110,14 @@ H.run(async () => {
     await H.settle(page);
     await shot(page, `deleted-empty-${tag}`);
 
-    // ── 3. Twee verwijderd: ingebouwd + eigen; alleen de eigen kan permanent weg
+    // ── 3. Twee verwijderd: ingebouwd + eigen, allebei dezelfde rij (geen label, beide knoppen)
     await page.evaluate(() => {
       for (const id of ['bench-press', 'ex-mijn']) { openDeleteExerciseConfirm(allExercises().find(e => e.id === id)); document.getElementById('btn-delete-ex-confirm').click(); }
       openDeletedExercises();
     });
     await page.waitForFunction(() => !document.getElementById('toast').classList.contains('show')); await H.settle(page); // the toast has gone
     const two = await page.evaluate(() => [...document.querySelectorAll('.deleted-ex-row')].map(r => [r.querySelector('.deleted-ex-name').textContent, r.querySelector('.deleted-ex-meta').textContent, [...r.querySelectorAll('.row-icon-btn')].map(b => b.getAttribute('aria-label') + ' ' + b.getBoundingClientRect().width + 'x' + b.getBoundingClientRect().height)]));
-    H.check(`${tag} twee rijen (ingebouwd zonder Permanent verwijderen)`, two, [['Bench Press', 'Borst · ingebouwd', ['Terugzetten 48x48']], ['Mijn press', 'Borst · eigen oefening', ['Terugzetten 48x48', 'Permanent verwijderen 48x48']]]);
+    H.check(`${tag} twee rijen, ingebouwd en eigen gelijk`, two, [['Bench Press', 'Borst', ['Terugzetten 48x48', 'Permanent verwijderen 48x48']], ['Mijn press', 'Borst', ['Terugzetten 48x48', 'Permanent verwijderen 48x48']]]);
     const fits = await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth && [...document.querySelectorAll('.deleted-ex-row')].every(r => r.scrollWidth <= r.clientWidth));
     H.check(`${tag} past in breedte`, fits, true);
     await shot(page, `deleted-screen-${tag}`);
@@ -196,7 +196,8 @@ H.run(async () => {
     }
 
     // ── 4. Permanent verwijderen (eigen oefening), met vinkje
-    await page.click('.deleted-ex-purge'); await H.settle(page);
+    const purgeBtn = name => `.deleted-ex-row:has(.deleted-ex-name:text-is("${name}")) .deleted-ex-purge`;
+    await page.click(purgeBtn('Mijn press')); await H.settle(page);
     const pp = await page.evaluate(() => {
       const p = document.querySelector('#purge-exercise-overlay .overlay-panel');
       return { msg: document.getElementById('purge-ex-msg').innerText, title: document.querySelector('#purge-exercise-overlay h3').textContent,
@@ -237,8 +238,35 @@ H.run(async () => {
     });
     H.check(`${tag} zelfde naam opnieuw`, again, { toast: 'Oefening aangemaakt', zichtbaar: true });
 
-    // ── 6. De rij verdwijnt als er niets meer verwijderd is
-    const last = await page.evaluate(() => { restoreExercise('bench-press'); exerciseBrowserMode = 'categories'; renderCategoryBrowser(); return !!document.getElementById('exercises-deleted-row'); });
+    // ── 6. Permanent verwijderen van een ingebouwde oefening: dezelfde knop, pop-up en gevolgen,
+    // en het id op meta/purged_builtins (zie de vm-test builtin-exercises voor laden en migraties)
+    await page.evaluate(() => openDeletedExercises()); await H.settle(page);
+    await page.click(purgeBtn('Bench Press')); await H.settle(page);
+    H.check(`${tag} pop-up permanent, ingebouwd`, await page.evaluate(() => document.getElementById('purge-ex-msg').innerText),
+      'Bench Press en alle gelogde sets, records en info worden definitief gewist, en de oefening verdwijnt uit je plannen. Ook je overzichten in Inzicht veranderen daardoor met terugwerkende kracht.');
+    await page.check('#purge-ex-confirm-check');
+    await page.click('#btn-purge-ex-confirm'); await H.settle(page);
+    const pb = await page.evaluate(() => ({
+      oefening: findExercise('bench-press'), bewerkt: db.custom_exercises.some(e => e.id === 'bench-press'),
+      workouts: Object.keys(db.workouts), records: 'bench-press' in db.records, info: 'bench-press' in db.exerciseInfo, favoriet: isFavoriteExercise('bench-press'),
+      plannen: Object.values(db.plans).map(pl => pl.days.map(d => d.exercises.map(e => e.exerciseId))),
+      lijst: { purged: db.purgedBuiltins, hidden: 'bench-press' in db.hiddenBuiltins },
+      nergens: !allExercises().some(e => e.id === 'bench-press') && !deletedExercises().some(e => e.id === 'bench-press') && !aiExerciseNameList().split('\n').includes('Bench Press')
+        && !sortByName(exercisesInCategory('chest')).some(e => e.name === 'Bench Press'),
+      scherm: [...document.querySelectorAll('.deleted-ex-name')].map(n => n.textContent),
+    }));
+    H.check(`${tag} ingebouwde permanent verwijderd`, { ...pb, toast: (await state()).toast }, {
+      oefening: null, bewerkt: false, workouts: [], records: false, info: false, favoriet: false, plannen: [[[]], [[]]],
+      lijst: { purged: { 'bench-press': true }, hidden: false }, nergens: true, scherm: [], toast: 'Bench Press is permanent verwijderd' });
+    const free = await page.evaluate(() => {
+      showScreen('screen-exercises'); pendingEditExerciseId = null; setFieldBtnValue('new-ex-category', 'chest');
+      document.getElementById('new-ex-name').value = 'Bench Press'; saveNewExerciseFromScreen();
+      return { toast: document.getElementById('toast-msg').textContent, eigen: allExercises().filter(e => e.name === 'Bench Press').map(e => /^ex-/.test(e.id)) };
+    });
+    H.check(`${tag} naam van de ingebouwde is vrij voor een eigen oefening`, free, { toast: 'Oefening aangemaakt', eigen: [true] });
+
+    // ── 7. De rij verdwijnt als er niets meer verwijderd is
+    const last = await page.evaluate(() => { exerciseBrowserMode = 'categories'; renderCategoryBrowser(); return !!document.getElementById('exercises-deleted-row'); });
     H.check(`${tag} rij weg bij lege lijst`, last, false);
 
     await browser.close();

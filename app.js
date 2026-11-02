@@ -18,7 +18,7 @@ const fStore = firebase.firestore();
 let currentUser = null;
 
 // -- In-memory state ------------------------------------
-let db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, workoutPlanDays: {}, unknownWorkoutEntries: {}, favoriteExercises: {}, hiddenBuiltins: {}, exerciseInfo: {}, plateInventory: {}, plateOnBar: {}, categories: { names: {}, custom: [], deleted: [] }, scheduleVersions: {}, weekCycle: {}, sleep: {}, bodyWeight: {} };
+let db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, workoutPlanDays: {}, unknownWorkoutEntries: {}, favoriteExercises: {}, hiddenBuiltins: {}, purgedBuiltins: {}, exerciseInfo: {}, plateInventory: {}, plateOnBar: {}, categories: { names: {}, custom: [], deleted: [] }, scheduleVersions: {}, weekCycle: {}, sleep: {}, bodyWeight: {} };
 
 // -- Home selection mode state --------------------------
 // Fitness Tracker's long-press selection mode (see createSelectionMode).
@@ -150,26 +150,51 @@ function persistFailed(e) {
 // db.custom_exercises holds self-added exercises AND edited built-ins: an entry with a
 // built-in's id overrides that built-in. A deleted entry stays as { …, deleted: true } so a
 // plan day that still lists it keeps its name.
+// Built-ins and own exercises are treated alike everywhere the user can see; the differences
+// are only in where they're stored (see PROJECT_CONTEXT.md, "Oefening-id's").
 function newExerciseId() { return 'ex-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+// The built-ins this user can have:
+//  - not permanently deleted (db.purgedBuiltins, meta/purged_builtins; only Alles resetten
+//    empties that list), and
+//  - not one with the same name (case-insensitive) as an entry of the user's own in
+//    db.custom_exercises with another id. That happens when an update adds a built-in with the
+//    name of an own exercise: the own exercise keeps the name and its history, the built-in
+//    stays out, nothing is merged. Renaming or permanently deleting the own one brings it in.
+function availableBuiltins() {
+  const purged = db.purgedBuiltins || {};
+  const custom = db.custom_exercises || [];
+  return EXERCISE_DB.filter(b => {
+    if (purged[b.id]) return false;
+    const n = b.name.toLowerCase();
+    return !custom.some(e => e.id !== b.id && e.name.toLowerCase() === n);
+  });
+}
 function allExercises() {
   const custom = db.custom_exercises || [];
   const customIds = new Set(custom.map(e => e.id));
   const hidden = db.hiddenBuiltins || {};
-  const builtins = EXERCISE_DB.filter(e => !hidden[e.id] && !customIds.has(e.id));
-  return [...builtins, ...custom.filter(e => !e.deleted).map(e => ({ ...e, custom: true }))];
+  const builtins = availableBuiltins().filter(e => !hidden[e.id] && !customIds.has(e.id));
+  return [...builtins, ...custom.filter(e => !e.deleted)];
 }
-// Any exercise by id, deleted ones included, or null.
+// Any exercise by id, deleted ones included, or null. A permanently deleted one is gone.
 function findExercise(id) {
-  return (db.custom_exercises || []).find(e => e.id === id) || EXERCISE_DB.find(e => e.id === id) || null;
+  return (db.custom_exercises || []).find(e => e.id === id) || EXERCISE_DB.find(e => e.id === id && !(db.purgedBuiltins || {})[id]) || null;
 }
 function exerciseName(id) {
   const ex = findExercise(id);
   return ex ? ex.name : '';
 }
+// Text for inside innerHTML or an attribute: an exercise name is typed by the user, so "<", "&"
+// or a quote in it must show as itself. Wherever a name goes in as text (textContent) this isn't needed.
+function escapeHtml(text) {
+  return String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
 // The built-in with this exact name, its current one or the one it had before (BUILTIN_PREVIOUS),
 // or null. Only for data stored by name before exercises had an id (the one-time migrations).
+// A permanently deleted built-in is never found: a migration must not bring it back.
 function builtinByName(name) {
-  return EXERCISE_DB.find(b => b.name === name) || EXERCISE_DB.find(b => (BUILTIN_PREVIOUS[b.id] || {}).name === name) || null;
+  const builtins = EXERCISE_DB.filter(b => !(db.purgedBuiltins || {})[b.id]);
+  return builtins.find(b => b.name === name) || builtins.find(b => (BUILTIN_PREVIOUS[b.id] || {}).name === name) || null;
 }
 
 // -- Categories -----------------------------------------
@@ -395,6 +420,10 @@ async function persistHiddenBuiltins() {
   if (!currentUser) return;
   uDoc('meta/hidden_builtins').set({ ids: Object.keys(db.hiddenBuiltins || {}) }).catch(persistFailed);
 }
+async function persistPurgedBuiltins() {
+  if (!currentUser) return;
+  uDoc('meta/purged_builtins').set({ ids: Object.keys(db.purgedBuiltins || {}) }).catch(persistFailed);
+}
 async function persistExerciseInfo() {
   if (!currentUser) return;
   uDoc('meta/exercise_info').set({ data: db.exerciseInfo || {} }).catch(persistFailed);
@@ -426,8 +455,8 @@ async function persistPlateOnBar() {
 async function loadUserData(userUid) {
   console.log('[Load] loadUserData start, uid:', userUid);
   try {
-    console.log('[Load] firing Promise.all for 16 Firestore reads...');
-    const [workoutsSnap, recordsSnap, customSnap, plansSnap, activePlanSnap, favoritesSnap, hiddenBuiltinsSnap, exerciseInfoSnap, plateInventorySnap, plateOnBarSnap, categoriesSnap, migrationsSnap, scheduleVersionsSnap, weekCycleSnap, sleepSnap, bodyWeightSnap] = await Promise.all([
+    console.log('[Load] firing Promise.all for 17 Firestore reads...');
+    const [workoutsSnap, recordsSnap, customSnap, plansSnap, activePlanSnap, favoritesSnap, hiddenBuiltinsSnap, exerciseInfoSnap, plateInventorySnap, plateOnBarSnap, categoriesSnap, migrationsSnap, scheduleVersionsSnap, weekCycleSnap, sleepSnap, bodyWeightSnap, purgedBuiltinsSnap] = await Promise.all([
       fStore.collection('users/' + userUid + '/workouts').get(),
       fStore.doc('users/' + userUid + '/meta/records').get(),
       fStore.doc('users/' + userUid + '/meta/custom_exercises').get(),
@@ -444,6 +473,7 @@ async function loadUserData(userUid) {
       fStore.collection('users/' + userUid + '/week_cycle').get(),
       fStore.collection('users/' + userUid + '/sleep').get(),
       fStore.collection('users/' + userUid + '/body_weight').get(),
+      fStore.doc('users/' + userUid + '/meta/purged_builtins').get(),
     ]);
     console.log('[Load] Promise.all resolved, exerciseInfoSnap.exists:', exerciseInfoSnap.exists);
     db.workouts = {};
@@ -474,7 +504,10 @@ async function loadUserData(userUid) {
     }
     db.hiddenBuiltins = {};
     if (hiddenBuiltinsSnap.exists) {
-      (hiddenBuiltinsSnap.data().ids || hiddenBuiltinsSnap.data().names || []).forEach(key => { db.hiddenBuiltins[key] = true; });    }
+      (hiddenBuiltinsSnap.data().ids || hiddenBuiltinsSnap.data().names || []).forEach(key => { db.hiddenBuiltins[key] = true; });
+    }
+    db.purgedBuiltins = {};
+    if (purgedBuiltinsSnap.exists) (purgedBuiltinsSnap.data().ids || []).forEach(id => { db.purgedBuiltins[id] = true; });
     db.exerciseInfo = exerciseInfoSnap.exists ? (exerciseInfoSnap.data().data || {}) : {};
     if (stripLegacyMuscleFields()) persistExerciseInfo();
     db.plateInventory = plateInventorySnap.exists ? (plateInventorySnap.data().counts || {}) : {};
@@ -531,7 +564,7 @@ async function migrateExerciseIds(userUid) {
   // Custom entries last: one with a built-in's name is that (edited) built-in. A built-in's
   // previous name (BUILTIN_PREVIOUS) goes first: the data being converted is from before.
   const previousNames = Object.entries(BUILTIN_PREVIOUS).filter(([, p]) => p.name).map(([id, p]) => ({ id, name: p.name }));
-  const idByName = new Map([...previousNames, ...EXERCISE_DB, ...(db.custom_exercises || [])].map(e => [e.name, e.id]));
+  const idByName = new Map([...previousNames.filter(p => !(db.purgedBuiltins || {})[p.id]), ...EXERCISE_DB.filter(b => !(db.purgedBuiltins || {})[b.id]), ...(db.custom_exercises || [])].map(e => [e.name, e.id]));
 
   const convertEntries = (entries, where) => {
     let changed = false;
@@ -1105,7 +1138,7 @@ async function initAuth() {
       console.log('[Auth] showScreen(screen-home) done');
     } else {
       console.log('[Auth] no user, showing login screen');
-      db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, workoutPlanDays: {}, unknownWorkoutEntries: {}, favoriteExercises: {}, hiddenBuiltins: {}, scheduleVersions: {}, weekCycle: {}, sleep: {}, bodyWeight: {} };
+      db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, workoutPlanDays: {}, unknownWorkoutEntries: {}, favoriteExercises: {}, hiddenBuiltins: {}, purgedBuiltins: {}, scheduleVersions: {}, weekCycle: {}, sleep: {}, bodyWeight: {} };
       currentPlanId = null; currentPlanData = null; bannerDismissed = false;
       showScreen('screen-login');
     }
@@ -1194,6 +1227,8 @@ document.getElementById('btn-overflow-exercises').addEventListener('click', e =>
 //   - users/{uid}/meta/records           (PR records)
 //   - users/{uid}/meta/custom_exercises  (self-added exercises)
 //   - users/{uid}/meta/activeplan        (active plan pointer)
+//   - users/{uid}/meta/favorites, meta/hidden_builtins
+//   - users/{uid}/meta/purged_builtins   (permanently deleted built-ins: back to standard brings them back)
 //   - users/{uid}/meta/categories        (renamed/added/deleted categories)
 let resetInProgress = false;
 
@@ -1256,6 +1291,7 @@ document.getElementById('btn-reset-confirm').addEventListener('click', async () 
       fStore.doc(userPrefix + 'meta/activeplan'),
       fStore.doc(userPrefix + 'meta/favorites'),
       fStore.doc(userPrefix + 'meta/hidden_builtins'),
+      fStore.doc(userPrefix + 'meta/purged_builtins'),
       fStore.doc(userPrefix + 'meta/categories'),
     ];
 
@@ -1276,7 +1312,7 @@ document.getElementById('btn-reset-confirm').addEventListener('click', async () 
       await batch.commit();
     }
 
-    db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, workoutPlanDays: {}, unknownWorkoutEntries: {}, favoriteExercises: {}, hiddenBuiltins: {}, scheduleVersions: {}, weekCycle: {}, sleep: {}, bodyWeight: {} };
+    db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, workoutPlanDays: {}, unknownWorkoutEntries: {}, favoriteExercises: {}, hiddenBuiltins: {}, purgedBuiltins: {}, scheduleVersions: {}, weekCycle: {}, sleep: {}, bodyWeight: {} };
     currentPlanId = null;
     currentPlanData = null;
     await syncInsightSchedule(); // starts over: "geen schema" from today
@@ -1380,7 +1416,7 @@ function renderHome() {
     const header = document.createElement('div');
     header.className = 'exercise-card-header';
     header.innerHTML = `
-      <div class="exercise-card-name">${exerciseName(ex.exerciseId)}</div>
+      <div class="exercise-card-name">${escapeHtml(exerciseName(ex.exerciseId))}</div>
       <div class="exercise-card-drag-handle" aria-label="Sleep om te verplaatsen">
         <svg viewBox="0 0 24 24"><path d="M3 15h18v-2H3v2zm0 4h18v-2H3v2zm0-8h18V9H3v2zm0-6v2h18V5H3z"/></svg>
       </div>`;
@@ -2904,7 +2940,7 @@ function insightChartSvg(width, o) {
   const yAt = v => INSIGHT_CHART_TOP + (1 - (v - o.lo) / (o.hi - o.lo)) * (plotB - INSIGHT_CHART_TOP);
   const crisp = y => Math.round(y) + 0.5;
   const hline = (y, cls) => `<line class="${cls}" x1="${x0}" x2="${W}" y1="${crisp(y)}" y2="${crisp(y)}"/>`;
-  let svg = `<svg class="insight-chart-svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${o.aria}">`;
+  let svg = `<svg class="insight-chart-svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${escapeHtml(o.aria)}">`;
   if (o.base !== undefined) svg += hline(yAt(o.base), 'insight-chart-grid');
   o.ticks.forEach(t => {
     svg += hline(yAt(t.v), 'insight-chart-grid');
@@ -3209,9 +3245,9 @@ function insightMuscleRowLines(r, dayStats) {
     return features ? `<div class="role-sub">${features}</div>` : '';
   }
   const done = Object.entries(dayStats.doneEx).filter(([ex]) => insightMuscleRowId(ex) === r.id)
-    .map(([ex, f]) => `<div class="role-sub">${insightExerciseLine(ex, f)}</div>`);
+    .map(([ex, f]) => `<div class="role-sub">${escapeHtml(insightExerciseLine(ex, f))}</div>`);
   const notDone = insightPlannedNotDone(r, dayStats), missed = [...notDone.missed, ...notDone.today];
-  return done.join('') + (missed.length ? `<div class="role-sub insight-muted">Gepland: ${missed.map(([ex, p]) => exerciseName(ex) || p.name).join(', ')}</div>` : '');
+  return done.join('') + (missed.length ? `<div class="role-sub insight-muted">Gepland: ${escapeHtml(missed.map(([ex, p]) => exerciseName(ex) || p.name).join(', '))}</div>` : '');
 }
 document.getElementById('btn-back-insight-training').addEventListener('click', () => goBack('screen-insight'));
 document.getElementById('insight-training-body').addEventListener('click', e => {
@@ -3246,11 +3282,11 @@ function renderInsightMuscle() {
   const missed = notDone.missed.sort(bySets), today = notDone.today.sort(bySets);
   const exRows = done.map(([ex, f]) => {
     const features = insightFeaturesText(f);
-    return insightListRowHtml(`<div class="role-row">${exerciseName(ex)}</div>${features ? `<div class="role-sub">${features}</div>` : ''}`, insightSetsFigureHtml(f.sets));
+    return insightListRowHtml(`<div class="role-row">${escapeHtml(exerciseName(ex))}</div>${features ? `<div class="role-sub">${features}</div>` : ''}`, insightSetsFigureHtml(f.sets));
   }).concat(missed.map(([ex, p]) => insightListRowHtml(
-    `<div class="role-row insight-muted">${exerciseName(ex) || p.name}</div><div class="role-sub">Gepland · ${insightPlural(p.sets, 'set', 'sets')}</div>`)),
+    `<div class="role-row insight-muted">${escapeHtml(exerciseName(ex) || p.name)}</div><div class="role-sub">Gepland · ${insightPlural(p.sets, 'set', 'sets')}</div>`)),
   today.map(([ex, p]) => insightListRowHtml(
-    `<div class="role-row insight-muted">${exerciseName(ex) || p.name}</div><div class="role-sub">Vandaag gepland · ${insightPlural(p.sets, 'set', 'sets')}</div>`)));
+    `<div class="role-row insight-muted">${escapeHtml(exerciseName(ex) || p.name)}</div><div class="role-sub">Vandaag gepland · ${insightPlural(p.sets, 'set', 'sets')}</div>`)));
   // MEEGETRAIND: done with this group as a secondary one; left out when there is none.
   const secondary = id ? Object.entries(stats.doneEx).filter(([ex]) => {
     const info = getExerciseInfo(ex);
@@ -3258,7 +3294,7 @@ function renderInsightMuscle() {
   }).sort(bySets) : [];
   const secRows = secondary.map(([ex, f]) => {
     const primary = insightMuscleRowId(ex);
-    return insightListRowHtml(`<div class="role-row">${exerciseName(ex)}</div><div class="role-sub">Primair: ${primary ? muscleGroupName(primary) : 'niet ingesteld'}</div>`, insightSetsFigureHtml(f.sets));
+    return insightListRowHtml(`<div class="role-row">${escapeHtml(exerciseName(ex))}</div><div class="role-sub">Primair: ${primary ? muscleGroupName(primary) : 'niet ingesteld'}</div>`, insightSetsFigureHtml(f.sets));
   });
   document.getElementById('insight-muscle-body').innerHTML = insightFeaturesSummaryHtml(r.features, note)
     + '<div class="section-label insight-label">Oefeningen</div>'
@@ -3528,7 +3564,7 @@ function renderInsightCategory() {
     const chart = insightStrengthChartHtml(`insight-category-chart-${e.id}`, insightPctChartOptions(insightCategoryLine([series.map(p => p && p.value)]), labels, `${name}, verandering`),
       count, `Pas één ${insightStrengthUnit(r)} getraind`);
     return `<div class="card insight-strength-card" data-insight-exercise-card="${e.id}">`
-      + insightStrengthHeadHtml(`<div class="role-row">${e.records ? prTrophySvg('insight-pr') : ''}${name}</div>`, figure, vs, false)
+      + insightStrengthHeadHtml(`<div class="role-row">${e.records ? prTrophySvg('insight-pr') : ''}${escapeHtml(name)}</div>`, figure, vs, false)
       // With Sterkst/Zwakst: the chart and those two in one .divided-list, for the line between them.
       + (extremes ? '<div class="divided-list">' + chart + extremes + '</div>' : chart) + '</div>';
   }).join('') + '</div>';
@@ -4137,7 +4173,7 @@ function renderExerciseGroup(list, group, items) {
 
 function renderFavoriteExercises() {
   const list = exerciseListCard();
-  const favs = allExercises().filter(e => isFavoriteExercise(e.id));
+  const favs = sortByName(allExercises().filter(e => isFavoriteExercise(e.id)));
   if (favs.length === 0) {
     document.getElementById('exercise-list').innerHTML = `<div class="exercise-empty">Nog geen favorieten</div>`;
     return;
@@ -4147,11 +4183,11 @@ function renderFavoriteExercises() {
 
 function renderExerciseSearchResults(q) {
   const list = exerciseListCard();
-  // Flat, over all categories (no groups); a subcategory name also finds its exercises.
-  const filtered = allExercises().filter(e => {
+  // Flat, over all categories (no groups), by name; a subcategory name also finds its exercises.
+  const filtered = sortByName(allExercises().filter(e => {
     const sub = exerciseSubcategory(e);
     return e.name.toLowerCase().includes(q) || (sub && sub.name.toLowerCase().includes(q));
-  });
+  }));
   if (filtered.length === 0) {
     document.getElementById('exercise-list').innerHTML = `<div class="exercise-empty">Geen oefeningen gevonden</div>`;
     return;
@@ -4175,13 +4211,13 @@ function renderExerciseItem(list, ex) {
   const item = document.createElement('div');
   const isPlanAddMode = exerciseScreenMode === 'plan-add';
   const inPlanDay = isPlanAddMode && planDayHasExercise(ex.id);
-  item.className = 'exercise-item list-row' + (ex.custom ? ' exercise-item-custom' : '') + (isPlanAddMode ? ' exercise-item-add' : '');
+  item.className = 'exercise-item list-row' + (isPlanAddMode ? ' exercise-item-add' : '');
   const isFav = isFavoriteExercise(ex.id);
   // Plan-add mode: a small stepper-style + directly left of the ⋮ menu, which turns into a
   // filled check once the exercise is in the plan day. Only the + adds; the rest of the row
   // does nothing in this mode.
   item.innerHTML = `
-    <span class="exercise-item-name">${ex.name}</span>
+    <span class="exercise-item-name">${escapeHtml(ex.name)}</span>
     ${isPlanAddMode ? `
     <button type="button" class="plate-stepper-btn ex-add-btn${inPlanDay ? ' ex-add-btn-done' : ''}" aria-label="${inPlanDay ? 'Toegevoegd' : 'Toevoegen'}"${inPlanDay ? ' disabled' : ''}>${
       inPlanDay ? `<svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>` : '+'
@@ -6282,7 +6318,7 @@ function deletedExercises() {
   const custom = db.custom_exercises || [];
   const customIds = new Set(custom.map(e => e.id));
   const hidden = db.hiddenBuiltins || {};
-  return [...custom.filter(e => e.deleted), ...EXERCISE_DB.filter(e => hidden[e.id] && !customIds.has(e.id))];
+  return [...custom.filter(e => e.deleted), ...availableBuiltins().filter(e => hidden[e.id] && !customIds.has(e.id))];
 }
 function deletedExerciseNameTaken(name) {
   const n = name.toLowerCase();
@@ -6376,7 +6412,7 @@ document.getElementById('btn-delete-ex-confirm').addEventListener('click', () =>
 
 // -- Verwijderde oefeningen (#screen-deleted-exercises) ---------------------------
 // Every hidden exercise (deletedExercises()), sorted by name. Each can be put back
-// (terugzetten); an own exercise can also be deleted for good (permanent verwijderen).
+// (terugzetten) or deleted for good (permanent verwijderen), built-in or own alike.
 // Built-in = its id is in EXERCISE_DB, also when it was edited (it then has a custom entry).
 function isBuiltinExerciseId(id) { return EXERCISE_DB.some(b => b.id === id); }
 
@@ -6400,7 +6436,6 @@ function renderDeletedExercises() {
   const card = document.createElement('div');
   card.className = 'card list-card divided-list divided-list-under';
   items.forEach(ex => {
-    const builtin = isBuiltinExerciseId(ex.id);
     const row = document.createElement('div');
     row.className = 'deleted-ex-row list-row';
     row.innerHTML = `
@@ -6412,17 +6447,18 @@ function renderDeletedExercises() {
         <button type="button" class="row-icon-btn row-icon-btn-primary deleted-ex-restore" aria-label="Terugzetten">
           <svg viewBox="0 0 24 24"><path d="M9 14l-4 -4l4 -4"/><path d="M5 10h11a4 4 0 1 1 0 8h-1"/></svg>
         </button>
-        ${builtin ? '' : `
         <button type="button" class="row-icon-btn row-icon-btn-danger deleted-ex-purge" aria-label="Permanent verwijderen">
           <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-        </button>`}
+        </button>
       </div>
     `;
     row.querySelector('.deleted-ex-name').textContent = ex.name;
     const cat = categoryName(ex.category) || removedCategoryName(ex.category);
-    row.querySelector('.deleted-ex-meta').textContent = (cat ? cat + ' · ' : '') + (builtin ? 'ingebouwd' : 'eigen oefening');
+    const meta = row.querySelector('.deleted-ex-meta');
+    meta.textContent = cat;
+    meta.classList.toggle('hidden', !cat);
     row.querySelector('.deleted-ex-restore').addEventListener('click', () => restoreExercise(ex.id));
-    if (!builtin) row.querySelector('.deleted-ex-purge').addEventListener('click', () => openPurgeExerciseConfirm(ex));
+    row.querySelector('.deleted-ex-purge').addEventListener('click', () => openPurgeExerciseConfirm(ex));
     card.appendChild(row);
   });
   list.appendChild(card);
@@ -6488,8 +6524,16 @@ document.getElementById('btn-purge-ex-confirm').addEventListener('click', () => 
 // volgen) and the favorite mark. It also leaves every plan day; for the active plan that
 // stores a new schedule version (persistPlan → syncInsightSchedule). Existing schedule
 // versions are not touched: they carry the exercise's name. The name is free again after.
+// A built-in goes the same way (its edited version in db.custom_exercises included) and its id
+// goes from hiddenBuiltins onto db.purgedBuiltins (meta/purged_builtins): it's then gone from
+// every list, and only Alles resetten brings it back.
 function purgeExercise(id) {
-  if (isBuiltinExerciseId(id)) return; // built-ins can only be hidden
+  if (isBuiltinExerciseId(id)) {
+    if (!db.purgedBuiltins) db.purgedBuiltins = {};
+    db.purgedBuiltins[id] = true;
+    persistPurgedBuiltins();
+    if (db.hiddenBuiltins && db.hiddenBuiltins[id]) { delete db.hiddenBuiltins[id]; persistHiddenBuiltins(); }
+  }
   db.custom_exercises = (db.custom_exercises || []).filter(e => e.id !== id);
   persistCustomExercises();
   Object.keys(db.workouts).forEach(date => {
@@ -7292,7 +7336,7 @@ function openDayRecap() {
   } else {
     body.innerHTML = shown.map(ex => `
       <div class="recap-ex">
-        <div class="recap-ex-name">${exerciseName(ex.exerciseId)}</div>
+        <div class="recap-ex-name">${escapeHtml(exerciseName(ex.exerciseId))}</div>
         ${ex.target ? recapSetsLine(ex) : ''}
         ${recapSetLines(ex, date, prs.byId[ex.exerciseId])}
       </div>`).join('');
@@ -7928,7 +7972,7 @@ function buildPlanDayCard(day, idx) {
     ${expanded ? `
     <div class="plan-day-preview">
       ${exCount === 0 ? `<div class="plan-day-preview-empty">Geen oefeningen</div>` : exercises.map(ex => `
-      <div class="plan-day-preview-row"><span class="plan-day-preview-name">${exerciseName(ex.exerciseId)}</span><span class="plan-day-preview-meta">${formatExerciseSetsReps(ex, 'short')}</span></div>`).join('')}
+      <div class="plan-day-preview-row"><span class="plan-day-preview-name">${escapeHtml(exerciseName(ex.exerciseId))}</span><span class="plan-day-preview-meta">${formatExerciseSetsReps(ex, 'short')}</span></div>`).join('')}
     </div>` : ''}
   `;
   // Tapping the head (number, name, exercise count) toggles this card's inline
@@ -8311,7 +8355,7 @@ function renderPlanDayEdit() {
     item.innerHTML = `
       <div class="pde-item-inner">
         <div class="pde-ex-info">
-          <span class="pde-ex-name">${exerciseName(ex.exerciseId)}</span>
+          <span class="pde-ex-name">${escapeHtml(exerciseName(ex.exerciseId))}</span>
           <span class="pde-ex-meta">${formatExerciseSetsReps(ex)}</span>
         </div>
         <svg class="pde-chevron" viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
@@ -8763,7 +8807,9 @@ function openPresetsOverlay() {
     `;
     item.addEventListener('click', async () => {
       closeOverlay('presets-overlay');
-      const planId = await createPlan(preset.name, JSON.parse(JSON.stringify(preset.days)));
+      // A permanently deleted built-in (findExercise() null) is left out of the new plan.
+      const days = JSON.parse(JSON.stringify(preset.days)).map(d => ({ ...d, exercises: d.exercises.filter(e => findExercise(e.exerciseId)) }));
+      const planId = await createPlan(preset.name, days);
       openPlanDetail(planId);
       toast('Sjabloon toegevoegd!');
     });

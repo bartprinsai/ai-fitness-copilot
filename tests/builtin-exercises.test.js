@@ -1,7 +1,10 @@
 // De ingebouwde oefeningenlijst (vm, geen browser): aantallen per categorie en subcategorie, de
 // ingebouwde subcategorieën (samen met een eigen subcategorie met dezelfde naam), de eenmalige
 // migratie van bewerkte ingebouwde oefeningen, gelogde sets van een oefening die niet meer bestaat
-// (overgeslagen, in Firestore bewaard), oude namen, sjablonen en de AI-koppeling.
+// (overgeslagen, in Firestore bewaard), oude namen, sjablonen en de AI-koppeling. Gelijk aan eigen
+// oefeningen: een type, permanent verwijderen (meta/purged_builtins: blijft weg, ook bij migraties,
+// tot Alles resetten) en geen dubbele naam als een update een ingebouwde met de naam van een eigen
+// oefening toevoegt (de eigen wint, niets wordt samengevoegd).
 // See PROJECT_CONTEXT.md ("Categorieën en spiergroepen" → Ingebouwde oefeningen, Subcategorieën).
 const H = require('./helpers');
 const { FakeStore } = H;
@@ -44,6 +47,7 @@ A(BUILTIN_SUBCATEGORIES.every(s => visible.some(e => e.subcategory === s.id)), '
 A(visible.filter(e => e.subcategory).every(e => { const s = BUILTIN_SUBCATEGORIES.find(s => s.id === e.subcategory); return e.name === s.name || e.name.startsWith(s.name + ' - '); }), 'naam = subcategorie of "<subcategorie> - …"');
 A(!EXERCISE_DB.some(e => e.hidden) && !['crunches', 'sit-ups', 'plank', 'hanging-leg-raises'].some(id => EXERCISE_DB.some(e => e.id === id)), 'Crunches, Sit-ups, Plank, Hanging leg raises helemaal weg, geen verborgen ingebouwde');
 A(Object.keys(BUILTIN_PREVIOUS).every(id => EXERCISE_DB.some(e => e.id === id)), 'BUILTIN_PREVIOUS alleen voor bestaande oefeningen');
+A(EXERCISE_DB.every(e => e.type === (e.category === 'cardio' ? 'duration' : 'weight_reps')), 'elk type gezet: Cardio Duur, de rest Gewicht en reps');
 
 console.test('\n# Laden en migratie van bewerkte ingebouwde oefeningen');
 await loadUserData('u1');
@@ -86,10 +90,56 @@ setWorkout('2026-10-25', [{ exerciseId: 'squat', sets: [{ weight: 1, reps: 1 }] 
 A(W('2026-10-25') === undefined, 'gewone dag leegmaken verwijdert het document nog steeds');
 A(!aiExerciseNameList().split('\n').some(n => /^(Crunches|Plank|Sit-ups|Hanging leg raises)$/.test(n)) && JSON.stringify(aiPlanDaysToIds([{ name: 'Core', exercises: [{ name: 'Crunches', sets: 3, reps: 20 }] }])) === JSON.stringify([{ name: 'Core', exercises: [] }]), 'AI: niet in de lijst, als antwoord weggelaten');
 
+console.test('\n# Type in Oefening bewerken');
+openEditExerciseScreen(allExercises().find(e => e.id === 'treadmill'));
+A(getFieldBtnValue('new-ex-type') === 'duration', 'Treadmill: Duur');
+openEditExerciseScreen(allExercises().find(e => e.id === 'leg-press'));
+A(getFieldBtnValue('new-ex-type') === 'weight_reps', 'Leg Press: Gewicht en reps');
+
+console.test('\n# Ingebouwde oefening permanent verwijderen');
+db.favoriteExercises['leg-press'] = true; db.exerciseInfo['leg-press'] = { primaryMuscleGroup: 'quads' };
+setWorkout('2026-10-23', [{ exerciseId: 'leg-press', sets: [{ weight: 200, reps: 10 }] }]);
+updateExistingExercise('leg-press', { category: 'legs', subcategory: 'sub-leg-press', name: 'Mijn leg press', type: 'weight_reps' });
+purgeExercise('leg-press');
+A(JSON.stringify(F('users/u1/meta/purged_builtins')) === '{"ids":["leg-press"]}', 'id op meta/purged_builtins');
+A(!findExercise('leg-press') && !allExercises().some(e => e.id === 'leg-press') && !deletedExercises().some(e => e.id === 'leg-press'), 'nergens meer: niet te vinden, niet in de lijst, niet bij Verwijderde oefeningen');
+A(!F('users/u1/meta/custom_exercises').list.some(e => e.id === 'leg-press') && F('users/u1/workouts/2026-10-23') === undefined && !isFavoriteExercise('leg-press') && !('leg-press' in db.exerciseInfo), 'bewerkte versie, sets, favoriet en info gewist');
+A(!aiExerciseNameList().split('\n').some(n => /^(Leg Press|Mijn leg press)$/.test(n)) && JSON.stringify(aiPlanDaysToIds([{ name: 'L', exercises: [{ name: 'Leg Press', sets: 1, reps: 1 }] }])[0].exercises) === '[]', 'AI kent hem niet meer');
+const presetDays = PLAN_PRESETS[0].days.map(d => d.exercises.filter(e => findExercise(e.exerciseId)).map(e => e.exerciseId));
+A(!presetDays.flat().includes('leg-press') && PLAN_PRESETS[0].days[2].exercises.some(e => e.exerciseId === 'leg-press'), 'sjabloon met Leg Press: wordt overgeslagen bij het aanmaken');
+openNewExerciseScreen();
+document.getElementById('new-ex-name').value = 'Leg Press';
+setFieldBtnValue('new-ex-category', 'legs', 'Benen');
+saveNewExerciseFromScreen();
+const eigenLp = allExercises().filter(e => e.name === 'Leg Press');
+A(document.getElementById('toast-msg').textContent === 'Oefening aangemaakt' && eigenLp.length === 1 && /^ex-/.test(eigenLp[0].id), 'naam vrij: eigen Leg Press aangemaakt');
+db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, favoriteExercises: {}, hiddenBuiltins: {} };
+await loadUserData('u1');
+A(!findExercise('leg-press') && allExercises().filter(e => e.name === 'Leg Press').length === 1, 'na herladen nog steeds weg, alleen de eigen Leg Press');
+db.workouts['2026-11-01'] = [{ name: 'Leg press', sets: [{ weight: 1, reps: 1 }] }];
+await migrateExerciseIds('u1');
+A(!JSON.stringify(db.workouts['2026-11-01'] || []).includes('leg-press') && builtinByName('Leg press') === null && builtinByName('Leg Press') === null, 'migratie op oude naam zet hem niet terug');
+await migrateBuiltinSubcategories('u1');
+A(!findExercise('leg-press') && !(db.custom_exercises || []).some(e => e.id === 'leg-press'), 'migratie bewerkte ingebouwde zet hem niet terug');
+document.getElementById('reset-confirm-input').value = 'RESET';
+await document.getElementById('btn-reset-confirm').__fire('click');
+A(F('users/u1/meta/purged_builtins') === undefined && allExercises().some(e => e.id === 'leg-press' && e.name === 'Leg Press'), 'Alles resetten: lijst leeg, Leg Press terug');
+
+console.test('\n# Naambotsing: een update voegt een ingebouwde toe met de naam van een eigen oefening');
+db.custom_exercises = [{ id: 'ex-ext', category: 'legs', name: 'leg extension', type: 'weight_reps' }];
+const ext = allExercises().filter(e => e.name.toLowerCase() === 'leg extension');
+A(ext.length === 1 && ext[0].id === 'ex-ext' && !findExercise('ex-ext').subcategory, 'één oefening met die naam: de eigen, niets samengevoegd');
+A(!deletedExercises().some(e => e.id === 'leg-extension-machine'), 'ingebouwde ook niet bij Verwijderde oefeningen');
+db.custom_exercises[0].deleted = true;
+A(!allExercises().some(e => e.id === 'leg-extension-machine') && deletedExercises().map(e => e.id).join() === 'ex-ext', 'eigen verwijderd: naam blijft van de eigen, de ingebouwde blijft weg');
+db.custom_exercises[0].name = 'Leg extension oud'; delete db.custom_exercises[0].deleted;
+A(allExercises().some(e => e.id === 'leg-extension-machine') && allExercises().some(e => e.id === 'ex-ext'), 'eigen hernoemd: de ingebouwde verschijnt');
+db.custom_exercises = [];
+
 console.test('\n# Oude namen, sjablonen, AI');
 A(builtinByName('Lat pulldown').id === 'lat-pulldown' && builtinByName('Pulldown - Wide Grip').id === 'lat-pulldown' && builtinByName('Snatch') === null && builtinByName('Crunches') === null, 'oude en nieuwe naam gevonden, verwijderde niet');
 A(PLAN_PRESETS.every(p => p.days.every(d => d.exercises.every(e => visible.some(b => b.id === e.exerciseId)))), 'alle sjabloonoefeningen bestaan en zijn zichtbaar');
-A(aiExerciseNameList().split('\n').includes('Bench Press - Close Grip') && aiExerciseNameList().split('\n').length === 114, 'AI-lijst: de 113 ingebouwde (nieuwe namen) en Mijn row');
+A(aiExerciseNameList().split('\n').includes('Bench Press - Close Grip') && aiExerciseNameList().split('\n').length === 113, 'AI-lijst: de 113 ingebouwde met nieuwe namen (na Alles resetten)');
 const ai = aiPlanDaysToIds([{ name: 'Pull', exercises: [{ name: 'Barbell Row - Overhand', sets: 3, reps: 8 }, { name: 'Bent-over barbell row', sets: 3, reps: 8 }] }]);
 A(JSON.stringify(ai[0].exercises) === JSON.stringify([{ exerciseId: 'bent-over-barbell-row', sets: 3, reps: 8 }]), 'AI-naam naar id, oude naam niet geraden');
 `;

@@ -488,7 +488,6 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .category-item-dots, .exercise-item-dots { width: var(--icon-list); height: var(--icon-list); fill: var(--text-muted); flex-shrink: 0; }
 .category-item-favorites .category-item-name { font-weight: var(--fw-bold); }
 .category-item-fav-star, .exercise-item-fav-star { width: var(--icon-list); height: var(--icon-list); fill: var(--primary); flex-shrink: 0; margin-right: var(--space-3); }
-.exercise-item-custom .exercise-item-name { color: var(--primary); }
 .exercise-empty { padding: var(--space-6); }
 /* Plan Day add-exercise flow only (exerciseScreenMode === 'plan-add') — the per-row add control
    is the stepper button (.plate-stepper-btn, 36×36), directly left of the ⋮ menu. Only the + adds,
