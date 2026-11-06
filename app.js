@@ -355,6 +355,7 @@ function uDoc(path) { return fStore.doc('users/' + currentUser.uid + '/' + path)
 // unchanged, so Firestore keeps them. A day that's empty in the app but has such entries keeps
 // only those (not its note or plan day, like a deleted document).
 async function persistWorkout(date, exercises) {
+  if (window.SheetsLog) SheetsLog.onWorkoutChange(date, exercises); // SHEETS-LOG (tijdelijk, zie sheets-log.js)
   if (!currentUser) return;
   const unknown = (db.unknownWorkoutEntries || {})[date] || [];
   if ((!exercises || exercises.length === 0) && !unknown.length) {
@@ -1214,6 +1215,7 @@ document.getElementById('overflow-menu').addEventListener('click', e => {
 });
 document.getElementById('btn-overflow-home').addEventListener('click', e => {
   showOverflowMenu([
+    ...(window.SheetsLog ? [{ label: 'Instellingen', action: SheetsLog.openSettings }] : []), // SHEETS-LOG (tijdelijk, zie sheets-log.js)
     { label: 'Uitloggen', action: signOutUser },
     { label: 'Alles resetten', action: openResetOverlay, danger: true },
   ], e.currentTarget);
@@ -1325,6 +1327,7 @@ document.getElementById('btn-reset-confirm').addEventListener('click', async () 
     currentPlanId = null;
     currentPlanData = null;
     await syncInsightSchedule(); // starts over: "geen schema" from today
+    if (window.SheetsLog) SheetsLog.onResetAll(); // SHEETS-LOG: alleen de regels van vandaag weg (tijdelijk, zie sheets-log.js)
 
     closeOverlay('reset-overlay');
     toast('Reset voltooid');

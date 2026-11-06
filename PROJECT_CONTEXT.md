@@ -372,6 +372,7 @@ Code: `app.js`, "Inzicht: Kracht" (`insightStrengthStats()`), "The charts of Kra
 
 ---
 
+- **Tijdelijk trainingslog naar Google Sheets** (`sheets-log.js`, vangnet zolang de app in ontwikkeling is): elke set van vandaag komt ook als regel in de Google Sheet "AI Fitness Co-Pilot - Trainingslog" (scope `drive.file`, Google Identity Services, koppeling per account in `meta/sheets_log`, dat Alles resetten niet wist). Alleen regels met de datum van vandaag worden toegevoegd/gewijzigd/verwijderd; Alles resetten wist alleen die van vandaag. Instellingen (menu van de Fitness Tracker) toont schakelaar, Koppelen/Ontkoppelen, Vernieuwen, de spreadsheet en een statusregel. Verwijderen: zie bovenaan `sheets-log.js` (alle haakjes elders zijn gemarkeerd met `SHEETS-LOG`). Test: `tests/sheets-log.test.js`.
 ## Volgende stappen
 1. Chat Coach activeren (koppelen aan de globale AI Coach-balk)
 2. Nutrition sectie bouwen
