@@ -868,7 +868,10 @@ function restoreConsumedEntry() {
 // user already confirmed "Discard": the unsaved-changes guard must not ask again.
 let skipScreenGuardOnce = false;
 
-function showScreen(id) {
+// `replace`: the screen being left is a finished step (e.g. Plan Schedule after Doorgaan),
+// so `id` takes over its history entry instead of going on top of it — back never lands
+// on the finished step again.
+function showScreen(id, { replace = false } = {}) {
   const el = document.getElementById(id);
   if (!el) return;
   const wasActive = el.classList.contains('active');
@@ -883,7 +886,8 @@ function showScreen(id) {
     historyInitialized = true;
     history.replaceState({ screen: id }, '', '#' + id);
   } else if (!wasActive) {
-    pushHistoryEntry({ screen: id }, '#' + id);
+    if (replace) runAfterPendingBack(() => history.replaceState({ screen: id }, '', '#' + id));
+    else pushHistoryEntry({ screen: id }, '#' + id);
   }
 }
 
@@ -899,14 +903,19 @@ function showScreen(id) {
 // below already guards via SCREEN_HAS_CHANGES (the same table hardware back
 // must use, since it never calls goBack() at all). Checking here too would
 // show the confirmation twice for the same tap.
+// The whole decision waits for a history step still in flight (e.g. a popup that was just
+// closed): until its popstate arrives, history.state is still the popup's entry, which would
+// wrongly send this to the fallback (a new screen pushed on top instead of a step back).
 function goBack(fallbackId, hasChangedFn) {
-  if (history.state && history.state.screen) {
-    runAfterPendingBack(() => history.back());
-  } else if (hasChangedFn) {
-    confirmDiscardIfChanged(hasChangedFn, () => showScreen(fallbackId));
-  } else {
-    showScreen(fallbackId);
-  }
+  runAfterPendingBack(() => {
+    if (history.state && history.state.screen) {
+      history.back();
+    } else if (hasChangedFn) {
+      confirmDiscardIfChanged(hasChangedFn, () => showScreen(fallbackId));
+    } else {
+      showScreen(fallbackId);
+    }
+  });
 }
 
 // -- Modal back-button handling --------------------------
@@ -6358,11 +6367,9 @@ function saveNewExerciseFromScreen() {
     if (deletedExerciseNameTaken(name)) { toast(DELETED_NAME_MSG); return; }
     updateExistingExercise(id, { category: cat, subcategory, name, type });
     setExerciseInfoFor(id, readExerciseInfoForm(EXERCISE_INFO_FORMS.newEx));
-    pendingEditExerciseId = null;
-    exerciseBrowserMode = 'categories';
-    currentBrowseCategory = null;
-    renderCategoryBrowser();
-    showScreen('screen-exercises');
+    // pendingEditExerciseId stays set: should this form ever be saved again, it updates this
+    // same exercise. (Clearing it here once turned a second Opslaan into a NEW exercise.)
+    closeExerciseFormAfterSave();
     return;
   }
 
@@ -6374,10 +6381,18 @@ function saveNewExerciseFromScreen() {
   persistCustomExercises();
   setExerciseInfoFor(id, readExerciseInfoForm(EXERCISE_INFO_FORMS.newEx));
   toast('Oefening aangemaakt');
-  exerciseBrowserMode = 'categories';
-  currentBrowseCategory = null;
-  renderCategoryBrowser();
-  showScreen('screen-exercises');
+  // From now on this form is about the exercise it just made: a second Opslaan updates it.
+  pendingEditExerciseId = id;
+  closeExerciseFormAfterSave();
+}
+
+// Opslaan is a finished step back: the form leaves history (the same step as the back arrow,
+// without the discard question — nothing is unsaved) and the list it was opened from shows
+// again, refreshed. Never a new screen on top: back would then reopen the saved form.
+function closeExerciseFormAfterSave() {
+  newExerciseBaseline = getNewExerciseFormSnapshot();
+  refreshExerciseList();
+  goBack('screen-exercises');
 }
 
 // -- Delete exercise (built-in or custom) ----------------
@@ -7871,7 +7886,7 @@ function buildPlanListItem(plan, featured) {
 }
 
 // ── Plan Detail Screen ────────────────────────────────
-function openPlanDetail(planId) {
+function openPlanDetail(planId, { replace = false } = {}) {
   currentPlanId = planId;
   currentPlanData = db.plans[planId];
   if (!currentPlanData) return;
@@ -7884,7 +7899,7 @@ function openPlanDetail(planId) {
   const starBtn = document.getElementById('btn-plan-set-active');
   starBtn.classList.toggle('is-active', isActive);
   renderPlanDetail();
-  showScreen('screen-plan-detail');
+  showScreen('screen-plan-detail', { replace });
 }
 
 // True once "Week toevoegen" has started a Week B section — checked via the explicit
@@ -8297,7 +8312,8 @@ document.getElementById('btn-plan-schedule-continue').addEventListener('click', 
   currentPlanData.scheduleConfirmed = true;
   db.plans[currentPlanId] = currentPlanData;
   await persistPlan(currentPlanId, currentPlanData);
-  openPlanDetail(currentPlanId);
+  // The schedule is done: Plan Detail takes its place in history, so back goes to the plan list.
+  openPlanDetail(currentPlanId, { replace: true });
 });
 
 document.getElementById('plan-schedule-scroll').addEventListener('click', async e => {
@@ -8634,6 +8650,13 @@ document.getElementById('btn-plan-set-active').addEventListener('click', async (
 // Saves (everything's already persisted per-action, but this re-confirms) and leaves
 // the editable state — shared by the header checkmark, the back arrow's first tap
 // while editing, and the hardware back button's equivalent (see the popstate handler).
+// The plan is gone: leave its detail screen as a step back (out of history), not with the
+// plan list pushed on top of it — back would then reopen the deleted plan.
+function leavePlanDetailAfterDelete() {
+  planDetailEditMode = false; // otherwise the back step would only end edit mode (SCREEN_TEMP_MODE)
+  goBack('screen-workout-plan');
+}
+
 async function exitPlanDetailEditMode() {
   planDetailEditMode = false;
   renderPlanDetail();
@@ -8648,7 +8671,7 @@ document.getElementById('btn-overflow-plan-detail').addEventListener('click', e 
       { label: 'Dupliceren', action: () => duplicatePlan(currentPlanId) },
       { label: 'Verwijderen', action: () => {
         if (!currentPlanData) return;
-        openDeletePlanConfirm(currentPlanId, currentPlanData.name, () => showScreen('screen-workout-plan'));
+        openDeletePlanConfirm(currentPlanId, currentPlanData.name, leavePlanDetailAfterDelete);
       }},
     ], e.currentTarget);
     return;
@@ -8658,7 +8681,7 @@ document.getElementById('btn-overflow-plan-detail').addEventListener('click', e 
     { label: 'Dupliceren', action: () => duplicatePlan(currentPlanId) },
     { label: 'Verwijderen', action: () => {
       if (!currentPlanData) return;
-      openDeletePlanConfirm(currentPlanId, currentPlanData.name, () => showScreen('screen-workout-plan'));
+      openDeletePlanConfirm(currentPlanId, currentPlanData.name, leavePlanDetailAfterDelete);
     }},
   ], e.currentTarget);
 });
