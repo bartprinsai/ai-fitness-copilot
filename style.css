@@ -913,6 +913,8 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 /* A square of the grid cell, so it is exactly as big as a weekday circle in the same grid. */
 .ps-num-box { aspect-ratio: 1; padding: 0; }
 .ps-toggle-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-2); }
+/* Plan detail, HUIDIGE WEEK (active plan with a Week B): label, Week A · Week B, a line under it. */
+.plan-week-now { display: flex; flex-direction: column; gap: var(--space-3); margin-bottom: var(--card-gap); }
 .ps-weekdays-counter { color: var(--text-secondary); }
 .ps-week-block { display: flex; flex-direction: column; gap: var(--space-2); }
 .ps-weekday-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: var(--space-2); }
@@ -937,6 +939,37 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    Text: Rij in een lijst; buttons: Compacte actieknop, half each. */
 .smart-banner { display: flex; flex-direction: column; gap: var(--space-3); margin: var(--screen-top) var(--screen-gutter) 0; padding: calc(var(--card-padding) - 2px); background: var(--surface); border: 2px solid var(--primary); border-radius: var(--radius-lg); box-shadow: var(--card-shadow); flex-shrink: 0; }
 .smart-banner.hidden { display: none; }
+
+/* ── Rustdag and Deloaddag (day marks) ──
+   Always recognisable by icon AND text, never by colour alone. Icons: Tabler zzz (rest) and feather
+   (deload), stroke icons (.icon-stroke). Tracker: the rest-day card (.card .day-mark-card, instead
+   of the empty state, with Ongedaan maken) and the deload label (.day-mark-label: dotted border, no
+   fill, ⋮ to take it away); both a card's width, --card-gap above like the exercise cards. */
+.icon-stroke, .nav-card-icon svg.icon-stroke { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.nav-card-icon { color: var(--primary); }
+.nav-card-group-gap { margin-top: var(--space-4); }
+.day-mark-card, .day-mark-label { display: flex; align-items: center; gap: var(--space-3); margin: var(--card-gap) var(--screen-gutter) 0; flex-shrink: 0; }
+.home-content:not(:has(> .exercise-card)) > .day-mark-card, .home-content:not(:has(> .exercise-card)) > .day-mark-label { margin-top: var(--screen-top); }
+.day-mark-label { padding: var(--space-2) var(--space-2) var(--space-2) var(--card-padding); border: 2px dotted var(--text-muted); border-radius: var(--radius-lg); }
+.day-mark-card { flex-wrap: wrap; }
+.day-mark-card .btn { flex-basis: 100%; }
+.day-mark-icon { width: 36px; height: 36px; border-radius: var(--radius-sm); background: var(--primary-light); color: var(--primary); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.day-mark-icon svg { width: var(--icon-list); height: var(--icon-list); }
+.day-mark-body { flex: 1; min-width: 0; }
+.day-mark-title { font-size: var(--fs-heading); font-weight: var(--fw-medium); color: var(--text); }
+.day-mark-sub { font-size: var(--fs-small); color: var(--text-secondary); }
+.day-mark-menu svg { fill: var(--text-secondary); }
+/* The small inline mark (calendar popup, Geschiedenis, Samenvatting, Inzicht day overview): icon + text. */
+.day-mark-inline { display: inline-flex; align-items: center; gap: var(--space-1); font-size: var(--fs-small); color: var(--text-secondary); }
+.day-mark-inline svg { width: 14px; height: 14px; flex-shrink: 0; }
+.history-card-header .day-mark-inline { margin-left: auto; padding-right: var(--space-3); }
+.cal-detail-mark { margin-bottom: var(--space-3); }
+/* Calendar: a rest or deload day has its icon under the number instead of the dot. */
+.cal-day.cal-rest::after, .cal-day.cal-deload::after { display: none; }
+.cal-mark { position: absolute; bottom: 1px; left: 50%; transform: translateX(-50%); display: flex; color: var(--text-secondary); }
+.cal-day.has-workout .cal-mark { color: var(--primary); }
+.cal-day.selected .cal-mark { color: var(--on-primary); }
+.cal-mark svg { width: 10px; height: 10px; }
 .smart-banner-body { display: flex; align-items: flex-start; gap: var(--space-2); }
 .smart-banner-icon { flex-shrink: 0; font-size: var(--fs-body); }
 .smart-banner-msg { color: var(--text-secondary); line-height: 1.4; }
@@ -1168,6 +1201,12 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .insight-done { display: flex; align-items: center; justify-content: center; background: var(--success); }
 .insight-done svg { width: 14px; height: 14px; fill: var(--on-primary); }
 .insight-missed { border: 2px solid var(--danger); }
+/* Rest and deload days (insightTrainingState): their own icon, never colour alone. A rest day taken on a
+   plan day counts as missed: the same icon in --danger (the meaning is in the label and the day overview). */
+.insight-mark { display: flex; align-items: center; justify-content: center; width: var(--icon-list); height: var(--icon-list); color: var(--text-secondary); }
+.insight-mark svg { width: 16px; height: 16px; }
+.insight-mark-missed { color: var(--danger); }
+.insight-day-mark { margin-bottom: var(--card-gap); }
 .insight-cards { display: flex; flex-direction: column; gap: var(--card-gap); margin-top: var(--card-gap); }
 .insight-card-label { margin-bottom: var(--space-2); }
 /* Big figure on Groot getal (.set-val) with its unit/explanation on Klein (.set-unit), like "80 kg". */

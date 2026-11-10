@@ -18,7 +18,7 @@ const fStore = firebase.firestore();
 let currentUser = null;
 
 // -- In-memory state ------------------------------------
-let db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, workoutPlanDays: {}, unknownWorkoutEntries: {}, favoriteExercises: {}, hiddenBuiltins: {}, purgedBuiltins: {}, exerciseInfo: {}, plateInventory: {}, plateOnBar: {}, categories: { names: {}, custom: [], deleted: [] }, scheduleVersions: {}, weekCycle: {}, sleep: {}, bodyWeight: {} };
+let db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, workoutPlanDays: {}, unknownWorkoutEntries: {}, favoriteExercises: {}, hiddenBuiltins: {}, purgedBuiltins: {}, exerciseInfo: {}, plateInventory: {}, plateOnBar: {}, categories: { names: {}, custom: [], deleted: [] }, scheduleVersions: {}, weekCycle: {}, sleep: {}, bodyWeight: {}, dayMarks: {} };
 
 // -- Home selection mode state --------------------------
 // Fitness Tracker's long-press selection mode (see createSelectionMode).
@@ -456,8 +456,8 @@ async function persistPlateOnBar() {
 async function loadUserData(userUid) {
   console.log('[Load] loadUserData start, uid:', userUid);
   try {
-    console.log('[Load] firing Promise.all for 17 Firestore reads...');
-    const [workoutsSnap, recordsSnap, customSnap, plansSnap, activePlanSnap, favoritesSnap, hiddenBuiltinsSnap, exerciseInfoSnap, plateInventorySnap, plateOnBarSnap, categoriesSnap, migrationsSnap, scheduleVersionsSnap, weekCycleSnap, sleepSnap, bodyWeightSnap, purgedBuiltinsSnap] = await Promise.all([
+    console.log('[Load] firing Promise.all for 18 Firestore reads...');
+    const [workoutsSnap, recordsSnap, customSnap, plansSnap, activePlanSnap, favoritesSnap, hiddenBuiltinsSnap, exerciseInfoSnap, plateInventorySnap, plateOnBarSnap, categoriesSnap, migrationsSnap, scheduleVersionsSnap, weekCycleSnap, sleepSnap, bodyWeightSnap, purgedBuiltinsSnap, dayMarksSnap] = await Promise.all([
       fStore.collection('users/' + userUid + '/workouts').get(),
       fStore.doc('users/' + userUid + '/meta/records').get(),
       fStore.doc('users/' + userUid + '/meta/custom_exercises').get(),
@@ -475,6 +475,7 @@ async function loadUserData(userUid) {
       fStore.collection('users/' + userUid + '/sleep').get(),
       fStore.collection('users/' + userUid + '/body_weight').get(),
       fStore.doc('users/' + userUid + '/meta/purged_builtins').get(),
+      fStore.collection('users/' + userUid + '/day_marks').get(),
     ]);
     console.log('[Load] Promise.all resolved, exerciseInfoSnap.exists:', exerciseInfoSnap.exists);
     db.workouts = {};
@@ -493,6 +494,8 @@ async function loadUserData(userUid) {
     db.sleep = byDate(sleepSnap);
     db.bodyWeight = {};
     bodyWeightSnap.forEach(doc => { db.bodyWeight[doc.id] = doc.data().kg; });
+    db.dayMarks = {};
+    dayMarksSnap.forEach(doc => { const t = doc.data().type; if (t === 'rest' || t === 'deload') db.dayMarks[doc.id] = t; });
     db.records = recordsSnap.exists ? (recordsSnap.data().data || {}) : {};
     db.custom_exercises = customSnap.exists ? (customSnap.data().list || []) : [];
     db.plans = {};
@@ -1148,7 +1151,7 @@ async function initAuth() {
       console.log('[Auth] showScreen(screen-home) done');
     } else {
       console.log('[Auth] no user, showing login screen');
-      db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, workoutPlanDays: {}, unknownWorkoutEntries: {}, favoriteExercises: {}, hiddenBuiltins: {}, purgedBuiltins: {}, scheduleVersions: {}, weekCycle: {}, sleep: {}, bodyWeight: {} };
+      db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, workoutPlanDays: {}, unknownWorkoutEntries: {}, favoriteExercises: {}, hiddenBuiltins: {}, purgedBuiltins: {}, scheduleVersions: {}, weekCycle: {}, sleep: {}, bodyWeight: {}, dayMarks: {} };
       currentPlanId = null; currentPlanData = null; bannerDismissed = false;
       showScreen('screen-login');
     }
@@ -1235,6 +1238,7 @@ document.getElementById('btn-overflow-exercises').addEventListener('click', e =>
 //   - users/{uid}/plans/*                (every Workout Plan Builder plan)
 //   - users/{uid}/coachingPhilosophies/* (if that collection exists)
 //   - users/{uid}/schedule_versions/*, week_cycle/*, sleep/*, body_weight/*  (Inzicht)
+//   - users/{uid}/day_marks/*            (Rustdag / Deloaddag per date)
 //   - users/{uid}/meta/records           (PR records)
 //   - users/{uid}/meta/custom_exercises  (self-added exercises)
 //   - users/{uid}/meta/activeplan        (active plan pointer)
@@ -1292,7 +1296,7 @@ document.getElementById('btn-reset-confirm').addEventListener('click', async () 
   setResetBusy(true);
 
   try {
-    const collections = ['workouts', 'plans', 'coachingPhilosophies', 'schedule_versions', 'week_cycle', 'sleep', 'body_weight'];
+    const collections = ['workouts', 'plans', 'coachingPhilosophies', 'schedule_versions', 'week_cycle', 'sleep', 'body_weight', 'day_marks'];
     const snaps = await Promise.all(collections.map(c => fStore.collection(userPrefix + c).get()));
 
     const refs = [
@@ -1323,7 +1327,7 @@ document.getElementById('btn-reset-confirm').addEventListener('click', async () 
       await batch.commit();
     }
 
-    db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, workoutPlanDays: {}, unknownWorkoutEntries: {}, favoriteExercises: {}, hiddenBuiltins: {}, purgedBuiltins: {}, scheduleVersions: {}, weekCycle: {}, sleep: {}, bodyWeight: {} };
+    db = { workouts: {}, custom_exercises: [], records: {}, plans: {}, activePlan: null, sessionNotes: {}, workoutPlanDays: {}, unknownWorkoutEntries: {}, favoriteExercises: {}, hiddenBuiltins: {}, purgedBuiltins: {}, scheduleVersions: {}, weekCycle: {}, sleep: {}, bodyWeight: {}, dayMarks: {} };
     currentPlanId = null;
     currentPlanData = null;
     await syncInsightSchedule(); // starts over: "geen schema" from today
@@ -1357,7 +1361,7 @@ document.getElementById('btn-reset-confirm').addEventListener('click', async () 
 // Derived purely from the logged sets (no stored record table that could drift).
 function getPRSetKeys(exId) {
   const bestWeight = {}, firstKey = {};
-  Object.keys(db.workouts).sort().forEach(date => {
+  statsWorkoutDates().sort().forEach(date => {
     const ex = (db.workouts[date] || []).find(e => e.exerciseId === exId);
     if (!ex) return;
     const sets = ex.sets || [];
@@ -1394,6 +1398,35 @@ function emptyAddStateHtml(btnId, label, title = '') {
       </div>`;
 }
 
+// The Fitness Tracker's rest-day card (instead of the empty state): icon, "Rustdag", "Geen training
+// vandaag" and Ongedaan maken — to train after all, the rest day is undone first.
+function buildRestDayCard(date) {
+  const card = document.createElement('div');
+  card.className = 'card day-mark-card';
+  card.innerHTML = `<div class="day-mark-icon">${REST_ICON_SVG}</div>
+    <div class="day-mark-body"><div class="day-mark-title">Rustdag</div>
+    <div class="day-mark-sub">${date === todayStr() ? 'Geen training vandaag' : 'Geen training op deze dag'}</div></div>
+    <button type="button" class="btn btn-secondary btn-compact" id="btn-undo-rest">Ongedaan maken</button>`;
+  card.querySelector('#btn-undo-rest').addEventListener('click', () => undoRestDay(date));
+  return card;
+}
+// The deload label at the top of the Tracker: icon, dotted border, "Deloaddag" and "Telt nergens
+// voor mee"; its ⋮ takes the label away (a mistake): the sets then count again.
+function buildDeloadLabel(date) {
+  const label = document.createElement('div');
+  label.className = 'day-mark-label';
+  label.innerHTML = `<div class="day-mark-icon">${DELOAD_ICON_SVG}</div>
+    <div class="day-mark-body"><div class="day-mark-title">Deloaddag</div><div class="day-mark-sub">Telt nergens voor mee</div></div>
+    <button type="button" class="toolbar-btn day-mark-menu" aria-label="Menu deloaddag">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+    </button>`;
+  label.querySelector('.day-mark-menu').addEventListener('click', e => {
+    e.stopPropagation();
+    showOverflowMenu([{ label: 'Label weghalen', action: () => removeDeloadMark(date) }], e.currentTarget);
+  });
+  return label;
+}
+
 function renderHome() {
   document.getElementById('day-nav-label').textContent = formatDateStr(currentDate, 'nav');
   const exercises = getWorkout(currentDate);
@@ -1403,10 +1436,19 @@ function renderHome() {
   // with it on a day change. Replacing the content below detaches it; it's put back
   // (same element, listeners intact) before renderSmartBanner() decides on visibility.
   const banner = document.getElementById('smart-day-banner');
+  const mark = getDayMark(currentDate);
 
   if (exercises.length === 0) {
     screenEl.classList.remove('has-day-actions');
+    if (mark === 'rest') {
+      container.innerHTML = '';
+      container.appendChild(buildRestDayCard(currentDate));
+      container.prepend(banner);
+      renderSmartBanner();
+      return;
+    }
     container.innerHTML = emptyAddStateHtml('btn-start-new', 'Nieuwe workout', 'Nog geen workout gelogd');
+    if (mark === 'deload') container.prepend(buildDeloadLabel(currentDate));
     container.prepend(banner);
     renderSmartBanner();
     document.getElementById('btn-start-new').addEventListener('click', openNewWorkoutScreen);
@@ -1415,6 +1457,9 @@ function renderHome() {
 
   screenEl.classList.add('has-day-actions');
   container.innerHTML = '';
+  // (A rest day with exercises only comes from another device; the card still says so.)
+  if (mark === 'rest') container.appendChild(buildRestDayCard(currentDate));
+  if (mark === 'deload') container.appendChild(buildDeloadLabel(currentDate));
   container.prepend(banner);
   renderSmartBanner();
 
@@ -1948,6 +1993,174 @@ function markScheduledDayLoaded(pick) {
   return persistActivePlan(a);
 }
 
+const otherWeek = w => (w === 'A' ? 'B' : 'A');
+// Whole weeks from Monday a to Monday b (negative when b is earlier).
+function weeksBetween(a, b) {
+  return Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / (7 * 86400000));
+}
+
+// The week ('A'/'B') of a split plan on `date`: a past date its recorded week (week_cycle) when
+// there is one; otherwise counted on from the current cycle (planWeekCycle): this calendar week
+// is the cycle's week (after an early switch also next week, its `since`), and every calendar
+// week further on or back is the other one.
+function planWeekForDate(plan, date) {
+  if (date < todayStr()) { const w = activeWeekOn(plan.id, date); if (w) return w; }
+  const { week, since } = planWeekCycle(plan);
+  const thisMonday = mondayOf(todayStr()), m = mondayOf(date);
+  const anchor = since && since > thisMonday ? since : thisMonday;
+  if (m === thisMonday || m === anchor) return week;
+  return Math.abs(weeksBetween(anchor, m)) % 2 ? otherWeek(week) : week;
+}
+
+// The active plan's day planned on `date`, in the shape of getTodaysScheduledDay() (which it is
+// for today). Another date by the same rules: "Geen vaste dagen" the next day in order (a date
+// doesn't matter there), "Vaste dagen" that weekday's day, Week A/B that weekday in the week of
+// that date (planWeekForDate). null: no active plan, or no day for that date.
+function getScheduledDayForDate(date) {
+  if (date === todayStr()) return getTodaysScheduledDay();
+  if (!db.activePlan) return null;
+  const plan = db.plans[db.activePlan.planId];
+  if (!plan || !plan.days || plan.days.length === 0) return null;
+  let dayIndex;
+  if (!plan.fixedDays) {
+    dayIndex = ((db.activePlan.lastDayIndex ?? -1) + 1) % plan.days.length;
+  } else {
+    const weekday = weekdayOfDateStr(date);
+    const week = planHasWeekSplit(plan) ? planWeekForDate(plan, date) : null;
+    dayIndex = plan.days.findIndex(d => planDayWeekday(d) === weekday && (!week || d.group === week));
+    if (dayIndex < 0) return null;
+  }
+  const day = plan.days[dayIndex];
+  return { plan, dayIndex, day, dayName: day.name || ('Dag ' + (dayIndex + 1)) };
+}
+
+// A day of the ACTIVE plan loaded by hand (Schema handmatig laden), or as a deload day on another
+// date than today: the app takes it as where the plan is now, so what it suggests next follows on
+// from it.
+//   "Geen vaste dagen": the next suggestion is the day after it.
+//   Week A/B: the day's week is the week of that date's calendar week, so this calendar week
+//     follows from it (the same week, or the other one for every week in between) and the week
+//     after is the other one again; loaded this week, its weekday counts as done (all days of the
+//     week done: the other week is next, as in markScheduledDayLoaded). A correction of this
+//     week's week goes into Inzicht from this Monday (correctWeekCycle).
+// A date before the last loaded one (filling in an older day) doesn't wind the plan back.
+function adoptLoadedPlanDay(plan, dayIndex, date) {
+  const a = db.activePlan;
+  const day = plan && plan.days && plan.days[dayIndex];
+  if (!a || !day || a.planId !== plan.id) return Promise.resolve();
+  const today = todayStr();
+  if (a.lastDate && date < a.lastDate) return Promise.resolve();
+  if (plan.fixedDays && planHasWeekSplit(plan) && (day.group === 'A' || day.group === 'B')) {
+    const thisMonday = mondayOf(today), m = mondayOf(date);
+    const cur = planWeekCycle(plan);
+    const early = !!(cur.since && cur.since > thisMonday); // this week's week was completed early
+    const w = planDayWeekday(day);
+    const k = weeksBetween(thisMonday, m);
+    let week = cur.week, done = [...cur.done], since = cur.since || thisMonday;
+    if (k < 0) {
+      // An earlier calendar week: that week was the day's week; planWeekCycle switches from there.
+      week = day.group; since = m; done = w !== undefined ? [w] : [];
+    } else if (k === 0 && !(early && day.group !== cur.week)) {
+      if (day.group !== cur.week) {
+        // A correction: this week is the day's week.
+        week = day.group; since = thisMonday; done = [];
+        correctWeekCycle(plan.id, week);
+      }
+      if (w !== undefined && !done.includes(w)) done.push(w);
+      if (planWeekWeekdays(plan, week).every(d => done.includes(d))) { week = otherWeek(week); done = []; since = mondayOf(today, 1); }
+    }
+    // (A day of the week already completed this week, or a date in a later week: the week stays.)
+    a.activeWeek = week;
+    a.doneWeekdays = done;
+    a.weekStart = since;
+  }
+  a.lastDayIndex = dayIndex;
+  if (date <= today) a.lastDate = date;
+  delete a.lastGroup;
+  return persistActivePlan(a);
+}
+
+// Plan detail, "Huidige week" (only the active plan with a Week B): which week it is now. Fixed
+// days: that week is active from this Monday, nothing of it done yet; the week switches every
+// calendar week from here (planWeekCycle). "Geen vaste dagen": the next suggestion is the first
+// day of that week. Inzicht takes the week from this Monday (correctWeekCycle).
+async function setActivePlanWeek(week) {
+  const a = db.activePlan;
+  const plan = a && db.plans[a.planId];
+  if (!plan || !planHasWeekSplit(plan) || (week !== 'A' && week !== 'B')) return;
+  const today = todayStr();
+  if (plan.fixedDays) {
+    a.activeWeek = week;
+    a.doneWeekdays = [];
+    a.weekStart = mondayOf(today);
+    // A day of the other week loaded earlier today no longer stays today's suggestion.
+    if (a.lastDate === today && plan.days[a.lastDayIndex] && plan.days[a.lastDayIndex].group !== week) {
+      a.lastDate = addDaysToDateStr(today, -1);
+    }
+    correctWeekCycle(plan.id, week);
+  } else {
+    const first = plan.days.findIndex(d => d.group === week);
+    if (first < 0) return;
+    a.lastDayIndex = (first - 1 + plan.days.length) % plan.days.length;
+  }
+  delete a.lastGroup;
+  bannerDismissed = false;
+  await persistActivePlan(a);
+}
+
+// The week of the current calendar week in Inzicht (week_cycle), set by hand: `week` from this
+// Monday on; this plan's later entries (this week, or tomorrow's after a week was completed) go.
+// The one exception to "never changed afterwards": the user says which week this week is.
+function correctWeekCycle(planId, week) {
+  const from = mondayOf(todayStr());
+  if (!db.weekCycle) db.weekCycle = {};
+  Object.keys(db.weekCycle).filter(k => k > from && db.weekCycle[k].planId === planId).forEach(k => {
+    delete db.weekCycle[k];
+    if (currentUser) uDoc('week_cycle/' + k).delete().catch(persistFailed);
+  });
+  const entry = { effectiveFrom: from, planId, week };
+  db.weekCycle[from] = entry;
+  if (currentUser) uDoc('week_cycle/' + from).set(entry).catch(persistFailed);
+}
+
+// -- Rustdag and Deloaddag (day marks) --------------------------------------
+// A date can be marked as a rest day or a deload day (New Workout: Rustdag / Deloaddag), one
+// document per date: users/{uid}/day_marks/{YYYY-MM-DD} → { type: 'rest' | 'deload' }; in memory
+// db.dayMarks[date] = 'rest' | 'deload'. Rules: PROJECT_CONTEXT.md, "Rustdag en deloaddag".
+//   Rustdag: no training that day (undo it first to train). Fixed days / Week A/B: that date's plan
+//     day lapses (Inzicht: missed), the plan simply goes on the next day. "Geen vaste dagen": the
+//     plan day moves on to the next time (nothing changes; never missed there).
+//   Deloaddag: the planned day is loaded (like Schema automatisch laden) and counts as done for the
+//     plan; its sets count for nothing (statsWorkoutDates()), but stay visible, marked as deload.
+//     Inzicht: its plan day counts as 100% done, trained or not.
+function getDayMark(date) { return (db.dayMarks || {})[date] || null; }
+function isRestDay(date) { return getDayMark(date) === 'rest'; }
+function isDeloadDay(date) { return getDayMark(date) === 'deload'; }
+function setDayMark(date, type) {
+  if (!db.dayMarks) db.dayMarks = {};
+  if (type) db.dayMarks[date] = type; else delete db.dayMarks[date];
+  if (!currentUser) return;
+  const ref = uDoc('day_marks/' + date);
+  (type ? ref.set({ type }) : ref.delete()).catch(persistFailed);
+}
+// THE dates whose sets count for anything derived from them (records and PR trophies, the Graph,
+// Records, Kracht, the Samenvatting's comparison with last time, and anything new — AI included):
+// every workout date except a deload day. History and the calendar show every date.
+function statsWorkoutDates() { return Object.keys(db.workouts).filter(d => !isDeloadDay(d)); }
+
+// The small mark with icon and text for a marked date (calendar popup, Geschiedenis, Samenvatting,
+// Inzicht's day overview): "Rustdag" / "Deloaddag · telt nergens voor mee" (+ `extra`, plain text);
+// '' for another date.
+function dayMarkInlineHtml(date, extra = '') {
+  const mark = getDayMark(date);
+  if (mark === 'rest') return `<span class="day-mark-inline">${REST_ICON_SVG}Rustdag${extra}</span>`;
+  if (mark === 'deload') return `<span class="day-mark-inline">${DELOAD_ICON_SVG}Deloaddag · telt nergens voor mee${extra}</span>`;
+  return '';
+}
+// The Tabler icons zzz (rest day) and feather (deload day), stroke icons (.icon-stroke).
+const REST_ICON_SVG = '<svg class="icon-stroke" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h6l-6 8h6"/><path d="M14 4h6l-6 8h6"/></svg>';
+const DELOAD_ICON_SVG = '<svg class="icon-stroke" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l10 -10m0 -5v5h5m-9 -1v5h5m-9 -1v5h5m-5 -5l4 -4l4 -4"/><path d="M19 10c.638 -.636 1 -1.515 1 -2.486a3.515 3.515 0 0 0 -3.517 -3.514c-.97 0 -1.847 .367 -2.483 1m-3 13l4 -4l4 -4"/></svg>';
+
 // -- Inzicht: schedule versions and Week A/B per date ---------------------
 // Inzicht compares every day with the schedule that was active on THAT day, so every
 // version of the active schedule is kept, apart from the plans themselves (editing or
@@ -2300,10 +2513,12 @@ const INSIGHT_WEEKDAYS_SHORT = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo'];
 
 function hasLoggedSets(date) { return getWorkout(date).some(ex => (ex.sets || []).length > 0); }
 
-// One day: { date, planned (getPlannedForDate), logged, past, counted }.
+// One day: { date, planned (getPlannedForDate), mark ('rest' / 'deload' / null, getDayMark), logged,
+// past, counted }. `logged`: ≥ 1 set that counts — a deload day's sets count for nothing, so never.
 function insightDay(date) {
   const today = todayStr();
-  return { date, planned: getPlannedForDate(date), logged: hasLoggedSets(date), past: date < today, counted: date <= today };
+  const mark = getDayMark(date);
+  return { date, planned: getPlannedForDate(date), mark, logged: mark !== 'deload' && hasLoggedSets(date), past: date < today, counted: date <= today };
 }
 // insightDay() for every date from..to.
 function insightRangeDays(from, to) {
@@ -2320,9 +2535,14 @@ function insightWeekDays(weekStart) {
 }
 
 // "done" (≥ 1 set logged), "missed" (a planned day of a fixed or Week A/B schedule that is
-// over without a set) or "empty" (rest day, no schedule, sequential, today, still to come).
+// over without a set) or "empty" (rest day, no schedule, sequential, today, still to come); a
+// marked day: "deload" (its plan day counts as done), "rest-missed" (a rest day taken on a plan day
+// of a fixed or Week A/B schedule: that day is missed, from the day itself on) or "rest" (any other
+// rest day, e.g. "Geen vaste dagen": the plan day just moves on, never missed).
 function insightTrainingState(d) {
+  if (d.mark === 'deload') return 'deload';
   if (d.logged) return 'done';
+  if (d.mark === 'rest') return d.planned.status === 'day' ? 'rest-missed' : 'rest';
   if (d.past && d.planned.status === 'day') return 'missed';
   return 'empty';
 }
@@ -2401,11 +2621,15 @@ function insightTrainingStats(days) {
   const today = todayStr();
   let plannedTrainings = 0, doneTrainings = 0, loggedDays = 0;
   counted.forEach(d => {
-    if (d.planned.status === 'day' && (d.date !== today || d.logged)) {
+    // A marked day counts at once, today too: a deload day as done in full, a rest day as missed.
+    const deload = d.mark === 'deload';
+    if (d.planned.status === 'day' && (d.date !== today || d.logged || d.mark)) {
       plannedTrainings++;
-      if (d.logged) doneTrainings++;
+      if (d.logged || deload) doneTrainings++;
       d.planned.day.exercises.forEach(ex => {
         const k = keyOf(ex.exerciseId); planned[k] = (planned[k] || 0) + (ex.sets || 0);
+        // Deload: the planned sets count as done from the schedule (100%), its own sets for nothing.
+        if (deload) doneCompared[k] = (doneCompared[k] || 0) + (ex.sets || 0);
         if (!(ex.sets > 0)) return;
         const p = plannedEx[ex.exerciseId] || (plannedEx[ex.exerciseId] = { sets: 0, name: ex.name });
         p.sets += ex.sets;
@@ -2418,6 +2642,7 @@ function insightTrainingStats(days) {
       });
     }
     if (d.logged) loggedDays++;
+    if (deload) return; // its sets count for nothing: not in the totals, the shares or the comparison
     const comparable = insightComparable(d);
     getWorkout(d.date).forEach(ex => {
       const n = countWorkingSets(ex.sets || []);
@@ -2587,6 +2812,10 @@ function insightDaysGridHtml(days) {
     const state = insightTrainingState(d);
     if (state === 'done') return cell(d, `<span class="insight-done" role="img" aria-label="Getraind">${INSIGHT_CHECK_SVG}</span>`);
     if (state === 'missed') return cell(d, '<span class="insight-missed" role="img" aria-label="Gemist"></span>');
+    // Rest and deload days: their own icon (never colour alone); a rest day on a plan day in --danger.
+    if (state === 'deload') return cell(d, `<span class="insight-mark" role="img" aria-label="Deloaddag">${DELOAD_ICON_SVG}</span>`);
+    if (state === 'rest-missed') return cell(d, `<span class="insight-mark insight-mark-missed" role="img" aria-label="Rustdag, geplande training gemist">${REST_ICON_SVG}</span>`);
+    if (state === 'rest') return cell(d, `<span class="insight-mark" role="img" aria-label="Rustdag">${REST_ICON_SVG}</span>`);
     return dash(d);
   }));
   html += row('Voeding', days.map(dash));
@@ -2820,19 +3049,32 @@ function insightDayScheduleText(d) {
 //   otherwise   "Geen vergelijking met schema" (no schedule, sequential, unknown A/B week)
 // — or, without a set on a day without a plan day, only "Rustdag" / "Geen training". Then PER
 // SPIERGROEP with only the groups planned or trained that day (none: the block is left out).
+// A rest or deload day (getDayMark) gets a line with its icon above it all (insightDayMarkHtml).
 function insightDayTrainingHtml(d) {
   const st = d.planned.status;
-  if (!d.logged && st !== 'day') return `<div class="card insight-summary">${insightEmptyHtml(st === 'rest' ? 'Rustdag' : 'Geen training')}</div>`;
+  const markHtml = insightDayMarkHtml(d);
+  if (!d.logged && st !== 'day') {
+    const empty = d.mark === 'deload' && hasLoggedSets(d.date) ? 'Sets tellen niet mee' : st === 'rest' || d.mark === 'rest' ? 'Rustdag' : 'Geen training';
+    return markHtml + `<div class="card insight-summary">${insightEmptyHtml(empty)}</div>`;
+  }
   const stats = insightTrainingStats([d]);
   const compare = stats.compare;
   const rows = insightMuscleRows(stats).filter(r => r.planned || r.done || r.today);
   let note;
   if (!compare) note = 'Geen vergelijking met schema';
   else if (st === 'rest') note = `Geen sets gepland · +${formatCount(stats.extra)} extra`;
-  else if (!d.logged && d.date === todayStr()) note = `Gepland: ${insightPlural(Object.values(stats.plannedToday).reduce((a, b) => a + b, 0), 'set', 'sets')}`;
+  else if (!d.logged && !d.mark && d.date === todayStr()) note = `Gepland: ${insightPlural(Object.values(stats.plannedToday).reduce((a, b) => a + b, 0), 'set', 'sets')}`;
   else note = insightSetsCompareText(stats);
   const total = rows.reduce((a, r) => insightAddFeatures(a, r.features), INSIGHT_FEATURES_EMPTY);
-  return insightFeaturesSummaryHtml(total, `<div>${note}</div>`) + (rows.length ? insightMuscleListHtml(rows, compare, stats) : '');
+  return markHtml + insightFeaturesSummaryHtml(total, `<div>${note}</div>`) + (rows.length ? insightMuscleListHtml(rows, compare, stats) : '');
+}
+// The day overview's line for a marked day, icon and text:
+//   deload  "Deloaddag · telt nergens voor mee" (+ " · geplande dag telt als gedaan" on a plan day)
+//   rest    "Rustdag" (+ " · geplande training gemist" on a plan day of a fixed / Week A/B schedule)
+function insightDayMarkHtml(d) {
+  if (!d.mark) return '';
+  const extra = d.planned.status !== 'day' ? '' : d.mark === 'deload' ? ' · geplande dag telt als gedaan' : ' · geplande training gemist';
+  return `<div class="insight-day-mark">${dayMarkInlineHtml(d.date, extra)}</div>`;
 }
 
 // "00:20 – 06:50 · nacht van woensdag op donderdag" / "Nacht van woensdag op donderdag".
@@ -3331,6 +3573,7 @@ const INSIGHT_STRENGTH_EMPTY = 'Zet Kracht volgen aan bij een oefening om je kra
 // The set behind it as { value, weight, reps } (the logged weight and full reps; equal: the later
 // set); dayBestOneRm: only the value.
 function dayBestOneRmSet(exId, date) {
+  if (isDeloadDay(date)) return null; // a deload day counts for nothing (statsWorkoutDates)
   const ex = (db.workouts[date] || []).find(e => e.exerciseId === exId);
   let best = null;
   ((ex && ex.sets) || []).forEach((s, i, sets) => {
@@ -3347,7 +3590,7 @@ function dayBestOneRm(exId, date) { const b = dayBestOneRmSet(exId, date); retur
 // set); null when the exercise wasn't done then. bestOneRmIn: only the value.
 function bestOneRmPointIn(exId, from, to) {
   let best = null;
-  Object.keys(db.workouts).filter(d => d >= from && d <= to).forEach(date => {
+  statsWorkoutDates().filter(d => d >= from && d <= to).forEach(date => {
     const b = dayBestOneRmSet(exId, date);
     if (b && (best === null || b.value > best.value || (b.value === best.value && date > best.date))) best = { ...b, date };
   });
@@ -3356,7 +3599,7 @@ function bestOneRmPointIn(exId, from, to) {
 function bestOneRmIn(exId, from, to) { const p = bestOneRmPointIn(exId, from, to); return p ? p.value : null; }
 // The last known value before `date`: the highest of the last day before it with a counting set.
 function lastOneRmBefore(exId, date) {
-  const dates = Object.keys(db.workouts).filter(d => d < date).sort();
+  const dates = statsWorkoutDates().filter(d => d < date).sort();
   for (let i = dates.length - 1; i >= 0; i--) {
     const v = dayBestOneRm(exId, dates[i]);
     if (v !== null) return v;
@@ -3833,10 +4076,10 @@ function planDayHasExercises(day) {
 // it: New Workout, the pickers, an open popup), so the back button doesn't land on
 // the pickers again. The popstate handler's showScreen() re-renders the tracker for
 // currentDate.
-function showTrackerAfterLoad(date, steps) {
+function showTrackerAfterLoad(date, steps, msg = 'Workout geladen!') {
   currentDate = date;
   history.go(-steps);
-  toast('Workout geladen!');
+  toast(msg);
 }
 
 // -- Load Schedule Manually: Kies een plan -> [Plan] — kies een dag ----------
@@ -3912,7 +4155,10 @@ function loadPickedScheduleDay(idx) {
   if (!planDayHasExercises(day)) { toast('Deze dag heeft geen oefeningen', { type: 'error' }); return; }
   // Into the day the Tracker was showing when New Workout opened — not forced to today.
   const date = newWorkoutDate || currentDate;
+  if (isRestDay(date)) { toast('Dit is een rustdag. Maak de rustdag eerst ongedaan.', { type: 'error' }); return; }
   loadPlanDayIntoWorkout(plan, day, date);
+  // A day of the active plan: the plan goes on from here (its week too, for Week A/B).
+  adoptLoadedPlanDay(plan, idx, date);
   showTrackerAfterLoad(date, 3); // day picker, plan picker, New Workout
 }
 
@@ -3924,6 +4170,16 @@ let pendingScheduleLoad = null;
 
 // A day without exercises gets the notice too: nothing to load.
 function openScheduleLoadAuto() {
+  if (isRestDay(todayStr())) {
+    // Today is a rest day: nothing is loaded into it (undo the rest day first).
+    pendingScheduleLoad = null;
+    document.getElementById('schedule-load-title').textContent = 'Vandaag is een rustdag';
+    document.getElementById('schedule-load-msg').textContent = 'Wil je toch trainen? Maak de rustdag eerst ongedaan in de Fitness Tracker.';
+    document.getElementById('btn-schedule-load-cancel').classList.add('hidden');
+    document.getElementById('btn-schedule-load-confirm').textContent = 'Sluiten';
+    openOverlay('schedule-load-overlay');
+    return;
+  }
   const scheduled = getTodaysScheduledDay();
   const empty = scheduled && !planDayHasExercises(scheduled.day);
   const pick = empty ? null : scheduled;
@@ -3964,6 +4220,45 @@ document.getElementById('btn-schedule-load-confirm').addEventListener('click', a
   document.getElementById('schedule-load-overlay').classList.remove('open');
   showTrackerAfterLoad(todayStr(), 2); // always today, whatever day the Tracker was showing
 });
+
+// -- New Workout: Rustdag and Deloaddag ------------------------------------
+// For the day the Tracker was showing when New Workout opened (newWorkoutDate), like Schema
+// handmatig laden. See "Rustdag and Deloaddag (day marks)".
+// Rustdag: only on a day without a workout (New Workout is only reached from an empty day).
+function chooseRestDay() {
+  const date = newWorkoutDate || currentDate;
+  if (getWorkout(date).length > 0) { toast('Op deze dag staat al een workout', { type: 'error' }); return; }
+  setDayMark(date, 'rest');
+  if (date === todayStr()) bannerDismissed = true;
+  showTrackerAfterLoad(date, 1, 'Rustdag ingesteld');
+}
+// Deloaddag: the planned day of that date (getScheduledDayForDate; today: the one Schema
+// automatisch laden offers) is loaded and counts as done for the plan. Without a planned day with
+// exercises the day is still a deload day, with nothing loaded.
+async function chooseDeloadDay() {
+  const date = newWorkoutDate || currentDate;
+  const pick = getScheduledDayForDate(date);
+  setDayMark(date, 'deload');
+  let msg = 'Deloaddag ingesteld';
+  if (pick && planDayHasExercises(pick.day)) {
+    loadPlanDayIntoWorkout(pick.plan, pick.day, date);
+    if (date === todayStr()) markScheduledDayLoaded(pick);
+    else adoptLoadedPlanDay(pick.plan, pick.dayIndex, date);
+    msg = `Deloaddag: ${pick.dayName} geladen`;
+  }
+  showTrackerAfterLoad(date, 1, msg);
+}
+function undoRestDay(date) {
+  setDayMark(date, null);
+  if (date === todayStr()) bannerDismissed = false;
+  renderHome();
+  toast('Rustdag ongedaan gemaakt');
+}
+function removeDeloadMark(date) {
+  setDayMark(date, null);
+  renderHome();
+  toast('Deloadlabel weggehaald');
+}
 
 function openExerciseList() {
   exerciseScreenMode = 'browse';
@@ -4558,7 +4853,7 @@ function recordsRepLabel(n) { return n === 1 ? 'One rep max' : n + 'RM'; }
 // order: by day, then by position within the day.
 function getExerciseValidSets(exId) {
   const out = [];
-  Object.keys(db.workouts).sort().forEach(date => {
+  statsWorkoutDates().sort().forEach(date => {
     const ex = (db.workouts[date] || []).find(e => e.exerciseId === exId);
     if (!ex) return;
     const sets = ex.sets || [];
@@ -5349,7 +5644,8 @@ function renderHistoryTab() {
     card.className = 'history-card';
     const header = document.createElement('div');
     header.className = 'history-card-header clickable';
-    header.innerHTML = `<div class="section-label">${formatDateStr(date)}</div>`;
+    // A deload day stays, marked with its icon and "Deload" (short, so the date keeps its line).
+    header.innerHTML = `<div class="section-label">${formatDateStr(date)}</div>${isDeloadDay(date) ? `<span class="day-mark-inline">${DELOAD_ICON_SVG}Deload</span>` : ''}`;
     header.addEventListener('click', () => openHistoryGotoDate(date));
     card.appendChild(header);
     card.appendChild(Object.assign(document.createElement('div'), { className: 'history-card-divider' }));
@@ -5466,7 +5762,7 @@ function graphRepsLabel(n) { return n === 1 ? 'One rep max' : String(n); }
 function getExerciseRepStats(exId) {
   const sessions = {};
   let highest = 0;
-  Object.keys(db.workouts).forEach(date => {
+  statsWorkoutDates().forEach(date => {
     const ex = (db.workouts[date] || []).find(e => e.exerciseId === exId);
     if (!ex) return;
     const seen = new Set();
@@ -5583,7 +5879,7 @@ const GRAPH_TAP_RADIUS = 28; // px around a point that counts as a tap on it (fi
 // Shared by the Graph tab and the Personal Records overlay.
 function getExerciseRepSeries(exId, reps) {
   if (!(reps >= 1)) return [];
-  return Object.keys(db.workouts).sort().reduce((acc, date) => {
+  return statsWorkoutDates().sort().reduce((acc, date) => {
     const ex = db.workouts[date] && db.workouts[date].find(e => e.exerciseId === exId);
     if (!ex) return acc;
     const sets = ex.sets || [];
@@ -5867,6 +6163,13 @@ function calBuildMonthEl(year, month) {
       (dateStr === today ? ' today' : '') +
       (dateStr === calSelectedDate ? ' selected' : '');
     el.textContent = d;
+    // A rest day or deload day: its icon in place of the dot (never colour alone), and in the label.
+    const mark = getDayMark(dateStr);
+    if (mark) {
+      el.classList.add(mark === 'rest' ? 'cal-rest' : 'cal-deload');
+      el.insertAdjacentHTML('beforeend', `<span class="cal-mark">${mark === 'rest' ? REST_ICON_SVG : DELOAD_ICON_SVG}</span>`);
+      el.setAttribute('aria-label', `${d}, ${mark === 'rest' ? 'rustdag' : 'deloaddag'}`);
+    }
     el.dataset.date = dateStr;
     el.addEventListener('click', () => calDayClick(dateStr));
     grid.appendChild(el);
@@ -5923,7 +6226,8 @@ function calJumpTo(y, m, dateStr) {
 }
 
 function calUpdateWorkoutCount() {
-  const n = calWorkoutDates.length;
+  // A deload day counts for nothing, so not as a workout here (it is still on the calendar and the arrows go to it).
+  const n = calWorkoutDates.filter(d => !isDeloadDay(d)).length;
   document.getElementById('cal-workout-count').textContent = `${n} ${n === 1 ? 'workout' : 'workouts'}`;
 }
 
@@ -6030,11 +6334,13 @@ function openWorkoutDetail(dateStr) {
   const exercises = (db.workouts[dateStr] || []).filter(ex => (ex.sets || []).length > 0);
 
   if (exercises.length === 0) {
-    body.innerHTML = `<div class="records-empty">Er is voor deze dag geen workout opgeslagen.</div>`;
+    // A rest day says so (with its icon); otherwise the usual empty text.
+    body.innerHTML = isRestDay(dateStr) ? `<div class="records-empty">${dayMarkInlineHtml(dateStr)}</div>` : `<div class="records-empty">Er is voor deze dag geen workout opgeslagen.</div>`;
     openOverlay('cal-detail-overlay');
     return;
   }
 
+  if (isDeloadDay(dateStr)) body.insertAdjacentHTML('beforeend', `<div class="cal-detail-mark">${dayMarkInlineHtml(dateStr)}</div>`);
   exercises.forEach(ex => {
     const firstPRKeys = getPRSetKeys(ex.exerciseId);
     const exEl = document.createElement('div');
@@ -6685,7 +6991,11 @@ function setupDaySwipeNav() {
 document.getElementById('btn-prev-day').addEventListener('click', () => navigateDay(-1));
 document.getElementById('btn-next-day').addEventListener('click', () => navigateDay(1));
 document.getElementById('btn-calendar').addEventListener('click', openCalendar);
-document.getElementById('btn-add-exercise').addEventListener('click', openExerciseList);
+// A rest day takes no exercises: undo it first (the card's Ongedaan maken).
+document.getElementById('btn-add-exercise').addEventListener('click', () => {
+  if (isRestDay(currentDate)) { toast('Dit is een rustdag. Maak de rustdag eerst ongedaan.', { type: 'error' }); return; }
+  openExerciseList();
+});
 document.getElementById('btn-home-sel-done').addEventListener('click', exitHomeSelMode);
 document.getElementById('btn-home-sel-delete').addEventListener('click', confirmDeleteHomeSelectedEx);
 setupHomeExDragReorder();
@@ -6710,6 +7020,8 @@ document.getElementById('btn-back-new-workout').addEventListener('click', () => 
 document.getElementById('btn-nw-manual').addEventListener('click', openExerciseList);
 document.getElementById('btn-nw-schema-manual').addEventListener('click', openSchedulePickPlan);
 document.getElementById('btn-nw-schema-auto').addEventListener('click', openScheduleLoadAuto);
+document.getElementById('btn-nw-rest').addEventListener('click', chooseRestDay);
+document.getElementById('btn-nw-deload').addEventListener('click', chooseDeloadDay);
 document.getElementById('btn-back-schedule-pick-plan').addEventListener('click', () => goBack('screen-new-workout'));
 document.getElementById('btn-back-schedule-pick-day').addEventListener('click', () => goBack('screen-schedule-pick-plan'));
 document.getElementById('btn-save-set').addEventListener('click', saveSet);
@@ -7253,7 +7565,7 @@ function countWorkingSets(sets) {
 
 // The most recent session BEFORE `date` with logged sets of exercise `exId`, or null.
 function previousSessionSets(exId, date) {
-  const prev = Object.keys(db.workouts).filter(d => d < date).sort().reverse()
+  const prev = statsWorkoutDates().filter(d => d < date).sort().reverse()
     .map(d => db.workouts[d].find(e => e.exerciseId === exId))
     .find(e => e && e.sets && e.sets.length > 0);
   return prev ? prev.sets : null;
@@ -7297,7 +7609,9 @@ function workingSetGroups(sets) {
 function recapSetLines(ex, date, prKeys) {
   const groups = workingSetGroups(ex.sets || []);
   if (groups.length === 0) return recapLine('recap-muted', '', 'Nog geen sets gelogd');
-  const prevSessionSets = previousSessionSets(ex.exerciseId, date);
+  // A deload day isn't compared with last time (it counts for nothing, see statsWorkoutDates).
+  const deload = isDeloadDay(date);
+  const prevSessionSets = deload ? null : previousSessionSets(ex.exerciseId, date);
   const prev = prevSessionSets ? workingSets(prevSessionSets) : null;
   const reps = n => `${n} ${n === 1 ? 'rep' : 'reps'}`;
   const blocks = groups.map(({ set: s, idxs }, i) => {
@@ -7336,7 +7650,7 @@ function recapSetLines(ex, date, prKeys) {
         ${drops > 0 ? `<div class="recap-note recap-drop">${DROP_ARROW_SVG}Gevolgd door ${drops === 1 ? 'dropset' : `${drops} dropsets`}</div>` : ''}
       </div>`;
   });
-  if (!prev) blocks.push(recapLine('recap-muted', '', 'Eerste keer deze oefening — geen vergelijking'));
+  if (!prev && !deload) blocks.push(recapLine('recap-muted', '', 'Eerste keer deze oefening — geen vergelijking'));
   return blocks.join('');
 }
 
@@ -7375,6 +7689,8 @@ function openDayRecap() {
         ${recapSetLines(ex, date, prs.byId[ex.exerciseId])}
       </div>`).join('');
   }
+  const mark = dayMarkInlineHtml(date);
+  if (mark) body.insertAdjacentHTML('afterbegin', `<div class="recap-ex">${mark}</div>`);
   openOverlay('recap-overlay');
 }
 
@@ -7913,6 +8229,37 @@ function planHasWeekB() {
   return !!(currentPlanData.hasWeekB || (currentPlanData.days || []).some(d => d.group === 'B'));
 }
 
+// The week ('A'/'B') the active split plan is in now: fixed days the cycle's week (planWeekCycle,
+// the week whose days are suggested), "Geen vaste dagen" the week of the next suggested day.
+function activePlanCurrentWeek(plan) {
+  if (plan.fixedDays) return planWeekCycle(plan).week;
+  const next = plan.days[((db.activePlan.lastDayIndex ?? -1) + 1) % plan.days.length];
+  return (next && next.group) || 'A';
+}
+
+// Plan detail, HUIDIGE WEEK: only on the ACTIVE plan with a Week B, outside edit mode. Week A ·
+// Week B (Plan schedule's choice buttons), the current week selected; tapping the other one makes
+// that the week now (setActivePlanWeek), from where the app switches by itself.
+function buildCurrentWeekCard() {
+  const plan = currentPlanData;
+  if (!plan || !db.activePlan || db.activePlan.planId !== plan.id || !planHasWeekSplit(plan) || !(plan.days || []).length) return null;
+  const week = activePlanCurrentWeek(plan);
+  const card = document.createElement('div');
+  card.className = 'card plan-week-now';
+  card.innerHTML = `<div class="section-label">Huidige week</div>
+    <div class="ps-toggle-row" role="group" aria-label="Huidige week">
+      ${['A', 'B'].map(w => `<button type="button" class="ps-toggle-option${w === week ? ' selected' : ''}" data-week="${w}" aria-pressed="${w === week}">Week ${w}</button>`).join('')}
+    </div>
+    <div class="role-sub">${plan.fixedDays ? 'Wisselt elke maandag vanzelf naar de andere week.' : 'Je volgende dag komt uit deze week.'}</div>`;
+  card.querySelectorAll('[data-week]').forEach(btn => btn.addEventListener('click', async () => {
+    if (btn.dataset.week === activePlanCurrentWeek(plan)) return;
+    await setActivePlanWeek(btn.dataset.week);
+    renderPlanDetail();
+    toast(`Het is nu Week ${btn.dataset.week}`);
+  }));
+  return card;
+}
+
 function renderPlanDetail() {
   document.getElementById('btn-plan-title-edit').classList.toggle('hidden', !planDetailEditMode);
   document.getElementById('btn-plan-set-active').classList.toggle('hidden', planDetailEditMode);
@@ -7920,6 +8267,8 @@ function renderPlanDetail() {
   const scroll = document.getElementById('plan-detail-scroll');
   if (!currentPlanData || !currentPlanData.days) { scroll.innerHTML = ''; return; }
   scroll.innerHTML = '';
+  const weekCard = !planDetailEditMode && buildCurrentWeekCard();
+  if (weekCard) scroll.appendChild(weekCard);
 
   // Rendered as segments so each week's own "Dag toevoegen" block lands right after
   // that week's last card, even when Week A's block is tapped after Week B already
@@ -8648,6 +8997,7 @@ document.getElementById('btn-plan-set-active').addEventListener('click', async (
   const isActive = db.activePlan && db.activePlan.planId === currentPlanId;
   document.getElementById('plan-active-ribbon').classList.toggle('show', isActive);
   document.getElementById('btn-plan-set-active').classList.toggle('is-active', isActive);
+  renderPlanDetail(); // "Huidige week" only shows on the active plan
 });
 
 // Saves (everything's already persisted per-action, but this re-confirms) and leaves
@@ -8941,7 +9291,7 @@ function renderSmartBanner() {
   recordWeekCycle().catch(persistFailed);
   const pick = getTodaysScheduledDay();
   bannerSuggestedPick = pick;
-  if (bannerDismissed || !pick || !planDayHasExercises(pick.day) || currentDate !== todayStr() || getWorkout(todayStr()).length > 0) { banner.classList.add('hidden'); return; }
+  if (bannerDismissed || !pick || !planDayHasExercises(pick.day) || currentDate !== todayStr() || getWorkout(todayStr()).length > 0 || getDayMark(todayStr())) { banner.classList.add('hidden'); return; }
   document.getElementById('smart-banner-msg').textContent = `Volgens je plan staat vandaag ${pick.dayName} op het programma. Laden?`;
   banner.classList.remove('hidden');
 }
