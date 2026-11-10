@@ -90,7 +90,7 @@ const BUILTIN_SUBCATEGORIES = [
 
 // Built-in exercises, each in a category and optionally in a subcategory (BUILTIN_SUBCATEGORIES;
 // without one it's a "Losse oefening"), with a type like an own exercise (EX_TYPE_OPTIONS in
-// app.js): Cardio "duration" (Duur), everything else "weight_reps" (Gewicht en reps).
+// app.js): Cardio and Plank "duration" (Duur), everything else "weight_reps" (Gewicht en reps).
 // `id` is the exercise's fixed id (kebab-case of its name when ids were introduced, October 2026,
 // or when it was added). It never changes, also not when the name or category does: plans,
 // workouts, favorites, exercise info and records all point at it. Never edit an existing id; a
@@ -109,8 +109,8 @@ const EXERCISE_DB = [
 
   { id: "bench-press-dumbbell", category: "chest", subcategory: "sub-dumbbell-press", name: "Dumbbell Press - Flat", type: "weight_reps" },
   { id: "incline-bench-press-dumbbell", category: "chest", subcategory: "sub-dumbbell-press", name: "Dumbbell Press - Incline", type: "weight_reps" },
-  { id: "dumbbell-press-flat-neutral-grip", category: "chest", subcategory: "sub-dumbbell-press", name: "Dumbbell Press - Flat Neutral Grip", type: "weight_reps" },
-  { id: "dumbbell-press-incline-neutral-grip", category: "chest", subcategory: "sub-dumbbell-press", name: "Dumbbell Press - Incline Neutral Grip", type: "weight_reps" },
+  { id: "dumbbell-press-flat-neutral-grip", category: "chest", subcategory: "sub-dumbbell-press", name: "Dumbbell Press - Flat - Neutral Grip", type: "weight_reps" },
+  { id: "dumbbell-press-incline-neutral-grip", category: "chest", subcategory: "sub-dumbbell-press", name: "Dumbbell Press - Incline - Neutral Grip", type: "weight_reps" },
 
   { id: "cable-crossover", category: "chest", subcategory: "sub-cable-fly", name: "Cable Fly - High to Low", type: "weight_reps" },
   { id: "flyes-cable", category: "chest", subcategory: "sub-cable-fly", name: "Cable Fly - Medium", type: "weight_reps" },
@@ -122,10 +122,12 @@ const EXERCISE_DB = [
   { id: "machine-flat-chest-press", category: "chest", subcategory: "sub-machine", name: "Machine - Flat Chest Press", type: "weight_reps" },
   { id: "machine-incline-chest-press", category: "chest", subcategory: "sub-machine", name: "Machine - Incline Chest Press", type: "weight_reps" },
 
-  { id: "chin-ups", category: "back", name: "Chin-ups", type: "weight_reps" },
-  { id: "pull-ups", category: "back", name: "Pull-ups", type: "weight_reps" },
-  { id: "face-pulls", category: "back", name: "Face pulls", type: "weight_reps" },
-  { id: "good-mornings", category: "back", name: "Good mornings", type: "weight_reps" },
+  { id: "chin-ups", category: "back", name: "Chin-Up", type: "weight_reps" },
+  { id: "pull-ups", category: "back", name: "Pull-Up", type: "weight_reps" },
+  { id: "face-pulls", category: "back", name: "Face Pull - Rug", type: "weight_reps" },
+  { id: "good-mornings", category: "back", name: "Good Morning", type: "weight_reps" },
+  { id: "dumbbell-row-chest-supported", category: "back", name: "Dumbbell Row - Chest Supported", type: "weight_reps" },
+  { id: "lat-prayer", category: "back", name: "Lat Prayer", type: "weight_reps" },
 
   { id: "bent-over-barbell-row", category: "back", subcategory: "sub-barbell-row", name: "Barbell Row - Overhand", type: "weight_reps" },
   { id: "barbell-row-underhand", category: "back", subcategory: "sub-barbell-row", name: "Barbell Row - Underhand", type: "weight_reps" },
@@ -133,7 +135,7 @@ const EXERCISE_DB = [
   { id: "lat-pulldown", category: "back", subcategory: "sub-pulldown", name: "Pulldown - Wide Grip", type: "weight_reps" },
   { id: "pulldown-close-grip", category: "back", subcategory: "sub-pulldown", name: "Pulldown - Close Grip", type: "weight_reps" },
   { id: "pulldown-machine", category: "back", subcategory: "sub-pulldown", name: "Pulldown - Machine", type: "weight_reps" },
-  { id: "pulldown-machine-single-arm", category: "back", subcategory: "sub-pulldown", name: "Pulldown - Machine Single Arm", type: "weight_reps" },
+  { id: "pulldown-machine-single-arm", category: "back", subcategory: "sub-pulldown", name: "Pulldown - Machine - Single Arm", type: "weight_reps" },
   { id: "pulldown-neutral-grip", category: "back", subcategory: "sub-pulldown", name: "Pulldown - Neutral Grip", type: "weight_reps" },
   { id: "pulldown-underhand", category: "back", subcategory: "sub-pulldown", name: "Pulldown - Underhand", type: "weight_reps" },
 
@@ -145,8 +147,8 @@ const EXERCISE_DB = [
   { id: "single-arm-row-high-to-low", category: "back", subcategory: "sub-single-arm-row", name: "Single Arm Row - High to Low", type: "weight_reps" },
   { id: "single-arm-row-medium", category: "back", subcategory: "sub-single-arm-row", name: "Single Arm Row - Medium", type: "weight_reps" },
 
-  { id: "rear-delt-flyes-machine", category: "shoulders", name: "Rear Delt Flyes - Machine", type: "weight_reps" },
-  { id: "face-pull-shoulder", category: "shoulders", name: "Face Pull Shoulder", type: "weight_reps" },
+  { id: "rear-delt-flyes-machine", category: "shoulders", name: "Rear Delt Fly - Machine", type: "weight_reps" },
+  { id: "face-pull-shoulder", category: "shoulders", name: "Face Pull - Shoulder", type: "weight_reps" },
 
   { id: "lateral-raises-cable", category: "shoulders", subcategory: "sub-lateral-raise", name: "Lateral Raise - Cable", type: "weight_reps" },
   { id: "lateral-raises-dumbbell", category: "shoulders", subcategory: "sub-lateral-raise", name: "Lateral Raise - Dumbbell", type: "weight_reps" },
@@ -157,7 +159,7 @@ const EXERCISE_DB = [
   { id: "machine-shoulder-press", category: "shoulders", subcategory: "sub-shoulder-press", name: "Shoulder Press - Machine", type: "weight_reps" },
 
   { id: "skull-crushers-barbell", category: "arms", name: "Skull Crusher - Ez-Bar", type: "weight_reps" },
-  { id: "dips-triceps", category: "arms", name: "Tricep Dips", type: "weight_reps" },
+  { id: "dips-triceps", category: "arms", name: "Tricep Dip", type: "weight_reps" },
 
   { id: "barbell-curl", category: "arms", subcategory: "sub-bicep-curl", name: "Bicep Curl - Barbell", type: "weight_reps" },
   { id: "cable-curl", category: "arms", subcategory: "sub-bicep-curl", name: "Bicep Curl - Cable Straight Bar", type: "weight_reps" },
@@ -172,26 +174,30 @@ const EXERCISE_DB = [
   { id: "hammer-curl-rope", category: "arms", subcategory: "sub-hammer-curl", name: "Hammer Curl - Rope", type: "weight_reps" },
   { id: "hammer-curl-rope-single-arm", category: "arms", subcategory: "sub-hammer-curl", name: "Hammer Curl - Rope - Single Arm", type: "weight_reps" },
   { id: "hammer-curl-rope-preacher-single-arm", category: "arms", subcategory: "sub-hammer-curl", name: "Hammer Curl - Rope Preacher - Single Arm", type: "weight_reps" },
+  { id: "hammer-curl-dumbbell-preacher", category: "arms", subcategory: "sub-hammer-curl", name: "Hammer Curl - Dumbbell Preacher", type: "weight_reps" },
 
   { id: "reverse-curl", category: "arms", subcategory: "sub-forearms", name: "Forearms - Reverse Curl - Ez-Bar", type: "weight_reps" },
   { id: "forearms-wrist-curl-barbell", category: "arms", subcategory: "sub-forearms", name: "Forearms - Wrist Curl - Barbell", type: "weight_reps" },
   { id: "forearms-wrist-curl-cable", category: "arms", subcategory: "sub-forearms", name: "Forearms - Wrist Curl - Cable", type: "weight_reps" },
+  { id: "forearms-wrist-curl-dumbbell", category: "arms", subcategory: "sub-forearms", name: "Forearms - Wrist Curl - Dumbbell", type: "weight_reps" },
 
   { id: "overhead-triceps-extension-cable", category: "arms", subcategory: "sub-overhead-extension", name: "Overhead Extension - Rope", type: "weight_reps" },
   { id: "overhead-extension-straight-bar", category: "arms", subcategory: "sub-overhead-extension", name: "Overhead Extension - Straight Bar", type: "weight_reps" },
 
   { id: "triceps-pushdown-cable", category: "arms", subcategory: "sub-pushdown", name: "Pushdown - Rope", type: "weight_reps" },
   { id: "pushdown-rope-single-arm", category: "arms", subcategory: "sub-pushdown", name: "Pushdown - Rope - Single Arm", type: "weight_reps" },
-  { id: "pushdown-rope-seated", category: "arms", subcategory: "sub-pushdown", name: "Pushdown - Rope Seated", type: "weight_reps" },
+  { id: "pushdown-rope-seated", category: "arms", subcategory: "sub-pushdown", name: "Pushdown - Rope - Seated", type: "weight_reps" },
   { id: "pushdown-straight-bar", category: "arms", subcategory: "sub-pushdown", name: "Pushdown - Straight Bar", type: "weight_reps" },
   { id: "pushdown-v-bar", category: "arms", subcategory: "sub-pushdown", name: "Pushdown - V-Bar", type: "weight_reps" },
-  { id: "pushdown-v-bar-seated", category: "arms", subcategory: "sub-pushdown", name: "Pushdown - V-Bar Seated", type: "weight_reps" },
+  { id: "pushdown-v-bar-seated", category: "arms", subcategory: "sub-pushdown", name: "Pushdown - V-Bar - Seated", type: "weight_reps" },
 
-  { id: "bulgarian-split-squat", category: "legs", name: "Bulgarian Split Squats", type: "weight_reps" },
+  { id: "bulgarian-split-squat", category: "legs", name: "Bulgarian Split Squat", type: "weight_reps" },
   { id: "hip-thrust-barbell", category: "legs", name: "Hip Thrust", type: "weight_reps" },
-  { id: "lunges-dumbbell", category: "legs", name: "Walking Lunges", type: "weight_reps" },
-  { id: "front-foot-elevated-split-squats", category: "legs", name: "Front Foot Elevated Split Squats", type: "weight_reps" },
-  { id: "sissy-squats", category: "legs", name: "Sissy Squats", type: "weight_reps" },
+  { id: "lunges-dumbbell", category: "legs", name: "Walking Lunge", type: "weight_reps" },
+  { id: "front-foot-elevated-split-squats", category: "legs", name: "Front Foot Elevated Split Squat", type: "weight_reps" },
+  { id: "sissy-squats", category: "legs", name: "Sissy Squat", type: "weight_reps" },
+  { id: "hip-adduction", category: "legs", name: "Hip Adduction", type: "weight_reps" },
+  { id: "45-degree-back-extension", category: "legs", name: "45-Degree Back Extension", type: "weight_reps" },
 
   { id: "leg-press-calf-raise", category: "legs", subcategory: "sub-calves", name: "Calves - Press", type: "weight_reps" },
   { id: "seated-calf-raise-machine", category: "legs", subcategory: "sub-calves", name: "Calves - Seated", type: "weight_reps" },
@@ -200,11 +206,11 @@ const EXERCISE_DB = [
 
   { id: "deadlift", category: "legs", subcategory: "sub-deadlift", name: "Deadlift", type: "weight_reps" },
   { id: "romanian-deadlift", category: "legs", subcategory: "sub-deadlift", name: "Deadlift - Romanian", type: "weight_reps" },
-  { id: "deadlift-deficit-paused", category: "legs", subcategory: "sub-deadlift", name: "Deadlift - Deficit Paused", type: "weight_reps" },
+  { id: "deadlift-deficit-paused", category: "legs", subcategory: "sub-deadlift", name: "Deadlift - Deficit - Paused", type: "weight_reps" },
   { id: "deadlift-paused", category: "legs", subcategory: "sub-deadlift", name: "Deadlift - Paused", type: "weight_reps" },
   { id: "deadlift-rack-pull", category: "legs", subcategory: "sub-deadlift", name: "Deadlift - Rack Pull", type: "weight_reps" },
   { id: "deadlift-romanian-smith-machine", category: "legs", subcategory: "sub-deadlift", name: "Deadlift - Romanian - Smith Machine", type: "weight_reps" },
-  { id: "deadlift-romanian-single-leg", category: "legs", subcategory: "sub-deadlift", name: "Deadlift - Romanian Single Leg", type: "weight_reps" },
+  { id: "deadlift-romanian-single-leg", category: "legs", subcategory: "sub-deadlift", name: "Deadlift - Romanian - Single Leg", type: "weight_reps" },
 
   { id: "leg-curl-lying", category: "legs", subcategory: "sub-leg-curl", name: "Leg Curl - Lying", type: "weight_reps" },
   { id: "leg-curl-machine", category: "legs", subcategory: "sub-leg-curl", name: "Leg Curl - Seated", type: "weight_reps" },
@@ -216,7 +222,8 @@ const EXERCISE_DB = [
   { id: "leg-press", category: "legs", subcategory: "sub-leg-press", name: "Leg Press", type: "weight_reps" },
   { id: "leg-press-paused", category: "legs", subcategory: "sub-leg-press", name: "Leg Press - Paused", type: "weight_reps" },
   { id: "leg-press-single-leg", category: "legs", subcategory: "sub-leg-press", name: "Leg Press - Single Leg", type: "weight_reps" },
-  { id: "leg-press-single-leg-paused", category: "legs", subcategory: "sub-leg-press", name: "Leg Press - Single Leg Paused", type: "weight_reps" },
+  { id: "leg-press-single-leg-paused", category: "legs", subcategory: "sub-leg-press", name: "Leg Press - Single Leg - Paused", type: "weight_reps" },
+  { id: "leg-press-sissy", category: "legs", subcategory: "sub-leg-press", name: "Leg Press - Sissy", type: "weight_reps" },
 
   { id: "squat", category: "legs", subcategory: "sub-squat", name: "Squat", type: "weight_reps" },
   { id: "front-squat", category: "legs", subcategory: "sub-squat", name: "Squat - Front", type: "weight_reps" },
@@ -226,63 +233,89 @@ const EXERCISE_DB = [
 
   { id: "ab-wheel-rollout", category: "abs", name: "Ab Roller", type: "weight_reps" },
   { id: "weighted-crunch", category: "abs", name: "Weighted Crunch", type: "weight_reps" },
+  // Plank came back in November 2026 under a new id: the old id "plank" (taken out earlier) is
+  // still in logged sets, which would otherwise show up again.
+  { id: "plank-hold", category: "abs", name: "Plank", type: "duration" },
 
   { id: "running", category: "cardio", name: "Running", type: "duration" },
   { id: "treadmill", category: "cardio", name: "Treadmill", type: "duration" },
-  { id: "rowing-machine", category: "cardio", name: "Rowing machine", type: "duration" },
-  { id: "cycling-outdoor", category: "cardio", name: "Cycling (outdoor)", type: "duration" },
-  { id: "stationary-bike", category: "cardio", name: "Stationary bike", type: "duration" },
+  { id: "rowing-machine", category: "cardio", name: "Rowing Machine", type: "duration" },
+  { id: "cycling-outdoor", category: "cardio", name: "Cycling - Outdoor", type: "duration" },
+  { id: "stationary-bike", category: "cardio", name: "Stationary Bike", type: "duration" },
   { id: "elliptical", category: "cardio", name: "Elliptical", type: "duration" },
-  { id: "jump-rope", category: "cardio", name: "Jump rope", type: "duration" },
+  { id: "jump-rope", category: "cardio", name: "Jump Rope", type: "duration" },
   { id: "stairmaster", category: "cardio", name: "Stairmaster", type: "duration" },
   { id: "hiit", category: "cardio", name: "HIIT", type: "duration" },
   { id: "swimming", category: "cardio", name: "Swimming", type: "duration" },
 ];
 
-// What the renamed or moved built-ins were called / where they were before the indeling in
-// subcategories (November 2026), by id. Used to recognise old names in data stored by name (the
-// one-time migrations in app.js) and to bring along an edited built-in that still has the old
-// name or category (migrateBuiltinSubcategories() in app.js).
+// What the renamed or moved built-ins were called / where they were before, by id: `names` lists
+// every earlier name (oldest first), `category` the earlier category. Two rounds, both November
+// 2026: the indeling in subcategories, then the standard for names (every word capitalised, also
+// after a hyphen; singular; " - " between separate features). Used to recognise old names in data
+// stored by name (the one-time migrations in app.js), to bring along an edited built-in that still
+// has an old name or category (migrateBuiltinSubcategories()) and to recognise an edited built-in
+// that differs in nothing but an old name (migrateBuiltinCopies()). "Face pulls - Rug" is the name
+// an edited copy of Face pulls carried in user data, not a name the built-in itself ever had.
 const BUILTIN_PREVIOUS = {
-  "bench-press": { name: "Bench press" },
-  "close-grip-bench-press": { name: "Close grip bench press", category: "arms" },
-  "incline-bench-press": { name: "Incline bench press" },
-  "bench-press-dumbbell": { name: "Bench press (dumbbell)" },
-  "incline-bench-press-dumbbell": { name: "Incline bench press (dumbbell)" },
-  "cable-crossover": { name: "Cable crossover" },
-  "flyes-cable": { name: "Flyes (cable)" },
-  "flyes-machine": { name: "Flyes (machine)" },
-  "bent-over-barbell-row": { name: "Bent-over barbell row" },
-  "lat-pulldown": { name: "Lat pulldown" },
-  "seated-cable-row": { name: "Seated cable row" },
-  "rear-delt-flyes-machine": { name: "Rear delt flyes (machine)" },
-  "lateral-raises-cable": { name: "Lateral raises (cable)" },
-  "lateral-raises-dumbbell": { name: "Lateral raises (dumbbell)" },
-  "military-press-barbell": { name: "Military press (barbell)" },
-  "shoulder-press-dumbbell": { name: "Shoulder press (dumbbell)" },
-  "machine-shoulder-press": { name: "Machine shoulder press" },
-  "skull-crushers-barbell": { name: "Skull crushers (barbell)" },
-  "dips-triceps": { name: "Dips (triceps)" },
-  "barbell-curl": { name: "Barbell curl" },
-  "cable-curl": { name: "Cable curl" },
-  "dumbbell-curl": { name: "Dumbbell curl" },
-  "incline-dumbbell-curl": { name: "Incline dumbbell curl" },
-  "hammer-curl": { name: "Hammer curl" },
-  "reverse-curl": { name: "Reverse curl" },
-  "overhead-triceps-extension-cable": { name: "Overhead triceps extension (cable)" },
-  "triceps-pushdown-cable": { name: "Triceps pushdown (cable)" },
-  "bulgarian-split-squat": { name: "Bulgarian split squat" },
-  "hip-thrust-barbell": { name: "Hip thrust (barbell)" },
-  "lunges-dumbbell": { name: "Lunges (dumbbell)" },
-  "leg-press-calf-raise": { name: "Leg press calf raise" },
-  "seated-calf-raise-machine": { name: "Seated calf raise (machine)" },
-  "standing-calf-raise-machine": { name: "Standing calf raise (machine)" },
+  "bench-press": { names: ["Bench press"] },
+  "close-grip-bench-press": { names: ["Close grip bench press"], category: "arms" },
+  "incline-bench-press": { names: ["Incline bench press"] },
+  "bench-press-dumbbell": { names: ["Bench press (dumbbell)"] },
+  "incline-bench-press-dumbbell": { names: ["Incline bench press (dumbbell)"] },
+  "dumbbell-press-flat-neutral-grip": { names: ["Dumbbell Press - Flat Neutral Grip"] },
+  "dumbbell-press-incline-neutral-grip": { names: ["Dumbbell Press - Incline Neutral Grip"] },
+  "cable-crossover": { names: ["Cable crossover"] },
+  "flyes-cable": { names: ["Flyes (cable)"] },
+  "flyes-machine": { names: ["Flyes (machine)"] },
+  "chin-ups": { names: ["Chin-ups"] },
+  "pull-ups": { names: ["Pull-ups"] },
+  "face-pulls": { names: ["Face pulls", "Face pulls - Rug"] },
+  "good-mornings": { names: ["Good mornings"] },
+  "bent-over-barbell-row": { names: ["Bent-over barbell row"] },
+  "lat-pulldown": { names: ["Lat pulldown"] },
+  "pulldown-machine-single-arm": { names: ["Pulldown - Machine Single Arm"] },
+  "seated-cable-row": { names: ["Seated cable row"] },
+  "rear-delt-flyes-machine": { names: ["Rear delt flyes (machine)", "Rear Delt Flyes - Machine"] },
+  "face-pull-shoulder": { names: ["Face Pull Shoulder"] },
+  "lateral-raises-cable": { names: ["Lateral raises (cable)"] },
+  "lateral-raises-dumbbell": { names: ["Lateral raises (dumbbell)"] },
+  "military-press-barbell": { names: ["Military press (barbell)"] },
+  "shoulder-press-dumbbell": { names: ["Shoulder press (dumbbell)"] },
+  "machine-shoulder-press": { names: ["Machine shoulder press"] },
+  "skull-crushers-barbell": { names: ["Skull crushers (barbell)"] },
+  "dips-triceps": { names: ["Dips (triceps)", "Tricep Dips"] },
+  "barbell-curl": { names: ["Barbell curl"] },
+  "cable-curl": { names: ["Cable curl"] },
+  "dumbbell-curl": { names: ["Dumbbell curl"] },
+  "incline-dumbbell-curl": { names: ["Incline dumbbell curl"] },
+  "hammer-curl": { names: ["Hammer curl"] },
+  "reverse-curl": { names: ["Reverse curl"] },
+  "overhead-triceps-extension-cable": { names: ["Overhead triceps extension (cable)"] },
+  "triceps-pushdown-cable": { names: ["Triceps pushdown (cable)"] },
+  "pushdown-rope-seated": { names: ["Pushdown - Rope Seated"] },
+  "pushdown-v-bar-seated": { names: ["Pushdown - V-Bar Seated"] },
+  "bulgarian-split-squat": { names: ["Bulgarian split squat", "Bulgarian Split Squats"] },
+  "hip-thrust-barbell": { names: ["Hip thrust (barbell)"] },
+  "lunges-dumbbell": { names: ["Lunges (dumbbell)", "Walking Lunges"] },
+  "front-foot-elevated-split-squats": { names: ["Front Foot Elevated Split Squats"] },
+  "sissy-squats": { names: ["Sissy Squats"] },
+  "leg-press-calf-raise": { names: ["Leg press calf raise"] },
+  "seated-calf-raise-machine": { names: ["Seated calf raise (machine)"] },
+  "standing-calf-raise-machine": { names: ["Standing calf raise (machine)"] },
   "deadlift": { category: "back" },
-  "romanian-deadlift": { name: "Romanian deadlift", category: "back" },
-  "leg-curl-lying": { name: "Leg curl (lying)" },
-  "leg-curl-machine": { name: "Leg curl (machine)" },
-  "leg-extension-machine": { name: "Leg extension (machine)" },
-  "leg-press": { name: "Leg press" },
-  "front-squat": { name: "Front squat" },
-  "ab-wheel-rollout": { name: "Ab wheel rollout" },
+  "romanian-deadlift": { names: ["Romanian deadlift"], category: "back" },
+  "deadlift-deficit-paused": { names: ["Deadlift - Deficit Paused"] },
+  "deadlift-romanian-single-leg": { names: ["Deadlift - Romanian Single Leg"] },
+  "leg-curl-lying": { names: ["Leg curl (lying)"] },
+  "leg-curl-machine": { names: ["Leg curl (machine)"] },
+  "leg-extension-machine": { names: ["Leg extension (machine)"] },
+  "leg-press": { names: ["Leg press"] },
+  "leg-press-single-leg-paused": { names: ["Leg Press - Single Leg Paused"] },
+  "front-squat": { names: ["Front squat"] },
+  "ab-wheel-rollout": { names: ["Ab wheel rollout"] },
+  "rowing-machine": { names: ["Rowing machine"] },
+  "cycling-outdoor": { names: ["Cycling (outdoor)"] },
+  "stationary-bike": { names: ["Stationary bike"] },
+  "jump-rope": { names: ["Jump rope"] },
 };

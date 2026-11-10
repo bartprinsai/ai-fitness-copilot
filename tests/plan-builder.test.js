@@ -310,7 +310,7 @@ H.run(async () => {
     H.ok(geo.every(x => x.hitDots && x.gapDots >= 0 && x.hitEdge && x.gapName >= 0), `${tag}: tikvlak plusje valt niet over ⋮ en niet over de naam`, geo.filter(x => !(x.hitDots && x.gapDots >= 0 && x.hitEdge && x.gapName >= 0)).map(x => x.name));
     // A name too long for one line (Bicep Curl - Cable Preacher - Single Arm …) wraps and makes its row taller.
     H.ok(geo.every(x => x.dotsRight === x.padRight && (x.lines > 1 || x.h === 56) && x.cursor === 'default'), `${tag}: ⋮ helemaal rechts, rijen 56px, geen knop-cursor`, geo.filter(x => !(x.dotsRight === x.padRight && (x.lines > 1 || x.h === 56) && x.cursor === 'default')));
-    H.ok(['Bicep Curl - Cable Bayesian', 'Overhead Extension - Rope', 'Pushdown - Rope Seated'].every(n => (geo.find(x => x.name === n) || {}).lines === 1) && (geo.find(x => x.name === 'Bicep Curl - Cable Preacher - Single Arm') || {}).lines === 2, `${tag}: middellange namen op één regel naast plusje en ⋮, een lange op twee`);
+    H.ok(['Bicep Curl - Cable Bayesian', 'Overhead Extension - Rope', 'Pushdown - Rope - Seated'].every(n => (geo.find(x => x.name === n) || {}).lines === 1) && (geo.find(x => x.name === 'Bicep Curl - Cable Preacher - Single Arm') || {}).lines === 2, `${tag}: middellange namen op één regel naast plusje en ⋮, een lange op twee`);
     await page.evaluate(() => document.getElementById('exercise-list').scrollTo(0, 0)); await H.settle(page);
 
     // ⋮ menu also works in add mode

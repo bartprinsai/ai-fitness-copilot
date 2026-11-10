@@ -49,7 +49,8 @@ H.run(async () => {
     'Inzicht dag 20 oktober': () => { openInsightDay('2026-10-20'); return document.querySelector('.screen.active').innerText; },
     'Inzicht training': () => { showScreen('screen-insight'); openInsightTraining(); return document.querySelector('.screen.active').innerText; },
     'Inzicht kracht': () => { showScreen('screen-insight'); openInsightStrength(); return document.querySelector('.screen.active').innerText; },
-    'AI-namenlijst': () => aiExerciseNameList(),
+    // Plank is back as a new built-in under another id (plank-hold): its own line in the list is fine.
+    'AI-namenlijst': () => aiExerciseNameList().split('\n').filter(n => n !== 'Plank').join('\n'),
   };
   const seen = {};
   for (const name of Object.keys(screens)) {
@@ -62,6 +63,7 @@ H.run(async () => {
   check('Fitness Tracker 20 oktober: geen oefeningkaart', seen['Fitness Tracker 20 oktober (alleen verdwenen sets)'].endsWith('|0'), true);
   check('Kalender: 20 oktober is geen trainingsdag', /\|2026-10-12,2026-10-19$/.test(seen['Kalender']), true);
   check('Zoeken "crunch": alleen Weighted Crunch', seen['Zoeken "crunch"'].trim(), 'Weighted Crunch');
+  check('AI-namenlijst: de nieuwe Plank één keer, de oude id plank blijft weg', await page.evaluate(() => [aiExerciseNameList().split('\n').filter(n => n === 'Plank').length, !!findExercise('plank'), findExercise('plank-hold').name]), [1, false, 'Plank']);
   check('Inzicht dag 20 oktober: geen training', /Crunches|25/.test(seen['Inzicht dag 20 oktober']), false);
 
   await browser.close();

@@ -167,7 +167,7 @@ H.run(async () => {
     H.check(`${tag} groepen: volgorde, aantallen, dicht`, g1.map(g => [g.name, g.count, g.open]),
       [['Losse oefeningen', String(loose.length), false], ['Barbell Row', '2', false], ['Pulldown', '6', false], ['Row', '2', false], ['Seated Cable Row', '4', false], ['Single Arm Row', '2', false], ['T-bar', '1', false]]);
     H.check(`${tag} groepen: volledige namen op alfabet`, g1.slice(1).map(g => g.items), [['Barbell Row - Overhand', 'Barbell Row - Underhand'],
-      ['Pulldown - Behind neck', 'Pulldown - Close Grip', 'Pulldown - Machine', 'Pulldown - Machine Single Arm', 'Pulldown - Neutral Grip', 'Pulldown - Underhand'],
+      ['Pulldown - Behind neck', 'Pulldown - Close Grip', 'Pulldown - Machine', 'Pulldown - Machine - Single Arm', 'Pulldown - Neutral Grip', 'Pulldown - Underhand'],
       ['Row - Kneeling', 'Row - Wide Grip'],
       ['Seated Cable Row - Close Grip', 'Seated Cable Row - Neutral Grip', 'Seated Cable Row - Rope', 'Seated Cable Row - Wide Overhand'],
       ['Single Arm Row - High to Low', 'Single Arm Row - Medium'], ['T-bar - Chest supported']]);

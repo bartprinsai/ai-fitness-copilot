@@ -189,12 +189,16 @@ function exerciseName(id) {
 function escapeHtml(text) {
   return String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 }
-// The built-in with this exact name, its current one or the one it had before (BUILTIN_PREVIOUS),
+// The built-in with this exact name, its current one or one it had before (BUILTIN_PREVIOUS),
 // or null. Only for data stored by name before exercises had an id (the one-time migrations).
 // A permanently deleted built-in is never found: a migration must not bring it back.
 function builtinByName(name) {
   const builtins = EXERCISE_DB.filter(b => !(db.purgedBuiltins || {})[b.id]);
-  return builtins.find(b => b.name === name) || builtins.find(b => (BUILTIN_PREVIOUS[b.id] || {}).name === name) || null;
+  return builtins.find(b => b.name === name) || builtins.find(b => previousNames(b.id).includes(name)) || null;
+}
+// Every earlier name of a built-in (BUILTIN_PREVIOUS), oldest first; [] when it never had another.
+function previousNames(id) {
+  return (BUILTIN_PREVIOUS[id] || {}).names || [];
 }
 
 // -- Categories -----------------------------------------
@@ -526,6 +530,7 @@ async function loadUserData(userUid) {
     if (!migrations.exerciseIds) await migrateExerciseIds(userUid);
     if (!migrations.planDays) await migratePlanDays(userUid);
     if (!migrations.builtinSubcategories) await migrateBuiltinSubcategories(userUid);
+    if (!migrations.builtinCopies) await migrateBuiltinCopies(userUid);
     // After the migrations: they convert entries stored by name.
     setAsideUnknownExercises();
     // The first run stores today's schedule (and Week A/B) as the starting point.
@@ -570,8 +575,8 @@ async function migrateExerciseIds(userUid) {
   });
   // Custom entries last: one with a built-in's name is that (edited) built-in. A built-in's
   // previous name (BUILTIN_PREVIOUS) goes first: the data being converted is from before.
-  const previousNames = Object.entries(BUILTIN_PREVIOUS).filter(([, p]) => p.name).map(([id, p]) => ({ id, name: p.name }));
-  const idByName = new Map([...previousNames.filter(p => !(db.purgedBuiltins || {})[p.id]), ...EXERCISE_DB.filter(b => !(db.purgedBuiltins || {})[b.id]), ...(db.custom_exercises || [])].map(e => [e.name, e.id]));
+  const oldNames = Object.keys(BUILTIN_PREVIOUS).flatMap(id => previousNames(id).map(name => ({ id, name })));
+  const idByName = new Map([...oldNames.filter(p => !(db.purgedBuiltins || {})[p.id]), ...EXERCISE_DB.filter(b => !(db.purgedBuiltins || {})[b.id]), ...(db.custom_exercises || [])].map(e => [e.name, e.id]));
 
   const convertEntries = (entries, where) => {
     let changed = false;
@@ -686,7 +691,7 @@ async function migrateBuiltinSubcategories(userUid) {
     const b = EXERCISE_DB.find(b => b.id === e.id);
     if (!b) return;
     const prev = BUILTIN_PREVIOUS[b.id] || {};
-    if (prev.name && e.name === prev.name) { e.name = b.name; report.renamed++; changed = true; }
+    if (previousNames(b.id).includes(e.name)) { e.name = b.name; report.renamed++; changed = true; }
     else if (e.name !== b.name) report.keptName.push(e.name);
     if (prev.category && e.category === prev.category) { e.category = b.category; report.moved++; changed = true; }
     if (e.subcategory) { if (e.subcategory !== b.subcategory) report.keptSubcategory.push(e.name); }
@@ -699,6 +704,34 @@ async function migrateBuiltinSubcategories(userUid) {
   ]);
   if (report.keptName.length || report.keptSubcategory.length) console.warn('[Migration] edited built-ins kept as the user set them:', report);
   console.log('[Migration] built-in subcategories:', report);
+  return report;
+}
+
+// One-time step, per user (flag meta/migrations.builtinCopies, set in the last write batch), for
+// the standard names (November 2026). An edited built-in (custom entry with a built-in's id) that
+// differs from the built-in in nothing but its name being the current one or an earlier one
+// (BUILTIN_PREVIOUS) — same category, subcategory and type, not deleted — is no edit any more:
+// it's taken out of meta/custom_exercises, so the built-in itself shows (with the new name).
+// Everything else that points at the id (sets, plans, favorites, exercise info) stays as it is.
+// An entry with a name, category, subcategory or type of the user's own stays an edited built-in.
+// Returns { removed: [ids], kept: [names] }.
+async function migrateBuiltinCopies(userUid) {
+  const report = { removed: [], kept: [] };
+  db.custom_exercises = (db.custom_exercises || []).filter(e => {
+    const b = EXERCISE_DB.find(b => b.id === e.id);
+    if (!b) return true;
+    const same = !e.deleted && (e.name === b.name || previousNames(b.id).includes(e.name))
+      && e.category === b.category && (e.subcategory || '') === (b.subcategory || '') && (e.type || 'weight_reps') === b.type;
+    if (same) report.removed.push(e.id); else report.kept.push(e.name);
+    return !same;
+  });
+  const prefix = 'users/' + userUid + '/';
+  await commitMigrationWrites([
+    ...(report.removed.length ? [[prefix + 'meta/custom_exercises', { list: db.custom_exercises }]] : []),
+    [prefix + 'meta/migrations', { builtinCopies: todayStr() }, { merge: true }],
+  ]);
+  if (report.kept.length) console.warn('[Migration] edited built-ins that really differ, kept:', report.kept);
+  console.log('[Migration] built-in copies:', report);
   return report;
 }
 

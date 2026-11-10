@@ -32,14 +32,14 @@ H.run(async () => {
   for (const how of ['android', 'pijltje']) {
     H.section(`Oefening bewerken (ingebouwd), opslaan, dan terug met ${how}`);
     await page.evaluate(() => { db.custom_exercises = []; });
-    await openEdit('Bulgarian Split Squats');
+    await openEdit('Bulgarian Split Squat');
     H.check(`${how}: bewerkscherm open`, (await state()).screen, 'screen-new-exercise');
     await page.fill('#new-ex-name', 'Bulgarian Split Squa');
     await click('#btn-new-ex-save');
     let s = await state();
     H.check(`${how}: na opslaan terug op de lijst Benen`, [s.screen, s.discard, await page.evaluate(() => currentBrowseCategory)], ['screen-exercises', false, 'legs']);
     const n = await names();
-    H.check(`${how}: nieuwe naam één keer in de lijst, oude weg`, [n.filter(x => x === 'Bulgarian Split Squa').length, n.includes('Bulgarian Split Squats')], [1, false]);
+    H.check(`${how}: nieuwe naam één keer in de lijst, oude weg`, [n.filter(x => x === 'Bulgarian Split Squa').length, n.includes('Bulgarian Split Squat')], [1, false]);
     H.check(`${how}: bewerkte kopie met hetzelfde id, geen nieuwe oefening`, await customs(), [['bulgarian-split-squat', 'Bulgarian Split Squa']]);
     if (how === 'android') await hwBack(); else await click('#btn-back-exercises');
     s = await state();
@@ -51,7 +51,7 @@ H.run(async () => {
 
   H.section('Tweede keer opslaan (zelfde formulier) werkt dezelfde oefening bij');
   await page.evaluate(() => { db.custom_exercises = []; });
-  await openEdit('Bulgarian Split Squats');
+  await openEdit('Bulgarian Split Squat');
   await page.fill('#new-ex-name', 'Bulgarian Split Squa');
   await click('#btn-new-ex-save');
   // the old route back onto the saved form, by hand: Opslaan again must not make a new exercise
@@ -87,7 +87,7 @@ H.run(async () => {
   H.section('Niet opgeslagen: melding blijft');
   await page.evaluate(() => { db.custom_exercises = []; });
   for (const how of ['android', 'pijltje']) {
-    await openEdit('Bulgarian Split Squats');
+    await openEdit('Bulgarian Split Squat');
     await page.fill('#new-ex-name', 'Iets anders');
     if (how === 'android') await hwBack(); else await click('#btn-new-ex-back');
     s = await state();
@@ -95,7 +95,7 @@ H.run(async () => {
     await click('#btn-discard-changes-confirm');
     s = await state();
     H.check(`${how}: Weggooien → lijst, niets opgeslagen`, [s.screen, s.discard, (await customs()).length], ['screen-exercises', false, 0]);
-    await openEdit('Bulgarian Split Squats');
+    await openEdit('Bulgarian Split Squat');
     if (how === 'android') await hwBack(); else await click('#btn-new-ex-back');
     H.check(`${how}: niets gewijzigd → zonder melding terug`, await state(), { screen: 'screen-exercises', discard: false });
   }
