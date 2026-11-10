@@ -2080,37 +2080,10 @@ function adoptLoadedPlanDay(plan, dayIndex, date) {
   return persistActivePlan(a);
 }
 
-// Plan detail, "Huidige week" (only the active plan with a Week B): which week it is now. Fixed
-// days: that week is active from this Monday, nothing of it done yet; the week switches every
-// calendar week from here (planWeekCycle). "Geen vaste dagen": the next suggestion is the first
-// day of that week. Inzicht takes the week from this Monday (correctWeekCycle).
-async function setActivePlanWeek(week) {
-  const a = db.activePlan;
-  const plan = a && db.plans[a.planId];
-  if (!plan || !planHasWeekSplit(plan) || (week !== 'A' && week !== 'B')) return;
-  const today = todayStr();
-  if (plan.fixedDays) {
-    a.activeWeek = week;
-    a.doneWeekdays = [];
-    a.weekStart = mondayOf(today);
-    // A day of the other week loaded earlier today no longer stays today's suggestion.
-    if (a.lastDate === today && plan.days[a.lastDayIndex] && plan.days[a.lastDayIndex].group !== week) {
-      a.lastDate = addDaysToDateStr(today, -1);
-    }
-    correctWeekCycle(plan.id, week);
-  } else {
-    const first = plan.days.findIndex(d => d.group === week);
-    if (first < 0) return;
-    a.lastDayIndex = (first - 1 + plan.days.length) % plan.days.length;
-  }
-  delete a.lastGroup;
-  bannerDismissed = false;
-  await persistActivePlan(a);
-}
-
-// The week of the current calendar week in Inzicht (week_cycle), set by hand: `week` from this
+// The week of the current calendar week in Inzicht (week_cycle), corrected by a day loaded with
+// Schema handmatig laden (adoptLoadedPlanDay): `week` from this
 // Monday on; this plan's later entries (this week, or tomorrow's after a week was completed) go.
-// The one exception to "never changed afterwards": the user says which week this week is.
+// The one exception to "never changed afterwards": the loaded day says which week this week is.
 function correctWeekCycle(planId, week) {
   const from = mondayOf(todayStr());
   if (!db.weekCycle) db.weekCycle = {};
@@ -8229,37 +8202,6 @@ function planHasWeekB() {
   return !!(currentPlanData.hasWeekB || (currentPlanData.days || []).some(d => d.group === 'B'));
 }
 
-// The week ('A'/'B') the active split plan is in now: fixed days the cycle's week (planWeekCycle,
-// the week whose days are suggested), "Geen vaste dagen" the week of the next suggested day.
-function activePlanCurrentWeek(plan) {
-  if (plan.fixedDays) return planWeekCycle(plan).week;
-  const next = plan.days[((db.activePlan.lastDayIndex ?? -1) + 1) % plan.days.length];
-  return (next && next.group) || 'A';
-}
-
-// Plan detail, HUIDIGE WEEK: only on the ACTIVE plan with a Week B, outside edit mode. Week A ·
-// Week B (Plan schedule's choice buttons), the current week selected; tapping the other one makes
-// that the week now (setActivePlanWeek), from where the app switches by itself.
-function buildCurrentWeekCard() {
-  const plan = currentPlanData;
-  if (!plan || !db.activePlan || db.activePlan.planId !== plan.id || !planHasWeekSplit(plan) || !(plan.days || []).length) return null;
-  const week = activePlanCurrentWeek(plan);
-  const card = document.createElement('div');
-  card.className = 'card plan-week-now';
-  card.innerHTML = `<div class="section-label">Huidige week</div>
-    <div class="ps-toggle-row" role="group" aria-label="Huidige week">
-      ${['A', 'B'].map(w => `<button type="button" class="ps-toggle-option${w === week ? ' selected' : ''}" data-week="${w}" aria-pressed="${w === week}">Week ${w}</button>`).join('')}
-    </div>
-    <div class="role-sub">${plan.fixedDays ? 'Wisselt elke maandag vanzelf naar de andere week.' : 'Je volgende dag komt uit deze week.'}</div>`;
-  card.querySelectorAll('[data-week]').forEach(btn => btn.addEventListener('click', async () => {
-    if (btn.dataset.week === activePlanCurrentWeek(plan)) return;
-    await setActivePlanWeek(btn.dataset.week);
-    renderPlanDetail();
-    toast(`Het is nu Week ${btn.dataset.week}`);
-  }));
-  return card;
-}
-
 function renderPlanDetail() {
   document.getElementById('btn-plan-title-edit').classList.toggle('hidden', !planDetailEditMode);
   document.getElementById('btn-plan-set-active').classList.toggle('hidden', planDetailEditMode);
@@ -8267,8 +8209,6 @@ function renderPlanDetail() {
   const scroll = document.getElementById('plan-detail-scroll');
   if (!currentPlanData || !currentPlanData.days) { scroll.innerHTML = ''; return; }
   scroll.innerHTML = '';
-  const weekCard = !planDetailEditMode && buildCurrentWeekCard();
-  if (weekCard) scroll.appendChild(weekCard);
 
   // Rendered as segments so each week's own "Dag toevoegen" block lands right after
   // that week's last card, even when Week A's block is tapped after Week B already
@@ -8997,7 +8937,6 @@ document.getElementById('btn-plan-set-active').addEventListener('click', async (
   const isActive = db.activePlan && db.activePlan.planId === currentPlanId;
   document.getElementById('plan-active-ribbon').classList.toggle('show', isActive);
   document.getElementById('btn-plan-set-active').classList.toggle('is-active', isActive);
-  renderPlanDetail(); // "Huidige week" only shows on the active plan
 });
 
 // Saves (everything's already persisted per-action, but this re-confirms) and leaves

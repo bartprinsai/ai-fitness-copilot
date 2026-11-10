@@ -1,6 +1,6 @@
-// Week A/B: welke week en dag de app voorstelt, zelf de huidige week instellen in Plan detail, en
-// een handmatig geladen dag die de app overneemt als waar het plan nu staat. See PROJECT_CONTEXT.md
-// ("Week A/B: de huidige week").
+// Week A/B: welke week en dag de app voorstelt, en een handmatig geladen dag (Schema handmatig
+// laden) die de app overneemt als waar het plan nu staat — de enige manier om de week te bepalen;
+// Plan detail heeft er geen keuze meer voor. See PROJECT_CONTEXT.md ("Week A/B: de huidige week").
 //
 // De fout die dit oploste: wie in week B begon, kreeg steeds de verkeerde week. Nooit geladen = Week
 // A (planWeekCycle), en Schema handmatig laden gaf de geladen dag niet door aan het plan, dus de
@@ -72,59 +72,43 @@ H.run(async () => {
   await page.evaluate(() => adoptLoadedPlanDay(db.plans.seq, 2, todayStr()));
   check('dag van een ander plan: actief plan ongewijzigd', await page.evaluate(() => db.activePlan.lastDayIndex), -1);
 
-  // ── 3. Plan detail: Huidige week
-  H.section('Plan detail: huidige week');
+  // ── 3. Plan detail heeft geen keuze voor de week meer; handmatig laden is de enige manier
+  H.section('Plan detail: geen keuze voor de week');
   await H.loadData(page, data(splitPlan));
   await page.evaluate(() => openPlanDetail('ab'));
   await H.settle(page);
-  const card = () => page.evaluate(() => {
-    const c = document.querySelector('#plan-detail-scroll .plan-week-now');
-    return c && { label: c.querySelector('.section-label').textContent, options: [...c.querySelectorAll('[data-week]')].map(b => b.textContent + (b.classList.contains('selected') ? ' ✓' : '')),
-      note: c.querySelector('.role-sub').textContent, first: c === document.querySelector('#plan-detail-scroll').firstElementChild };
-  });
-  check('kaart bovenaan, Week A gekozen (nooit geladen)', await card(), { label: 'Huidige week', options: ['Week A ✓', 'Week B'], note: 'Wisselt elke maandag vanzelf naar de andere week.', first: true });
-  for (const theme of H.THEMES) for (const w of H.WIDTHS) {
-    await page.setViewportSize({ width: w, height: 900 });
-    await page.evaluate(t => { document.documentElement.dataset.theme = t; }, theme);
-    await page.screenshot({ path: require('path').join(H.outDir(__filename), `plan-detail-${theme}-${w}.png`) });
-  }
-  await page.click('#plan-detail-scroll [data-week="B"]');
-  await H.settle(page);
-  check('Week B getikt: B is de week, niets gedaan, vanaf maandag', await cycle(), { week: 'B', done: [], since: MON });
-  check('kaart toont Week B', (await card()).options, ['Week A', 'Week B ✓']);
-  check('vandaag (donderdag): Donderdag B', await suggestion(), 'Donderdag B');
-  check('Inzicht: Week B vanaf maandag', await page.evaluate(m => db.weekCycle[m].week, MON), 'B');
-  await setToday(NEXT_MON);
-  check('na de wissel: volgende maandag Week A', await suggestion(), 'Maandag A');
-  await setToday(THU);
-  // Terug naar A: de Inzicht-regel van maandag wordt overschreven, latere regels van dit plan gaan weg.
-  await page.evaluate(n => { db.weekCycle[n] = { effectiveFrom: n, planId: 'ab', week: 'A' }; }, NEXT_MON);
-  await page.click('#plan-detail-scroll [data-week="A"]');
-  await H.settle(page);
-  check('terug naar Week A: Inzicht maandag A, geen latere regel', await page.evaluate(() => db.weekCycle), { [MON]: { effectiveFrom: MON, planId: 'ab', week: 'A' } });
-  check('vandaag (donderdag, alleen B): geen dag', await suggestion(), null);
+  check('geen kaart Huidige week, geen weekknoppen', await page.evaluate(() => [
+    !!document.querySelector('#plan-detail-scroll .plan-week-now'), document.querySelectorAll('#plan-detail-scroll [data-week]').length,
+    document.getElementById('plan-detail-scroll').textContent.includes('Huidige week')]), [false, 0, false]);
+  check('Plan detail begint met de weeklabels', await page.evaluate(() => document.querySelector('#plan-detail-scroll').firstElementChild.textContent), 'WEEK A');
+  check('de functies van de keuze bestaan niet meer', await page.evaluate(() => [typeof setActivePlanWeek, typeof buildCurrentWeekCard, typeof activePlanCurrentWeek]), ['undefined', 'undefined', 'undefined']);
+  await page.screenshot({ path: require('path').join(H.outDir(__filename), 'plan-detail.png') });
 
-  // Niet actief of zonder Week B: geen kaart
-  await H.loadData(page, { ...data(splitPlan), activePlan: null });
-  await page.evaluate(() => openPlanDetail('ab', { replace: true })); await H.settle(page);
-  check('plan niet actief: geen kaart', await card(), null);
-  await H.loadData(page, data({ ...splitPlan, hasWeekB: false, days: splitPlan.days.slice(0, 2) }));
-  await page.evaluate(() => openPlanDetail('ab', { replace: true })); await H.settle(page);
-  check('plan zonder Week B: geen kaart', await card(), null);
+  // ── 4. Inzicht volgt de week van handmatig laden, ook na de wissel op maandag
+  H.section('Inzicht volgt handmatig laden');
   await H.loadData(page, data(splitPlan));
-  await page.evaluate(() => { openPlanDetail('ab', { replace: true }); planDetailEditMode = true; renderPlanDetail(); }); await H.settle(page);
-  check('bewerken: geen kaart', await card(), null);
-  await page.evaluate(() => { planDetailEditMode = false; renderPlanDetail(); });
+  // Een eerdere (verkeerde) Week A-regel van dit plan, maandag en morgen: de geladen dag corrigeert ze.
+  await page.evaluate(({ m }) => {
+    db.weekCycle[m] = { effectiveFrom: m, planId: 'ab', week: 'A' };
+    db.weekCycle['2026-10-23'] = { effectiveFrom: '2026-10-23', planId: 'ab', week: 'B' };
+    currentDate = todayStr(); newWorkoutDate = todayStr(); schedulePickPlanId = 'ab'; loadPickedScheduleDay(3); // Donderdag B
+  }, { m: MON });
+  await H.settle(page);
+  check('week_cycle: Week B vanaf maandag, latere regels weg', await page.evaluate(() => db.weekCycle), { [MON]: { effectiveFrom: MON, planId: 'ab', week: 'B' } });
+  check('Inzicht: dinsdag en donderdag in Week B', await page.evaluate(() => [activeWeekOn('ab', '2026-10-20'), activeWeekOn('ab', '2026-10-22')]), ['B', 'B']);
+  check('Inzicht: geplande dag dinsdag is Dinsdag B', await page.evaluate(() => {
+    db.scheduleVersions = { '2026-10-01': { effectiveFrom: '2026-10-01', ...scheduleSnapshot() } };
+    const p = getPlannedForDate('2026-10-20'); return [p.status, p.week, p.day && p.day.name]; }), ['day', 'B', 'Dinsdag B']);
+  // Volgende week: de app stelt Week A voor (wissel op maandag)
+  await setToday(NEXT_MON);
+  check('volgende maandag stelt de app Week A voor', await suggestion(), 'Maandag A');
+  await setToday(THU);
 
-  // Geen vaste dagen: de volgende dag komt uit de gekozen week
+  // Geen vaste dagen: handmatig laden bepaalt ook daar waar het schema verder gaat
   await H.loadData(page, data(seqPlan));
-  await page.evaluate(() => openPlanDetail('seq', { replace: true })); await H.settle(page);
-  check('geen vaste dagen: Week A (volgende dag A1)', (await card()).options, ['Week A ✓', 'Week B']);
-  check('geen vaste dagen: eigen uitleg', (await card()).note, 'Je volgende dag komt uit deze week.');
-  await page.click('#plan-detail-scroll [data-week="B"]'); await H.settle(page);
-  check('Week B gekozen: volgende dag B1', await suggestion(), 'B1');
-  // Handmatig laden gaat verder vanaf die dag
-  await page.evaluate(() => adoptLoadedPlanDay(db.plans.seq, 0, todayStr()));
+  await page.evaluate(() => adoptLoadedPlanDay(db.plans.seq, 2, todayStr())); // B1
+  check('B1 handmatig geladen: volgende dag B2', await suggestion(), 'B2');
+  await page.evaluate(() => adoptLoadedPlanDay(db.plans.seq, 0, todayStr())); // A1
   check('A1 handmatig geladen: volgende dag A2', await suggestion(), 'A2');
 
   await browser.close();

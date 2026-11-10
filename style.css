@@ -913,8 +913,6 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 /* A square of the grid cell, so it is exactly as big as a weekday circle in the same grid. */
 .ps-num-box { aspect-ratio: 1; padding: 0; }
 .ps-toggle-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-2); }
-/* Plan detail, HUIDIGE WEEK (active plan with a Week B): label, Week A · Week B, a line under it. */
-.plan-week-now { display: flex; flex-direction: column; gap: var(--space-3); margin-bottom: var(--card-gap); }
 .ps-weekdays-counter { color: var(--text-secondary); }
 .ps-week-block { display: flex; flex-direction: column; gap: var(--space-2); }
 .ps-weekday-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: var(--space-2); }
