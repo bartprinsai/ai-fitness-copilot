@@ -1,4 +1,4 @@
-// Rustdag en Deloaddag: de keuzes in Nieuwe workout, de kaart en het label in de Fitness Tracker, wat
+// Rustdag en Deloaddag: de knoppen onderaan een lege dag van de Fitness Tracker, de kaart en het label, wat
 // ze met het schema doen, en dat een deloaddag nergens voor meetelt (records, PR, Grafiek, Records,
 // Kracht, Samenvatting, Inzicht) maar zichtbaar blijft (Geschiedenis, kalender). Overal herkenbaar
 // aan icoon en tekst. See PROJECT_CONTEXT.md ("Rustdag en deloaddag").
@@ -36,36 +36,97 @@ H.run(async () => {
     await page.evaluate(t => { document.documentElement.dataset.theme = t; }, theme);
     await H.settle(page);
     await page.screenshot({ path: path.join(out, `${name}-${theme}-${w}.png`) });
-  } await page.setViewportSize({ width: 390, height: 900 }); };
+  } await page.setViewportSize({ width: 390, height: 900 }); await page.evaluate(() => { document.documentElement.dataset.theme = 'light'; }); };
   const tracker = d => page.evaluate(d => { exitHomeSelMode(); currentDate = d; bannerDismissed = false; showScreen('screen-fitness-tracker'); renderHome(); }, d);
   const toastText = () => page.evaluate(() => document.getElementById('toast').classList.contains('show') ? document.getElementById('toast-msg').textContent : null);
   const hideToast = () => page.evaluate(() => { clearTimeout(toastTimer); document.getElementById('toast').classList.remove('show'); });
   const openNewWorkout = async d => { await tracker(d); await page.click('#btn-start-new'); await H.settle(page); };
 
-  // ── 1. Nieuwe workout: twee nieuwe keuzes, met ruimte erboven, zelfde stijl
+  // Welke knoppen onderaan zichtbaar zijn (en of Notitie een eigen regel boven Rustdag en Deloaddag heeft).
+  const pills = () => page.evaluate(() => ({
+    shown: [...document.querySelectorAll('.day-actions-row .pill')].filter(p => p.offsetParent !== null).map(p => p.textContent.trim()),
+    twoRows: document.querySelector('.day-actions-row').classList.contains('day-actions-two-rows') }));
+  const pillStyle = id => page.evaluate(id => { const p = document.getElementById(id), cs = getComputedStyle(p), svg = getComputedStyle(p.querySelector('svg'));
+    return { cls: p.className, height: cs.height, radius: cs.borderRadius, border: cs.border, bg: cs.backgroundColor, shadow: cs.boxShadow, font: cs.fontSize + ' ' + cs.fontWeight,
+      icon: svg.width, iconColor: svg.fill === 'none' ? svg.stroke : svg.fill }; }, id);
+  const bottomGap = id => page.evaluate(id => Math.round(document.querySelector('.day-actions-row').getBoundingClientRect().bottom - document.getElementById(id).getBoundingClientRect().bottom), id);
+
+  // ── 1. Nieuwe workout: alleen de drie laadopties
   H.section('Nieuwe workout');
   await H.loadData(page, base(fixedPlan));
-  await openNewWorkout(TODAY);
-  const cards = await page.evaluate(() => [...document.querySelectorAll('#screen-new-workout .nav-card')].map(c => ({
-    title: c.querySelector('.nav-card-title').textContent, desc: c.querySelector('.nav-card-desc').textContent,
-    top: Math.round(c.getBoundingClientRect().top), bottom: Math.round(c.getBoundingClientRect().bottom),
-    iconFill: getComputedStyle(c.querySelector('.nav-card-icon svg')).fill, iconStroke: getComputedStyle(c.querySelector('.nav-card-icon svg')).stroke,
-    radius: getComputedStyle(c).borderRadius, height: Math.round(c.getBoundingClientRect().height) })));
-  check('vijf keuzes in volgorde', cards.map(c => [c.title, c.desc]), [
-    ['Handmatig', 'Kies zelf je oefeningen'], ['Schema handmatig laden', "Kies uit je opgeslagen schema's"],
-    ['Schema automatisch laden', 'Vandaag staat Donderdag op het programma.'], ['Rustdag', 'Vandaag niet trainen'], ['Deloaddag', 'Lichter trainen vandaag']]);
-  const gap = i => cards[i].top - cards[i - 1].bottom;
-  ok(gap(3) > gap(2) && gap(4) === gap(2), 'kleine ruimte boven Rustdag, Deloaddag gewoon eronder', [gap(2), gap(3), gap(4)]);
-  ok(cards[3].radius === cards[0].radius && cards[3].height === cards[0].height && cards[4].height === cards[0].height, 'zelfde kaartstijl');
-  const primary = await H.tokenColor(page, '--primary');
-  check('iconen Rustdag en Deloaddag: lijn-iconen in --primary', [cards[3].iconFill, cards[3].iconStroke, cards[4].iconFill, cards[4].iconStroke], ['none', primary, 'none', primary]);
-  await shot('new-workout');
+  await tracker(TODAY);
+  check('alleen Handmatig, Schema handmatig laden, Schema automatisch laden', await page.evaluate(() =>
+    [...document.querySelectorAll('#screen-new-workout .nav-card .nav-card-title')].map(t => t.textContent)), ['Handmatig', 'Schema handmatig laden', 'Schema automatisch laden']);
+  check('geen Rustdag of Deloaddag op Nieuwe workout', await page.evaluate(() => document.getElementById('screen-new-workout').textContent.match(/Rustdag|Deloaddag/g)), null);
 
-  // ── 2. Rustdag
+  // ── 2. Dagoverzicht: knoppen Rustdag en Deloaddag
+  H.section('knoppen in het dagoverzicht');
+  await tracker(TODAY);
+  check('lege dag: alleen Rustdag en Deloaddag', await pills(), { shown: ['Rustdag', 'Deloaddag'], twoRows: false });
+  const rest = await pillStyle('btn-day-rest'), deload = await pillStyle('btn-day-deload'), restGap = await bottomGap('btn-day-rest');
+  ok(await page.evaluate(() => document.getElementById('btn-start-new').getBoundingClientRect().bottom <= document.getElementById('btn-day-rest').getBoundingClientRect().top),
+    'Nieuwe workout (+) valt niet achter de knoppen');
+  await shot('empty-day');
+  await page.evaluate(() => { db.workouts[todayStr()] = [{ exerciseId: 'bench-press', sets: [] }]; renderHome(); });
+  check('met een oefening: Samenvatting en Notitie, Rustdag en Deloaddag weg', await pills(), { shown: ['Samenvatting', 'Notitie'], twoRows: false });
+  const recap = await pillStyle('btn-day-recap');
+  check('Rustdag: zelfde ronde knopstijl als Samenvatting', rest, recap);
+  check('Deloaddag: zelfde ronde knopstijl als Samenvatting', deload, recap);
+  check('op dezelfde plek als Samenvatting (onderkant van de rij)', restGap, await bottomGap('btn-day-recap'));
+  check('iconen zzz en feather', await page.evaluate(() => ['btn-day-rest', 'btn-day-deload'].map(id => document.querySelector(`#${id} svg path`).getAttribute('d').slice(0, 10))),
+    ['M4 12h6l-6', 'M4 20l10 -']);
+  await page.evaluate(() => { delete db.workouts[todayStr()]; renderHome(); });
+  // Een bestaande notitie: Notitie erbij, op een eigen regel boven Rustdag en Deloaddag
+  await page.evaluate(() => { saveSessionNote(todayStr(), 'Knie wat stijf'); renderHome(); });
+  check('lege dag met notitie: Notitie boven Rustdag en Deloaddag', await pills(), { shown: ['Rustdag', 'Deloaddag', 'Notitie'], twoRows: true });
+  check('Notitie gecentreerd op de bovenste regel, de twee naast elkaar eronder', await page.evaluate(() => {
+    const r = id => document.getElementById(id).getBoundingClientRect();
+    return [r('btn-day-comment').bottom <= r('btn-day-rest').top, Math.round(r('btn-day-rest').top) === Math.round(r('btn-day-deload').top), r('btn-day-rest').right <= r('btn-day-deload').left,
+      Math.abs((r('btn-day-comment').left + r('btn-day-comment').right) / 2 - innerWidth / 2) < 1]; }), [true, true, true, true]);
+  ok(await page.evaluate(() => document.getElementById('btn-start-new').getBoundingClientRect().bottom <= document.getElementById('btn-day-comment').getBoundingClientRect().top),
+    'Nieuwe workout (+) valt niet achter twee regels knoppen');
+  await shot('empty-day-note');
+  await page.evaluate(() => { saveSessionNote(todayStr(), ''); renderHome(); });
+  check('notitie gewist: Notitie weg', await pills(), { shown: ['Rustdag', 'Deloaddag'], twoRows: false });
+  // Rustdag: Notitie blijft bereikbaar; ongedaan maken brengt de knoppen terug
+  await page.click('#btn-day-rest'); await H.settle(page);
+  check('rustdag: alleen Notitie', await pills(), { shown: ['Notitie'], twoRows: false });
+  await page.click('#btn-day-comment'); await H.settle(page);
+  check('Notitie op een rustdag opent het invulvenster', await page.evaluate(() => document.getElementById('comment-overlay').classList.contains('open')), true);
+  await page.evaluate(() => closeOverlay('comment-overlay')); await H.settle(page);
+  await page.click('#btn-undo-rest'); await H.settle(page);
+  check('rustdag ongedaan: Rustdag en Deloaddag terug', await pills(), { shown: ['Rustdag', 'Deloaddag'], twoRows: false });
+  await page.evaluate(() => { db.activePlan = null; }); // geen plandag: een deloaddag zonder oefeningen
+  await page.click('#btn-day-deload'); await H.settle(page);
+  check('deloaddag zonder oefeningen: alleen Notitie', await pills(), { shown: ['Notitie'], twoRows: false });
+  await page.click('#home-content .day-mark-menu'); await H.settle(page);
+  await page.click('#overflow-panel .dropdown-item'); await H.settle(page);
+  check('deloadlabel weg: Rustdag en Deloaddag terug', await pills(), { shown: ['Rustdag', 'Deloaddag'], twoRows: false });
+  // Elke datum: eerder, een week terug, later
+  for (const d of ['2026-10-21', '2026-10-15', '2026-10-23']) {
+    await tracker(d);
+    check(`${d}: lege dag met Rustdag en Deloaddag`, await pills(), { shown: ['Rustdag', 'Deloaddag'], twoRows: false });
+  }
+  // Een notitie blijft bewaard als de laatste oefening van een dag verdwijnt
+  check('notitie bewaard na de laatste oefening weg; zonder notitie gaat het document', await page.evaluate(() => {
+    const writes = [], prevUser = currentUser, orig = uDoc;
+    currentUser = { uid: 'u' };
+    uDoc = p => ({ set: d => { writes.push(['set', p, d]); return Promise.resolve(); }, delete: () => { writes.push(['delete', p]); return Promise.resolve(); } });
+    db.sessionNotes['2026-10-15'] = 'Noot';
+    setWorkout('2026-10-15', []);
+    delete db.sessionNotes['2026-10-15'];
+    setWorkout('2026-10-15', []);
+    uDoc = orig; currentUser = prevUser;
+    return writes; }),
+    [['set', 'workouts/2026-10-15', { sessionNote: 'Noot' }], ['delete', 'workouts/2026-10-15']]);
+
+  // ── 3. Rustdag
+  await H.loadData(page, base(fixedPlan));
+  await tracker(TODAY);
   H.section('Rustdag');
   await hideToast();
-  await page.click('#btn-nw-rest'); await H.settle(page);
-  check('rustdag opgeslagen, terug in de tracker', await page.evaluate(() => [db.dayMarks[todayStr()], document.querySelector('.screen.active').id]), ['rest', 'screen-fitness-tracker']);
+  await page.click('#btn-day-rest'); await H.settle(page);
+  check('rustdag opgeslagen, in de tracker', await page.evaluate(() => [db.dayMarks[todayStr()], document.querySelector('.screen.active').id]), ['rest', 'screen-fitness-tracker']);
   check('melding', await toastText(), 'Rustdag ingesteld');
   const restCard = () => page.evaluate(() => {
     const c = document.querySelector('#home-content .day-mark-card');
@@ -98,17 +159,17 @@ H.run(async () => {
 
   // Een rustdag op een eerdere dag (maandag, plandag): gemist; het schema gaat de volgende dag door
   await H.loadData(page, base(fixedPlan));
-  await openNewWorkout(MON);
-  await page.click('#btn-nw-rest'); await H.settle(page);
+  await tracker(MON);
+  await page.click('#btn-day-rest'); await H.settle(page);
   check('rustdag op de getoonde datum (maandag)', await page.evaluate(m => [db.dayMarks[m], currentDate, db.dayMarks[todayStr()] || null], MON), ['rest', MON, null]);
   check('maandag: "Geen training op deze dag"', (await restCard()).sub, 'Geen training op deze dag');
   check('vandaag: gewoon Donderdag voorgesteld', await page.evaluate(() => getTodaysScheduledDay().dayName), 'Donderdag');
   check('Inzicht: maandag gemist, telt niet als training', await stats([MON]), [1, 0, 3, 0, 0]);
   // Doorlopend schema: de dag schuift door, niet gemist
   await H.loadData(page, base(seqPlan, { scheduleVersions: { '2026-10-01': version(seqPlan, '2026-10-01') } }));
-  await openNewWorkout(TODAY);
+  await tracker(TODAY);
   check('doorlopend: voor de rustdag Push', await page.evaluate(() => getTodaysScheduledDay().dayName), 'Push');
-  await page.click('#btn-nw-rest'); await H.settle(page);
+  await page.click('#btn-day-rest'); await H.settle(page);
   check('doorlopend: na de rustdag nog steeds Push (schuift door)', await page.evaluate(() => [getTodaysScheduledDay().dayName, db.activePlan.lastDayIndex]), ['Push', -1]);
   check('doorlopend: status rest (niet gemist)', await page.evaluate(d => insightTrainingState(insightDay(d)), TODAY), 'rest');
   // Kalender: icoon en tekst, geen trainingsdag
@@ -121,14 +182,14 @@ H.run(async () => {
   check('kalender-popup: "Rustdag" met icoon', await page.evaluate(() => { const m = document.querySelector('#cal-detail-body .day-mark-inline'); return m && [m.textContent, !!m.querySelector('svg')]; }), ['Rustdag', true]);
   await page.evaluate(() => closeOverlay('cal-detail-overlay'));
 
-  // ── 3. Deloaddag
+  // ── 4. Deloaddag
   H.section('Deloaddag');
   // Eerdere sessies: maandag 100 × 5. De deloaddag (vandaag) heeft een zwaardere set die nergens mag tellen.
   const history = { [MON]: [{ exerciseId: 'bench-press', sets: [set(100, 5), set(100, 5)] }] };
   await H.loadData(page, base(fixedPlan, { workouts: history, exerciseInfo: { 'bench-press': { trackStrength: true, primaryMuscleGroup: 'chest' } } }));
-  await openNewWorkout(TODAY);
+  await tracker(TODAY);
   await hideToast();
-  await page.click('#btn-nw-deload'); await H.settle(page);
+  await page.click('#btn-day-deload'); await H.settle(page);
   check('deloaddag: geplande dag geladen en als uitgevoerd geteld', await page.evaluate(() => ({
     mark: db.dayMarks[todayStr()], workout: getWorkout(todayStr()).map(e => [e.exerciseId, e.target]), planDays: getWorkoutPlanDays(todayStr()).map(p => p.dayName),
     lastDayIndex: db.activePlan.lastDayIndex, lastDate: db.activePlan.lastDate })),
@@ -207,20 +268,20 @@ H.run(async () => {
 
   // Deloaddag op een andere datum met een doorlopend schema: de volgende dag wordt geladen en het schema gaat door
   await H.loadData(page, base(seqPlan, { scheduleVersions: { '2026-10-01': version(seqPlan, '2026-10-01') } }));
-  await openNewWorkout(WED);
-  await page.click('#btn-nw-deload'); await H.settle(page);
+  await tracker(WED);
+  await page.click('#btn-day-deload'); await H.settle(page);
   check('doorlopend, woensdag: Push geladen, volgende is Pull', await page.evaluate(w => [db.dayMarks[w], getWorkout(w).map(e => e.exerciseId), getTodaysScheduledDay().dayName], WED),
     ['deload', ['bench-press'], 'Pull']);
   // Zonder geplande dag: wel deloaddag, niets geladen
   await H.loadData(page, base(fixedPlan));
-  await openNewWorkout(TUE);
+  await tracker(TUE);
   await hideToast();
-  await page.click('#btn-nw-deload'); await H.settle(page);
+  await page.click('#btn-day-deload'); await H.settle(page);
   check('dinsdag (geen plandag): deloaddag, niets geladen, label met lege staat', await page.evaluate(t => [db.dayMarks[t], getWorkout(t).length, !!document.querySelector('#home-content .day-mark-label'), !!document.querySelector('#home-content .home-empty')], TUE),
     ['deload', 0, true, true]);
   check('melding', await toastText(), 'Deloaddag ingesteld');
 
-  // ── 4. Opslag en Alles resetten (vm, nagebootste Firestore)
+  // ── 5. Opslag en Alles resetten (vm, nagebootste Firestore)
   H.section('opslag');
   const store = new H.FakeStore({ 'users/u1/day_marks/2026-10-20': { type: 'rest' }, 'users/u1/day_marks/2026-10-21': { type: 'deload' }, 'users/u1/day_marks/2026-10-22': { type: 'iets anders' } });
   await H.runInVm(`

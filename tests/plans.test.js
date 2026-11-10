@@ -23,7 +23,9 @@ H.run(async () => {
     await H.loadData(page, { plans: {}, activePlan: null });
     await page.evaluate(() => { const t = document.getElementById('toast'); if (t) t.style.display = 'none'; });
 
-    await page.evaluate(() => showScreen('screen-fitness-tracker'));
+    // The empty state itself: on the tracker an empty day also has the Rustdag / Deloaddag pills, whose
+    // room moves it up (tested in day-marks); Trainingsplannen has no pills.
+    await page.evaluate(() => { showScreen('screen-fitness-tracker'); document.getElementById('screen-fitness-tracker').classList.remove('has-day-actions', 'day-actions-two-rows'); });
     const tracker = await page.evaluate(measure);
     await page.evaluate(() => showScreen('screen-workout-plan'));
     const plans = await page.evaluate(measure);

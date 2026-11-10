@@ -359,7 +359,10 @@ async function persistWorkout(date, exercises) {
   if (!currentUser) return;
   const unknown = (db.unknownWorkoutEntries || {})[date] || [];
   if ((!exercises || exercises.length === 0) && !unknown.length) {
-    uDoc('workouts/' + date).delete().catch(persistFailed);
+    // The day's note stays (it can be on an empty, rest or deload day too); without one the document goes.
+    const note = getSessionNote(date);
+    if (note) uDoc('workouts/' + date).set({ sessionNote: note }).catch(persistFailed);
+    else uDoc('workouts/' + date).delete().catch(persistFailed);
   } else if (!exercises || exercises.length === 0) {
     uDoc('workouts/' + date).set({ exercises: unknown }).catch(persistFailed);
   } else {
@@ -483,7 +486,7 @@ async function loadUserData(userUid) {
     db.workoutPlanDays = {};
     workoutsSnap.forEach(doc => {
       const data = doc.data();
-      db.workouts[doc.id] = data.exercises || [];
+      if (data.exercises && data.exercises.length) db.workouts[doc.id] = data.exercises; // a document can hold only a note
       if (data.sessionNote) db.sessionNotes[doc.id] = data.sessionNote;
       if (data.planDays && data.planDays.length) db.workoutPlanDays[doc.id] = data.planDays;
     });
@@ -1427,19 +1430,35 @@ function buildDeloadLabel(date) {
   return label;
 }
 
+// The pills at the bottom of the day (.day-actions-row), for the day shown:
+//   Samenvatting  once the day has exercises
+//   Notitie       once the day has exercises, is a rest or deload day, or already has a note (so a
+//                 note can always be reached)
+//   Rustdag / Deloaddag  only on an empty day: no exercises and no rest or deload day (a note
+//                 doesn't take them away; Notitie then gets a line of its own above them)
+function updateDayActions(exercises, mark) {
+  const has = exercises.length > 0;
+  const show = { 'btn-day-recap': has, 'btn-day-comment': has || !!mark || !!getSessionNote(currentDate), 'btn-day-rest': !has && !mark, 'btn-day-deload': !has && !mark };
+  Object.entries(show).forEach(([id, on]) => document.getElementById(id).classList.toggle('hidden', !on));
+  const twoRows = show['btn-day-comment'] && show['btn-day-rest'];
+  document.querySelector('.day-actions-row').classList.toggle('day-actions-two-rows', twoRows);
+  const screenEl = document.getElementById('screen-fitness-tracker');
+  screenEl.classList.toggle('has-day-actions', Object.values(show).some(Boolean));
+  screenEl.classList.toggle('day-actions-two-rows', twoRows);
+}
+
 function renderHome() {
   document.getElementById('day-nav-label').textContent = formatDateStr(currentDate, 'nav');
   const exercises = getWorkout(currentDate);
   const container = document.getElementById('home-content');
-  const screenEl = document.getElementById('screen-fitness-tracker');
   // The smart day banner is the first block of the day's content, so it slides along
   // with it on a day change. Replacing the content below detaches it; it's put back
   // (same element, listeners intact) before renderSmartBanner() decides on visibility.
   const banner = document.getElementById('smart-day-banner');
   const mark = getDayMark(currentDate);
+  updateDayActions(exercises, mark);
 
   if (exercises.length === 0) {
-    screenEl.classList.remove('has-day-actions');
     if (mark === 'rest') {
       container.innerHTML = '';
       container.appendChild(buildRestDayCard(currentDate));
@@ -1455,7 +1474,6 @@ function renderHome() {
     return;
   }
 
-  screenEl.classList.add('has-day-actions');
   container.innerHTML = '';
   // (A rest day with exercises only comes from another device; the card still says so.)
   if (mark === 'rest') container.appendChild(buildRestDayCard(currentDate));
@@ -1580,8 +1598,9 @@ function openSessionCommentPopup() {
   openCommentPopup({
     label: 'Notitie bij deze workout',
     getText: () => getSessionNote(date),
-    onSave: val => saveSessionNote(date, val),
-    onDelete: () => saveSessionNote(date, '')
+    // The day's pills follow the note (Notitie stays while a note is there, see updateDayActions).
+    onSave: val => { saveSessionNote(date, val); renderHome(); },
+    onDelete: () => { saveSessionNote(date, ''); renderHome(); }
   });
 }
 
@@ -4049,10 +4068,10 @@ function planDayHasExercises(day) {
 // it: New Workout, the pickers, an open popup), so the back button doesn't land on
 // the pickers again. The popstate handler's showScreen() re-renders the tracker for
 // currentDate.
-function showTrackerAfterLoad(date, steps, msg = 'Workout geladen!') {
+function showTrackerAfterLoad(date, steps) {
   currentDate = date;
   history.go(-steps);
-  toast(msg);
+  toast('Workout geladen!');
 }
 
 // -- Load Schedule Manually: Kies een plan -> [Plan] — kies een dag ----------
@@ -4194,22 +4213,24 @@ document.getElementById('btn-schedule-load-confirm').addEventListener('click', a
   showTrackerAfterLoad(todayStr(), 2); // always today, whatever day the Tracker was showing
 });
 
-// -- New Workout: Rustdag and Deloaddag ------------------------------------
-// For the day the Tracker was showing when New Workout opened (newWorkoutDate), like Schema
-// handmatig laden. See "Rustdag and Deloaddag (day marks)".
-// Rustdag: only on a day without a workout (New Workout is only reached from an empty day).
+// -- Fitness Tracker: Rustdag and Deloaddag --------------------------------
+// The pills at the bottom of an empty day (updateDayActions), for the day the Tracker shows
+// (currentDate), any date. See "Rustdag and Deloaddag (day marks)".
+// Rustdag: only on a day without exercises (the pills are only there then).
 function chooseRestDay() {
-  const date = newWorkoutDate || currentDate;
-  if (getWorkout(date).length > 0) { toast('Op deze dag staat al een workout', { type: 'error' }); return; }
+  const date = currentDate;
+  if (getWorkout(date).length > 0 || getDayMark(date)) return;
   setDayMark(date, 'rest');
   if (date === todayStr()) bannerDismissed = true;
-  showTrackerAfterLoad(date, 1, 'Rustdag ingesteld');
+  renderHome();
+  toast('Rustdag ingesteld');
 }
 // Deloaddag: the planned day of that date (getScheduledDayForDate; today: the one Schema
 // automatisch laden offers) is loaded and counts as done for the plan. Without a planned day with
 // exercises the day is still a deload day, with nothing loaded.
-async function chooseDeloadDay() {
-  const date = newWorkoutDate || currentDate;
+function chooseDeloadDay() {
+  const date = currentDate;
+  if (getWorkout(date).length > 0 || getDayMark(date)) return;
   const pick = getScheduledDayForDate(date);
   setDayMark(date, 'deload');
   let msg = 'Deloaddag ingesteld';
@@ -4219,7 +4240,8 @@ async function chooseDeloadDay() {
     else adoptLoadedPlanDay(pick.plan, pick.dayIndex, date);
     msg = `Deloaddag: ${pick.dayName} geladen`;
   }
-  showTrackerAfterLoad(date, 1, msg);
+  renderHome();
+  toast(msg);
 }
 function undoRestDay(date) {
   setDayMark(date, null);
@@ -6993,8 +7015,8 @@ document.getElementById('btn-back-new-workout').addEventListener('click', () => 
 document.getElementById('btn-nw-manual').addEventListener('click', openExerciseList);
 document.getElementById('btn-nw-schema-manual').addEventListener('click', openSchedulePickPlan);
 document.getElementById('btn-nw-schema-auto').addEventListener('click', openScheduleLoadAuto);
-document.getElementById('btn-nw-rest').addEventListener('click', chooseRestDay);
-document.getElementById('btn-nw-deload').addEventListener('click', chooseDeloadDay);
+document.getElementById('btn-day-rest').addEventListener('click', chooseRestDay);
+document.getElementById('btn-day-deload').addEventListener('click', chooseDeloadDay);
 document.getElementById('btn-back-schedule-pick-plan').addEventListener('click', () => goBack('screen-new-workout'));
 document.getElementById('btn-back-schedule-pick-day').addEventListener('click', () => goBack('screen-schedule-pick-plan'));
 document.getElementById('btn-save-set').addEventListener('click', saveSet);

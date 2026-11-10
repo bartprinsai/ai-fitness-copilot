@@ -149,6 +149,9 @@ H.run(async () => {
       const action = sel => { const btn = document.querySelector(sel), svg = btn.querySelector('svg'), span = btn.querySelector('span'); const r = e => { const x = e.getBoundingClientRect(); return [x.left, x.top, x.width, x.height].map(v => Math.round(v * 10) / 10); }; const sp = getComputedStyle(span); return { btn: r(btn), svg: r(svg), fill: getComputedStyle(svg).fill, span: `${sp.fontSize}/${sp.fontWeight} ${sp.color}`, text: span.textContent, vis: getComputedStyle(btn).visibility, pe: getComputedStyle(btn).pointerEvents }; };
       db.plans = {}; db.workouts = {};
       showScreen('screen-fitness-tracker'); renderHome();
+      // The empty state itself: on the tracker an empty day also has the Rustdag / Deloaddag pills, whose
+      // room moves it up (tested in day-marks); the other screens have no pills.
+      document.getElementById('screen-fitness-tracker').classList.remove('has-day-actions', 'day-actions-two-rows');
       const tracker = { title: ti('#home-content .home-empty-title'), act: action('#home-content .home-empty-action') };
       db.plans.p = { name: 'P', createdAt: 1, days: [{ name: 'Dag', exercises: [] }] }; currentPlanId = 'p'; currentPlanData = db.plans.p; openPlanDayEdit(0);
       const pde = { title: ti('#pde-list .home-empty-title'), act: action('#pde-list .home-empty-action') };

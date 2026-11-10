@@ -284,6 +284,13 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 #screen-fitness-tracker.active.has-day-actions ~ .day-actions-row { display: flex; }
 .day-actions-row .pill { pointer-events: auto; }
 .day-actions-row .pill svg { fill: var(--text-secondary); }
+.day-actions-row .pill svg.icon-stroke { fill: none; stroke: var(--text-secondary); }
+/* Notitie with Rustdag and Deloaddag (an empty day with a note): Notitie on a line of its own above
+   the two (the three side by side do not fit at 360px). */
+.day-actions-break { display: none; }
+.day-actions-row.day-actions-two-rows { flex-wrap: wrap; }
+.day-actions-two-rows #btn-day-comment { order: -2; }
+.day-actions-two-rows .day-actions-break { display: block; order: -1; flex-basis: 100%; height: 0; }
 
 /* ══ SPLASH (loading screen) ════════════════════════════ */
 /* A copy of Android's launch screen (Chrome's WebAPK splash): the logo in the exact centre of the
@@ -335,6 +342,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    the padding makes up the rest to --screen-top under the day bar. Not in the empty state (fixed height). */
 .home-content:has(> .exercise-card) { padding-top: calc(var(--screen-top) - var(--card-gap)); }
 #screen-fitness-tracker.has-day-actions .home-content { padding-bottom: calc(var(--ai-bar-space) + var(--day-actions-height) + var(--space-4)); }
+#screen-fitness-tracker.has-day-actions.day-actions-two-rows .home-content { padding-bottom: calc(var(--ai-bar-space) + 2 * var(--day-actions-height) + var(--space-4)); }
 @keyframes slideInFromRight { from { transform: translateX(18px); opacity: .4; } to { transform: translateX(0); opacity: 1; } }
 @keyframes slideInFromLeft { from { transform: translateX(-18px); opacity: .4; } to { transform: translateX(0); opacity: 1; } }
 /* The page-turn of the day / period navigation (playSlideIn() in app.js): #home-content here, the
@@ -943,9 +951,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
    (deload), stroke icons (.icon-stroke). Tracker: the rest-day card (.card .day-mark-card, instead
    of the empty state, with Ongedaan maken) and the deload label (.day-mark-label: dotted border, no
    fill, ⋮ to take it away); both a card's width, --card-gap above like the exercise cards. */
-.icon-stroke, .nav-card-icon svg.icon-stroke { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.nav-card-icon { color: var(--primary); }
-.nav-card-group-gap { margin-top: var(--space-4); }
+.icon-stroke { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .day-mark-card, .day-mark-label { display: flex; align-items: center; gap: var(--space-3); margin: var(--card-gap) var(--screen-gutter) 0; flex-shrink: 0; }
 .home-content:not(:has(> .exercise-card)) > .day-mark-card, .home-content:not(:has(> .exercise-card)) > .day-mark-label { margin-top: var(--screen-top); }
 .day-mark-label { padding: var(--space-2) var(--space-2) var(--space-2) var(--card-padding); border: 2px dotted var(--text-muted); border-radius: var(--radius-lg); }
