@@ -1401,33 +1401,23 @@ function emptyAddStateHtml(btnId, label, title = '') {
       </div>`;
 }
 
-// The Fitness Tracker's rest-day card (instead of the empty state): icon, "Rustdag", "Geen training
-// vandaag" and Ongedaan maken — to train after all, the rest day is undone first.
-function buildRestDayCard(date) {
+// THE day-mark card of the Fitness Tracker, one component for a rest day and a deload day, at the top
+// of the day: the blue tile with the icon, the title, a line under it and the wide Ongedaan maken.
+//   rest    zzz, "Rustdag", "Geen training vandaag" ("… op deze dag"), instead of the empty state;
+//           to train after all, the rest day is undone first (undoRestDay)
+//   deload  feather, "Deloaddag", "Telt nergens voor mee", above the loaded exercises; Ongedaan maken
+//           only takes the mark away (removeDeloadMark): the exercises and sets stay and count again
+function buildDayMarkCard(date, type) {
+  const rest = type === 'rest';
   const card = document.createElement('div');
   card.className = 'card day-mark-card';
-  card.innerHTML = `<div class="day-mark-icon">${REST_ICON_SVG}</div>
-    <div class="day-mark-body"><div class="day-mark-title">Rustdag</div>
-    <div class="day-mark-sub">${date === todayStr() ? 'Geen training vandaag' : 'Geen training op deze dag'}</div></div>
-    <button type="button" class="btn btn-secondary btn-compact" id="btn-undo-rest">Ongedaan maken</button>`;
-  card.querySelector('#btn-undo-rest').addEventListener('click', () => undoRestDay(date));
+  card.dataset.mark = type;
+  card.innerHTML = `<div class="day-mark-icon">${rest ? REST_ICON_SVG : DELOAD_ICON_SVG}</div>
+    <div class="day-mark-body"><div class="day-mark-title">${rest ? 'Rustdag' : 'Deloaddag'}</div>
+    <div class="day-mark-sub">${!rest ? 'Telt nergens voor mee' : date === todayStr() ? 'Geen training vandaag' : 'Geen training op deze dag'}</div></div>
+    <button type="button" class="btn btn-secondary btn-compact day-mark-undo">Ongedaan maken</button>`;
+  card.querySelector('.day-mark-undo').addEventListener('click', () => (rest ? undoRestDay : removeDeloadMark)(date));
   return card;
-}
-// The deload label at the top of the Tracker: icon, dotted border, "Deloaddag" and "Telt nergens
-// voor mee"; its ⋮ takes the label away (a mistake): the sets then count again.
-function buildDeloadLabel(date) {
-  const label = document.createElement('div');
-  label.className = 'day-mark-label';
-  label.innerHTML = `<div class="day-mark-icon">${DELOAD_ICON_SVG}</div>
-    <div class="day-mark-body"><div class="day-mark-title">Deloaddag</div><div class="day-mark-sub">Telt nergens voor mee</div></div>
-    <button type="button" class="toolbar-btn day-mark-menu" aria-label="Menu deloaddag">
-      <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
-    </button>`;
-  label.querySelector('.day-mark-menu').addEventListener('click', e => {
-    e.stopPropagation();
-    showOverflowMenu([{ label: 'Label weghalen', action: () => removeDeloadMark(date) }], e.currentTarget);
-  });
-  return label;
 }
 
 // The pills at the bottom of the day (.day-actions-row), for the day shown:
@@ -1461,13 +1451,13 @@ function renderHome() {
   if (exercises.length === 0) {
     if (mark === 'rest') {
       container.innerHTML = '';
-      container.appendChild(buildRestDayCard(currentDate));
+      container.appendChild(buildDayMarkCard(currentDate, 'rest'));
       container.prepend(banner);
       renderSmartBanner();
       return;
     }
     container.innerHTML = emptyAddStateHtml('btn-start-new', 'Nieuwe workout', 'Nog geen workout gelogd');
-    if (mark === 'deload') container.prepend(buildDeloadLabel(currentDate));
+    if (mark === 'deload') container.prepend(buildDayMarkCard(currentDate, 'deload'));
     container.prepend(banner);
     renderSmartBanner();
     document.getElementById('btn-start-new').addEventListener('click', openNewWorkoutScreen);
@@ -1475,9 +1465,9 @@ function renderHome() {
   }
 
   container.innerHTML = '';
-  // (A rest day with exercises only comes from another device; the card still says so.)
-  if (mark === 'rest') container.appendChild(buildRestDayCard(currentDate));
-  if (mark === 'deload') container.appendChild(buildDeloadLabel(currentDate));
+  // The day's mark on top: a deload day above its exercises (a rest day with exercises only comes
+  // from another device; the card still says so).
+  if (mark) container.appendChild(buildDayMarkCard(currentDate, mark));
   container.prepend(banner);
   renderSmartBanner();
 
@@ -4252,7 +4242,7 @@ function undoRestDay(date) {
 function removeDeloadMark(date) {
   setDayMark(date, null);
   renderHome();
-  toast('Deloadlabel weggehaald');
+  toast('Deloaddag ongedaan gemaakt');
 }
 
 function openExerciseList() {
@@ -6330,7 +6320,8 @@ function openWorkoutDetail(dateStr) {
 
   if (exercises.length === 0) {
     // A rest day says so (with its icon); otherwise the usual empty text.
-    body.innerHTML = isRestDay(dateStr) ? `<div class="records-empty">${dayMarkInlineHtml(dateStr)}</div>` : `<div class="records-empty">Er is voor deze dag geen workout opgeslagen.</div>`;
+    // (the same mark line as a deload day above its sets, .cal-detail-mark)
+    body.innerHTML = isRestDay(dateStr) ? `<div class="cal-detail-mark">${dayMarkInlineHtml(dateStr)}</div>` : `<div class="records-empty">Er is voor deze dag geen workout opgeslagen.</div>`;
     openOverlay('cal-detail-overlay');
     return;
   }

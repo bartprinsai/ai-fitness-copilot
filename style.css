@@ -948,21 +948,19 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 
 /* ── Rustdag and Deloaddag (day marks) ──
    Always recognisable by icon AND text, never by colour alone. Icons: Tabler zzz (rest) and feather
-   (deload), stroke icons (.icon-stroke). Tracker: the rest-day card (.card .day-mark-card, instead
-   of the empty state, with Ongedaan maken) and the deload label (.day-mark-label: dotted border, no
-   fill, ⋮ to take it away); both a card's width, --card-gap above like the exercise cards. */
+   (deload), stroke icons (.icon-stroke). Tracker: ONE card for both (.card .day-mark-card,
+   buildDayMarkCard()): the blue tile with the icon, title, line and the wide Ongedaan maken; a rest
+   day instead of the empty state, a deload day above its exercises; --card-gap above like the
+   exercise cards. */
 .icon-stroke { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.day-mark-card, .day-mark-label { display: flex; align-items: center; gap: var(--space-3); margin: var(--card-gap) var(--screen-gutter) 0; flex-shrink: 0; }
-.home-content:not(:has(> .exercise-card)) > .day-mark-card, .home-content:not(:has(> .exercise-card)) > .day-mark-label { margin-top: var(--screen-top); }
-.day-mark-label { padding: var(--space-2) var(--space-2) var(--space-2) var(--card-padding); border: 2px dotted var(--text-muted); border-radius: var(--radius-lg); }
-.day-mark-card { flex-wrap: wrap; }
+.day-mark-card { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin: var(--card-gap) var(--screen-gutter) 0; flex-shrink: 0; }
+.home-content:not(:has(> .exercise-card)) > .day-mark-card { margin-top: var(--screen-top); }
 .day-mark-card .btn { flex-basis: 100%; }
 .day-mark-icon { width: 36px; height: 36px; border-radius: var(--radius-sm); background: var(--primary-light); color: var(--primary); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .day-mark-icon svg { width: var(--icon-list); height: var(--icon-list); }
 .day-mark-body { flex: 1; min-width: 0; }
 .day-mark-title { font-size: var(--fs-heading); font-weight: var(--fw-medium); color: var(--text); }
 .day-mark-sub { font-size: var(--fs-small); color: var(--text-secondary); }
-.day-mark-menu svg { fill: var(--text-secondary); }
 /* The small inline mark (calendar popup, Geschiedenis, Samenvatting, Inzicht day overview): icon + text. */
 .day-mark-inline { display: inline-flex; align-items: center; gap: var(--space-1); font-size: var(--fs-small); color: var(--text-secondary); }
 .day-mark-inline svg { width: 14px; height: 14px; flex-shrink: 0; }

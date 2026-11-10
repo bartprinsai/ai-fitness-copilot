@@ -1,4 +1,4 @@
-// Rustdag en Deloaddag: de knoppen onderaan een lege dag van de Fitness Tracker, de kaart en het label, wat
+// Rustdag en Deloaddag: de knoppen onderaan een lege dag van de Fitness Tracker, de kaart voor beide (zelfde component), wat
 // ze met het schema doen, en dat een deloaddag nergens voor meetelt (records, PR, Grafiek, Records,
 // Kracht, Samenvatting, Inzicht) maar zichtbaar blijft (Geschiedenis, kalender). Overal herkenbaar
 // aan icoon en tekst. See PROJECT_CONTEXT.md ("Rustdag en deloaddag").
@@ -94,14 +94,13 @@ H.run(async () => {
   await page.click('#btn-day-comment'); await H.settle(page);
   check('Notitie op een rustdag opent het invulvenster', await page.evaluate(() => document.getElementById('comment-overlay').classList.contains('open')), true);
   await page.evaluate(() => closeOverlay('comment-overlay')); await H.settle(page);
-  await page.click('#btn-undo-rest'); await H.settle(page);
+  await page.click('#home-content .day-mark-card .day-mark-undo'); await H.settle(page);
   check('rustdag ongedaan: Rustdag en Deloaddag terug', await pills(), { shown: ['Rustdag', 'Deloaddag'], twoRows: false });
   await page.evaluate(() => { db.activePlan = null; }); // geen plandag: een deloaddag zonder oefeningen
   await page.click('#btn-day-deload'); await H.settle(page);
   check('deloaddag zonder oefeningen: alleen Notitie', await pills(), { shown: ['Notitie'], twoRows: false });
-  await page.click('#home-content .day-mark-menu'); await H.settle(page);
-  await page.click('#overflow-panel .dropdown-item'); await H.settle(page);
-  check('deloadlabel weg: Rustdag en Deloaddag terug', await pills(), { shown: ['Rustdag', 'Deloaddag'], twoRows: false });
+  await page.click('#home-content .day-mark-card .day-mark-undo'); await H.settle(page);
+  check('deloaddag ongedaan (geen oefeningen): Rustdag en Deloaddag terug', await pills(), { shown: ['Rustdag', 'Deloaddag'], twoRows: false });
   // Elke datum: eerder, een week terug, later
   for (const d of ['2026-10-21', '2026-10-15', '2026-10-23']) {
     await tracker(d);
@@ -152,7 +151,7 @@ H.run(async () => {
   check('Inzicht (vast): rustdag op een plandag = gemist', await stats([TODAY]), [1, 0, 3, 0, 0]);
   check('Inzicht (vast): status rest-missed', await page.evaluate(d => insightTrainingState(insightDay(d)), TODAY), 'rest-missed');
   await hideToast();
-  await page.click('#btn-undo-rest'); await H.settle(page);
+  await page.click('#home-content .day-mark-card .day-mark-undo'); await H.settle(page);
   check('Ongedaan maken: weg, lege staat terug, banner terug', await page.evaluate(() => [db.dayMarks[todayStr()] || null, !!document.querySelector('#home-content .home-empty'),
     !document.getElementById('smart-day-banner').classList.contains('hidden')]), [null, true, true]);
   check('melding', await toastText(), 'Rustdag ongedaan gemaakt');
@@ -179,6 +178,7 @@ H.run(async () => {
     return [c.classList.contains('cal-rest'), !!c.querySelector('.cal-mark svg'), c.getAttribute('aria-label'), c.classList.contains('has-workout'), document.getElementById('cal-workout-count').textContent];
   }, TODAY), [true, true, '22, rustdag', false, '0 workouts']);
   await page.evaluate(d => openWorkoutDetail(d), TODAY); await H.settle(page);
+  check('kalender-popup rustdag: in .cal-detail-mark (zoals een deloaddag)', await page.evaluate(() => document.querySelector('#cal-detail-body .day-mark-inline').parentElement.className), 'cal-detail-mark');
   check('kalender-popup: "Rustdag" met icoon', await page.evaluate(() => { const m = document.querySelector('#cal-detail-body .day-mark-inline'); return m && [m.textContent, !!m.querySelector('svg')]; }), ['Rustdag', true]);
   await page.evaluate(() => closeOverlay('cal-detail-overlay'));
 
@@ -195,20 +195,34 @@ H.run(async () => {
     lastDayIndex: db.activePlan.lastDayIndex, lastDate: db.activePlan.lastDate })),
     { mark: 'deload', workout: [['bench-press', { sets: 3, reps: 5 }]], planDays: ['Donderdag'], lastDayIndex: 2, lastDate: TODAY });
   check('melding', await toastText(), 'Deloaddag: Donderdag geladen');
-  const label = () => page.evaluate(() => {
-    const l = document.querySelector('#home-content .day-mark-label');
-    if (!l) return null;
-    const cs = getComputedStyle(l);
-    return { icon: !!l.querySelector('.day-mark-icon svg'), title: l.querySelector('.day-mark-title').textContent, sub: l.querySelector('.day-mark-sub').textContent,
-      border: cs.borderTopStyle, menu: l.querySelector('.day-mark-menu').getAttribute('aria-label'),
-      aboveCards: l.getBoundingClientRect().bottom <= document.querySelector('#home-content .exercise-card').getBoundingClientRect().top };
+  // De kaart van de dag: inhoud, en de opbouw en stijl van elk deel (om met de rustdagkaart te vergelijken).
+  const markCard = () => page.evaluate(() => {
+    const c = document.querySelector('#home-content .day-mark-card');
+    if (!c) return null;
+    const st = el => { const s = getComputedStyle(el), r = el.getBoundingClientRect();
+      return [s.backgroundColor, s.color, s.border, s.borderRadius, s.boxShadow, s.fontSize, s.fontWeight, s.textTransform, Math.round(r.width), Math.round(r.height), Math.round(r.left)].join(' | '); };
+    return {
+      content: { mark: c.dataset.mark, title: c.querySelector('.day-mark-title').textContent, sub: c.querySelector('.day-mark-sub').textContent, button: c.querySelector('button').textContent,
+        buttons: c.querySelectorAll('button').length, menu: !!c.querySelector('.day-mark-menu, .toolbar-btn') },
+      structure: [...c.children].map(ch => ch.className),
+      style: { card: st(c), tile: st(c.querySelector('.day-mark-icon')), icon: st(c.querySelector('.day-mark-icon svg')), title: st(c.querySelector('.day-mark-title')),
+        sub: st(c.querySelector('.day-mark-sub')), button: st(c.querySelector('button')) },
+      aboveCards: !document.querySelector('#home-content .exercise-card') || c.getBoundingClientRect().bottom <= document.querySelector('#home-content .exercise-card').getBoundingClientRect().top };
   });
-  check('label bovenaan: icoon, gestippelde rand, Deloaddag, Telt nergens voor mee, ⋮', await label(),
-    { icon: true, title: 'Deloaddag', sub: 'Telt nergens voor mee', border: 'dotted', menu: 'Menu deloaddag', aboveCards: true });
+  const deloadCard = await markCard();
+  check('deloadkaart bovenaan: blauw tegeltje met icoon, Deloaddag, Telt nergens voor mee, Ongedaan maken, geen ⋮',
+    [deloadCard.content, deloadCard.aboveCards, await page.evaluate(() => document.querySelector('#home-content .day-mark-card .day-mark-icon path').getAttribute('d').slice(0, 10))],
+    [{ mark: 'deload', title: 'Deloaddag', sub: 'Telt nergens voor mee', button: 'Ongedaan maken', buttons: 1, menu: false }, true, 'M4 20l10 -']);
+  // Precies dezelfde kaart als de rustdagkaart (op een andere dag, zonder oefeningen)
+  await page.evaluate(m => { db.dayMarks[m] = 'rest'; currentDate = m; renderHome(); }, '2026-10-16');
+  const restCardSnap = await markCard();
+  await page.evaluate(m => { delete db.dayMarks[m]; currentDate = todayStr(); renderHome(); }, '2026-10-16');
+  check('zelfde opbouw als de rustdagkaart', deloadCard.structure, restCardSnap.structure);
+  check('zelfde stijl als de rustdagkaart (kaart, tegeltje, icoon, titel, subtekst, knop)', deloadCard.style, restCardSnap.style);
   // Sets loggen op de deloaddag (zwaarder dan maandag)
   await page.evaluate(() => { const w = getWorkout(todayStr()); w[0].sets = [{ weight: 140, reps: 5 }, { weight: 140, reps: 5 }]; setWorkout(todayStr(), w); renderHome(); });
   await H.settle(page);
-  await shot('deload-label');
+  await shot('deload-card');
   check('geen PR-trofee op de deloaddag (wel op maandag)', await page.evaluate(() => [...getPRSetKeys('bench-press')]), [MON + '#0']);
   check('trofee niet getekend in de tracker', await page.evaluate(() => document.querySelectorAll('#home-content .exercise-card .set-pr-icon').length), 0);
   check('Grafiek: alleen maandag', await page.evaluate(() => getExerciseRepSeries('bench-press', 5).map(p => p.date)), [MON]);
@@ -239,17 +253,19 @@ H.run(async () => {
   }, TODAY), [true, true, '22, deloaddag', true, '1 workout']);
   await shot('calendar');
   await page.evaluate(d => openWorkoutDetail(d), TODAY); await H.settle(page);
+  check('kalender-popup deloaddag: in .cal-detail-mark (zoals een rustdag)', await page.evaluate(() => document.querySelector('#cal-detail-body .day-mark-inline').parentElement.className), 'cal-detail-mark');
   check('kalender-popup: markering en de sets', await page.evaluate(() => [(document.querySelector('#cal-detail-body .day-mark-inline') || {}).textContent, document.querySelectorAll('#cal-detail-body .set-row').length]),
     ['Deloaddag · telt nergens voor mee', 2]);
   await page.evaluate(() => closeOverlay('cal-detail-overlay'));
-  // Label weghalen via ⋮: de sets tellen weer
+  // Ongedaan maken op de kaart: alleen de markering weg; oefeningen en sets blijven en tellen weer
   await tracker(TODAY);
   await hideToast();
-  await page.click('#home-content .day-mark-menu'); await H.settle(page);
-  check('⋮: Label weghalen', await page.evaluate(() => [...document.querySelectorAll('#overflow-panel .dropdown-item')].map(i => i.textContent)), ['Label weghalen']);
-  await page.click('#overflow-panel .dropdown-item'); await H.settle(page);
-  check('label weg, sets tellen weer (PR)', await page.evaluate(() => [db.dayMarks[todayStr()] || null, !!document.querySelector('#home-content .day-mark-label'), getPRSetKeys('bench-press').has(todayStr() + '#0')]), [null, false, true]);
-  check('melding', await toastText(), 'Deloadlabel weggehaald');
+  await page.click('#home-content .day-mark-card .day-mark-undo'); await H.settle(page);
+  check('Ongedaan maken: kaart weg, oefening en sets blijven, sets tellen weer (PR)', await page.evaluate(() => [db.dayMarks[todayStr()] || null, !!document.querySelector('#home-content .day-mark-card'),
+    getWorkout(todayStr()).map(e => [e.exerciseId, e.sets.length]), document.querySelectorAll('#home-content .exercise-card').length, getPRSetKeys('bench-press').has(todayStr() + '#0')]),
+    [null, false, [['bench-press', 2]], 1, true]);
+  check('melding', await toastText(), 'Deloaddag ongedaan gemaakt');
+  check('met oefeningen: Samenvatting en Notitie, geen Rustdag of Deloaddag', await pills(), { shown: ['Samenvatting', 'Notitie'], twoRows: false });
 
   // Deloaddag zonder te trainen: plandag in Inzicht toch 100%
   await H.loadData(page, base(fixedPlan, { dayMarks: { [MON]: 'deload' } }));
@@ -277,7 +293,7 @@ H.run(async () => {
   await tracker(TUE);
   await hideToast();
   await page.click('#btn-day-deload'); await H.settle(page);
-  check('dinsdag (geen plandag): deloaddag, niets geladen, label met lege staat', await page.evaluate(t => [db.dayMarks[t], getWorkout(t).length, !!document.querySelector('#home-content .day-mark-label'), !!document.querySelector('#home-content .home-empty')], TUE),
+  check('dinsdag (geen plandag): deloaddag, niets geladen, kaart met lege staat', await page.evaluate(t => [db.dayMarks[t], getWorkout(t).length, !!document.querySelector('#home-content .day-mark-card[data-mark="deload"]'), !!document.querySelector('#home-content .home-empty')], TUE),
     ['deload', 0, true, true]);
   check('melding', await toastText(), 'Deloaddag ingesteld');
 
